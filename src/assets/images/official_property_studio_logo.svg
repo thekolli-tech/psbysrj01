@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800;900&amp;display=swap');
+      .brand-title {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+      }
+      .badge-text {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+      }
+      .tagline-text {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+      }
+    </style>
+  </defs>
+
+  <!-- Clean Pure White Background -->
+  <rect width="800" height="800" fill="#FFFFFF" />
+
+  <!-- ========================================== -->
+  <!-- 1. OFFICIAL CAMERA + SKYLINE LOGO EMBLEM   -->
+  <!-- ========================================== -->
+  <g transform="translate(400, 270)">
+    <!-- Camera Viewfinder Body Outline -->
+    <rect x="-115" y="-60" width="230" height="120" rx="16" fill="none" stroke="#0B2341" stroke-width="9" />
+
+    <!-- Viewfinder Top Shutter Button -->
+    <rect x="-75" y="-72" width="36" height="12" rx="4" fill="#0B2341" />
+
+    <!-- Camera Right Lens Funnel / Bracket -->
+    <path d="M 122 -22 L 170 -48 L 170 48 L 122 22 Z" fill="#0B2341" />
+
+    <!-- BUILDINGS & HOUSE INSIDE CAMERA -->
+    <!-- Tower 1 (Behind House on Left) -->
+    <rect x="-42" y="-30" width="16" height="82" fill="#0B2341" />
+    <line x1="-34" y1="-24" x2="-34" y2="48" stroke="#FFFFFF" stroke-width="1.5" opacity="0.6" />
+
+    <!-- Tower 2: Tallest Center Tower with Slanted Roof (MUSTARD GOLD) -->
+    <path d="M -18 -75 L 8 -94 L 8 52 L -18 52 Z" fill="#B48529" />
+    <line x1="-5" y1="-80" x2="-5" y2="48" stroke="#FFFFFF" stroke-width="2" opacity="0.7" />
+
+    <!-- Tower 3: Right Center Tower with Slanted Roof (NAVY) -->
+    <path d="M 14 -50 L 36 -36 L 36 52 L 14 52 Z" fill="#0B2341" />
+    <line x1="25" y1="-40" x2="25" y2="48" stroke="#FFFFFF" stroke-width="1.5" opacity="0.6" />
+
+    <!-- Tower 4: Far Right Tower (NAVY) -->
+    <rect x="42" y="-22" width="16" height="74" fill="#0B2341" />
+    <line x1="50" y1="-16" x2="50" y2="48" stroke="#FFFFFF" stroke-width="1.5" opacity="0.6" />
+
+    <!-- Pitch Roof House in Foreground (NAVY) -->
+    <path d="M -102 12 L -56 -30 L -10 12 L -10 52 L -102 52 Z" fill="#0B2341" />
+    <!-- White roof highlight -->
+    <path d="M -98 10 L -56 -26 L -14 10" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" />
+
+    <!-- 4-Pane Square Window (MUSTARD GOLD) -->
+    <rect x="-66" y="2" width="20" height="20" fill="#B48529" />
+    <!-- Cross divider panes in window -->
+    <line x1="-56" y1="2" x2="-56" y2="22" stroke="#0B2341" stroke-width="2.5" />
+    <line x1="-66" y1="12" x2="-46" y2="12" stroke="#0B2341" stroke-width="2.5" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- 2. BRAND TITLE: PROPERTY STUDIO             -->
+  <!-- ========================================== -->
+  <g transform="translate(400, 420)">
+    <text text-anchor="middle" class="brand-title" font-size="52">
+      <tspan fill="#000000">PROPERTY </tspan>
+      <tspan fill="#B48529">STUDIO</tspan>
+    </text>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- 3. GOLD RULE LINE & "BY SWAMY REDDY JAVIDI" -->
+  <!-- ========================================== -->
+  <!-- Full-width Horizontal Gold Rule Line -->
+  <line x1="0" y1="478" x2="800" y2="478" stroke="#B48529" stroke-width="4" />
+
+  <!-- Centered Rounded Pill Badge -->
+  <g transform="translate(400, 478)">
+    <rect x="-170" y="-19" width="340" height="38" rx="19" fill="#B48529" />
+    <text x="0" y="6" text-anchor="middle" fill="#FFFFFF" class="badge-text" font-size="16">
+      BY SWAMY REDDY JAVIDI
+    </text>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- 4. SUBTITLE TAGLINE (TWO LINES)            -->
+  <!-- ========================================== -->
+  <g transform="translate(400, 552)" fill="#0B2341">
+    <text text-anchor="middle" class="tagline-text" font-size="16">
+      <tspan>REAL ESTATE</tspan>
+      <tspan fill="#A0AEC0" font-weight="300" dx="14" dy="0">|</tspan>
+      <tspan dx="14">VISUAL STORIES</tspan>
+    </text>
+    <text x="0" y="28" text-anchor="middle" class="tagline-text" font-size="16">
+      MARKET TRENDS &amp; INSIGHTS
+    </text>
+  </g>
+</svg>

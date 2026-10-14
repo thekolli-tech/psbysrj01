@@ -1,0 +1,614 @@
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
+import {
+  LogIn,
+  LogOut,
+  X,
+  ShieldCheck,
+  User,
+  KeyRound,
+  ArrowRight,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  UserPlus,
+  Lock,
+  Mail,
+  CheckCircle2,
+  RotateCcw,
+  Smartphone
+} from 'lucide-react';
+
+interface LoginModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
+  const {
+    currentUser,
+    isLoggedIn,
+    login,
+    logout,
+    setActiveView,
+    showToast
+  } = useApp();
+
+  const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [roleInput, setRoleInput] = useState<'PROPERTY_SEEKER' | 'AGENT' | 'LAND_OWNER' | 'CONTENT_CREATOR'>('PROPERTY_SEEKER');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [organizationInput, setOrganizationInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Email OTP verification state
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [countdown, setCountdown] = useState(0);
+
+  // Mobile Phone OTP verification state (Mandatory for Property Seeker)
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneOtpInput, setPhoneOtpInput] = useState('');
+  const [phoneCountdown, setPhoneCountdown] = useState(0);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (countdown > 0) {
+      timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (phoneCountdown > 0) {
+      timer = setTimeout(() => setPhoneCountdown(c => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [phoneCountdown]);
+
+  if (!isOpen) return null;
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: emailInput.trim(),
+          password: passwordInput
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Authentication failed');
+      }
+
+      // Success! Update AppContext state
+      login(data.user);
+      showToast(`Welcome back, ${data.user.name}!`);
+
+      if (data.user.role === 'SUPER_ADMIN') {
+        setActiveView('ADMIN');
+      } else if (data.user.role === 'PROPERTY_ADMIN') {
+        setActiveView('PROPERTY_ADMIN');
+      }
+
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Invalid credentials. Please verify your email and password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendPhoneOtp = async () => {
+    if (!phoneInput.trim() || phoneInput.trim().length < 8) {
+      setErrorMsg('Please enter a valid mobile number first.');
+      return;
+    }
+    setErrorMsg(null);
+    try {
+      const res = await fetch('/api/auth/send-phone-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneInput.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to dispatch SMS verification code');
+      setPhoneOtpSent(true);
+      setPhoneCountdown(60);
+      showToast(`SMS OTP dispatched to ${phoneInput.trim()}`);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to dispatch mobile OTP');
+    }
+  };
+
+  const handleSendEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    if (!nameInput.trim() || !emailInput.trim() || !passwordInput) {
+      setErrorMsg('Please enter your full name, valid email, and password first.');
+      return;
+    }
+
+    if (passwordInput.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    // Role-specific validation:
+    // Property Seeker requires phone number; other three do not.
+    if (roleInput === 'PROPERTY_SEEKER') {
+      if (!phoneInput.trim() || phoneInput.trim().length < 8) {
+        setErrorMsg('Mobile phone number is required for Property Seeker registration.');
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/send-email-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send verification code');
+      }
+
+      setOtpSent(true);
+      setCountdown(60);
+      showToast(`Property Studio verification code sent to ${emailInput.trim()}`);
+
+      // If Property Seeker, also automatically dispatch SMS OTP to the required mobile number
+      if (roleInput === 'PROPERTY_SEEKER' && phoneInput.trim()) {
+        fetch('/api/auth/send-phone-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phoneInput.trim() })
+        }).then(r => r.json()).then(d => {
+          if (d.success) {
+            setPhoneOtpSent(true);
+            setPhoneCountdown(60);
+          }
+        }).catch(() => {});
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to send verification code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtpAndRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    if (!otpInput.trim() || otpInput.trim().length < 4) {
+      setErrorMsg('Please enter the 6-digit email verification code received.');
+      return;
+    }
+
+    // Property Seeker requires Phone OTP verification
+    if (roleInput === 'PROPERTY_SEEKER') {
+      if (!phoneOtpInput.trim() || phoneOtpInput.trim().length < 4) {
+        setErrorMsg('Please enter the 6-digit mobile SMS OTP received on your phone.');
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: nameInput.trim(),
+          email: emailInput.trim(),
+          password: passwordInput,
+          role: roleInput,
+          phone: phoneInput.trim(),
+          organization: organizationInput.trim(),
+          otp: otpInput.trim(),
+          phoneOtp: roleInput === 'PROPERTY_SEEKER' ? phoneOtpInput.trim() : undefined
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+
+      login(data.user);
+      showToast(`Account successfully registered and verified! Welcome, ${data.user.name}`);
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Verification failed. Please check the OTP code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white font-display">
+                {isLoggedIn ? 'Account Session' : mode === 'LOGIN' ? 'Portal Sign In' : 'Create Account'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {isLoggedIn ? `Active as ${currentUser.name}` : 'Live server database authentication'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-4 text-xs">
+          {isLoggedIn ? (
+            /* Logged in state */
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-3">
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.name}
+                  className="w-12 h-12 rounded-xl object-cover border border-slate-300"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
+                  }}
+                />
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">{currentUser.name}</h4>
+                  <span className="text-[10px] font-mono text-amber-900 bg-amber-100 px-2 py-0.5 rounded font-semibold inline-block mt-0.5">
+                    {currentUser.role.replace('_', ' ')}
+                  </span>
+                  <span className="text-slate-500 block text-[11px] mt-0.5">{currentUser.email}</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs">
+                Wallet Balance: <strong className="font-mono text-slate-900">₹{currentUser.walletBalance.toLocaleString('en-IN')}</strong>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                {currentUser.role === 'SUPER_ADMIN' && (
+                  <button
+                    onClick={() => {
+                      setActiveView('ADMIN');
+                      onClose();
+                    }}
+                    className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all"
+                  >
+                    Admin Console
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    logout();
+                    onClose();
+                  }}
+                  className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Log Out</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Auth Form */
+            <div className="space-y-4">
+              {errorMsg && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {/* Mode Switcher */}
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => { setMode('LOGIN'); setErrorMsg(null); }}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    mode === 'LOGIN' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMode('REGISTER'); setErrorMsg(null); }}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    mode === 'REGISTER' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  Register Account
+                </button>
+              </div>
+
+              {mode === 'LOGIN' ? (
+                <form onSubmit={handleLogin} className="space-y-3.5">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Account Email</label>
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)}
+                      placeholder="e.g. admin@propertystudio.org"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Password</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={passwordInput}
+                        onChange={e => setPasswordInput(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  >
+                    <LogIn className="w-4 h-4 text-amber-400" />
+                    <span>{loading ? 'Authenticating...' : 'Sign In to Account'}</span>
+                  </button>
+                </form>
+              ) : !otpSent ? (
+                <form onSubmit={handleSendEmailOtp} className="space-y-3.5">
+                  <div className="bg-amber-50/80 p-2.5 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Email OTP verification is mandatory for verified account registration.</span>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={nameInput}
+                      onChange={e => setNameInput(e.target.value)}
+                      placeholder="e.g. Suresh Chandra"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)}
+                      placeholder="e.g. suresh@example.com"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Role / Account Type</label>
+                    <select
+                      value={roleInput}
+                      onChange={e => setRoleInput(e.target.value as any)}
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                    >
+                      <option value="PROPERTY_SEEKER">Property Seeker (HNI / Investor / Buyer)</option>
+                      <option value="LAND_OWNER">Land Owner (Direct Sale / Joint Development)</option>
+                      <option value="AGENT">Channel Partner / Reseller / RERA Agent</option>
+                      <option value="CONTENT_CREATOR">Real Estate Media / Content Creator</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        Contact Mobile {roleInput === 'PROPERTY_SEEKER' ? (
+                          <span className="text-red-500 font-bold text-[10px]">* Required</span>
+                        ) : (
+                          <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
+                        )}
+                      </label>
+                      <input
+                        type="tel"
+                        value={phoneInput}
+                        onChange={e => setPhoneInput(e.target.value)}
+                        placeholder="e.g. +91 98490 12345"
+                        required={roleInput === 'PROPERTY_SEEKER'}
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        {roleInput === 'LAND_OWNER' ? 'Land Parcel' : roleInput === 'AGENT' ? 'Agency / RERA' : 'Organization'} <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={organizationInput}
+                        onChange={e => setOrganizationInput(e.target.value)}
+                        placeholder={roleInput === 'LAND_OWNER' ? 'e.g. Shamshabad 12 Acres' : roleInput === 'AGENT' ? 'e.g. A02400000124' : 'Firm or Organization'}
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Choose Password</label>
+                    <input
+                      type="password"
+                      value={passwordInput}
+                      onChange={e => setPasswordInput(e.target.value)}
+                      placeholder="Minimum 6 characters"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  >
+                    <Mail className="w-4 h-4 text-amber-400" />
+                    <span>{loading ? 'Sending Code...' : 'Send Email Verification Code'}</span>
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4">
+                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                        <Mail className="w-4 h-4 text-blue-600" />
+                        Property Studio OTP Sent
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setOtpSent(false); setErrorMsg(null); }}
+                        className="text-[11px] text-blue-700 hover:underline font-bold"
+                      >
+                        Change Email
+                      </button>
+                    </div>
+                    <p className="text-blue-800 text-[11px] leading-relaxed">
+                      A real-time 6-digit verification code has been dispatched from <strong>Property Studio</strong> to <strong className="font-mono text-blue-950">{emailInput}</strong>. Please check your inbox for the email from Property Studio and enter the code below to complete registration.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Enter 6-Digit Email Verification Code
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={otpInput}
+                      onChange={e => setOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="• • • • • •"
+                      className="w-full text-center text-lg tracking-[0.3em] font-mono font-bold px-3.5 py-3 border-2 border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      required
+                      autoFocus
+                    />
+                  </div>
+
+                  {roleInput === 'PROPERTY_SEEKER' && (
+                    <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-2xl text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-amber-950 flex items-center gap-1.5">
+                          <Smartphone className="w-4 h-4 text-amber-600" />
+                          Property Seeker Mobile SMS Verification
+                        </span>
+                        {phoneCountdown > 0 ? (
+                          <span className="text-[10px] text-amber-700 font-mono">Resend SMS in {phoneCountdown}s</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleSendPhoneOtp}
+                            className="text-[11px] text-amber-800 hover:underline font-bold"
+                          >
+                            {phoneOtpSent ? 'Resend SMS OTP' : 'Send SMS OTP'}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-amber-900 text-[11px] leading-relaxed">
+                        SMS code dispatched to <strong className="font-mono text-amber-950">{phoneInput}</strong>.
+                      </p>
+                      <div>
+                        <label className="block font-bold text-amber-950 mb-1">
+                          Enter 6-Digit Mobile SMS OTP <span className="text-red-500">* Required</span>
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={phoneOtpInput}
+                          onChange={e => setPhoneOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
+                          placeholder="• • • • • •"
+                          className="w-full text-center text-md tracking-[0.25em] font-mono font-bold px-3 py-2.5 bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Didn't receive the email from Property Studio?</span>
+                    {countdown > 0 ? (
+                      <span className="font-mono text-slate-400">Resend in {countdown}s</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSendEmailOtp}
+                        className="text-amber-700 hover:underline font-bold flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Resend Email OTP</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || otpInput.length < 4 || (roleInput === 'PROPERTY_SEEKER' && phoneOtpInput.length < 4)}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>{loading ? 'Verifying...' : roleInput === 'PROPERTY_SEEKER' ? 'Verify Email & Mobile to Register' : 'Verify Email & Create Account'}</span>
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span>Official Secretariat: info@propertystudio.org</span>
+          <button
+            onClick={onClose}
+            className="font-bold text-slate-800 hover:text-slate-950"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

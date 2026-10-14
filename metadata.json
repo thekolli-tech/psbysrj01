@@ -1,0 +1,8 @@
+{
+  "name": "Remix Property Studio by Swamy Reddy Javidi",
+  "description": "Integrated real estate ecosystem, visual media network, and role-based data intelligence platform for developers, agents, and property seekers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
