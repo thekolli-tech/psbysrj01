@@ -23,3 +23,9 @@ services:
         sync: false
       - key: DEVELOPER_RECOVERY_KEY
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: "Property Studio <otp@propertystudio.org>"
+      - key: OTP_HASH_SECRET
+        sync: false

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { queryPostgres } from './postgres.ts';
+import { OTP_MAX_ATTEMPTS, OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, otpMatches, sealOtp } from './otpCrypto.ts';
 import type {
   UserRole,
   DbUser,
@@ -163,7 +164,7 @@ export async function pgCreateUser(data: {
     data.organization?.trim() || '',
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
-    data.phone ? 1 : 0,
+    0,
     hash,
     salt,
     now,
@@ -617,6 +618,10 @@ export async function pgRevokeAllUserSessions(userId: string): Promise<boolean> 
 // OTP VERIFICATION (POSTGRESQL)
 // ==============================================================================
 
+export async function pgDiscardUnconsumedOtp(target: string, type: string): Promise<void> {
+  await queryPostgres('DELETE FROM otps WHERE target = $1 AND type = $2 AND consumed_at IS NULL', [target.trim().toLowerCase(), type]);
+}
+
 export async function pgGenerateOtp(
   target: string,
   type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'
@@ -632,26 +637,22 @@ export async function pgGenerateOtp(
 
   if (recentRes.rows.length > 0) {
     const elapsed = Date.now() - new Date(recentRes.rows[0].created_at).getTime();
-    if (elapsed < 30 * 1000) {
-      const waitSeconds = Math.ceil((30 * 1000 - elapsed) / 1000);
-      throw new Error(`Please wait ${waitSeconds} seconds before requesting a new verification code.`);
+    if (elapsed < OTP_RESEND_COOLDOWN_MS) {
+      const waitSeconds = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000);
+      throw new OtpCooldownError(waitSeconds);
     }
   }
 
-  const randomBytes = crypto.randomBytes(3);
-  const otpNumber = (randomBytes.readUIntBE(0, 3) % 900000) + 100000;
-  const otp = otpNumber.toString();
-  const expiresAt = Date.now() + 10 * 60 * 1000;
+  const otp = generateOtpCode();
+  const expiresAt = Date.now() + OTP_TTL_MS;
   const id = `otp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   const now = new Date().toISOString();
-  const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
 
   await queryPostgres('DELETE FROM otps WHERE target = $1 AND type = $2 AND consumed_at IS NULL', [normalizedTarget, type]);
-
   await queryPostgres(`
     INSERT INTO otps (id, target, type, otp_hash, otp_raw, expires_at, attempt_count, is_verified, consumed_at, created_at)
     VALUES ($1, $2, $3, $4, NULL, $5, 0, 0, NULL, $6)
-  `, [id, normalizedTarget, type, otpHash, expiresAt, now]);
+  `, [id, normalizedTarget, type, sealOtp(otp), expiresAt, now]);
 
   return { otp, expiresAt };
 }
@@ -662,9 +663,6 @@ export async function pgVerifyOtp(
   code: string
 ): Promise<boolean> {
   const normalizedTarget = target.trim().toLowerCase();
-  const normalizedCode = code.trim();
-  const codeHash = crypto.createHash('sha256').update(normalizedCode).digest('hex');
-
   const res = await queryPostgres(`
     SELECT * FROM otps 
     WHERE target = $1 AND type = $2 AND consumed_at IS NULL
@@ -675,25 +673,19 @@ export async function pgVerifyOtp(
   if (res.rows.length === 0) return false;
   const record = res.rows[0];
 
-  if (record.attempt_count >= 5) {
-    await queryPostgres('DELETE FROM otps WHERE id = $1', [record.id]);
+  if (Number(record.attempt_count) >= OTP_MAX_ATTEMPTS || Date.now() > Number(record.expires_at)) {
+    await queryPostgres('UPDATE otps SET consumed_at = $1 WHERE id = $2', [new Date().toISOString(), record.id]);
     return false;
   }
 
-  if (Date.now() > Number(record.expires_at)) {
-    await queryPostgres('DELETE FROM otps WHERE id = $1', [record.id]);
+  if (!otpMatches(record.otp_hash, code)) {
+    const attempts = Number(record.attempt_count) + 1;
+    const consumedAt = attempts >= OTP_MAX_ATTEMPTS ? new Date().toISOString() : null;
+    await queryPostgres('UPDATE otps SET attempt_count = $1, consumed_at = COALESCE($2, consumed_at) WHERE id = $3', [attempts, consumedAt, record.id]);
     return false;
   }
 
-  const hashMatches = record.otp_hash ? record.otp_hash === codeHash : record.otp_raw === normalizedCode;
-
-  if (!hashMatches) {
-    await queryPostgres('UPDATE otps SET attempt_count = attempt_count + 1 WHERE id = $1', [record.id]);
-    return false;
-  }
-
-  const now = new Date().toISOString();
-  await queryPostgres('UPDATE otps SET is_verified = 1, consumed_at = $1 WHERE id = $2', [now, record.id]);
+  await queryPostgres('UPDATE otps SET is_verified = 1, consumed_at = $1 WHERE id = $2', [new Date().toISOString(), record.id]);
   return true;
 }
 

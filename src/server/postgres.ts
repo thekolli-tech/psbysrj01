@@ -11,6 +11,13 @@ const { Pool } = pg;
 
 let poolInstance: pg.Pool | null = null;
 
+/** Removes connection strings so health and logs cannot reveal database credentials. */
+export function redactDatabaseError(message: string): string {
+  return String(message || 'PostgreSQL error')
+    .replace(/postgres(?:ql)?:\/\/[^\s'")]+/gi, 'postgresql://[redacted]')
+    .slice(0, 300);
+}
+
 export function getPostgresPool(): pg.Pool | null {
   if (!process.env.DATABASE_URL) {
     return null;
@@ -23,11 +30,11 @@ export function getPostgresPool(): pg.Pool | null {
       max: Number(process.env.PG_POOL_MAX) || 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000, // 10s for Neon cold-start wake-up
-      ssl: isSslDisabled ? false : { rejectUnauthorized: false }
+      ssl: isSslDisabled ? false : { rejectUnauthorized: process.env.PGSSL_REJECT_UNAUTHORIZED !== 'false' }
     });
 
     poolInstance.on('error', (err: any) => {
-      console.error('[PostgreSQL] Unexpected error on idle client:', err);
+      console.error('[PostgreSQL] Unexpected error on idle client:', redactDatabaseError(err?.message || 'idle client error'));
     });
   }
 
@@ -50,7 +57,7 @@ export async function checkPostgresHealth(): Promise<{ connected: boolean; laten
       client.release();
     }
   } catch (err: any) {
-    return { connected: false, error: err.message || 'Failed to connect to PostgreSQL' };
+    return { connected: false, error: redactDatabaseError(err.message || 'Failed to connect to PostgreSQL') };
   }
 }
 
@@ -421,7 +428,7 @@ export async function checkSchemaReadiness(): Promise<{
     const missing = REQUIRED_TABLES.filter(table => !present.has(table));
     return { ready: missing.length === 0, missing: [...missing], connected: true };
   } catch (err: any) {
-    return { ready: false, missing: [...REQUIRED_TABLES], connected: false, error: err.message || 'Schema check failed' };
+    return { ready: false, missing: [...REQUIRED_TABLES], connected: false, error: redactDatabaseError(err?.message || 'Schema check failed') };
   }
 }
 
@@ -433,6 +440,10 @@ export async function queryPostgres<T extends pg.QueryResultRow = any>(
   if (!pool) {
     throw new Error('PostgreSQL connection unavailable: DATABASE_URL is not configured.');
   }
-  return pool.query<T>(text, params);
+  try {
+    return await pool.query<T>(text, params);
+  } catch (err: any) {
+    throw new Error(redactDatabaseError(err?.message || 'PostgreSQL query failed'));
+  }
 }
 

@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { applySqliteAdditiveSchema } from './platformSchema.ts';
+import { OTP_MAX_ATTEMPTS, OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, otpMatches, sealOtp } from './otpCrypto.ts';
 import {
   pgFindUserByEmail,
   pgFindUserById,
@@ -591,6 +592,22 @@ export async function revokeSession(rawToken: string): Promise<boolean> {
 export async function revokeAllUserSessions(userId: string): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgRevokeAllUserSessions(userId);
   return sqliteRevokeAllUserSessions(userId);
+}
+
+export async function discardUnconsumedOtp(
+  target: string,
+  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'
+): Promise<void> {
+  if (isPostgresAuthoritative()) {
+    const { pgDiscardUnconsumedOtp } = await import('./postgresRepo.ts');
+    await pgDiscardUnconsumedOtp(target, type);
+    return;
+  }
+  sqliteDiscardUnconsumedOtp(target, type);
+}
+
+function sqliteDiscardUnconsumedOtp(target: string, type: string): void {
+  db.prepare('DELETE FROM otps WHERE target = ? AND type = ? AND consumed_at IS NULL').run(target.trim().toLowerCase(), type);
 }
 
 export async function generateOtp(
@@ -1256,7 +1273,7 @@ function sqliteCreateUser(data: {
     data.organization?.trim() || '',
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
-    data.phone ? 1 : 0,
+    0,
     hash,
     salt,
     now,
@@ -1683,66 +1700,50 @@ function sqliteGenerateOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_V
 
   if (recentOtp) {
     const elapsed = Date.now() - new Date(recentOtp.created_at).getTime();
-    if (elapsed < 30 * 1000) {
-      const waitSeconds = Math.ceil((30 * 1000 - elapsed) / 1000);
-      throw new Error(`Please wait ${waitSeconds} seconds before requesting a new verification code.`);
+    if (elapsed < OTP_RESEND_COOLDOWN_MS) {
+      const waitSeconds = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000);
+      throw new OtpCooldownError(waitSeconds);
     }
   }
 
-  const randomBytes = crypto.randomBytes(3);
-  const otpNumber = (randomBytes.readUIntBE(0, 3) % 900000) + 100000;
-  const otp = otpNumber.toString();
-  const expiresAt = Date.now() + 10 * 60 * 1000;
+  const otp = generateOtpCode();
+  const expiresAt = Date.now() + OTP_TTL_MS;
   const id = `otp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   const now = new Date().toISOString();
-  const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
 
-  const deleteOld = db.prepare('DELETE FROM otps WHERE target = ? AND type = ? AND consumed_at IS NULL');
-  deleteOld.run(normalizedTarget, type);
-
-  const insert = db.prepare(`
+  db.prepare('DELETE FROM otps WHERE target = ? AND type = ? AND consumed_at IS NULL').run(normalizedTarget, type);
+  db.prepare(`
     INSERT INTO otps (id, target, type, otp_hash, otp_raw, expires_at, attempt_count, is_verified, consumed_at, created_at)
     VALUES (?, ?, ?, ?, NULL, ?, 0, 0, NULL, ?)
-  `);
-  insert.run(id, normalizedTarget, type, otpHash, expiresAt, now);
+  `).run(id, normalizedTarget, type, sealOtp(otp), expiresAt, now);
 
   return { otp, expiresAt };
 }
 
 function sqliteVerifyOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET', code: string): boolean {
   const normalizedTarget = target.trim().toLowerCase();
-  const normalizedCode = code.trim();
-  const codeHash = crypto.createHash('sha256').update(normalizedCode).digest('hex');
-
-  const stmt = db.prepare(`
+  const record = db.prepare(`
     SELECT * FROM otps 
     WHERE target = ? AND type = ? AND consumed_at IS NULL
     ORDER BY created_at DESC 
     LIMIT 1
-  `);
-  const record = stmt.get(normalizedTarget, type) as DbOtp | undefined;
+  `).get(normalizedTarget, type) as DbOtp | undefined;
 
   if (!record) return false;
 
-  if (record.attempt_count >= 5) {
-    db.prepare('DELETE FROM otps WHERE id = ?').run(record.id);
+  if (record.attempt_count >= OTP_MAX_ATTEMPTS || Date.now() > record.expires_at) {
+    db.prepare('UPDATE otps SET consumed_at = ? WHERE id = ?').run(new Date().toISOString(), record.id);
     return false;
   }
 
-  if (Date.now() > record.expires_at) {
-    db.prepare('DELETE FROM otps WHERE id = ?').run(record.id);
+  if (!otpMatches(record.otp_hash, code)) {
+    const attempts = record.attempt_count + 1;
+    db.prepare('UPDATE otps SET attempt_count = ?, consumed_at = CASE WHEN ? >= ? THEN ? ELSE consumed_at END WHERE id = ?')
+      .run(attempts, attempts, OTP_MAX_ATTEMPTS, new Date().toISOString(), record.id);
     return false;
   }
 
-  const hashMatches = record.otp_hash ? record.otp_hash === codeHash : (record as any).otp === normalizedCode;
-
-  if (!hashMatches) {
-    db.prepare('UPDATE otps SET attempt_count = attempt_count + 1 WHERE id = ?').run(record.id);
-    return false;
-  }
-
-  const now = new Date().toISOString();
-  db.prepare('UPDATE otps SET is_verified = 1, consumed_at = ? WHERE id = ?').run(now, record.id);
+  db.prepare('UPDATE otps SET is_verified = 1, consumed_at = ? WHERE id = ?').run(new Date().toISOString(), record.id);
   return true;
 }
 

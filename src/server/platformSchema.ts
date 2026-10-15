@@ -21,6 +21,7 @@ export const REQUIRED_TABLES = [
 ] as const;
 
 export const POSTGRES_ADDITIVE_SQL = `
+ALTER TABLE otps ALTER COLUMN otp_hash TYPE VARCHAR(128);
 ALTER TABLE community_posts ALTER COLUMN status SET DEFAULT 'PENDING_APPROVAL';
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS moderation_note TEXT;

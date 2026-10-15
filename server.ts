@@ -64,7 +64,9 @@ import {
   updateLastLogin
 } from './src/server/db.ts';
 import { checkPostgresHealth, checkSchemaReadiness } from './src/server/postgres.ts';
-import { sendRealEmailOtp, sendRealSmsOtp, getNotificationGatewayStatus } from './src/server/notifications.ts';
+import { sendRealSmsOtp, getNotificationGatewayStatus } from './src/server/notifications.ts';
+import { issueEmailOtp } from './src/server/emailOtp.ts';
+import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
@@ -324,30 +326,32 @@ app.post('/api/auth/send-email-otp', async (req: Request, res: Response): Promis
       res.status(400).json({ error: 'An account with this email address already exists' });
       return;
     }
-    const { otp, expiresAt } = await generateOtp(email, 'EMAIL_VERIFICATION');
-
-    const dispatchResult = await sendRealEmailOtp(email.trim(), otp);
-
-    if (!dispatchResult.success) {
+    const issued = await issueEmailOtp(email, 'EMAIL_VERIFICATION');
+    if (!issued.sent) {
       res.status(502).json({
-        error: dispatchResult.error || 'Failed to dispatch verification email from Property Studio. Please check email provider configuration.'
+        error: 'Verification email was not delivered. No account was created and the unused code was discarded.'
       });
       return;
     }
 
     res.json({
       success: true,
-      message: `Property Studio verification code dispatched to ${email}. Please check your inbox.`,
-      expiresAt,
-      deliveredVia: dispatchResult.provider
+      message: 'Property Studio verification code dispatched. Check the inbox for that address.',
+      expiresAt: issued.expiresAt,
+      deliveredVia: issued.provider
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
+      res.status(429).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: 'Unable to send a verification code.' });
   }
 });
 
 // Verify Email OTP
 app.post('/api/auth/verify-email-otp', async (req: Request, res: Response): Promise<void> => {
+  if (rejectIfRateLimited(req, res, 'verify-email-otp', String(req.body?.email || ''))) return;
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -360,13 +364,14 @@ app.post('/api/auth/verify-email-otp', async (req: Request, res: Response): Prom
       return;
     }
     res.json({ success: true, verified: true, message: 'Email address verified successfully' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Unable to verify the code.' });
   }
 });
 
 // Self-Service Forgot Password
 app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promise<void> => {
+  if (rejectIfRateLimited(req, res, 'forgot-password', String(req.body?.email || ''))) return;
   try {
     const { email } = req.body;
     if (!email || !email.includes('@')) {
@@ -383,12 +388,10 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promi
       return;
     }
 
-    const { otp, expiresAt } = await generateOtp(email, 'PASSWORD_RESET');
-    const dispatchResult = await sendRealEmailOtp(email.trim(), otp);
-
-    if (!dispatchResult.success) {
+    const issued = await issueEmailOtp(email, 'PASSWORD_RESET');
+    if (!issued.sent) {
       res.status(502).json({
-        error: dispatchResult.error || 'Failed to dispatch password reset email. Please try again later.'
+        error: 'Password reset email was not delivered. The unused code was discarded.'
       });
       return;
     }
@@ -396,16 +399,21 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promi
     res.json({
       success: true,
       message: 'If an active account exists with this email address, a password reset code has been dispatched.',
-      expiresAt,
-      deliveredVia: dispatchResult.provider
+      expiresAt: issued.expiresAt,
+      deliveredVia: issued.provider
     });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || 'Unable to process password reset request' });
+    if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
+      res.status(429).json({ error: err.message });
+      return;
+    }
+    res.status(500).json({ error: 'Unable to process password reset request' });
   }
 });
 
 // Self-Service Reset Password
 app.post('/api/auth/reset-password', async (req: Request, res: Response): Promise<void> => {
+  if (rejectIfRateLimited(req, res, 'reset-password', String(req.body?.email || ''))) return;
   try {
     const { email, otp, newPassword } = req.body;
     if (!email || !otp || !newPassword) {
