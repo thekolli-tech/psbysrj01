@@ -223,7 +223,7 @@ async function listListingRows(ownerId?: string): Promise<any[]> {
 
 export async function moderateListing(input: {
   listingId: string;
-  status: 'APPROVED' | 'REJECTED' | 'SUSPENDED' | 'PENDING';
+  status: 'APPROVED' | 'REJECTED' | 'SUSPENDED' | 'PENDING' | 'PAUSED' | 'ARCHIVED';
   actorId: string;
   reason?: string;
 }): Promise<any | null> {
@@ -730,6 +730,222 @@ export async function readSystemConfig(): Promise<Record<string, string>> {
     rows = getSqliteDb().prepare('SELECT key, value FROM system_metadata').all() as any[];
   }
   return Object.fromEntries(rows.map(row => [row.key, row.value]));
+}
+
+export async function updateOwnedListing(ownerId: string, listingId: string, patch: Record<string, unknown>): Promise<any | null> {
+  const listing = await getListing(listingId);
+  if (!listing) return null;
+  if (listing.ownerId !== ownerId) {
+    throw new CommerceError(403, 'FORBIDDEN', 'You can manage only listings you own.');
+  }
+  const payload = { ...listing, ...patch };
+  for (const key of ['id', 'ownerId', 'publicationStatus', 'rejectionReason', 'createdAt', 'updatedAt', 'assignedAdmins']) {
+    delete payload[key];
+  }
+  const title = String(payload.title || '').trim();
+  if (!title) throw new CommerceError(400, 'INVALID', 'A listing title is required.');
+  const now = nowIso();
+  const stored = JSON.stringify(payload);
+  if (isPostgresAuthoritative()) {
+    await queryPostgres(
+      `UPDATE property_listings SET title = $2, payload = $3, publication_status = 'PENDING', rejection_reason = NULL, updated_at = $4 WHERE id = $1 AND owner_id = $5`,
+      [listingId, title, stored, now, ownerId]
+    );
+  } else {
+    requireSqlite();
+    getSqliteDb().prepare(
+      `UPDATE property_listings SET title = ?, payload = ?, publication_status = 'PENDING', rejection_reason = NULL, updated_at = ? WHERE id = ? AND owner_id = ?`
+    ).run(title, stored, now, listingId, ownerId);
+  }
+  return getListing(listingId);
+}
+
+export async function setOwnedListingState(ownerId: string, listingId: string, status: 'PAUSED' | 'ARCHIVED' | 'PENDING'): Promise<any | null> {
+  const listing = await getListing(listingId);
+  if (!listing) return null;
+  if (listing.ownerId !== ownerId) {
+    throw new CommerceError(403, 'FORBIDDEN', 'You can manage only listings you own.');
+  }
+  const now = nowIso();
+  if (isPostgresAuthoritative()) {
+    await queryPostgres(
+      `UPDATE property_listings SET publication_status = $2, updated_at = $3 WHERE id = $1 AND owner_id = $4`,
+      [listingId, status, now, ownerId]
+    );
+  } else {
+    requireSqlite();
+    getSqliteDb().prepare(
+      `UPDATE property_listings SET publication_status = ?, updated_at = ? WHERE id = ? AND owner_id = ?`
+    ).run(status, now, listingId, ownerId);
+  }
+  return getListing(listingId);
+}
+
+export async function listFinancialRecords(): Promise<{ payments: string; transactions: any[]; ledger: any[] }> {
+  if (isPostgresAuthoritative()) {
+    const [transactions, ledger] = await Promise.all([
+      queryPostgres('SELECT id, user_id, provider, amount, purpose, status, idempotency_key, created_at FROM payment_transactions ORDER BY created_at DESC LIMIT 200'),
+      queryPostgres('SELECT id, user_id, entry_type, amount, balance_after, reference_type, reference_id, status, created_at FROM wallet_ledger ORDER BY created_at DESC LIMIT 200')
+    ]);
+    return { payments: paymentsStatus(), transactions: transactions.rows, ledger: ledger.rows };
+  }
+  requireSqlite();
+  const db = getSqliteDb();
+  return {
+    payments: paymentsStatus(),
+    transactions: db.prepare('SELECT id, user_id, provider, amount, purpose, status, idempotency_key, created_at FROM payment_transactions ORDER BY created_at DESC LIMIT 200').all() as any[],
+    ledger: db.prepare('SELECT id, user_id, entry_type, amount, balance_after, reference_type, reference_id, status, created_at FROM wallet_ledger ORDER BY created_at DESC LIMIT 200').all() as any[]
+  };
+}
+
+export async function adjustWallet(input: {
+  userId: string;
+  amount: number;
+  direction: 'CREDIT' | 'DEBIT';
+  reason: string;
+  idempotencyKey: string;
+}): Promise<{ balance: number; applied: boolean }> {
+  if (!input.reason.trim()) throw new CommerceError(400, 'REASON_REQUIRED', 'A reason is required for a financial adjustment.');
+  if (!(input.amount > 0) || !Number.isFinite(input.amount)) {
+    throw new CommerceError(400, 'INVALID_AMOUNT', 'Adjustment amount must be greater than zero.');
+  }
+  const delta = input.direction === 'DEBIT' ? -input.amount : input.amount;
+  return applyBalanceChange({
+    userId: input.userId,
+    delta,
+    entryType: input.direction === 'DEBIT' ? 'ADJUSTMENT_DEBIT' : 'ADJUSTMENT_CREDIT',
+    idempotencyKey: input.idempotencyKey,
+    referenceType: 'ADJUSTMENT',
+    referenceId: input.reason.slice(0, 120)
+  });
+}
+
+export async function refundVerifiedPayment(input: {
+  transactionId: string;
+  idempotencyKey: string;
+}): Promise<{ status: string; balance: number }> {
+  const txn = await paymentById(input.transactionId);
+  if (!txn) throw new CommerceError(404, 'NOT_FOUND', 'Payment transaction not found.');
+  if (txn.status === 'REFUNDED') {
+    const user = await userBalance(txn.user_id);
+    return { status: 'REFUNDED', balance: user };
+  }
+  if (txn.status !== 'VERIFIED') {
+    throw new CommerceError(409, 'NOT_REFUNDABLE', 'Only a verified payment can be refunded. Failed or unconfigured payments are not treated as successful.');
+  }
+  const result = await applyBalanceChange({
+    userId: txn.user_id,
+    delta: -Number(txn.amount),
+    entryType: 'REFUND',
+    idempotencyKey: input.idempotencyKey,
+    referenceType: 'PAYMENT',
+    referenceId: txn.id
+  });
+  await setPaymentStatus(txn.id, 'REFUNDED');
+  return { status: 'REFUNDED', balance: result.balance };
+}
+
+export async function disputePayment(transactionId: string): Promise<{ status: string }> {
+  const txn = await paymentById(transactionId);
+  if (!txn) throw new CommerceError(404, 'NOT_FOUND', 'Payment transaction not found.');
+  if (txn.status === 'REFUNDED') return { status: 'REFUNDED' };
+  await setPaymentStatus(txn.id, 'DISPUTED');
+  return { status: 'DISPUTED' };
+}
+
+async function paymentById(transactionId: string): Promise<any | null> {
+  if (isPostgresAuthoritative()) {
+    const res = await queryPostgres('SELECT * FROM payment_transactions WHERE id = $1', [transactionId]);
+    return res.rows[0] || null;
+  }
+  requireSqlite();
+  return getSqliteDb().prepare('SELECT * FROM payment_transactions WHERE id = ?').get(transactionId) || null;
+}
+
+async function userBalance(userId: string): Promise<number> {
+  if (!userId) return 0;
+  if (isPostgresAuthoritative()) {
+    const res = await queryPostgres('SELECT wallet_balance FROM users WHERE id = $1', [userId]);
+    return Number(res.rows[0]?.wallet_balance || 0);
+  }
+  requireSqlite();
+  const row = getSqliteDb().prepare('SELECT wallet_balance FROM users WHERE id = ?').get(userId) as any;
+  return Number(row?.wallet_balance || 0);
+}
+
+async function setPaymentStatus(transactionId: string, status: string): Promise<void> {
+  if (isPostgresAuthoritative()) {
+    await queryPostgres('UPDATE payment_transactions SET status = $2 WHERE id = $1', [transactionId, status]);
+    return;
+  }
+  requireSqlite();
+  getSqliteDb().prepare('UPDATE payment_transactions SET status = ? WHERE id = ?').run(status, transactionId);
+}
+
+async function applyBalanceChange(input: {
+  userId: string;
+  delta: number;
+  entryType: string;
+  idempotencyKey: string;
+  referenceType: string;
+  referenceId: string;
+}): Promise<{ balance: number; applied: boolean }> {
+  if (isPostgresAuthoritative()) {
+    const pool = getPostgresPool();
+    if (!pool) throw new CommerceError(503, 'DB_UNAVAILABLE', 'PostgreSQL is not configured.');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const existing = await client.query('SELECT balance_after FROM wallet_ledger WHERE idempotency_key = $1', [input.idempotencyKey]);
+      if (existing.rows[0]) {
+        await client.query('COMMIT');
+        return { balance: Number(existing.rows[0].balance_after), applied: false };
+      }
+      const user = await client.query('SELECT wallet_balance FROM users WHERE id = $1 FOR UPDATE', [input.userId]);
+      if (!user.rows[0]) throw new CommerceError(404, 'NOT_FOUND', 'Account not found.');
+      const next = Math.round((Number(user.rows[0].wallet_balance || 0) + input.delta) * 100) / 100;
+      if (next < 0) throw new CommerceError(409, 'INSUFFICIENT_BALANCE', 'The adjustment would make the wallet negative.');
+      await client.query('UPDATE users SET wallet_balance = $1, updated_at = $2 WHERE id = $3', [next, nowIso(), input.userId]);
+      await client.query(
+        `INSERT INTO wallet_ledger (id, user_id, entry_type, amount, balance_after, reference_type, reference_id, idempotency_key, status, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'POSTED',$9)`,
+        [id('ledger'), input.userId, input.entryType, input.delta, next, input.referenceType, input.referenceId, input.idempotencyKey, nowIso()]
+      );
+      await client.query('COMMIT');
+      return { balance: next, applied: true };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+  return withSqliteLock(async () => {
+    requireSqlite();
+    const db = getSqliteDb();
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const existing = db.prepare('SELECT balance_after FROM wallet_ledger WHERE idempotency_key = ?').get(input.idempotencyKey) as any;
+      if (existing) {
+        db.exec('COMMIT');
+        return { balance: Number(existing.balance_after), applied: false };
+      }
+      const user = db.prepare('SELECT wallet_balance FROM users WHERE id = ?').get(input.userId) as any;
+      if (!user) throw new CommerceError(404, 'NOT_FOUND', 'Account not found.');
+      const next = Math.round((Number(user.wallet_balance || 0) + input.delta) * 100) / 100;
+      if (next < 0) throw new CommerceError(409, 'INSUFFICIENT_BALANCE', 'The adjustment would make the wallet negative.');
+      db.prepare('UPDATE users SET wallet_balance = ?, updated_at = ? WHERE id = ?').run(next, nowIso(), input.userId);
+      db.prepare(
+        `INSERT INTO wallet_ledger (id, user_id, entry_type, amount, balance_after, reference_type, reference_id, idempotency_key, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'POSTED', ?)`
+      ).run(id('ledger'), input.userId, input.entryType, input.delta, next, input.referenceType, input.referenceId, input.idempotencyKey, nowIso());
+      db.exec('COMMIT');
+      return { balance: next, applied: true };
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  });
 }
 
 function requireSqlite(): void {

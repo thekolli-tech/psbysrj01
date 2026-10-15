@@ -804,9 +804,9 @@ export async function pgGetAllPosts(params?: {
   offset?: number;
   currentUserId?: string;
 }): Promise<any[]> {
-  let query = "SELECT p.* FROM community_posts p WHERE p.status IN ('APPROVED', 'PUBLISHED')";
-  const args: any[] = [];
-  let paramIdx = 1;
+  let query = "SELECT p.* FROM community_posts p WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = $1 AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
+  const args: any[] = [params?.currentUserId || ''];
+  let paramIdx = 2;
 
   if (params?.communityId) {
     query += ` AND p.community_id = $${paramIdx++}`;
@@ -1577,7 +1577,7 @@ export async function pgCreateCommunity(community: {
 
   await queryPostgres(`
     INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING_APPROVAL', '', 1, 'Users', 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80', $9, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING_APPROVAL', '', 1, 'Users', '', $9, $10, $11)
   `, [
     id,
     community.name.trim(),

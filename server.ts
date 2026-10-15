@@ -69,6 +69,7 @@ import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
 import { canViewModeratedContent, selfServeStorageRole } from './src/shared/policy.ts';
+import { allowRequest, clientKey } from './src/server/rateLimit.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -131,6 +132,23 @@ const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFuncti
   }
   next();
 };
+
+const requireSuperAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+    res.status(403).json({ error: 'Only a Super Admin can approve or reject this content.' });
+    return;
+  }
+  next();
+};
+
+function rejectIfRateLimited(req: Request, res: Response, action: string, identity = ''): boolean {
+  const allowed = allowRequest(clientKey(req.ip, action, identity), action === 'login' ? 20 : 8, 15 * 60 * 1000);
+  if (!allowed) {
+    res.status(429).json({ error: 'Too many attempts. Wait and try again.' });
+    return true;
+  }
+  return false;
+}
 
 const requireDeveloper = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!req.user || req.user.role !== 'DEVELOPER') {
@@ -232,21 +250,17 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
       res.status(400).json({ error: 'Email and password are required' });
       return;
     }
+    if (rejectIfRateLimited(req, res, 'login', String(email))) return;
 
     const user = await findUserByEmail(email);
-    if (!user) {
-      res.status(401).json({ error: 'No account found matching this email address' });
+    const passwordMatches = Boolean(user) && verifyPassword(password, user!.password_hash, user!.salt);
+    if (!user || !passwordMatches) {
+      res.status(401).json({ error: 'Invalid email or password.' });
       return;
     }
 
     if (user.account_status === 'DISABLED' || user.account_status === 'SUSPENDED') {
       res.status(403).json({ error: 'This account has been suspended. Please contact administrator.' });
-      return;
-    }
-
-    const isValid = verifyPassword(password, user.password_hash, user.salt);
-    if (!isValid) {
-      res.status(401).json({ error: 'Invalid password. Please check your credentials.' });
       return;
     }
 
@@ -260,7 +274,6 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
     const { password_hash, salt, ...safeUser } = user;
     res.json({
       success: true,
-      token,
       user: {
         ...safeUser,
         isVerified: Boolean(safeUser.is_verified),
@@ -299,6 +312,7 @@ app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
 
 // Send Email OTP for Account Registration
 app.post('/api/auth/send-email-otp', async (req: Request, res: Response): Promise<void> => {
+  if (rejectIfRateLimited(req, res, 'email-otp', String(req.body?.email || ''))) return;
   try {
     const { email } = req.body;
     if (!email || !email.includes('@')) {
@@ -476,6 +490,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
 
 // Registration endpoint
 app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
+  if (rejectIfRateLimited(req, res, 'register', String(req.body?.email || ''))) return;
   try {
     const { name, email, password, role, phone, organization, otp, phoneOtp } = req.body;
     if (!name || !email || !password) {
@@ -943,6 +958,59 @@ app.patch('/api/community/posts/:id/pin', requireAdmin, async (req: Request, res
   }
 });
 
+app.post('/api/community/posts/:id/upvote', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const post = await getPostById(req.params.id, req.user?.id);
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const result = await togglePostLike(req.params.id, req.user.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/community/posts/:id/reply', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const content = String(req.body?.content || '').trim();
+    if (!content) {
+      res.status(400).json({ error: 'Comment content cannot be empty' });
+      return;
+    }
+    const parentPost = await getPostById(req.params.id, req.user?.id);
+    if (!parentPost || !canViewModeratedContent(parentPost.status, parentPost.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const comment = await createComment({
+      postId: req.params.id,
+      parentId: null,
+      authorId: req.user.id,
+      authorName: req.user.name,
+      authorRole: req.user.role,
+      content
+    });
+    res.json({ success: true, comment });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/posts/:id', requireSuperAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const ok = await deletePost(req.params.id, req.user.id, true);
+    if (!ok) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Toggle Post Like
 app.post('/api/community/posts/:id/like', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -1133,10 +1201,17 @@ app.post('/api/notifications/mark-all-read', requireAuth, async (req: Authentica
 // COMMUNITIES MANAGEMENT
 // ==============================================================================
 
-app.get('/api/communities', async (_req: Request, res: Response): Promise<void> => {
+app.get('/api/communities', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const communities = await getAllCommunities('APPROVED');
-    res.json({ communities });
+    const approved = await getAllCommunities('APPROVED');
+    if (!req.user) {
+      res.json({ communities: approved });
+      return;
+    }
+    const all = await getAllCommunities();
+    const own = all.filter(community => community.created_by_id === req.user!.id && community.status !== 'APPROVED');
+    const seen = new Set(approved.map(community => community.id));
+    res.json({ communities: [...own.filter(community => !seen.has(community.id)), ...approved] });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1175,15 +1250,16 @@ app.post('/api/communities', requireAuth, async (req: AuthenticatedRequest, res:
   }
 });
 
-app.patch('/api/admin/communities/:id/status', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+app.patch('/api/admin/communities/:id/status', requireSuperAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { status, reason } = req.body;
+    const { status, reason, rejection_reason: rejectionReason } = req.body;
+    const recordedReason = reason || rejectionReason;
     if (!status || (status !== 'APPROVED' && status !== 'REJECTED')) {
       res.status(400).json({ error: 'Status must be APPROVED or REJECTED' });
       return;
     }
 
-    const updated = await updateCommunityStatus(req.params.id, status, reason);
+    const updated = await updateCommunityStatus(req.params.id, status, recordedReason);
     if (!updated) {
       res.status(404).json({ error: 'Community not found' });
       return;
@@ -1311,7 +1387,12 @@ async function start() {
   });
 }
 
-start().catch(err => {
-  console.error('[Property Studio] Failed to start server:', err);
-  process.exit(1);
-});
+const entry = process.argv[1] || '';
+if (entry.endsWith('server.ts') || entry.endsWith('server.js')) {
+  start().catch(err => {
+    console.error('[Property Studio] Failed to start server:', err);
+    process.exit(1);
+  });
+}
+
+export { app };

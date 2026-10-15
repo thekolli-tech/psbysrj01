@@ -1824,8 +1824,8 @@ function sqliteGetAllPosts(params?: {
   offset?: number;
   currentUserId?: string;
 }): any[] {
-  let query = "SELECT p.* FROM community_posts p WHERE p.status IN ('APPROVED', 'PUBLISHED')";
-  const args: any[] = [];
+  let query = "SELECT p.* FROM community_posts p WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
+  const args: any[] = [params?.currentUserId || ''];
 
   if (params?.communityId) {
     query += ' AND p.community_id = ?';
@@ -2456,7 +2456,7 @@ function sqliteCreateCommunity(community: {
 
   const insert = db.prepare(`
     INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', '', 1, 'Users', 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80', ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', '', 1, 'Users', '', ?, ?, ?)
   `);
 
   insert.run(

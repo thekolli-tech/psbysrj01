@@ -15,12 +15,18 @@ import {
   createEnquiry,
   createListing,
   creditWalletFromVerifiedPayment,
+  adjustWallet,
+  disputePayment,
+  listFinancialRecords,
   listLeadsForViewer,
   listModerationQueue,
   listOwnerListings,
   listPublicListings,
   listUnlockHistory,
   moderateListing,
+  refundVerifiedPayment,
+  setOwnedListingState,
+  updateOwnedListing,
   moderatePost,
   paymentsStatus,
   readSystemConfig,
@@ -84,11 +90,42 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
     }
   });
 
+  app.patch('/api/properties/:id', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+    try {
+      const listing = await updateOwnedListing(req.user.id, req.params.id, req.body || {});
+      if (!listing) {
+        res.status(404).json({ error: 'Listing not found' });
+        return;
+      }
+      res.json({ success: true, listing, notice: 'The edit returned the listing to pending review.' });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.post('/api/properties/:id/state', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+    try {
+      const status = req.body?.status;
+      if (!['PAUSED', 'ARCHIVED', 'PENDING'].includes(status)) {
+        res.status(400).json({ error: 'Owners may pause, archive, or resubmit a listing. They cannot approve it.' });
+        return;
+      }
+      const listing = await setOwnedListingState(req.user.id, req.params.id, status);
+      if (!listing) {
+        res.status(404).json({ error: 'Listing not found' });
+        return;
+      }
+      res.json({ success: true, listing });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
   app.patch('/api/admin/listings/:id/publication', guards.requireAdmin, async (req: any, res: Response): Promise<void> => {
     try {
       const status = req.body?.status;
-      if (!['APPROVED', 'REJECTED', 'SUSPENDED', 'PENDING'].includes(status)) {
-        res.status(400).json({ error: 'Status must be APPROVED, REJECTED, SUSPENDED, or PENDING.' });
+      if (!['APPROVED', 'REJECTED', 'SUSPENDED', 'PENDING', 'PAUSED', 'ARCHIVED'].includes(status)) {
+        res.status(400).json({ error: 'Status must be APPROVED, REJECTED, SUSPENDED, PENDING, PAUSED, or ARCHIVED.' });
         return;
       }
       const listing = await moderateListing({
@@ -183,6 +220,10 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
 
   app.patch('/api/admin/posts/:id/moderation', guards.requireAdmin, async (req: any, res: Response): Promise<void> => {
     try {
+      if (req.user.role !== 'SUPER_ADMIN') {
+        res.status(403).json({ error: 'Only a Super Admin can approve or reject community posts.' });
+        return;
+      }
       const status = req.body?.status;
       if (!['APPROVED', 'REJECTED', 'SUSPENDED', 'PENDING_APPROVAL'].includes(status)) {
         res.status(400).json({ error: 'Status must be APPROVED, REJECTED, SUSPENDED, or PENDING_APPROVAL.' });
@@ -206,6 +247,10 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
 
   app.patch('/api/admin/communities/:id/moderation', guards.requireAdmin, async (req: any, res: Response): Promise<void> => {
     try {
+      if (req.user.role !== 'SUPER_ADMIN') {
+        res.status(403).json({ error: 'Only a Super Admin can approve or reject communities.' });
+        return;
+      }
       const status = req.body?.status;
       if (!['APPROVED', 'REJECTED', 'SUSPENDED', 'PENDING_APPROVAL'].includes(status)) {
         res.status(400).json({ error: 'Status must be APPROVED, REJECTED, SUSPENDED, or PENDING_APPROVAL.' });
@@ -395,6 +440,79 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         return;
       }
       res.json({ success: true, status: 'VERIFIED', granted: revealAllowedAfterPayment('VERIFIED') });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.get('/api/admin/finance', guards.requireAdmin, async (_req: any, res: Response): Promise<void> => {
+    try {
+      res.json(await listFinancialRecords());
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.post('/api/admin/finance/adjustment', guards.requireAdmin, async (req: any, res: Response): Promise<void> => {
+    try {
+      const body = req.body || {};
+      if ((body.direction !== 'CREDIT' && body.direction !== 'DEBIT') || !body.userId || !body.idempotencyKey) {
+        res.status(400).json({ error: 'userId, direction, and idempotencyKey are required.' });
+        return;
+      }
+      const result = await adjustWallet({
+        userId: String(body.userId || ''),
+        amount: Number(body.amount),
+        direction: body.direction === 'DEBIT' ? 'DEBIT' : 'CREDIT',
+        reason: String(body.reason || ''),
+        idempotencyKey: String(body.idempotencyKey || '')
+      });
+      await createAuditLog({
+        actorId: req.user.id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'WALLET_ADJUSTMENT',
+        targetId: body.userId,
+        details: { direction: body.direction, amount: body.amount, reason: body.reason, applied: result.applied }
+      });
+      res.json({ success: true, ...result });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.post('/api/admin/payments/:id/refund', guards.requireAdmin, async (req: any, res: Response): Promise<void> => {
+    try {
+      const result = await refundVerifiedPayment({
+        transactionId: req.params.id,
+        idempotencyKey: String(req.body?.idempotencyKey || `refund:${req.params.id}`)
+      });
+      await createAuditLog({
+        actorId: req.user.id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'PAYMENT_REFUND',
+        targetId: req.params.id,
+        details: { status: result.status, reason: req.body?.reason || '' }
+      });
+      res.json({ success: true, ...result, granted: false });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.post('/api/admin/payments/:id/dispute', guards.requireAdmin, async (req: any, res: Response): Promise<void> => {
+    try {
+      const result = await disputePayment(req.params.id);
+      await createAuditLog({
+        actorId: req.user.id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'PAYMENT_DISPUTE',
+        targetId: req.params.id,
+        details: { status: result.status, reason: req.body?.reason || '' }
+      });
+      res.json({ success: true, ...result, granted: false });
     } catch (err) {
       sendError(res, err);
     }

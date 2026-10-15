@@ -520,10 +520,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const upvoteCommunityPost = (postId: string) => {
-    setCommunityPosts(prev =>
-      prev.map(p => (p.id === postId ? { ...p, upvotes: p.upvotes + 1 } : p))
-    );
-    fetch(`/api/community/posts/${postId}/upvote`, { method: 'POST' }).catch(() => {});
+    fetch(`/api/community/posts/${postId}/upvote`, { method: 'POST' })
+      .then(async res => {
+        if (!res.ok) {
+          showToast('Sign in to vote on an approved post.');
+          return;
+        }
+        const data = await res.json();
+        setCommunityPosts(prev =>
+          prev.map(p => (p.id === postId ? { ...p, upvotes: Number(data.upvotes ?? p.upvotes) } : p))
+        );
+      })
+      .catch(() => showToast('The vote was not saved.'));
   };
 
   const addCommunityReply = (postId: string, content: string) => {
@@ -537,48 +545,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: 'Just now'
     };
 
-    setCommunityPosts(prev =>
-      prev.map(p =>
-        p.id === postId
-          ? { ...p, replies: [...p.replies, newReply] }
-          : p
-      )
-    );
-
-    showToast('Reply posted to community thread');
-
     fetch(`/api/community/posts/${postId}/reply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        authorId: currentUser.id,
-        authorName: currentUser.name,
-        authorRole: currentUser.role,
-        isVerifiedBuilder: isVerifiedBuilderReply,
-        content
+      body: JSON.stringify({ content })
+    })
+      .then(async res => {
+        if (!res.ok) {
+          showToast('The reply was not accepted.');
+          return;
+        }
+        setCommunityPosts(prev =>
+          prev.map(p =>
+            p.id === postId
+              ? { ...p, replies: [...p.replies, newReply] }
+              : p
+          )
+        );
+        showToast('Reply posted to community thread');
       })
-    }).catch(() => {});
+      .catch(() => showToast('The reply was not saved.'));
   };
 
   const createCommunityPost = (postData: Omit<CommunityPost, 'id' | 'createdAt' | 'upvotes' | 'replies'>) => {
-    const newPost: CommunityPost = {
-      ...postData,
-      id: `post_${Date.now()}`,
-      upvotes: 1,
-      replies: [],
-      createdAt: 'Just now'
-    };
-
-    setCommunityPosts(prev => [newPost, ...prev]);
-    showToast('Community query submitted successfully');
-
     fetch('/api/community/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        authorId: currentUser.id,
-        authorName: currentUser.name,
-        authorRole: currentUser.role,
         propertyId: postData.propertyId,
         propertyName: postData.propertyName,
         topic: postData.topic,
@@ -588,7 +581,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mediaUrl: postData.mediaUrl,
         attachments: postData.attachments
       })
-    }).catch(() => {});
+    })
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.error || 'The post was not submitted.');
+          return;
+        }
+        showToast('Post submitted for approval. It stays hidden from the public feed until a Super Admin approves it.');
+        const postsRes = await fetch('/api/community/posts');
+        const postsData = await postsRes.json();
+        if (Array.isArray(postsData?.posts)) setCommunityPosts(postsData.posts);
+      })
+      .catch(() => showToast('The post was not submitted.'));
   };
 
   const createCommunityProposal = async (proposal: {
@@ -624,7 +629,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const approveCommunity = async (id: string) => {
     try {
       const res = await fetch(`/api/admin/communities/${id}/status`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'APPROVED' })
       });
@@ -640,9 +645,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const rejectCommunity = async (id: string, reason?: string) => {
     try {
       const res = await fetch(`/api/admin/communities/${id}/status`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'REJECTED', rejection_reason: reason })
+        body: JSON.stringify({ status: 'REJECTED', reason })
       });
       if (res.ok) {
         showToast('Community proposal rejected.');
