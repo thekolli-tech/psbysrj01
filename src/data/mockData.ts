@@ -18,7 +18,7 @@ export const ASSET_IMAGES = {
   swamyPortrait: '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
   studioBroadcast: '/src/assets/images/media_studio_broadcast_1791288261453.jpg',
   commercialHub: '/src/assets/images/project_commercial_hub_1791288276077.jpg',
-  officialLogo: '/src/assets/images/official_property_studio_logo.svg',
+officialLogo: '/src/assets/images/property_studio_logo_exact_1791291260921.jpg',
  officialHero: '/src/assets/images/property_studio_logo_exact_1791291260921.jpg',
   swamyFullPortrait: '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg'
 };
