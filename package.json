@@ -10,7 +10,10 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "bootstrap": "tsx scripts/bootstrap.ts"
+    "bootstrap": "tsx scripts/bootstrap.ts",
+    "migrate:postgres": "tsx -e \"import('./src/server/postgresMigration.ts').then(m => m.migrateSqliteToPostgres())\"",
+    "reconcile:postgres": "tsx -e \"import('./src/server/postgresMigration.ts').then(m => m.reconcileSqliteAndPostgres())\"",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

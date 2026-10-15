@@ -17,14 +17,16 @@ export interface MigrationResult {
   timestamp: string;
   durationMs: number;
   backupPath?: string;
+  jsonSnapshotPath?: string;
   stats: MigrationStats[];
   error?: string;
 }
 
 /**
- * Creates an immutable point-in-time file snapshot of SQLite prior to running migrations
+ * Creates an immutable point-in-time file snapshot of SQLite prior to running migrations,
+ * and writes a portable structured JSON snapshot of all 17 tables.
  */
-export function backupSqliteDatabase(): { success: boolean; backupPath?: string; error?: string } {
+export function backupSqliteDatabase(): { success: boolean; backupPath?: string; jsonSnapshotPath?: string; error?: string } {
   try {
     const dataDir = path.resolve(process.cwd(), 'data');
     const sourceDb = path.join(dataDir, 'propertystudio.db');
@@ -38,8 +40,22 @@ export function backupSqliteDatabase(): { success: boolean; backupPath?: string;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupPath = path.join(backupDir, `propertystudio_${timestamp}.bak.db`);
     fs.copyFileSync(sourceDb, backupPath);
+
+    // Also export structured JSON snapshot of all tables for external durability and human inspection
+    const dump: Record<string, any[]> = {};
+    for (const table of TABLES_TO_MIGRATE) {
+      try {
+        dump[table] = (db.prepare(`SELECT * FROM ${table}`).all() as any[]) || [];
+      } catch (_e) {
+        dump[table] = [];
+      }
+    }
+    const jsonSnapshotPath = path.join(backupDir, `propertystudio_${timestamp}_snapshot.json`);
+    fs.writeFileSync(jsonSnapshotPath, JSON.stringify(dump, null, 2), 'utf-8');
+
     console.log(`[SQLite Backup] Snapshot created successfully: ${backupPath}`);
-    return { success: true, backupPath };
+    console.log(`[SQLite Backup] Portable JSON dump created: ${jsonSnapshotPath}`);
+    return { success: true, backupPath, jsonSnapshotPath };
   } catch (err: any) {
     console.error('[SQLite Backup Error]:', err.message);
     return { success: false, error: err.message };
@@ -520,12 +536,29 @@ export async function migrateSqliteToPostgres(): Promise<MigrationResult> {
 }
 
 /**
- * Validates reconciliation between SQLite and PostgreSQL across all 17 tables without modifying data
+ * Validates reconciliation between SQLite and PostgreSQL across all 17 tables without modifying data:
+ * - Table row counts
+ * - Exact ID verification for users, posts, comments, communities, leads
+ * - Relational integrity (no orphaned references)
+ * - Credential integrity (password hashes and salts match)
  */
 export async function reconcileSqliteAndPostgres(): Promise<{
   reconciled: boolean;
   timestamp: string;
   stats: MigrationStats[];
+  idVerification?: {
+    verified: boolean;
+    details: Record<string, { sqliteCount: number; postgresCount: number; missingInPostgres: string[] }>;
+  };
+  relationshipVerification?: {
+    valid: boolean;
+    orphanedRecords: Record<string, number>;
+  };
+  credentialIntegrity?: {
+    verified: boolean;
+    checkedUserCount: number;
+    mismatches: string[];
+  };
   error?: string;
 }> {
   const pool = getPostgresPool();
@@ -559,11 +592,77 @@ export async function reconcileSqliteAndPostgres(): Promise<{
       });
     }
 
-    const allReconciled = stats.every(s => s.status === 'SUCCESS');
+    // 1. Deep ID Verification for critical tables
+    const idCheckTables = ['users', 'communities', 'community_posts', 'community_comments', 'buyer_leads'];
+    const idDetails: Record<string, { sqliteCount: number; postgresCount: number; missingInPostgres: string[] }> = {};
+    let allIdsMatched = true;
+
+    for (const table of idCheckTables) {
+      const sqliteIds = (db.prepare(`SELECT id FROM ${table}`).all() as Array<{ id: string }>).map((r: { id: string }) => r.id);
+      const pgIdsRes = await client.query(`SELECT id FROM ${table}`);
+      const pgIdSet = new Set(pgIdsRes.rows.map((r: any) => r.id));
+
+      const missing = sqliteIds.filter(id => !pgIdSet.has(id));
+      if (missing.length > 0) {
+        allIdsMatched = false;
+      }
+      idDetails[table] = {
+        sqliteCount: sqliteIds.length,
+        postgresCount: pgIdsRes.rows.length,
+        missingInPostgres: missing
+      };
+    }
+
+    // 2. Relational Integrity Checks on PostgreSQL
+    const orphaned: Record<string, number> = {};
+
+    const orphanedSessions = await client.query('SELECT COUNT(*) as cnt FROM sessions s WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = s.user_id)');
+    orphaned['sessions_without_user'] = parseInt(orphanedSessions.rows[0].cnt, 10);
+
+    const orphanedComments = await client.query('SELECT COUNT(*) as cnt FROM community_comments c WHERE NOT EXISTS (SELECT 1 FROM community_posts p WHERE p.id = c.post_id)');
+    orphaned['comments_without_post'] = parseInt(orphanedComments.rows[0].cnt, 10);
+
+    const orphanedLikes = await client.query('SELECT COUNT(*) as cnt FROM post_likes pl WHERE NOT EXISTS (SELECT 1 FROM community_posts p WHERE p.id = pl.post_id)');
+    orphaned['post_likes_without_post'] = parseInt(orphanedLikes.rows[0].cnt, 10);
+
+    const relationshipsValid = Object.values(orphaned).every(cnt => cnt === 0);
+
+    // 3. Credential Integrity Check (Verify password_hash and salt match between databases)
+    const sqliteUsers = db.prepare('SELECT id, email, password_hash, salt FROM users').all() as Array<{ id: string; email: string; password_hash: string; salt: string }>;
+    const credentialMismatches: string[] = [];
+
+    for (const u of sqliteUsers) {
+      const pgUserRes = await client.query('SELECT password_hash, salt FROM users WHERE id = $1', [u.id]);
+      if (pgUserRes.rows.length === 0) {
+        credentialMismatches.push(`${u.email}: Missing in PostgreSQL`);
+      } else {
+        const pgUser = pgUserRes.rows[0];
+        if (pgUser.password_hash !== u.password_hash || pgUser.salt !== u.salt) {
+          credentialMismatches.push(`${u.email}: Hash/salt mismatch`);
+        }
+      }
+    }
+
+    const countsReconciled = stats.every(s => s.status === 'SUCCESS');
+    const fullyReconciled = countsReconciled && allIdsMatched && relationshipsValid && credentialMismatches.length === 0;
+
     return {
-      reconciled: allReconciled,
+      reconciled: fullyReconciled,
       timestamp: new Date().toISOString(),
-      stats
+      stats,
+      idVerification: {
+        verified: allIdsMatched,
+        details: idDetails
+      },
+      relationshipVerification: {
+        valid: relationshipsValid,
+        orphanedRecords: orphaned
+      },
+      credentialIntegrity: {
+        verified: credentialMismatches.length === 0,
+        checkedUserCount: sqliteUsers.length,
+        mismatches: credentialMismatches
+      }
     };
   } catch (err: any) {
     return {

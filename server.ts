@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   initDatabase,
+  isPostgresAuthoritative,
   findUserByEmail,
   findUserById,
   getAllUsers,
@@ -74,9 +75,6 @@ import { connectMongoDB, saveRegistrationToMongo, getMongoHealth } from './src/s
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize database tables, migrations & seed data
-initDatabase();
-
 // Connect to MongoDB asynchronously if configured
 connectMongoDB().catch(err => {
   console.warn('[MongoDB Init Warning]:', err.message);
@@ -94,17 +92,21 @@ interface AuthenticatedRequest extends Request {
   sessionToken?: string;
 }
 
-// Global Authentication Middleware
-const authenticateUser = (req: AuthenticatedRequest, _res: Response, next: NextFunction): void => {
-  const token = req.cookies?.ps_session || req.headers.authorization?.replace(/^Bearer\s+/i, '');
-  if (token) {
-    const sessionData = getSession(token);
-    if (sessionData) {
-      req.user = sessionData.user;
-      req.sessionToken = token;
+// Global Authentication Middleware (Asynchronous session verification)
+const authenticateUser = async (req: AuthenticatedRequest, _res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const token = req.cookies?.ps_session || req.headers.authorization?.replace(/^Bearer\s+/i, '');
+    if (token) {
+      const sessionData = await getSession(token);
+      if (sessionData) {
+        req.user = sessionData.user;
+        req.sessionToken = token;
+      }
     }
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 };
 
 app.use(authenticateUser);
@@ -159,8 +161,8 @@ export function broadcastSseEvent(eventType: string, data: any, targetUserId?: s
   }
 }
 
-// SSE Connection Endpoint
-app.get('/api/community/events', (req: AuthenticatedRequest, res: Response): void => {
+// SSE Connection Endpoint with persistent replay from database
+app.get('/api/community/events', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -178,18 +180,18 @@ app.get('/api/community/events', (req: AuthenticatedRequest, res: Response): voi
   // Send initial handshake
   res.write(`event: CONNECTED\ndata: ${JSON.stringify({ clientId, timestamp: new Date().toISOString() })}\n\n`);
 
-  // Replay missed events if client provides Last-Event-ID / Last-Timestamp
+  // Replay missed events from authoritative database if client provides Last-Event-ID / Last-Timestamp
   const lastTime = req.headers['last-event-id'] as string;
   if (lastTime) {
     try {
-      const missedEvents = getCommunityEventsSince(lastTime, req.user?.id);
+      const missedEvents = await getCommunityEventsSince(lastTime, req.user?.id);
       for (const ev of missedEvents) {
         res.write(`event: ${ev.event_type}\ndata: ${ev.payload}\n\n`);
       }
     } catch (_e) {}
   }
 
-  // Heartbeat ping every 15s to keep Cloud Run connection active
+  // Heartbeat ping every 15s to keep connection active
   const heartbeatTimer = setInterval(() => {
     try {
       res.write(': ping\n\n');
@@ -210,7 +212,7 @@ app.get('/api/community/events', (req: AuthenticatedRequest, res: Response): voi
 // ==============================================================================
 
 // Login endpoint
-app.post('/api/auth/login', (req: Request, res: Response): void => {
+app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -218,7 +220,7 @@ app.post('/api/auth/login', (req: Request, res: Response): void => {
       return;
     }
 
-    const user = findUserByEmail(email);
+    const user = await findUserByEmail(email);
     if (!user) {
       res.status(401).json({ error: 'No account found matching this email address' });
       return;
@@ -235,9 +237,9 @@ app.post('/api/auth/login', (req: Request, res: Response): void => {
       return;
     }
 
-    // Create session in persistent database
-    const { token, session } = createSession(user.id, req.headers['user-agent'], req.ip);
-    updateLastLogin(user.id);
+    // Create session in authoritative database
+    const { token } = await createSession(user.id, req.headers['user-agent'], req.ip);
+    await updateLastLogin(user.id);
 
     // Set secure HttpOnly cookie
     res.cookie('ps_session', token, {
@@ -263,9 +265,9 @@ app.post('/api/auth/login', (req: Request, res: Response): void => {
 });
 
 // Logout endpoint
-app.post('/api/auth/logout', (req: AuthenticatedRequest, res: Response): void => {
+app.post('/api/auth/logout', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   if (req.sessionToken) {
-    revokeSession(req.sessionToken);
+    await revokeSession(req.sessionToken);
   }
   res.clearCookie('ps_session');
   res.json({ success: true, message: 'Logged out successfully' });
@@ -295,14 +297,13 @@ app.post('/api/auth/send-email-otp', async (req: Request, res: Response): Promis
       res.status(400).json({ error: 'Valid email address is required' });
       return;
     }
-    const existing = findUserByEmail(email);
+    const existing = await findUserByEmail(email);
     if (existing) {
       res.status(400).json({ error: 'An account with this email address already exists' });
       return;
     }
-    const { otp, expiresAt } = generateOtp(email, 'EMAIL_VERIFICATION');
+    const { otp, expiresAt } = await generateOtp(email, 'EMAIL_VERIFICATION');
 
-    // Asynchronously dispatch real-time email
     const dispatchResult = await sendRealEmailOtp(email.trim(), otp);
 
     if (!dispatchResult.success) {
@@ -324,14 +325,14 @@ app.post('/api/auth/send-email-otp', async (req: Request, res: Response): Promis
 });
 
 // Verify Email OTP
-app.post('/api/auth/verify-email-otp', (req: Request, res: Response): void => {
+app.post('/api/auth/verify-email-otp', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
       res.status(400).json({ error: 'Email and verification code are required' });
       return;
     }
-    const isValid = verifyOtp(email, 'EMAIL_VERIFICATION', otp);
+    const isValid = await verifyOtp(email, 'EMAIL_VERIFICATION', otp);
     if (!isValid) {
       res.status(400).json({ error: 'Invalid or expired verification code' });
       return;
@@ -342,7 +343,7 @@ app.post('/api/auth/verify-email-otp', (req: Request, res: Response): void => {
   }
 });
 
-// Self-Service Forgot Password: send OTP to registered email
+// Self-Service Forgot Password
 app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
@@ -351,8 +352,7 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promi
       return;
     }
 
-    const existingUser = findUserByEmail(email);
-    // Generic response to prevent account enumeration if user does not exist
+    const existingUser = await findUserByEmail(email);
     if (!existingUser) {
       res.json({
         success: true,
@@ -361,7 +361,7 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promi
       return;
     }
 
-    const { otp, expiresAt } = generateOtp(email, 'PASSWORD_RESET');
+    const { otp, expiresAt } = await generateOtp(email, 'PASSWORD_RESET');
     const dispatchResult = await sendRealEmailOtp(email.trim(), otp);
 
     if (!dispatchResult.success) {
@@ -382,8 +382,8 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promi
   }
 });
 
-// Self-Service Reset Password: verify PASSWORD_RESET OTP and set new password
-app.post('/api/auth/reset-password', (req: Request, res: Response): void => {
+// Self-Service Reset Password
+app.post('/api/auth/reset-password', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, otp, newPassword } = req.body;
     if (!email || !otp || !newPassword) {
@@ -396,21 +396,21 @@ app.post('/api/auth/reset-password', (req: Request, res: Response): void => {
       return;
     }
 
-    const targetUser = findUserByEmail(email);
+    const targetUser = await findUserByEmail(email);
     if (!targetUser) {
       res.status(400).json({ error: 'Invalid reset request' });
       return;
     }
 
-    const isValid = verifyOtp(email, 'PASSWORD_RESET', otp);
+    const isValid = await verifyOtp(email, 'PASSWORD_RESET', otp);
     if (!isValid) {
       res.status(400).json({ error: 'Invalid or expired password reset verification code' });
       return;
     }
 
-    resetPassword(targetUser.id, newPassword);
+    await resetPassword(targetUser.id, newPassword);
 
-    createAuditLog({
+    await createAuditLog({
       actorId: targetUser.id,
       actorEmail: targetUser.email,
       actorRole: targetUser.role,
@@ -425,7 +425,7 @@ app.post('/api/auth/reset-password', (req: Request, res: Response): void => {
   }
 });
 
-// Send Phone OTP for Lead Mobile Verification
+// Send Phone OTP
 app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
   try {
     const { phone } = req.body;
@@ -433,9 +433,7 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
       res.status(400).json({ error: 'Valid mobile number is required' });
       return;
     }
-    const { otp, expiresAt } = generateOtp(phone, 'PHONE_VERIFICATION');
-
-    // Asynchronously dispatch real-time SMS
+    const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
     const dispatchResult = await sendRealSmsOtp(phone.trim(), otp);
 
     res.json({
@@ -449,15 +447,15 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
   }
 });
 
-// Verify Phone OTP for Lead Mobile Verification
-app.post('/api/auth/verify-phone-otp', (req: Request, res: Response): void => {
+// Verify Phone OTP
+app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Promise<void> => {
   try {
     const { phone, otp } = req.body;
     if (!phone || !otp) {
       res.status(400).json({ error: 'Phone number and verification code are required' });
       return;
     }
-    const isValid = verifyOtp(phone, 'PHONE_VERIFICATION', otp);
+    const isValid = await verifyOtp(phone, 'PHONE_VERIFICATION', otp);
     if (!isValid) {
       res.status(400).json({ error: 'Invalid or expired SMS OTP code' });
       return;
@@ -468,8 +466,8 @@ app.post('/api/auth/verify-phone-otp', (req: Request, res: Response): void => {
   }
 });
 
-// Registration with verified email OTP & role-specific mobile OTP
-app.post('/api/auth/register', (req: Request, res: Response): void => {
+// Registration endpoint
+app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, email, password, role, phone, organization, otp, phoneOtp } = req.body;
     if (!name || !email || !password) {
@@ -482,20 +480,16 @@ app.post('/api/auth/register', (req: Request, res: Response): void => {
       return;
     }
 
-    const isVerified = verifyOtp(email, 'EMAIL_VERIFICATION', otp) || isTargetVerified(email, 'EMAIL_VERIFICATION');
+    const isVerified = (await verifyOtp(email, 'EMAIL_VERIFICATION', otp)) || (await isTargetVerified(email, 'EMAIL_VERIFICATION'));
     if (!isVerified) {
       res.status(400).json({ error: 'Invalid or expired email verification code' });
       return;
     }
 
-    // Disallow self-registering as Super Admin or Developer
     const safeRole = (role === 'AGENT' || role === 'CONTENT_CREATOR' || role === 'LAND_OWNER')
       ? role
       : 'PROPERTY_SEEKER';
 
-    // Role-specific phone number and mobile OTP requirements:
-    // 1. PROPERTY_SEEKER: Phone number IS REQUIRED, and phone OTP verification IS REQUIRED.
-    // 2. Remaining three (LAND_OWNER, AGENT, CONTENT_CREATOR): Phone number is NOT required.
     let isPhoneVerified = false;
     if (safeRole === 'PROPERTY_SEEKER') {
       if (!phone || phone.trim().length < 8) {
@@ -503,22 +497,20 @@ app.post('/api/auth/register', (req: Request, res: Response): void => {
         return;
       }
 
-      const isMobileVerified = (phoneOtp && verifyOtp(phone.trim(), 'PHONE_VERIFICATION', phoneOtp)) ||
-                               isTargetVerified(phone.trim(), 'PHONE_VERIFICATION');
+      const isMobileVerified = (phoneOtp && (await verifyOtp(phone.trim(), 'PHONE_VERIFICATION', phoneOtp))) ||
+                               (await isTargetVerified(phone.trim(), 'PHONE_VERIFICATION'));
       if (!isMobileVerified) {
         res.status(400).json({ error: 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.' });
         return;
       }
       isPhoneVerified = true;
     } else {
-      // For remaining three roles (Land Owner, Reseller/Agent, Content Creator):
-      // Phone is optional; if provided and verified, record it
       if (phone && phoneOtp) {
-        isPhoneVerified = Boolean(verifyOtp(phone.trim(), 'PHONE_VERIFICATION', phoneOtp) || isTargetVerified(phone.trim(), 'PHONE_VERIFICATION'));
+        isPhoneVerified = Boolean((await verifyOtp(phone.trim(), 'PHONE_VERIFICATION', phoneOtp)) || (await isTargetVerified(phone.trim(), 'PHONE_VERIFICATION')));
       }
     }
 
-    const newUser = createUser({
+    const newUser = await createUser({
       name,
       email,
       password,
@@ -534,11 +526,10 @@ app.post('/api/auth/register', (req: Request, res: Response): void => {
     }
 
     if (isPhoneVerified) {
-      updateUser(newUser.id, { phone_verified: 1 });
+      await updateUser(newUser.id, { phone_verified: 1 });
       newUser.phone_verified = 1;
     }
 
-    // Dual-persist registration to MongoDB collections ('users' and 'registrations')
     saveRegistrationToMongo(newUser, {
       ip_address: req.ip,
       user_agent: req.headers['user-agent']
@@ -546,7 +537,7 @@ app.post('/api/auth/register', (req: Request, res: Response): void => {
       console.warn('[MongoDB Storage Warning]:', err.message);
     });
 
-    const { token } = createSession(newUser.id, req.headers['user-agent'], req.ip);
+    const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);
     res.cookie('ps_session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -571,7 +562,7 @@ app.post('/api/auth/register', (req: Request, res: Response): void => {
 });
 
 // Change Password
-app.post('/api/auth/change-password', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.post('/api/auth/change-password', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {
@@ -579,7 +570,7 @@ app.post('/api/auth/change-password', requireAuth, (req: AuthenticatedRequest, r
       return;
     }
 
-    const ok = changePassword(req.user.id, currentPassword, newPassword);
+    const ok = await changePassword(req.user.id, currentPassword, newPassword);
     if (!ok) {
       res.status(400).json({ error: 'Incorrect current password' });
       return;
@@ -591,8 +582,8 @@ app.post('/api/auth/change-password', requireAuth, (req: AuthenticatedRequest, r
   }
 });
 
-// Lost Developer Account Recovery endpoint (Protected by recovery key)
-app.post('/api/auth/recover-developer', (req: Request, res: Response): void => {
+// Lost Developer Account Recovery endpoint
+app.post('/api/auth/recover-developer', async (req: Request, res: Response): Promise<void> => {
   try {
     const { recoverySecret, newPassword } = req.body;
     if (!recoverySecret || !newPassword) {
@@ -600,7 +591,7 @@ app.post('/api/auth/recover-developer', (req: Request, res: Response): void => {
       return;
     }
 
-    const result = recoverDeveloperAccount(recoverySecret, newPassword);
+    const result = await recoverDeveloperAccount(recoverySecret, newPassword);
     if (!result.success) {
       res.status(403).json({ error: result.error });
       return;
@@ -619,7 +610,7 @@ app.get('/api/notifications/status', (_req: Request, res: Response): void => {
 
 // Database, Authoritative Engine & Integration Health Check
 app.get('/api/database/status', async (_req: Request, res: Response): Promise<void> => {
-  const pgConfigured = Boolean(process.env.DATABASE_URL);
+  const pgConfigured = isPostgresAuthoritative();
   const pgStatus = await checkPostgresHealth();
   const mongoStatus = await getMongoHealth();
 
@@ -631,7 +622,7 @@ app.get('/api/database/status', async (_req: Request, res: Response): Promise<vo
         status: 'HEALTHY',
         latencyMs: pgStatus.latencyMs,
         durableStorage: true,
-        description: 'Primary ACID source of truth for users, roles, sessions, OTPs, posts, comments, likes, requirements, and notifications.'
+        description: 'Primary authoritative ACID database for all users, sessions, posts, comments, likes, leads, and events.'
       };
     } else {
       authoritativeDatabase = {
@@ -639,17 +630,17 @@ app.get('/api/database/status', async (_req: Request, res: Response): Promise<vo
         status: 'UNAVAILABLE',
         error: pgStatus.error || 'Failed to connect to managed PostgreSQL',
         durableStorage: true,
-        description: 'PostgreSQL is designated as authoritative via DATABASE_URL but is currently unreachable. Silent SQLite fallback is disallowed.'
+        description: 'PostgreSQL is designated as authoritative via DATABASE_URL but is currently unreachable. Silent SQLite fallback is disabled.'
       };
     }
   } else {
     authoritativeDatabase = {
       engine: 'sqlite_ephemeral',
       path: './data/propertystudio.db',
-      status: 'ACTIVE_PRE_CUTOVER',
+      status: 'ACTIVE_LOCAL_DEV',
       durableStorage: false,
-      warning: 'Operating on container filesystem. DATABASE_URL is not configured in Cloud Run. Cutover pending PostgreSQL provisioning.',
-      description: 'Primary ACID source of truth for users, roles, sessions, OTPs, posts, comments, likes, requirements, and notifications.'
+      warning: 'Operating in local development mode on container filesystem. Configure DATABASE_URL for Neon PostgreSQL authoritative persistence.',
+      description: 'Authoritative database in local-development mode. Production deployment requires DATABASE_URL.'
     };
   }
 
@@ -696,7 +687,7 @@ app.get('/api/admin/reconcile-databases', requireAdmin, async (_req: Authenticat
   }
 });
 
-// Emergency Rollback: Reverse-sync post-cutover delta records from PostgreSQL back into SQLite before disabling DATABASE_URL
+// Emergency Rollback: Reverse-sync post-cutover delta records from PostgreSQL back into SQLite
 app.post('/api/admin/reverse-sync-to-sqlite', requireAdmin, async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const result = await reverseSyncPostgresToSqlite();
@@ -714,10 +705,10 @@ app.post('/api/admin/reverse-sync-to-sqlite', requireAdmin, async (_req: Authent
 // PRIVILEGED USER & ROLE ADMINISTRATION
 // ==============================================================================
 
-// Get all users (Admin action)
-app.get('/api/admin/users', requireAdmin, (_req: Request, res: Response): void => {
+// Get all users
+app.get('/api/admin/users', requireAdmin, async (_req: Request, res: Response): Promise<void> => {
   try {
-    const users = getAllUsers();
+    const users = await getAllUsers();
     res.json({
       users: users.map(u => ({
         ...u,
@@ -730,21 +721,20 @@ app.get('/api/admin/users', requireAdmin, (_req: Request, res: Response): void =
   }
 });
 
-// Create user account (Admin action with hierarchy guard)
-app.post('/api/admin/users', requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
+// Create user account
+app.post('/api/admin/users', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { name, email, phone, role, organization, password } = req.body;
     if (!name || !email) {
       res.status(400).json({ error: 'Name and email are required' });
       return;
     }
-    const existing = findUserByEmail(email);
+    const existing = await findUserByEmail(email);
     if (existing) {
       res.status(400).json({ error: 'A user with this email already exists' });
       return;
     }
 
-    // Role creation hierarchy checks
     if (role === 'DEVELOPER' && req.user.role !== 'DEVELOPER') {
       res.status(403).json({ error: 'Access Denied: Only Platform Developers can create Developer accounts.' });
       return;
@@ -754,7 +744,7 @@ app.post('/api/admin/users', requireAdmin, (req: AuthenticatedRequest, res: Resp
       return;
     }
 
-    const newUser = createUser({
+    const newUser = await createUser({
       name,
       email,
       phone,
@@ -764,7 +754,7 @@ app.post('/api/admin/users', requireAdmin, (req: AuthenticatedRequest, res: Resp
       isVerified: true
     });
 
-    createAuditLog({
+    await createAuditLog({
       actorId: req.user.id,
       actorEmail: req.user.email,
       actorRole: req.user.role,
@@ -780,8 +770,8 @@ app.post('/api/admin/users', requireAdmin, (req: AuthenticatedRequest, res: Resp
   }
 });
 
-// Reset user password (Admin action with hierarchy guard)
-app.post('/api/admin/users/:id/reset-password', requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
+// Reset user password
+app.post('/api/admin/users/:id/reset-password', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { newPassword } = req.body;
     if (!newPassword || newPassword.length < 6) {
@@ -789,28 +779,25 @@ app.post('/api/admin/users/:id/reset-password', requireAdmin, (req: Authenticate
       return;
     }
 
-    const targetUser = findUserById(req.params.id);
+    const targetUser = await findUserById(req.params.id);
     if (!targetUser) {
       res.status(404).json({ error: 'Target user not found.' });
       return;
     }
 
-    // Mandatory hierarchy enforcement:
-    // SUPER_ADMIN cannot reset password of a DEVELOPER
     if (req.user.role === 'SUPER_ADMIN' && targetUser.role === 'DEVELOPER') {
       res.status(403).json({ error: 'Access Denied: Super Admins cannot reset passwords for Developer accounts.' });
       return;
     }
 
-    // SUPER_ADMIN cannot reset password of another SUPER_ADMIN
     if (req.user.role === 'SUPER_ADMIN' && targetUser.role === 'SUPER_ADMIN' && req.user.id !== targetUser.id) {
       res.status(403).json({ error: 'Access Denied: Only Platform Developers can reset Super Admin passwords.' });
       return;
     }
 
-    resetPassword(targetUser.id, newPassword);
+    await resetPassword(targetUser.id, newPassword);
 
-    createAuditLog({
+    await createAuditLog({
       actorId: req.user.id,
       actorEmail: req.user.email,
       actorRole: req.user.role,
@@ -826,8 +813,8 @@ app.post('/api/admin/users/:id/reset-password', requireAdmin, (req: Authenticate
   }
 });
 
-// Change user role (Strictly enforced hierarchy)
-app.patch('/api/admin/users/:id/role', requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
+// Change user role
+app.patch('/api/admin/users/:id/role', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { role } = req.body;
     if (!role) {
@@ -835,7 +822,7 @@ app.patch('/api/admin/users/:id/role', requireAdmin, (req: AuthenticatedRequest,
       return;
     }
 
-    const result = updateUserRole(req.user, req.params.id, role);
+    const result = await updateUserRole(req.user, req.params.id, role);
     if (!result.success) {
       res.status(403).json({ error: result.error });
       return;
@@ -848,10 +835,10 @@ app.patch('/api/admin/users/:id/role', requireAdmin, (req: AuthenticatedRequest,
 });
 
 // Suspend or activate user
-app.post('/api/admin/users/:id/suspend', requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
+app.post('/api/admin/users/:id/suspend', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { suspend } = req.body;
-    const result = suspendUser(req.user, req.params.id, Boolean(suspend));
+    const result = await suspendUser(req.user, req.params.id, Boolean(suspend));
     if (!result.success) {
       res.status(403).json({ error: result.error });
       return;
@@ -863,9 +850,9 @@ app.post('/api/admin/users/:id/suspend', requireAdmin, (req: AuthenticatedReques
 });
 
 // Delete user account
-app.delete('/api/admin/users/:id', requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
+app.delete('/api/admin/users/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const result = deleteUser(req.user, req.params.id);
+    const result = await deleteUser(req.user, req.params.id);
     if (!result.success) {
       res.status(403).json({ error: result.error });
       return;
@@ -876,13 +863,13 @@ app.delete('/api/admin/users/:id', requireAdmin, (req: AuthenticatedRequest, res
   }
 });
 
-// Immutable Audit Logs (Developer only)
-app.get('/api/admin/audit-logs', requireDeveloper, (req: Request, res: Response): void => {
+// Immutable Audit Logs
+app.get('/api/admin/audit-logs', requireDeveloper, async (req: Request, res: Response): Promise<void> => {
   try {
     const limit = Number(req.query.limit) || 50;
     const offset = Number(req.query.offset) || 0;
     const action = req.query.action as string | undefined;
-    const logs = getAuditLogs(limit, offset, action);
+    const logs = await getAuditLogs(limit, offset, action);
     res.json({ logs });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -894,7 +881,7 @@ app.get('/api/admin/audit-logs', requireDeveloper, (req: Request, res: Response)
 // ==============================================================================
 
 // Fetch all community posts
-app.get('/api/community/posts', (req: AuthenticatedRequest, res: Response): void => {
+app.get('/api/community/posts', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const communityId = req.query.communityId as string | undefined;
     const topic = req.query.topic as string | undefined;
@@ -902,7 +889,7 @@ app.get('/api/community/posts', (req: AuthenticatedRequest, res: Response): void
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
     const offset = req.query.offset ? Number(req.query.offset) : undefined;
 
-    const posts = getAllPosts({
+    const posts = await getAllPosts({
       communityId,
       topic,
       mediaType,
@@ -918,9 +905,9 @@ app.get('/api/community/posts', (req: AuthenticatedRequest, res: Response): void
 });
 
 // Fetch single post with full comments
-app.get('/api/community/posts/:id', (req: AuthenticatedRequest, res: Response): void => {
+app.get('/api/community/posts/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const post = getPostById(req.params.id, req.user?.id);
+    const post = await getPostById(req.params.id, req.user?.id);
     if (!post) {
       res.status(404).json({ error: 'Post not found' });
       return;
@@ -931,8 +918,8 @@ app.get('/api/community/posts/:id', (req: AuthenticatedRequest, res: Response): 
   }
 });
 
-// Create community post (supports links, attachments, podcasts, videos)
-app.post('/api/community/posts', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+// Create community post
+app.post('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { title, content, topic, communityId, communityName, propertyId, propertyName, links, attachments, mediaType, mediaUrl, thumbnailUrl, duration } = req.body;
     if (!title || !content || !topic) {
@@ -940,7 +927,7 @@ app.post('/api/community/posts', requireAuth, (req: AuthenticatedRequest, res: R
       return;
     }
 
-    const post = createPost({
+    const post = await createPost({
       authorId: req.user.id,
       authorName: req.user.name,
       authorRole: req.user.role,
@@ -967,10 +954,10 @@ app.post('/api/community/posts', requireAuth, (req: AuthenticatedRequest, res: R
 });
 
 // Update post
-app.put('/api/community/posts/:id', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.put('/api/community/posts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
-    const updated = updatePost(req.params.id, req.user.id, req.body, isElevated);
+    const updated = await updatePost(req.params.id, req.user.id, req.body, isElevated);
     if (!updated) {
       res.status(403).json({ error: 'Unauthorized to edit this post' });
       return;
@@ -983,10 +970,10 @@ app.put('/api/community/posts/:id', requireAuth, (req: AuthenticatedRequest, res
 });
 
 // Delete post
-app.delete('/api/community/posts/:id', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.delete('/api/community/posts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
-    const ok = deletePost(req.params.id, req.user.id, isElevated);
+    const ok = await deletePost(req.params.id, req.user.id, isElevated);
     if (!ok) {
       res.status(403).json({ error: 'Unauthorized to delete this post' });
       return;
@@ -998,11 +985,11 @@ app.delete('/api/community/posts/:id', requireAuth, (req: AuthenticatedRequest, 
   }
 });
 
-// Pin / Unpin post (Admin only)
-app.patch('/api/community/posts/:id/pin', requireAdmin, (req: Request, res: Response): void => {
+// Pin / Unpin post
+app.patch('/api/community/posts/:id/pin', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { isPinned } = req.body;
-    pinPost(req.params.id, Boolean(isPinned));
+    await pinPost(req.params.id, Boolean(isPinned));
     broadcastSseEvent('POST_UPDATED', { id: req.params.id, isPinned });
     res.json({ success: true });
   } catch (err: any) {
@@ -1011,9 +998,9 @@ app.patch('/api/community/posts/:id/pin', requireAdmin, (req: Request, res: Resp
 });
 
 // Toggle Post Like
-app.post('/api/community/posts/:id/like', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.post('/api/community/posts/:id/like', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const result = togglePostLike(req.params.id, req.user.id);
+    const result = await togglePostLike(req.params.id, req.user.id);
     broadcastSseEvent('LIKE_CHANGED', { postId: req.params.id, upvotes: result.upvotes });
     res.json({ success: true, ...result });
   } catch (err: any) {
@@ -1026,9 +1013,9 @@ app.post('/api/community/posts/:id/like', requireAuth, (req: AuthenticatedReques
 // ==============================================================================
 
 // Fetch comments for a post
-app.get('/api/community/posts/:id/comments', (req: AuthenticatedRequest, res: Response): void => {
+app.get('/api/community/posts/:id/comments', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const comments = getCommentsForPost(req.params.id, req.user?.id);
+    const comments = await getCommentsForPost(req.params.id, req.user?.id);
     res.json({ comments });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1036,7 +1023,7 @@ app.get('/api/community/posts/:id/comments', (req: AuthenticatedRequest, res: Re
 });
 
 // Add comment or nested reply to a post
-app.post('/api/community/posts/:id/comments', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.post('/api/community/posts/:id/comments', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { content, parentId } = req.body;
     if (!content || !content.trim()) {
@@ -1044,7 +1031,7 @@ app.post('/api/community/posts/:id/comments', requireAuth, (req: AuthenticatedRe
       return;
     }
 
-    const comment = createComment({
+    const comment = await createComment({
       postId: req.params.id,
       parentId: parentId || null,
       authorId: req.user.id,
@@ -1061,10 +1048,10 @@ app.post('/api/community/posts/:id/comments', requireAuth, (req: AuthenticatedRe
 });
 
 // Delete comment
-app.delete('/api/community/comments/:id', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.delete('/api/community/comments/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
-    const ok = deleteComment(req.params.id, req.user.id, isElevated);
+    const ok = await deleteComment(req.params.id, req.user.id, isElevated);
     if (!ok) {
       res.status(403).json({ error: 'Unauthorized to delete this comment' });
       return;
@@ -1077,9 +1064,9 @@ app.delete('/api/community/comments/:id', requireAuth, (req: AuthenticatedReques
 });
 
 // Toggle Comment Like
-app.post('/api/community/comments/:id/like', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.post('/api/community/comments/:id/like', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const result = toggleCommentLike(req.params.id, req.user.id);
+    const result = await toggleCommentLike(req.params.id, req.user.id);
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1090,7 +1077,7 @@ app.post('/api/community/comments/:id/like', requireAuth, (req: AuthenticatedReq
 // MODERATION REPORTS
 // ==============================================================================
 
-app.post('/api/community/reports', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.post('/api/community/reports', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { targetType, targetId, reason } = req.body;
     if (!targetType || !targetId || !reason) {
@@ -1098,7 +1085,7 @@ app.post('/api/community/reports', requireAuth, (req: AuthenticatedRequest, res:
       return;
     }
 
-    const report = createModerationReport({
+    const report = await createModerationReport({
       reporterId: req.user.id,
       reporterName: req.user.name,
       targetType,
@@ -1112,24 +1099,24 @@ app.post('/api/community/reports', requireAuth, (req: AuthenticatedRequest, res:
   }
 });
 
-app.get('/api/admin/reports', requireAdmin, (req: Request, res: Response): void => {
+app.get('/api/admin/reports', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const status = req.query.status as string | undefined;
-    const reports = getAllModerationReports(status);
+    const reports = await getAllModerationReports(status);
     res.json({ reports });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.patch('/api/admin/reports/:id', requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
+app.patch('/api/admin/reports/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { status, resolutionNotes } = req.body;
     if (!status) {
       res.status(400).json({ error: 'Status is required' });
       return;
     }
-    resolveModerationReport(req.params.id, req.user.name, status, resolutionNotes);
+    await resolveModerationReport(req.params.id, req.user.name, status, resolutionNotes);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1140,37 +1127,37 @@ app.patch('/api/admin/reports/:id', requireAdmin, (req: AuthenticatedRequest, re
 // USER NOTIFICATIONS
 // ==============================================================================
 
-app.get('/api/notifications', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.get('/api/notifications', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const notifications = getUserNotifications(req.user.id);
-    const unreadCount = getUnreadNotificationCount(req.user.id);
+    const notifications = await getUserNotifications(req.user.id);
+    const unreadCount = await getUnreadNotificationCount(req.user.id);
     res.json({ notifications, unreadCount });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/notifications/unread-count', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.get('/api/notifications/unread-count', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const count = getUnreadNotificationCount(req.user.id);
+    const count = await getUnreadNotificationCount(req.user.id);
     res.json({ unreadCount: count });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.patch('/api/notifications/:id/read', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.patch('/api/notifications/:id/read', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    markNotificationRead(req.params.id, req.user.id);
+    await markNotificationRead(req.params.id, req.user.id);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/notifications/mark-all-read', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.post('/api/notifications/mark-all-read', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    markAllNotificationsRead(req.user.id);
+    await markAllNotificationsRead(req.user.id);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1181,25 +1168,25 @@ app.post('/api/notifications/mark-all-read', requireAuth, (req: AuthenticatedReq
 // COMMUNITIES MANAGEMENT
 // ==============================================================================
 
-app.get('/api/communities', (_req: Request, res: Response): void => {
+app.get('/api/communities', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const communities = getAllCommunities('APPROVED');
+    const communities = await getAllCommunities('APPROVED');
     res.json({ communities });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/admin/communities/all', requireAdmin, (_req: Request, res: Response): void => {
+app.get('/api/admin/communities/all', requireAdmin, async (_req: Request, res: Response): Promise<void> => {
   try {
-    const communities = getAllCommunities();
+    const communities = await getAllCommunities();
     res.json({ communities });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/communities', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+app.post('/api/communities', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { name, description, category, location, rules } = req.body;
     if (!name || !description || !category) {
@@ -1207,7 +1194,7 @@ app.post('/api/communities', requireAuth, (req: AuthenticatedRequest, res: Respo
       return;
     }
 
-    const newCommunity = createCommunity({
+    const newCommunity = await createCommunity({
       name,
       description,
       category,
@@ -1223,7 +1210,7 @@ app.post('/api/communities', requireAuth, (req: AuthenticatedRequest, res: Respo
   }
 });
 
-app.patch('/api/admin/communities/:id/status', requireAdmin, (req: Request, res: Response): void => {
+app.patch('/api/admin/communities/:id/status', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { status, reason } = req.body;
     if (!status || (status !== 'APPROVED' && status !== 'REJECTED')) {
@@ -1231,7 +1218,7 @@ app.patch('/api/admin/communities/:id/status', requireAdmin, (req: Request, res:
       return;
     }
 
-    const updated = updateCommunityStatus(req.params.id, status, reason);
+    const updated = await updateCommunityStatus(req.params.id, status, reason);
     if (!updated) {
       res.status(404).json({ error: 'Community not found' });
       return;
@@ -1243,9 +1230,9 @@ app.patch('/api/admin/communities/:id/status', requireAdmin, (req: Request, res:
   }
 });
 
-app.delete('/api/admin/communities/:id', requireAdmin, (req: Request, res: Response): void => {
+app.delete('/api/admin/communities/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    deleteCommunity(req.params.id);
+    await deleteCommunity(req.params.id);
     res.json({ success: true, message: 'Community removed' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1256,76 +1243,85 @@ app.delete('/api/admin/communities/:id', requireAdmin, (req: Request, res: Respo
 // MEDIA, LEADS & CONFERENCE
 // ==============================================================================
 
-app.get('/api/media', (_req: Request, res: Response): void => {
+app.get('/api/media', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const items = getAllMedia();
+    const items = await getAllMedia();
     res.json({ items });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/media', requireAuth, (req: Request, res: Response): void => {
+app.post('/api/media', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const mediaId = createMedia(req.body);
+    const mediaId = await createMedia(req.body);
     res.json({ success: true, mediaId });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.delete('/api/media/:id', requireAdmin, (req: Request, res: Response): void => {
+app.delete('/api/media/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    deleteMedia(req.params.id);
+    await deleteMedia(req.params.id);
     res.json({ success: true, message: 'Media item deleted' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/leads', (_req: Request, res: Response): void => {
+app.get('/api/leads', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const leads = getAllLeads();
+    const leads = await getAllLeads();
     res.json({ leads });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/leads', requireAuth, (req: Request, res: Response): void => {
+app.post('/api/leads', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const leadId = createLead(req.body);
+    const leadId = await createLead(req.body);
     res.json({ success: true, leadId });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.delete('/api/leads/:id', requireAdmin, (req: Request, res: Response): void => {
+app.delete('/api/leads/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    deleteLead(req.params.id);
+    await deleteLead(req.params.id);
     res.json({ success: true, message: 'Lead deleted' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/conference', (_req: Request, res: Response): void => {
+app.get('/api/conference', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const conference = getConferenceDetails();
+    const conference = await getConferenceDetails();
     res.json({ conference });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.put('/api/conference', requireAdmin, (req: Request, res: Response): void => {
+app.put('/api/conference', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const updated = updateConferenceDetails(req.body);
+    const updated = await updateConferenceDetails(req.body);
     res.json({ success: true, conference: updated });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
+});
+
+app.get('/api/health', (_req: Request, res: Response): void => {
+  res.json({
+    status: 'OK',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    authoritativeDatabase: isPostgresAuthoritative() ? 'PostgreSQL' : 'SQLite'
+  });
 });
 
 // ==============================================================================
@@ -1333,6 +1329,14 @@ app.put('/api/conference', requireAdmin, (req: Request, res: Response): void => 
 // ==============================================================================
 
 async function start() {
+  // Ensure database initialization executes and verifies authoritative engine
+  try {
+    await initDatabase();
+  } catch (err: any) {
+    console.error('[Property Studio] FATAL: Authoritative database initialization failed:', err);
+    process.exit(1);
+  }
+
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (_req: Request, res: Response) => {
@@ -1349,10 +1353,10 @@ async function start() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Property Studio] Live server running on http://0.0.0.0:${PORT}`);
-    if (process.env.DATABASE_URL) {
-      console.log(`[Property Studio] Managed PostgreSQL database pooling active`);
+    if (isPostgresAuthoritative()) {
+      console.log(`[Property Studio] Authoritative engine: PostgreSQL (Neon / Managed Pooling Active)`);
     } else {
-      console.log(`[Property Studio] SQLite persistent database connected`);
+      console.log(`[Property Studio] Authoritative engine: SQLite (Local Development Persistence)`);
     }
   });
 }

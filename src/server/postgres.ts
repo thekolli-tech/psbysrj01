@@ -1,5 +1,11 @@
 import pg from 'pg';
 
+// Register PostgreSQL type parsers for Neon compatibility
+// Type ID 1700 (NUMERIC/DECIMAL) -> JavaScript number
+pg.types.setTypeParser(1700, (val: string) => (val === null ? null : parseFloat(val)));
+// Type ID 20 (BIGINT/INT8) -> JavaScript number
+pg.types.setTypeParser(20, (val: string) => (val === null ? null : parseInt(val, 10)));
+
 const { Pool } = pg;
 
 let poolInstance: pg.Pool | null = null;
@@ -15,11 +21,11 @@ export function getPostgresPool(): pg.Pool | null {
       connectionString: process.env.DATABASE_URL,
       max: Number(process.env.PG_POOL_MAX) || 10,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 10000, // 10s for Neon cold-start wake-up
       ssl: isSslDisabled ? false : { rejectUnauthorized: false }
     });
 
-    poolInstance.on('error', (err) => {
+    poolInstance.on('error', (err: any) => {
       console.error('[PostgreSQL] Unexpected error on idle client:', err);
     });
   }
@@ -88,6 +94,7 @@ export async function runPostgresMigrations(): Promise<boolean> {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_lower_email ON users(LOWER(email));
       CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
     `);
 
@@ -204,7 +211,7 @@ export async function runPostgresMigrations(): Promise<boolean> {
       CREATE TABLE IF NOT EXISTS post_likes (
         id VARCHAR(64) PRIMARY KEY,
         post_id VARCHAR(64) NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
-        user_id VARCHAR(64) NOT NULL,
+        user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         CONSTRAINT uq_post_user_like UNIQUE(post_id, user_id)
       );
@@ -235,11 +242,35 @@ export async function runPostgresMigrations(): Promise<boolean> {
       CREATE TABLE IF NOT EXISTS comment_likes (
         id VARCHAR(64) PRIMARY KEY,
         comment_id VARCHAR(64) NOT NULL REFERENCES community_comments(id) ON DELETE CASCADE,
-        user_id VARCHAR(64) NOT NULL,
+        user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         CONSTRAINT uq_comment_user_like UNIQUE(comment_id, user_id)
       );
       CREATE INDEX IF NOT EXISTS idx_comment_likes_comment_id ON comment_likes(comment_id);
+
+      -- Defensive constraint checks for existing installations
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'fk_post_likes_user'
+        ) THEN
+          BEGIN
+            ALTER TABLE post_likes ADD CONSTRAINT fk_post_likes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+          EXCEPTION WHEN OTHERS THEN
+            NULL;
+          END;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'fk_comment_likes_user'
+        ) THEN
+          BEGIN
+            ALTER TABLE comment_likes ADD CONSTRAINT fk_comment_likes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+          EXCEPTION WHEN OTHERS THEN
+            NULL;
+          END;
+        END IF;
+      END $$;
     `);
 
     // 10. Community Replies table
@@ -364,3 +395,19 @@ export async function runPostgresMigrations(): Promise<boolean> {
     client.release();
   }
 }
+
+/**
+ * Execute parameterized query on PostgreSQL pool.
+ * Fails clearly if DATABASE_URL is missing or connection fails.
+ */
+export async function queryPostgres<T extends pg.QueryResultRow = any>(
+  text: string,
+  params: any[] = []
+): Promise<pg.QueryResult<T>> {
+  const pool = getPostgresPool();
+  if (!pool) {
+    throw new Error('PostgreSQL connection unavailable: DATABASE_URL is not configured.');
+  }
+  return pool.query<T>(text, params);
+}
+

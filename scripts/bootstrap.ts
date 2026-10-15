@@ -5,16 +5,26 @@ import {
   findUserByEmail,
   hashPassword,
   createAuditLog,
-  getAllUsers
+  isPostgresAuthoritative,
+  DbUser
 } from '../src/server/db.js';
-
-// Ensure database tables exist
-initDatabase();
+import { queryPostgres } from '../src/server/postgres.js';
 
 async function runBootstrap() {
   console.log('================================================================');
   console.log(' PROPERTY STUDIO - SECURE PRODUCTION ACCOUNT BOOTSTRAPPER');
   console.log('================================================================');
+
+  // Ensure database tables exist in the authoritative database
+  await initDatabase();
+  const isPg = isPostgresAuthoritative();
+  console.log(`[BOOTSTRAP] Target authoritative database: ${isPg ? 'Neon PostgreSQL' : 'Local SQLite'}`);
+
+  let sqliteDb: any = null;
+  if (!isPg) {
+    const { DatabaseSync } = await import('node:sqlite');
+    sqliteDb = new DatabaseSync('./data/propertystudio.db');
+  }
 
   // Parse CLI arguments if provided: e.g. tsx scripts/bootstrap.ts --dev-password ...
   const args = process.argv.slice(2);
@@ -35,20 +45,26 @@ async function runBootstrap() {
   const resetTargetEmail = getArg('--reset-user')?.trim().toLowerCase();
   const newPasswordArg = getArg('--new-password');
 
-  const { DatabaseSync } = await import('node:sqlite');
-  const db = new DatabaseSync('./data/propertystudio.db');
   const now = new Date().toISOString();
 
   // Mode A: Individual User Password Reset via CLI
   if (resetTargetEmail && newPasswordArg) {
-    const user = findUserByEmail(resetTargetEmail);
+    const user = await findUserByEmail(resetTargetEmail);
     if (!user) {
       console.error(`[ERROR] User not found matching email: ${resetTargetEmail}`);
       process.exit(1);
     }
     const { hash, salt } = hashPassword(newPasswordArg);
-    db.prepare('UPDATE users SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ?').run(hash, salt, now, user.id);
-    createAuditLog({
+    if (isPg) {
+      await queryPostgres(
+        'UPDATE users SET password_hash = $1, salt = $2, updated_at = $3 WHERE id = $4',
+        [hash, salt, now, user.id]
+      );
+    } else {
+      sqliteDb.prepare('UPDATE users SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ?').run(hash, salt, now, user.id);
+    }
+
+    await createAuditLog({
       actorId: 'server_cli',
       actorEmail: 'cli@propertystudio.org',
       actorRole: 'SYSTEM',
@@ -67,8 +83,81 @@ async function runBootstrap() {
     return `${prefix}@${random}!2026`;
   };
 
+  // Helper to upsert user securely
+  async function upsertBootstrapUser(userData: {
+    id: string;
+    publicId: string;
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+    avatar: string;
+    organization: string;
+    mustChangePassword: number;
+    hash: string;
+    salt: string;
+  }) {
+    if (isPg) {
+      await queryPostgres(`
+        INSERT INTO users (
+          id, public_id, name, email, phone, role, avatar, organization, wallet_balance,
+          is_verified, email_verified, phone_verified, account_status, must_change_password,
+          assigned_properties, password_hash, salt, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, 0,
+          1, 1, 1, 'ACTIVE', $9,
+          '[]', $10, $11, $12, $13
+        )
+      `, [
+        userData.id,
+        userData.publicId,
+        userData.name,
+        userData.email,
+        userData.phone,
+        userData.role,
+        userData.avatar,
+        userData.organization,
+        userData.mustChangePassword,
+        userData.hash,
+        userData.salt,
+        now,
+        now
+      ]);
+    } else {
+      sqliteDb.prepare(`
+        INSERT INTO users (id, public_id, name, email, phone, role, avatar, organization, wallet_balance, is_verified, email_verified, phone_verified, account_status, must_change_password, assigned_properties, password_hash, salt, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 1, 1, 'ACTIVE', ?, '[]', ?, ?, ?, ?)
+      `).run(
+        userData.id,
+        userData.publicId,
+        userData.name,
+        userData.email,
+        userData.phone,
+        userData.role,
+        userData.avatar,
+        userData.organization,
+        userData.mustChangePassword,
+        userData.hash,
+        userData.salt,
+        now,
+        now
+      );
+    }
+  }
+
+  async function updatePassword(userId: string, role: string, hash: string, salt: string) {
+    if (isPg) {
+      await queryPostgres(
+        'UPDATE users SET password_hash = $1, salt = $2, role = $3, updated_at = $4 WHERE id = $5',
+        [hash, salt, role, now, userId]
+      );
+    } else {
+      sqliteDb.prepare("UPDATE users SET password_hash = ?, salt = ?, role = ?, updated_at = ? WHERE id = ?").run(hash, salt, role, now, userId);
+    }
+  }
+
   // 1. BOOTSTRAP DEVELOPER (Platform Owner)
-  let devUser = findUserByEmail(devEmail);
+  let devUser = await findUserByEmail(devEmail);
   const actualDevPassword = devPasswordInput || (devUser ? null : generateSecurePassword('Dev'));
   
   if (!devUser) {
@@ -76,25 +165,21 @@ async function runBootstrap() {
     const devId = 'user_dev_' + crypto.randomBytes(4).toString('hex');
     const publicId = 'dev_' + crypto.randomBytes(3).toString('hex');
 
-    db.prepare(`
-      INSERT INTO users (id, public_id, name, email, phone, role, avatar, organization, wallet_balance, is_verified, email_verified, phone_verified, account_status, must_change_password, assigned_properties, password_hash, salt, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'DEVELOPER', ?, ?, 0, 1, 1, 1, 'ACTIVE', ?, '[]', ?, ?, ?, ?)
-    `).run(
-      devId,
+    await upsertBootstrapUser({
+      id: devId,
       publicId,
-      'Swamy Reddy Javidi (Platform Owner)',
-      devEmail,
-      '+91 98490 12890',
-      '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
-      'Property Studio Secretariat',
-      devPasswordInput ? 0 : 1, // Require password change if temporary
+      name: 'Swamy Reddy Javidi (Platform Owner)',
+      email: devEmail,
+      phone: '+91 98490 12890',
+      role: 'DEVELOPER',
+      avatar: '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
+      organization: 'Property Studio Secretariat',
+      mustChangePassword: devPasswordInput ? 0 : 1,
       hash,
-      salt,
-      now,
-      now
-    );
+      salt
+    });
 
-    createAuditLog({
+    await createAuditLog({
       actorId: 'server_bootstrap',
       actorEmail: 'bootstrap@propertystudio.org',
       actorRole: 'SYSTEM',
@@ -117,7 +202,7 @@ async function runBootstrap() {
     // If password provided, update it
     if (devPasswordInput) {
       const { hash, salt } = hashPassword(devPasswordInput);
-      db.prepare("UPDATE users SET password_hash = ?, salt = ?, role = 'DEVELOPER', updated_at = ? WHERE id = ?").run(hash, salt, now, devUser.id);
+      await updatePassword(devUser.id, 'DEVELOPER', hash, salt);
       console.log(`\n[*] DEVELOPER Account Updated:`);
       console.log(`    Role:     DEVELOPER (Platform Owner)`);
       console.log(`    Email:    ${devEmail}`);
@@ -131,7 +216,7 @@ async function runBootstrap() {
   }
 
   // 2. BOOTSTRAP SUPER_ADMIN
-  let adminUser = findUserByEmail(adminEmail);
+  let adminUser = await findUserByEmail(adminEmail);
   const actualAdminPassword = adminPasswordInput || (adminUser ? null : generateSecurePassword('Admin'));
 
   if (!adminUser) {
@@ -139,25 +224,21 @@ async function runBootstrap() {
     const adminId = 'user_admin_' + crypto.randomBytes(4).toString('hex');
     const publicId = 'admin_' + crypto.randomBytes(3).toString('hex');
 
-    db.prepare(`
-      INSERT INTO users (id, public_id, name, email, phone, role, avatar, organization, wallet_balance, is_verified, email_verified, phone_verified, account_status, must_change_password, assigned_properties, password_hash, salt, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'SUPER_ADMIN', ?, ?, 0, 1, 1, 1, 'ACTIVE', ?, '[]', ?, ?, ?, ?)
-    `).run(
-      adminId,
+    await upsertBootstrapUser({
+      id: adminId,
       publicId,
-      'Property Studio Super Administrator',
-      adminEmail,
-      '+91 98490 12890',
-      '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
-      'Property Studio Administration',
-      adminPasswordInput ? 0 : 1, // Require password change if temporary
+      name: 'Property Studio Super Administrator',
+      email: adminEmail,
+      phone: '+91 98490 12890',
+      role: 'SUPER_ADMIN',
+      avatar: '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
+      organization: 'Property Studio Administration',
+      mustChangePassword: adminPasswordInput ? 0 : 1,
       hash,
-      salt,
-      now,
-      now
-    );
+      salt
+    });
 
-    createAuditLog({
+    await createAuditLog({
       actorId: 'server_bootstrap',
       actorEmail: 'bootstrap@propertystudio.org',
       actorRole: 'SYSTEM',
@@ -179,7 +260,7 @@ async function runBootstrap() {
   } else {
     if (adminPasswordInput) {
       const { hash, salt } = hashPassword(adminPasswordInput);
-      db.prepare("UPDATE users SET password_hash = ?, salt = ?, role = 'SUPER_ADMIN', updated_at = ? WHERE id = ?").run(hash, salt, now, adminUser.id);
+      await updatePassword(adminUser.id, 'SUPER_ADMIN', hash, salt);
       console.log(`\n[*] SUPER_ADMIN Account Updated:`);
       console.log(`    Role:     SUPER_ADMIN (Platform Administrator)`);
       console.log(`    Email:    ${adminEmail}`);
@@ -194,9 +275,16 @@ async function runBootstrap() {
 
   // 3. User Personal Account Check (charankolli.athmick@gmail.com)
   const ownerEmail = 'charankolli.athmick@gmail.com';
-  const ownerUser = findUserByEmail(ownerEmail);
+  const ownerUser = await findUserByEmail(ownerEmail);
   if (ownerUser) {
-    db.prepare("UPDATE users SET role = 'DEVELOPER', is_verified = 1, email_verified = 1, phone_verified = 1 WHERE email = ?").run(ownerEmail);
+    if (isPg) {
+      await queryPostgres(
+        "UPDATE users SET role = 'DEVELOPER', is_verified = 1, email_verified = 1, phone_verified = 1 WHERE email = $1",
+        [ownerEmail]
+      );
+    } else {
+      sqliteDb.prepare("UPDATE users SET role = 'DEVELOPER', is_verified = 1, email_verified = 1, phone_verified = 1 WHERE email = ?").run(ownerEmail);
+    }
     console.log(`\n[*] Owner Personal Account Configured:`);
     console.log(`    Email:    ${ownerEmail}`);
     console.log(`    Role:     DEVELOPER (Platform Owner)`);
