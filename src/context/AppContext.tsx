@@ -19,19 +19,9 @@ import {
   DeviceMode
 } from '../types';
 import {
-  INITIAL_USERS,
-  INITIAL_PROPERTIES,
-  INITIAL_CONSTRUCTION_LOGS,
-  INITIAL_LEADS,
-  INITIAL_MEDIA_ITEMS,
-  INITIAL_CONFERENCE,
-  MICRO_MARKET_TRENDS,
-  INITIAL_COMMUNITY_POSTS,
-  INITIAL_AGENT_APPLICATIONS,
-  INITIAL_DEVELOPER_CLAIMS,
-  INITIAL_ASSIGNMENTS,
-  INITIAL_MESSAGES
+  MICRO_MARKET_TRENDS
 } from '../data/mockData';
+import { postLoginDestination } from '../shared/policy';
 
 interface AppContextType {
   currentUser: User;
@@ -57,7 +47,7 @@ interface AppContextType {
   setSelectedLead: (lead: Lead | null) => void;
   leadPrices: Record<LeadTier, number>;
   updateLeadPrice: (tier: LeadTier, price: number) => void;
-  unlockLead: (leadId: string) => boolean;
+  unlockLead: (leadId: string) => Promise<boolean>;
 
   // Wallet
   walletBalance: number;
@@ -71,7 +61,12 @@ interface AppContextType {
   deleteMediaItem: (id: string) => void;
 
   // Leads
-  createBuyerLead: (lead: Omit<Lead, 'id' | 'isUnlocked' | 'createdAt'>) => void;
+  createBuyerLead: (lead: Omit<Lead, 'id' | 'isUnlocked' | 'createdAt'> & {
+    consentGranted?: boolean;
+    consentVersion?: string;
+    consentPurpose?: string;
+    propertyId?: string;
+  }) => void;
   deleteBuyerLead: (id: string) => void;
 
   // Conference
@@ -135,33 +130,88 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const GUEST_USER: User = {
+  id: 'guest',
+  name: 'Guest',
+  email: '',
+  phone: '',
+  role: 'PROPERTY_SEEKER',
+  avatar: '',
+  walletBalance: 0
+};
+
+const EMPTY_CONFERENCE: CorporateConference = {
+  id: '',
+  title: '',
+  developerName: '',
+  projectFocus: '',
+  date: '',
+  time: '',
+  status: 'UPCOMING',
+  attendeesCount: 0,
+  currentPresenter: '',
+  presenterRole: '',
+  streamThumbnail: '',
+  presentationSlideUrl: '',
+  currentSlideIndex: 0,
+  totalSlides: 0,
+  agenda: [],
+  questions: [],
+  polls: []
+};
+
+function mapLead(raw: any): Lead {
+  return {
+    id: raw.id,
+    seekerName: raw.seekerName || 'Seeker',
+    seekerPhone: raw.seekerPhone || '',
+    seekerEmail: raw.seekerEmail || '',
+    budget: raw.budget || '',
+    budgetMinLakhs: Number(raw.budgetMinLakhs || 0),
+    microMarket: raw.microMarket || '',
+    propertyType: raw.propertyType || '',
+    timeframe: raw.timeframe || 'Next 30-45 Days',
+    requirements: raw.requirements || '',
+    tier: raw.tier || 'STANDARD',
+    priceCredits: Number(raw.priceCredits || 0),
+    isUnlocked: Boolean(raw.isUnlocked || raw.revealed),
+    createdAt: raw.createdAt || ''
+  };
+}
+
+function mapApiUser(raw: any): User {
+  return {
+    id: raw.id,
+    publicId: raw.public_id || raw.publicId,
+    name: raw.name,
+    email: raw.email,
+    phone: raw.phone || '',
+    role: raw.role,
+    avatar: raw.avatar || '',
+    organization: raw.organization || '',
+    walletBalance: Number(raw.wallet_balance ?? raw.walletBalance ?? 0),
+    isVerified: Boolean(raw.is_verified ?? raw.isVerified),
+    emailVerified: Boolean(raw.email_verified ?? raw.emailVerified),
+    phoneVerified: Boolean(raw.phone_verified ?? raw.phoneVerified),
+    accountStatus: raw.account_status || raw.accountStatus,
+    assignedPropertyIds: raw.assignedPropertyIds || []
+  };
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('ps_users');
-    const parsed = saved ? JSON.parse(saved) : INITIAL_USERS;
-    return parsed.map((u: User) => ({ ...u, walletBalance: 0 }));
-  });
-
-  const [currentUserId, setCurrentUserId] = useState<string>(() => {
-    return localStorage.getItem('ps_current_user_id') || 'user_super_admin';
-  });
-
-  const currentUser = users.find(u => u.id === currentUserId) || users[0];
+  const [users, setUsers] = useState<User[]>([]);
+  const [sessionUser, setSessionUser] = useState<User | null>(null);
+  const currentUser = sessionUser ?? GUEST_USER;
+  const isLoggedIn = Boolean(sessionUser);
 
   const [activeView, setActiveView] = useState<ViewType>('HOME');
   const [deviceMode, setDeviceMode] = useState<DeviceMode>('AUTO');
 
-  const [properties, setProperties] = useState<Property[]>(() => {
-    const saved = localStorage.getItem('ps_properties');
-    return saved ? JSON.parse(saved) : INITIAL_PROPERTIES;
-  });
+  const [properties, setProperties] = useState<Property[]>([]);
 
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
 
-  const [constructionLogs, setConstructionLogs] = useState<ConstructionLog[]>(() => {
-    const saved = localStorage.getItem('ps_logs');
-    return saved ? JSON.parse(saved) : INITIAL_CONSTRUCTION_LOGS;
-  });
+  const [constructionLogs, setConstructionLogs] = useState<ConstructionLog[]>([]);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -175,17 +225,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
 
-  const [conference, setConference] = useState<CorporateConference>(() => {
-    const saved = localStorage.getItem('ps_conference');
-    return saved ? JSON.parse(saved) : INITIAL_CONFERENCE;
-  });
+  const [conference, setConference] = useState<CorporateConference>(EMPTY_CONFERENCE);
 
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
   const [communities, setCommunities] = useState<CommunityHub[]>([]);
 
   const refreshCommunities = async () => {
     try {
-      const url = currentUser?.role === 'SUPER_ADMIN' ? '/api/admin/communities' : '/api/communities';
+      const url = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'DEVELOPER'
+        ? '/api/admin/communities/all'
+        : '/api/communities';
       const res = await fetch(url);
       const data = await res.json();
       if (data?.communities && Array.isArray(data.communities)) {
@@ -238,19 +287,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             type: it.type || 'MASTERCLASS',
             duration: it.duration || '15:00',
             host: it.author_name || 'Swamy Reddy Javidi',
-            videoUrl: it.video_url || 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-            thumbnail: it.thumbnail || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+            videoUrl: it.video_url || '',
+            thumbnail: it.thumbnail || '',
             summary: it.summary || '',
-            keyTakeaways: [
-              'Regulatory due diligence & TG-RERA verification',
-              'Vector floor plan structural layout examination',
-              'Real-time landing cost calculations without marketing bias'
-            ],
-            timestamps: [
-              { time: '00:00', label: 'Executive Intro & Foundation Audit' },
-              { time: '05:30', label: 'Detailed Engineering Breakdown' }
-            ],
-            views: it.views || 1,
+            keyTakeaways: [],
+            timestamps: [],
+            views: it.views || 0,
             publishedDate: it.created_at ? new Date(it.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
           }));
           setMediaItems(mapped);
@@ -258,60 +300,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
       .catch(() => {});
 
-    // 3. Dynamic Buyer Leads
-    fetch('/api/leads')
+    fetch('/api/properties')
       .then(res => res.json())
       .then(data => {
-        if (data?.leads && Array.isArray(data.leads)) {
-          const mapped: Lead[] = data.leads.map((l: any) => ({
-            id: l.id,
-            seekerName: l.name ? (l.name.length > 2 ? `${l.name[0]}*** ${l.name.slice(-1)}***` : 'Verified Seeker') : 'S*** K***',
-            seekerPhone: l.phone ? `+91 ${l.phone.slice(0, 2)}****${l.phone.slice(-4)}` : '+91 98****3210',
-            seekerEmail: l.email ? `${l.email[0]}***@gmail.com` : 's***@domain.com',
-            budget: l.budget || '₹4.00 Cr - ₹6.00 Cr',
-            budgetMinLakhs: 400,
-            microMarket: l.micro_market || 'Western Corridor',
-            propertyType: l.property_type || 'Luxury High-Rise',
-            timeframe: 'Immediate (Within 15 Days)',
-            requirements: l.requirements || 'Verified buyer inquiry.',
-            tier: l.tier || 'PREMIUM',
-            priceCredits: l.price || 750,
-            isUnlocked: false,
-            createdAt: 'Recently'
+        if (Array.isArray(data?.properties)) setProperties(data.properties);
+      })
+      .catch(() => {});
+
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.user) setSessionUser(mapApiUser(data.user));
+      })
+      .catch(() => {});
+
+    fetch('/api/conference')
+      .then(res => res.json())
+      .then(data => {
+        const conferenceRow = data?.conference;
+        if (conferenceRow?.id) {
+          setConference(prev => ({
+            ...prev,
+            id: conferenceRow.id,
+            title: conferenceRow.title || '',
+            projectFocus: conferenceRow.subtitle || '',
+            date: conferenceRow.date || '',
+            time: conferenceRow.time || '',
+            status: conferenceRow.status === 'LIVE' ? 'LIVE' : conferenceRow.status === 'RECORDED' ? 'RECORDED' : 'UPCOMING'
           }));
-          setLeads(mapped);
         }
       })
       .catch(() => {});
   }, []);
 
-  const [agentApplications, setAgentApplications] = useState<AgentApplication[]>(() => {
-    const saved = localStorage.getItem('ps_agent_apps');
-    return saved ? JSON.parse(saved) : INITIAL_AGENT_APPLICATIONS;
-  });
+  useEffect(() => {
+    refreshCommunities();
+    if (!sessionUser) {
+      setLeads([]);
+      return;
+    }
+    fetch('/api/leads')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data?.leads)) setLeads(data.leads.map(mapLead));
+      })
+      .catch(() => {});
+  }, [sessionUser?.id, sessionUser?.role]);
 
-  const [developerClaims, setDeveloperClaims] = useState<DeveloperClaim[]>(() => {
-    const saved = localStorage.getItem('ps_dev_claims');
-    return saved ? JSON.parse(saved) : INITIAL_DEVELOPER_CLAIMS;
-  });
-
-  const [assignments, setAssignments] = useState<PropertyAdminAssignment[]>(() => {
-    const saved = localStorage.getItem('ps_assignments');
-    return saved ? JSON.parse(saved) : INITIAL_ASSIGNMENTS;
-  });
-
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem('ps_messages');
-    return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
-  });
+  const [agentApplications, setAgentApplications] = useState<AgentApplication[]>([]);
+  const [developerClaims, setDeveloperClaims] = useState<DeveloperClaim[]>([]);
+  const [assignments, setAssignments] = useState<PropertyAdminAssignment[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const [marketTrends] = useState<MicroMarketTrend[]>(MICRO_MARKET_TRENDS);
   const [toast, setToast] = useState<string | null>(null);
-
-  // Auth & Guest Mode: default to false as requested ("the website should be without login", only Login button)
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return localStorage.getItem('ps_is_logged_in') === 'true';
-  });
 
   // Track global scroll progress (0 to 1) for the smooth image-to-logo morphing animation
   const [scrollProgress, setScrollProgress] = useState<number>(0);
@@ -331,16 +373,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const login = (user?: User) => {
     if (user) {
-      setCurrentUserId(user.id);
+      const mapped = mapApiUser(user);
+      setSessionUser(mapped);
+      setActiveView(postLoginDestination(mapped.role));
+      showToast(`Signed in as ${mapped.name}`);
+      return;
     }
-    setIsLoggedIn(true);
-    localStorage.setItem('ps_is_logged_in', 'true');
-    showToast(`Signed in as ${user ? user.name : currentUser.name}`);
+    showToast('Signed in');
   };
 
   const logout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('ps_is_logged_in');
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    setSessionUser(null);
     setActiveView('HOME');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast('Signed out. Continuing in guest mode.');
@@ -357,10 +401,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('ps_users', JSON.stringify(users));
   }, [users]);
-
-  useEffect(() => {
-    localStorage.setItem('ps_current_user_id', currentUserId);
-  }, [currentUserId]);
 
   useEffect(() => {
     localStorage.setItem('ps_properties', JSON.stringify(properties));
@@ -394,67 +434,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('ps_messages', JSON.stringify(messages));
   }, [messages]);
 
-  const switchUser = (user: User) => {
-    setCurrentUserId(user.id);
-    setIsLoggedIn(true);
-    localStorage.setItem('ps_is_logged_in', 'true');
-    showToast(`Switched profile to: ${user.name} (${user.role.replace('_', ' ')})`);
+  const switchUser = (_user: User) => {
+    showToast('Account identity comes from the server session.');
   };
 
-  const switchRole = (role: UserRole) => {
-    const foundUser = users.find(u => u.role === role);
-    if (foundUser) {
-      setCurrentUserId(foundUser.id);
-      setIsLoggedIn(true);
-      localStorage.setItem('ps_is_logged_in', 'true');
-      showToast(`Active Role: ${role.replace('_', ' ')} (${foundUser.name})`);
-    } else {
-      showToast(`No user profile found for role ${role}`);
-    }
+  const switchRole = (_role: UserRole) => {
+    showToast('Roles are assigned on the server and cannot be switched in the browser.');
   };
 
   const topUpWallet = (amount: number) => {
-    setUsers(prev =>
-      prev.map(u => (u.id === currentUser.id ? { ...u, walletBalance: u.walletBalance + amount } : u))
-    );
-    showToast(`Wallet credited with ₹${amount.toLocaleString('en-IN')}`);
+    fetch('/api/billing/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, purpose: 'WALLET_TOPUP' })
+    })
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.error || 'Payment provider is NOT_CONFIGURED.');
+          return;
+        }
+        showToast(data.notice || 'Payment is pending verification.');
+      })
+      .catch(() => showToast('Payment provider is NOT_CONFIGURED.'));
   };
 
-  const unlockLead = (leadId: string): boolean => {
-    const lead = leads.find(l => l.id === leadId);
-    if (!lead) return false;
-    if (lead.isUnlocked) {
-      showToast('Lead is already unlocked!');
-      return true;
-    }
-
-    const price = leadPrices[lead.tier] || lead.priceCredits;
-    if (currentUser.walletBalance < price) {
-      showToast(`Insufficient wallet balance (Need ₹${price}, Available ₹${currentUser.walletBalance}). Please recharge.`);
+  const unlockLead = async (leadId: string): Promise<boolean> => {
+    const response = await fetch(`/api/leads/${leadId}/unlock`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': crypto.randomUUID()
+      },
+      body: JSON.stringify({})
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      showToast(data.error || 'Lead unlock was denied.');
       return false;
     }
-
-    // Deduct balance
-    setUsers(prev =>
-      prev.map(u => (u.id === currentUser.id ? { ...u, walletBalance: u.walletBalance - price } : u))
-    );
-
-    // Unlock lead
-    setLeads(prev =>
-      prev.map(l =>
-        l.id === leadId
-          ? {
-              ...l,
-              isUnlocked: true,
-              unlockedAt: 'Just now',
-              unlockedByUserId: currentUser.id,
-              unlockedByRole: currentUser.role
-            }
-          : l
-      )
-    );
-
-    showToast(`Lead verified & unlocked for ₹${price}! Contact details now visible.`);
+    if (data.lead) {
+      setLeads(prev => prev.map(lead => lead.id === leadId ? { ...lead, ...data.lead, isUnlocked: true } : lead));
+    }
+    if (typeof data.balance === 'number') {
+      setSessionUser(prev => prev ? { ...prev, walletBalance: data.balance } : prev);
+    }
+    showToast(data.charged > 0 ? `Lead unlocked. ₹${data.charged} debited.` : 'Lead contact details are available.');
     return true;
   };
 
@@ -679,7 +704,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .catch(() => {});
   };
 
-  const createBuyerLead = (leadData: Omit<Lead, 'id' | 'isUnlocked' | 'createdAt'>) => {
+  const createBuyerLead = (leadData: Omit<Lead, 'id' | 'isUnlocked' | 'createdAt'> & {
+    consentGranted?: boolean;
+    consentVersion?: string;
+    consentPurpose?: string;
+    propertyId?: string;
+  }) => {
     fetch('/api/leads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -692,19 +722,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         micro_market: leadData.microMarket,
         tier: leadData.tier,
         price: leadData.priceCredits,
-        requirements: leadData.requirements
+        requirements: leadData.requirements,
+        propertyId: leadData.propertyId,
+        consentGranted: leadData.consentGranted === true,
+        consentVersion: leadData.consentVersion,
+        consentPurpose: leadData.consentPurpose
       })
     })
-      .then(res => res.json())
-      .then(resData => {
-        const newLead: Lead = {
-          ...leadData,
-          id: resData.leadId || `lead_${Date.now()}`,
-          isUnlocked: false,
-          createdAt: 'Just now'
-        };
-        setLeads(prev => [newLead, ...prev]);
-        showToast(`Buyer lead for ${leadData.propertyType} (${leadData.budget}) submitted!`);
+      .then(async res => {
+        const resData = await res.json();
+        if (!res.ok) {
+          showToast(resData.error || 'Enquiry was not accepted.');
+          return;
+        }
+        showToast('Enquiry submitted. Contact details stay masked until an authorized unlock.');
       })
       .catch(() => {
         showToast('Failed to submit buyer lead to server.');

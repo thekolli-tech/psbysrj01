@@ -6,7 +6,12 @@ export type UserRole =
   | 'PROPERTY_ADMIN'
   | 'AGENT'
   | 'PROPERTY_SEEKER'
-  | 'LAND_OWNER';
+  | 'LAND_OWNER'
+  | 'LANDOWNER'
+  | 'CHANNEL_PARTNER'
+  | 'RESELLER'
+  | 'RERA_AGENT'
+  | 'REAL_ESTATE_MEDIA';
 
 export type LeadTier = 'STANDARD' | 'PREMIUM' | 'HNI';
 
@@ -385,6 +390,8 @@ export type ViewType =
   | 'COMMUNITY'
   | 'CHAT'
   | 'ADMIN'
+  | 'DEVELOPER'
+  | 'PROFESSIONAL'
   | 'PROPERTY_ADMIN'
   | 'STUDIO'
   | 'CONTACT';

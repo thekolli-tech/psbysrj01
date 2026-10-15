@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
+import { BrandLogo } from './BrandLogo';
 import { Lock, Sparkles, LogIn, ArrowRight, ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 interface AuthRequiredCardProps {
@@ -63,6 +64,7 @@ export const AuthRequiredCard: React.FC<AuthRequiredCardProps> = ({
   return (
     <div className="max-w-2xl mx-auto my-12 px-4">
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden p-8 sm:p-10 text-center space-y-6">
+        <BrandLogo variant="compact" size="xl" className="mx-auto" />
         {/* Lock Emblem */}
         <div className="relative w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-600">
           <Lock className="w-8 h-8 text-amber-600" />

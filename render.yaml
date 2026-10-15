@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: property-studio
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: BOOTSTRAP_DEVELOPER_EMAIL
+        sync: false
+      - key: BOOTSTRAP_DEVELOPER_PASSWORD
+        sync: false
+      - key: BOOTSTRAP_SUPER_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_SUPER_ADMIN_PASSWORD
+        sync: false
+      - key: DEVELOPER_RECOVERY_KEY
+        sync: false

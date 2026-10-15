@@ -32,7 +32,7 @@ export const MarketTrendsView: React.FC = () => {
             Western Corridor Market Trends & Capital Appreciation
           </h1>
           <p className="text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
-            Proprietary pricing models, quarterly absorption velocity, infrastructure impact analyses, and historical rate trajectories curated by Swamy Reddy Javidi.
+            Illustrative corridor models for layout exploration. These figures are not live market statistics and are not property listings.
           </p>
         </div>
 

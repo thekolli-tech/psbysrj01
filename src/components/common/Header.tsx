@@ -1,7 +1,8 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
-import { ASSET_IMAGES } from '../../data/mockData';
+import { isPlatformAdmin, isProfessionalRole, isPropertySeeker } from '../../shared/policy';
+import { BrandLogo } from './BrandLogo';
 import {
   Wallet,
   LogIn,
@@ -30,8 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
     setActiveView,
     currentUser,
     walletBalance,
-    isLoggedIn,
-    scrollProgress
+    isLoggedIn
   } = useApp();
 
   // Navigation links - member modules only visible after login
@@ -39,11 +39,12 @@ export const Header: React.FC<HeaderProps> = ({
     ? [
         { view: 'HOME', label: 'Overview' },
         { view: 'PROPERTIES', label: 'Projects' },
-        { view: 'LEADS_MARKET', label: 'Buyer Leads' },
+        ...(isPropertySeeker(currentUser.role) ? [] : [{ view: 'LEADS_MARKET' as ViewType, label: 'Buyer Leads' }]),
         { view: 'MEDIA', label: 'Media & Podcasts' },
         { view: 'CONFERENCE', label: 'Live Summit' },
         { view: 'MARKET_INSIGHTS', label: 'Market Trends' },
-        { view: 'COMMUNITY', label: 'Community Q&A' }
+        { view: 'COMMUNITY', label: 'Community Q&A' },
+        ...(isProfessionalRole(currentUser.role) ? [{ view: 'PROFESSIONAL' as ViewType, label: 'Workspace' }] : [])
       ]
     : [
         { view: 'HOME', label: 'Overview' },
@@ -51,8 +52,6 @@ export const Header: React.FC<HeaderProps> = ({
         { view: 'MARKET_INSIGHTS', label: 'Market Trends' },
         { view: 'COMMUNITY', label: 'Community Feed' }
       ];
-
-  const isScrolled = scrollProgress > 0.15;
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 transition-all duration-300">
@@ -89,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Main Navigation Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 flex items-center justify-between gap-4">
         {/* Zone 1: Brand & Logo */}
         <div className="flex items-center gap-6">
           <button
@@ -97,43 +96,10 @@ export const Header: React.FC<HeaderProps> = ({
               setActiveView('HOME');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="text-left group flex items-center gap-2.5 focus:outline-none cursor-pointer"
+            className="text-left group flex items-center focus:outline-none cursor-pointer"
+            aria-label="Property Studio home"
           >
-            {/* Scrolled Logo Container with Smooth Scale & Fade Morph */}
-            <div className="relative flex items-center">
-              <div
-                className={`transition-all duration-300 flex items-center ${
-                  isScrolled
-                    ? 'opacity-100 scale-100 max-w-[170px]'
-                    : 'opacity-0 scale-75 max-w-0 overflow-hidden'
-                }`}
-              >
-                <img
-                  src={ASSET_IMAGES.officialLogo}
-                  alt="Property Studio Logo"
-                  className="h-10 w-auto object-contain shrink-0"
-                />
-              </div>
-
-              <div
-                className={`transition-all duration-300 ${
-                  isScrolled ? 'hidden' : 'block'
-                }`}
-              >
-                <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-amber-400 font-extrabold text-base shadow-sm">
-                  PS
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <span className="text-base font-extrabold text-slate-900 tracking-tight block leading-tight font-display group-hover:text-amber-700 transition-colors">
-                Property Studio
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium block">
-                by Swamy Reddy Javidi
-              </span>
-            </div>
+            <BrandLogo variant="compact" size="md" />
           </button>
         </div>
 
@@ -178,7 +144,23 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {/* Admin / Developer Console direct button */}
-          {isLoggedIn && (currentUser.role === 'DEVELOPER' || currentUser.role === 'SUPER_ADMIN') && (
+          {isLoggedIn && currentUser.role === 'DEVELOPER' && (
+            <button
+              onClick={() => {
+                setActiveView('DEVELOPER');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                activeView === 'DEVELOPER'
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-800 border-slate-300'
+              }`}
+            >
+              Diagnostics
+            </button>
+          )}
+
+          {isLoggedIn && isPlatformAdmin(currentUser.role) && (
             <button
               onClick={() => {
                 setActiveView('ADMIN');

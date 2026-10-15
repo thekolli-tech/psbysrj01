@@ -4,7 +4,6 @@ import {
   Phone,
   Mail,
   MessageCircle,
-  ShieldCheck,
   Send,
   HelpCircle,
   FileCheck,
@@ -17,6 +16,7 @@ import {
   Lock
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { BrandLogo } from '../common/BrandLogo';
 
 interface SupportDeskProps {
   isOpen: boolean;
@@ -90,8 +90,8 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
         {/* Support Header */}
         <div className="p-5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shrink-0">
-              <ShieldCheck className="w-5 h-5" />
+            <div className="w-16 h-12 rounded-xl bg-white flex items-center justify-center px-1 shrink-0">
+              <BrandLogo variant="compact" size="sm" />
             </div>
             <div>
               <div className="flex items-center gap-2">

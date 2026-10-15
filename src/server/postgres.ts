@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { POSTGRES_ADDITIVE_SQL, REQUIRED_TABLES } from './platformSchema.ts';
 
 // Register PostgreSQL type parsers for Neon compatibility
 // Type ID 1700 (NUMERIC/DECIMAL) -> JavaScript number
@@ -384,6 +385,8 @@ export async function runPostgresMigrations(): Promise<boolean> {
       );
     `);
 
+    await client.query(POSTGRES_ADDITIVE_SQL);
+
     await client.query('COMMIT');
     console.log('[PostgreSQL Migration] All PostgreSQL tables, indexes, and constraints migrated successfully.');
     return true;
@@ -400,6 +403,28 @@ export async function runPostgresMigrations(): Promise<boolean> {
  * Execute parameterized query on PostgreSQL pool.
  * Fails clearly if DATABASE_URL is missing or connection fails.
  */
+export async function checkSchemaReadiness(): Promise<{
+  ready: boolean;
+  missing: string[];
+  connected: boolean;
+  error?: string;
+}> {
+  const health = await checkPostgresHealth();
+  if (!health.connected) {
+    return { ready: false, missing: [...REQUIRED_TABLES], connected: false, error: health.error };
+  }
+  try {
+    const res = await queryPostgres<{ table_name: string }>(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`
+    );
+    const present = new Set(res.rows.map(row => row.table_name));
+    const missing = REQUIRED_TABLES.filter(table => !present.has(table));
+    return { ready: missing.length === 0, missing: [...missing], connected: true };
+  } catch (err: any) {
+    return { ready: false, missing: [...REQUIRED_TABLES], connected: false, error: err.message || 'Schema check failed' };
+  }
+}
+
 export async function queryPostgres<T extends pg.QueryResultRow = any>(
   text: string,
   params: any[] = []

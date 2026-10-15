@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
+import { isPropertySeeker } from '../../shared/policy';
 import {
   Home,
   Building2,
@@ -16,9 +17,10 @@ interface MobileBottomNavProps {
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenSupport }) => {
-  const { activeView, setActiveView, isLoggedIn } = useApp();
+  const { activeView, setActiveView, isLoggedIn, currentUser } = useApp();
+  const seeker = isPropertySeeker(currentUser.role);
 
-  const tabs: { view: ViewType | 'SUPPORT'; label: string; icon: React.ReactNode; isSupportAction?: boolean }[] = isLoggedIn
+  const tabs: { view: ViewType | 'SUPPORT'; label: string; icon: React.ReactNode; isSupportAction?: boolean }[] = isLoggedIn && !seeker
     ? [
         {
           view: 'HOME',

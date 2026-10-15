@@ -394,15 +394,15 @@ export async function pgRecoverDeveloperAccount(recoverySecret: string, newPassw
   pgRecoveryAttempts.count = 0;
   pgRecoveryAttempts.lockedUntil = 0;
 
-  const devEmail = (process.env.BOOTSTRAP_DEVELOPER_EMAIL || 'developer@propertystudio.org').trim().toLowerCase();
-  let devUser = await pgFindUserByEmail(devEmail) || await pgFindUserByEmail('charankolli.athmick@gmail.com');
+  const devEmail = process.env.BOOTSTRAP_DEVELOPER_EMAIL?.trim().toLowerCase();
+  if (!devEmail) {
+    return { success: false, error: 'BOOTSTRAP_DEVELOPER_EMAIL is not configured. Recovery will not guess an account.' };
+  }
+  const devUser = await pgFindUserByEmail(devEmail);
 
   if (!devUser) {
-    await pgBootstrapProductionAccounts();
-    devUser = await pgFindUserByEmail(devEmail) || await pgFindUserByEmail('charankolli.athmick@gmail.com');
+    return { success: false, error: 'Developer account is not provisioned. Run npm run bootstrap. Recovery does not create accounts.' };
   }
-
-  if (!devUser) return { success: false, error: 'Failed to locate Developer account' };
 
   await pgResetPassword(devUser.id, newPassword);
   await queryPostgres("UPDATE users SET account_status = 'ACTIVE', updated_at = $1 WHERE id = $2", [new Date().toISOString(), devUser.id]);
@@ -421,13 +421,17 @@ export async function pgRecoverDeveloperAccount(recoverySecret: string, newPassw
 
 export async function pgBootstrapProductionAccounts(): Promise<void> {
   const now = new Date().toISOString();
+  const devEmail = process.env.BOOTSTRAP_DEVELOPER_EMAIL?.trim().toLowerCase();
+  const devPassword = process.env.BOOTSTRAP_DEVELOPER_PASSWORD;
+  const adminEmail = process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD;
+  if (!devEmail || !devPassword || !adminEmail || !adminPassword) {
+    throw new Error('Bootstrap requires BOOTSTRAP_DEVELOPER_EMAIL, BOOTSTRAP_DEVELOPER_PASSWORD, BOOTSTRAP_SUPER_ADMIN_EMAIL, and BOOTSTRAP_SUPER_ADMIN_PASSWORD. Refusing to invent credentials.');
+  }
 
-  // 1. Ensure DEVELOPER (Platform Owner) Account Exists
-  const devEmail = (process.env.BOOTSTRAP_DEVELOPER_EMAIL || 'developer@propertystudio.org').trim().toLowerCase();
   const existingDev = await pgFindUserByEmail(devEmail);
 
   if (!existingDev) {
-    const devPassword = process.env.BOOTSTRAP_DEVELOPER_PASSWORD || 'DevStudio@Reddy2026!';
     const { hash, salt } = hashPassword(devPassword);
     const devId = 'user_dev_' + crypto.randomBytes(4).toString('hex');
     const publicId = 'dev_' + crypto.randomBytes(3).toString('hex');
@@ -443,11 +447,11 @@ export async function pgBootstrapProductionAccounts(): Promise<void> {
     `, [
       devId,
       publicId,
-      'Swamy Reddy Javidi (Platform Owner)',
+      'Platform Developer',
       devEmail,
-      '+91 98490 12890',
-      '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
-      'Property Studio Secretariat',
+      '',
+      '',
+      'Property Studio',
       hash,
       salt,
       now,
@@ -465,12 +469,9 @@ export async function pgBootstrapProductionAccounts(): Promise<void> {
     });
   }
 
-  // 2. Ensure SUPER_ADMIN Account Exists
-  const adminEmail = (process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL || 'admin@propertystudio.org').trim().toLowerCase();
   const existingAdmin = await pgFindUserByEmail(adminEmail);
 
   if (!existingAdmin) {
-    const adminPassword = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD || 'SuperAdmin@Reddy2026!';
     const { hash, salt } = hashPassword(adminPassword);
     const adminId = 'user_admin_' + crypto.randomBytes(4).toString('hex');
     const publicId = 'admin_' + crypto.randomBytes(3).toString('hex');
@@ -486,11 +487,11 @@ export async function pgBootstrapProductionAccounts(): Promise<void> {
     `, [
       adminId,
       publicId,
-      'Property Studio Super Administrator',
+      'Platform Super Admin',
       adminEmail,
-      '+91 98490 12890',
-      '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
-      'Property Studio Administration',
+      '',
+      '',
+      'Property Studio',
       hash,
       salt,
       now,
@@ -508,15 +509,6 @@ export async function pgBootstrapProductionAccounts(): Promise<void> {
     });
   }
 
-  // 3. Ensure platform owner personal account has DEVELOPER privileges
-  const ownerEmail = 'charankolli.athmick@gmail.com'.toLowerCase();
-  const ownerUser = await pgFindUserByEmail(ownerEmail);
-  if (ownerUser) {
-    await queryPostgres(
-      "UPDATE users SET role = 'DEVELOPER', is_verified = 1, email_verified = 1, phone_verified = 1 WHERE email = $1",
-      [ownerEmail]
-    );
-  }
 }
 
 // ==============================================================================
@@ -812,7 +804,7 @@ export async function pgGetAllPosts(params?: {
   offset?: number;
   currentUserId?: string;
 }): Promise<any[]> {
-  let query = "SELECT p.* FROM community_posts p WHERE p.status = 'PUBLISHED'";
+  let query = "SELECT p.* FROM community_posts p WHERE p.status IN ('APPROVED', 'PUBLISHED')";
   const args: any[] = [];
   let paramIdx = 1;
 
@@ -942,7 +934,7 @@ export async function pgCreatePost(post: {
       media_type, media_url, thumbnail_url, duration, status, upvotes, comments_count,
       is_pinned, is_flagged, created_at, updated_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'PUBLISHED', 0, 0, 0, 0, $18, $19)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'PENDING_APPROVAL', 0, 0, 0, 0, $18, $19)
   `, [
     id,
     post.authorId || null,
@@ -970,8 +962,9 @@ export async function pgCreatePost(post: {
     title: post.title,
     authorName: post.authorName,
     communityId: post.communityId,
-    mediaType: post.mediaType || 'POST'
-  });
+    mediaType: post.mediaType || 'POST',
+    status: 'PENDING_APPROVAL'
+  }, post.authorId || null);
 
   return pgGetPostById(id);
 }
@@ -995,7 +988,7 @@ export async function pgUpdatePost(
 
   await queryPostgres(`
     UPDATE community_posts
-    SET title = $1, content = $2, links = $3, attachments = $4, updated_at = $5
+    SET title = $1, content = $2, links = $3, attachments = $4, status = 'PENDING_APPROVAL', updated_at = $5
     WHERE id = $6
   `, [title, content, links, attachments, now, postId]);
 
@@ -1511,73 +1504,7 @@ export async function pgGetCommunityEventsSince(sinceTimestamp: string, targetUs
 // ==============================================================================
 
 export async function pgEnsureInitialCommunities(): Promise<void> {
-  const countRes = await queryPostgres('SELECT COUNT(*) as count FROM communities');
-  const count = parseInt(countRes.rows[0]?.count || '0', 10);
-  if (count > 0) return;
-
-  const now = new Date().toISOString();
-  const starterCommunities = [
-    {
-      id: 'comm_neopolis_hub',
-      name: 'Kokapet Neopolis Residents & Investors Hub',
-      slug: 'kokapet-neopolis-hub',
-      description: 'Official verified forum for Kokapet Neopolis high-rise owners, floor plate investors, and future residents. Ground telemetry, construction milestone verifications, and civil infrastructure reviews.',
-      category: 'Micro-Market Hub',
-      location: 'Neopolis, Kokapet, Hyderabad',
-      created_by_id: 'user_dev_root',
-      created_by_name: 'Swamy Reddy Javidi',
-      status: 'APPROVED',
-      rejection_reason: '',
-      member_count: 342,
-      icon: 'Building2',
-      banner_image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
-      rules: '1. No speculative spam. 2. Verify RERA numbers before quoting delay metrics. 3. Respect resident privacy.'
-    },
-    {
-      id: 'comm_financial_district',
-      name: 'Financial District High-Rise Owners Forum',
-      slug: 'financial-district-owners',
-      description: 'The premier community destination for luxury tower owners in Nanakramguda and Financial District. Discussions on commercial rental yields, property tax assessments, and clubhouse operations.',
-      category: 'Residential Luxury',
-      location: 'Financial District, Nanakramguda',
-      created_by_id: 'user_dev_root',
-      created_by_name: 'Swamy Reddy Javidi',
-      status: 'APPROVED',
-      rejection_reason: '',
-      member_count: 218,
-      icon: 'ShieldCheck',
-      banner_image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
-      rules: '1. Verified deed holders given primary speaking stage. 2. High standards of civil discourse.'
-    },
-    {
-      id: 'comm_tellapur_builders',
-      name: 'Tellapur Town Builders & Landowners Community',
-      slug: 'tellapur-town-builders',
-      description: 'A dynamic community unifying villa developers, plotted land holders, and RERA certified channel partners operating in Tellapur and Kollur expansion zones.',
-      category: 'Town Development',
-      location: 'Tellapur, Western Corridor',
-      created_by_id: 'user_dev_root',
-      created_by_name: 'Swamy Reddy Javidi',
-      status: 'APPROVED',
-      rejection_reason: '',
-      member_count: 175,
-      icon: 'Users',
-      banner_image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-      rules: '1. All land surveys must cite revenue village survey numbers. 2. No anonymous broker solicitation.'
-    }
-  ];
-
-  for (const c of starterCommunities) {
-    await queryPostgres(`
-      INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-      ON CONFLICT (id) DO NOTHING
-    `, [
-      c.id, c.name, c.slug, c.description, c.category, c.location,
-      c.created_by_id, c.created_by_name, c.status, c.rejection_reason,
-      c.member_count, c.icon, c.banner_image, c.rules, now, now
-    ]);
-  }
+  // Intentionally empty. Schema initialization must not seed communities or statistics.
 }
 
 export async function pgGetAllCommunities(status?: string): Promise<DbCommunity[]> {
@@ -1815,23 +1742,16 @@ export async function pgGetConferenceDetails(): Promise<DbConferenceDetails> {
     };
   }
 
-  const now = new Date().toISOString();
-  await queryPostgres(`
-    INSERT INTO conference_details (id, title, subtitle, date, time, stream_url, status, agenda, updated_at)
-    VALUES ('conf_main', 'Neopolis High-Rise Layout Launch & Institutional Investor Summit 2026', 'The Crown Residences & Commercial Sky-Park (Neopolis Phase II)', 'October 24, 2026', '11:00 AM - 01:30 PM IST', 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'SCHEDULED', '[]', $1)
-    ON CONFLICT (id) DO NOTHING
-  `, [now]);
-
   return {
-    id: 'conf_main',
-    title: 'Neopolis High-Rise Layout Launch & Institutional Investor Summit 2026',
-    subtitle: 'The Crown Residences & Commercial Sky-Park (Neopolis Phase II)',
-    date: 'October 24, 2026',
-    time: '11:00 AM - 01:30 PM IST',
-    stream_url: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-    status: 'SCHEDULED',
+    id: '',
+    title: '',
+    subtitle: '',
+    date: '',
+    time: '',
+    stream_url: '',
+    status: 'UNSCHEDULED',
     agenda: '[]',
-    updated_at: now
+    updated_at: new Date().toISOString()
   };
 }
 

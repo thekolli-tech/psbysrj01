@@ -106,6 +106,15 @@ export async function migrateSqliteToPostgres(): Promise<MigrationResult> {
       error: 'CRITICAL: DATABASE_URL is not configured. Cannot perform migration.'
     };
   }
+  if (process.env.ALLOW_LEGACY_SQLITE_IMPORT !== 'true') {
+    return {
+      success: false,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      stats: [],
+      error: 'Legacy SQLite import is disabled. Set ALLOW_LEGACY_SQLITE_IMPORT=true to run it deliberately. Deployment does not import old records.'
+    };
+  }
 
   // Step 1: Ensure SQLite snapshot is safely backed up before migration
   const backupRes = backupSqliteDatabase();
@@ -692,6 +701,15 @@ export async function reverseSyncPostgresToSqlite(): Promise<MigrationResult> {
       durationMs: Date.now() - startTime,
       stats: [],
       error: 'CRITICAL: DATABASE_URL is not configured. Cannot perform reverse synchronization.'
+    };
+  }
+  if (process.env.ALLOW_LEGACY_SQLITE_IMPORT !== 'true') {
+    return {
+      success: false,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      stats: [],
+      error: 'SQLite reverse-sync is disabled. Set ALLOW_LEGACY_SQLITE_IMPORT=true only for an explicit legacy workflow.'
     };
   }
 

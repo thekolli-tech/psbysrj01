@@ -63,28 +63,32 @@ import {
   deleteCommunity,
   updateLastLogin
 } from './src/server/db.ts';
-import { checkPostgresHealth } from './src/server/postgres.ts';
-import {
-  migrateSqliteToPostgres,
-  reconcileSqliteAndPostgres,
-  reverseSyncPostgresToSqlite
-} from './src/server/postgresMigration.ts';
+import { checkPostgresHealth, checkSchemaReadiness } from './src/server/postgres.ts';
 import { sendRealEmailOtp, sendRealSmsOtp, getNotificationGatewayStatus } from './src/server/notifications.ts';
-import { connectMongoDB, saveRegistrationToMongo, getMongoHealth } from './src/server/mongodb.ts';
+import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
+import { upsertProfessionalProfile } from './src/server/commerce.ts';
+import { buildHealthReport } from './src/server/health.ts';
+import { canViewModeratedContent, selfServeStorageRole } from './src/shared/policy.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Connect to MongoDB asynchronously if configured
-connectMongoDB().catch(err => {
-  console.warn('[MongoDB Init Warning]:', err.message);
-});
-
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cookieParser());
+
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: 30 * 24 * 60 * 60 * 1000
+  };
+}
 
 // Extend Express Request type for authenticated session
 interface AuthenticatedRequest extends Request {
@@ -186,6 +190,15 @@ app.get('/api/community/events', async (req: AuthenticatedRequest, res: Response
     try {
       const missedEvents = await getCommunityEventsSince(lastTime, req.user?.id);
       for (const ev of missedEvents) {
+        let payload: any = {};
+        try {
+          payload = JSON.parse(ev.payload);
+        } catch {
+          payload = {};
+        }
+        if (payload?.status && !canViewModeratedContent(payload.status, payload.authorId, req.user)) {
+          continue;
+        }
         res.write(`event: ${ev.event_type}\ndata: ${ev.payload}\n\n`);
       }
     } catch (_e) {}
@@ -242,12 +255,7 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
     await updateLastLogin(user.id);
 
     // Set secure HttpOnly cookie
-    res.cookie('ps_session', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-    });
+    res.cookie('ps_session', token, sessionCookieOptions());
 
     const { password_hash, salt, ...safeUser } = user;
     res.json({
@@ -486,9 +494,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const safeRole = (role === 'AGENT' || role === 'CONTENT_CREATOR' || role === 'LAND_OWNER')
-      ? role
-      : 'PROPERTY_SEEKER';
+    const safeRole = selfServeStorageRole(role);
 
     let isPhoneVerified = false;
     if (safeRole === 'PROPERTY_SEEKER') {
@@ -530,20 +536,16 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       newUser.phone_verified = 1;
     }
 
-    saveRegistrationToMongo(newUser, {
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    }).catch(err => {
-      console.warn('[MongoDB Storage Warning]:', err.message);
-    });
+    if (safeRole !== 'PROPERTY_SEEKER') {
+      await upsertProfessionalProfile({
+        userId: newUser.id,
+        role: safeRole,
+        organization: organization?.trim() || ''
+      });
+    }
 
     const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);
-    res.cookie('ps_session', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000
-    });
+    res.cookie('ps_session', token, sessionCookieOptions());
 
     const { password_hash, salt, ...safeUser } = newUser;
     res.json({
@@ -610,95 +612,39 @@ app.get('/api/notifications/status', (_req: Request, res: Response): void => {
 
 // Database, Authoritative Engine & Integration Health Check
 app.get('/api/database/status', async (_req: Request, res: Response): Promise<void> => {
-  const pgConfigured = isPostgresAuthoritative();
-  const pgStatus = await checkPostgresHealth();
-  const mongoStatus = await getMongoHealth();
-
-  let authoritativeDatabase;
-  if (pgConfigured) {
-    if (pgStatus.connected) {
-      authoritativeDatabase = {
-        engine: 'postgresql_managed',
-        status: 'HEALTHY',
-        latencyMs: pgStatus.latencyMs,
-        durableStorage: true,
-        description: 'Primary authoritative ACID database for all users, sessions, posts, comments, likes, leads, and events.'
-      };
-    } else {
-      authoritativeDatabase = {
-        engine: 'postgresql_managed',
-        status: 'UNAVAILABLE',
-        error: pgStatus.error || 'Failed to connect to managed PostgreSQL',
-        durableStorage: true,
-        description: 'PostgreSQL is designated as authoritative via DATABASE_URL but is currently unreachable. Silent SQLite fallback is disabled.'
-      };
-    }
-  } else {
-    authoritativeDatabase = {
-      engine: 'sqlite_ephemeral',
-      path: './data/propertystudio.db',
-      status: 'ACTIVE_LOCAL_DEV',
-      durableStorage: false,
-      warning: 'Operating in local development mode on container filesystem. Configure DATABASE_URL for Neon PostgreSQL authoritative persistence.',
-      description: 'Authoritative database in local-development mode. Production deployment requires DATABASE_URL.'
-    };
-  }
-
-  res.json({
-    success: pgConfigured ? pgStatus.connected : true,
-    authoritativeDatabase,
+  const report = await buildHealthReport();
+  const pgStatus = isPostgresAuthoritative() ? await checkPostgresHealth() : { connected: false };
+  const schema = isPostgresAuthoritative() ? await checkSchemaReadiness() : null;
+  res.status(report.httpStatus).json({
+    success: report.httpStatus === 200,
+    authoritativeDatabase: report.body,
     integrations: {
-      postgres: pgStatus,
-      mongodb: {
-        ...mongoStatus,
-        role: 'Secondary persistence & export layer (Active and verified)'
-      }
+      postgres: { ...pgStatus, schemaReady: schema?.ready ?? false, missingTables: schema?.missing ?? [] },
+      mongodb: { configured: false, connected: false, role: 'NOT_USED' }
     }
   });
 });
 
-// MongoDB Registration Storage Status
-app.get('/api/mongodb/status', async (_req: Request, res: Response): Promise<void> => {
-  const status = await getMongoHealth();
-  res.json({ success: true, ...status });
+app.get('/api/mongodb/status', (_req: Request, res: Response): void => {
+  res.json({
+    success: true,
+    configured: false,
+    connected: false,
+    role: 'NOT_USED',
+    status: 'NOT_CONFIGURED'
+  });
 });
 
-// Trigger SQLite-to-PostgreSQL Data Migration (Developer & Super Admin only)
-app.post('/api/admin/migrate-to-postgres', requireAdmin, async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const result = await migrateSqliteToPostgres();
-    if (!result.success) {
-      res.status(500).json({ error: result.error, stats: result.stats });
-      return;
-    }
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+app.post('/api/admin/migrate-to-postgres', requireAdmin, (_req: AuthenticatedRequest, res: Response): void => {
+  res.status(410).json({ error: 'SQLite import is not available over HTTP. Deployment does not import old records.' });
 });
 
-// Reconcile and audit source vs destination record counts (Developer & Super Admin only)
-app.get('/api/admin/reconcile-databases', requireAdmin, async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const result = await reconcileSqliteAndPostgres();
-    res.json({ success: true, ...result });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+app.get('/api/admin/reconcile-databases', requireAdmin, (_req: AuthenticatedRequest, res: Response): void => {
+  res.status(410).json({ error: 'Database reconciliation against SQLite is disabled in the running service.' });
 });
 
-// Emergency Rollback: Reverse-sync post-cutover delta records from PostgreSQL back into SQLite
-app.post('/api/admin/reverse-sync-to-sqlite', requireAdmin, async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const result = await reverseSyncPostgresToSqlite();
-    if (!result.success) {
-      res.status(500).json({ error: result.error, stats: result.stats });
-      return;
-    }
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+app.post('/api/admin/reverse-sync-to-sqlite', requireAdmin, (_req: AuthenticatedRequest, res: Response): void => {
+  res.status(410).json({ error: 'SQLite reverse-sync is disabled. PostgreSQL remains the authoritative store.' });
 });
 
 // ==============================================================================
@@ -908,7 +854,7 @@ app.get('/api/community/posts', async (req: AuthenticatedRequest, res: Response)
 app.get('/api/community/posts/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
-    if (!post) {
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
       res.status(404).json({ error: 'Post not found' });
       return;
     }
@@ -946,7 +892,7 @@ app.post('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, 
       duration
     });
 
-    broadcastSseEvent('POST_CREATED', post);
+    broadcastSseEvent('POST_CREATED', { id: post.id, status: post.status }, req.user.id);
     res.json({ success: true, post });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -962,7 +908,7 @@ app.put('/api/community/posts/:id', requireAuth, async (req: AuthenticatedReques
       res.status(403).json({ error: 'Unauthorized to edit this post' });
       return;
     }
-    broadcastSseEvent('POST_UPDATED', updated);
+    broadcastSseEvent('POST_UPDATED', { id: updated.id, status: updated.status }, req.user.id);
     res.json({ success: true, post: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1000,8 +946,15 @@ app.patch('/api/community/posts/:id/pin', requireAdmin, async (req: Request, res
 // Toggle Post Like
 app.post('/api/community/posts/:id/like', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    const post = await getPostById(req.params.id, req.user?.id);
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
     const result = await togglePostLike(req.params.id, req.user.id);
-    broadcastSseEvent('LIKE_CHANGED', { postId: req.params.id, upvotes: result.upvotes });
+    if (post.status === 'APPROVED' || post.status === 'PUBLISHED') {
+      broadcastSseEvent('LIKE_CHANGED', { postId: req.params.id, upvotes: result.upvotes });
+    }
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1015,6 +968,11 @@ app.post('/api/community/posts/:id/like', requireAuth, async (req: Authenticated
 // Fetch comments for a post
 app.get('/api/community/posts/:id/comments', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    const post = await getPostById(req.params.id, req.user?.id);
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
     const comments = await getCommentsForPost(req.params.id, req.user?.id);
     res.json({ comments });
   } catch (err: any) {
@@ -1030,6 +988,11 @@ app.post('/api/community/posts/:id/comments', requireAuth, async (req: Authentic
       res.status(400).json({ error: 'Comment content cannot be empty' });
       return;
     }
+    const parentPost = await getPostById(req.params.id, req.user?.id);
+    if (!parentPost || !canViewModeratedContent(parentPost.status, parentPost.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
 
     const comment = await createComment({
       postId: req.params.id,
@@ -1040,7 +1003,9 @@ app.post('/api/community/posts/:id/comments', requireAuth, async (req: Authentic
       content: content.trim()
     });
 
-    broadcastSseEvent('COMMENT_CREATED', comment);
+    if (parentPost.status === 'APPROVED' || parentPost.status === 'PUBLISHED') {
+      broadcastSseEvent('COMMENT_CREATED', comment);
+    }
     res.json({ success: true, comment });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -1270,24 +1235,6 @@ app.delete('/api/media/:id', requireAdmin, async (req: Request, res: Response): 
   }
 });
 
-app.get('/api/leads', async (_req: Request, res: Response): Promise<void> => {
-  try {
-    const leads = await getAllLeads();
-    res.json({ leads });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/leads', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const leadId = await createLead(req.body);
-    res.json({ success: true, leadId });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
 app.delete('/api/leads/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     await deleteLead(req.params.id);
@@ -1315,14 +1262,12 @@ app.put('/api/conference', requireAdmin, async (req: Request, res: Response): Pr
   }
 });
 
-app.get('/api/health', (_req: Request, res: Response): void => {
-  res.json({
-    status: 'OK',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    authoritativeDatabase: isPostgresAuthoritative() ? 'PostgreSQL' : 'SQLite'
-  });
+app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
+  const report = await buildHealthReport();
+  res.status(report.httpStatus).json(report.body);
 });
+
+registerPlatformRoutes(app, { requireAuth, requireAdmin });
 
 // ==============================================================================
 // VITE DEV SERVER & PRODUCTION STATIC SERVING
@@ -1338,9 +1283,14 @@ async function start() {
   }
 
   if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (_req: Request, res: Response) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+    const distDir = path.resolve(__dirname, 'dist');
+    app.use(express.static(distDir));
+    app.get('*', (req: Request, res: Response) => {
+      if (req.path.startsWith('/api/')) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      res.sendFile(path.resolve(distDir, 'index.html'));
     });
   } else {
     const { createServer: createViteServer } = await import('vite');

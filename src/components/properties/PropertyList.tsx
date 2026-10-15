@@ -187,12 +187,9 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
       </div>
 
       {/* Demonstration Data Transparency Notice */}
-      <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
         <span>
-          <strong>Platform Demonstration Portfolio:</strong> The projects, architectural specs, simulated TS-RERA numbers, and civil progress metrics below represent demonstration models for Western Corridor developments. Production API data synchronization is active for user sessions, OTPs, and community feeds.
-        </span>
-        <span className="font-mono text-amber-800 font-bold text-[11px] uppercase shrink-0">
-          Sample Showcase Data
+          <strong>Published listings:</strong> Only approved listings from the database appear here. An empty catalog means no listing has been approved yet.
         </span>
       </div>
 
@@ -237,11 +234,15 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
                 <div>
                   {/* Image Hero with Hover Zoom & Badges */}
                   <div className="relative aspect-16/10 bg-slate-950 overflow-hidden">
-                    <img
-                      src={property.heroImage}
-                      alt={property.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
+                    {property.heroImage ? (
+                      <img
+                        src={property.heroImage}
+                        alt={property.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">No image supplied</div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/30 pointer-events-none" />
 
                     {/* Top Status & Verification Controls */}
@@ -369,7 +370,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
                 {/* Card Action Footer */}
                 <div className="p-4 sm:p-5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-3">
                   <div className="text-xs text-slate-500">
-                    RERA: <span className="font-mono text-slate-800 font-bold">{property.reraRegId}</span>
+                    RERA: <span className="font-mono text-slate-800 font-bold">{property.reraRegId || 'Not provided'}</span>
                   </div>
 
                   <button

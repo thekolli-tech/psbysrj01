@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { postLoginDestination } from '../../shared/policy';
+import { BrandLogo } from './BrandLogo';
 import {
   LogIn,
   LogOut,
@@ -12,7 +14,6 @@ import {
   Eye,
   EyeOff,
   UserPlus,
-  Lock,
   Mail,
   CheckCircle2,
   RotateCcw,
@@ -38,7 +39,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [nameInput, setNameInput] = useState('');
-  const [roleInput, setRoleInput] = useState<'PROPERTY_SEEKER' | 'AGENT' | 'LAND_OWNER' | 'CONTENT_CREATOR'>('PROPERTY_SEEKER');
+  const [roleInput, setRoleInput] = useState<'PROPERTY_SEEKER' | 'LANDOWNER' | 'CHANNEL_PARTNER' | 'RESELLER' | 'RERA_AGENT' | 'REAL_ESTATE_MEDIA'>('PROPERTY_SEEKER');
   const [phoneInput, setPhoneInput] = useState('');
   const [organizationInput, setOrganizationInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -97,11 +98,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       login(data.user);
       showToast(`Welcome back, ${data.user.name}!`);
 
-      if (data.user.role === 'SUPER_ADMIN') {
-        setActiveView('ADMIN');
-      } else if (data.user.role === 'PROPERTY_ADMIN') {
-        setActiveView('PROPERTY_ADMIN');
-      }
+      setActiveView(postLoginDestination(data.user.role));
 
       onClose();
     } catch (err: any) {
@@ -247,8 +244,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         {/* Header */}
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold">
-              <Lock className="w-5 h-5" />
+            <div className="w-16 h-12 rounded-xl bg-white border border-white/20 flex items-center justify-center px-1 shrink-0">
+              <BrandLogo variant="compact" size="sm" />
             </div>
             <div>
               <h3 className="text-base font-bold text-white font-display">
@@ -433,9 +430,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                     >
                       <option value="PROPERTY_SEEKER">Property Seeker (HNI / Investor / Buyer)</option>
-                      <option value="LAND_OWNER">Land Owner (Direct Sale / Joint Development)</option>
-                      <option value="AGENT">Channel Partner / Reseller / RERA Agent</option>
-                      <option value="CONTENT_CREATOR">Real Estate Media / Content Creator</option>
+                      <option value="LANDOWNER">Landowner</option>
+                      <option value="CHANNEL_PARTNER">Channel Partner</option>
+                      <option value="RESELLER">Reseller</option>
+                      <option value="RERA_AGENT">RERA Agent</option>
+                      <option value="REAL_ESTATE_MEDIA">Real Estate Media</option>
                     </select>
                   </div>
 
@@ -459,13 +458,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </div>
                     <div>
                       <label className="block font-bold text-slate-700 mb-1">
-                        {roleInput === 'LAND_OWNER' ? 'Land Parcel' : roleInput === 'AGENT' ? 'Agency / RERA' : 'Organization'} <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
+                        {roleInput === 'LANDOWNER' ? 'Land Parcel' : roleInput === 'RERA_AGENT' || roleInput === 'CHANNEL_PARTNER' ? 'Agency / RERA' : 'Organization'} <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
                       </label>
                       <input
                         type="text"
                         value={organizationInput}
                         onChange={e => setOrganizationInput(e.target.value)}
-                        placeholder={roleInput === 'LAND_OWNER' ? 'e.g. Shamshabad 12 Acres' : roleInput === 'AGENT' ? 'e.g. A02400000124' : 'Firm or Organization'}
+                        placeholder={roleInput === 'LANDOWNER' ? 'Land description' : roleInput === 'RERA_AGENT' ? 'RERA registration number' : 'Firm or organization'}
                         className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </div>

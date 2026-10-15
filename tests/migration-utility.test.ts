@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 test('Migration Utility and Backup Safety', async (t) => {
+  delete process.env.DATABASE_URL;
+  delete process.env.NODE_ENV;
+  process.env.DB_ENGINE = 'sqlite';
+  const { initDatabase } = await import('../src/server/db.ts');
+  await initDatabase();
+
   const {
     backupSqliteDatabase,
     migrateSqliteToPostgres,

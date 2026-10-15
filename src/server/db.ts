@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { runPostgresMigrations } from './postgres.ts';
+import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
+import { applySqliteAdditiveSchema } from './platformSchema.ts';
 import {
   pgFindUserByEmail,
   pgFindUserById,
@@ -72,12 +73,7 @@ import {
 } from './postgresRepo.ts';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-const DB_FILE = path.join(DATA_DIR, 'propertystudio.db');
-export const db = new DatabaseSync(DB_FILE);
+let sqliteDb: DatabaseSync | null = null;
 
 /**
  * Returns true if managed PostgreSQL is designated as authoritative via DATABASE_URL.
@@ -86,6 +82,39 @@ export const db = new DatabaseSync(DB_FILE);
 export function isPostgresAuthoritative(): boolean {
   return Boolean(process.env.DATABASE_URL);
 }
+
+/** SQLite is available only as an explicit local-development database. */
+export function isSqliteExplicit(): boolean {
+  return !process.env.DATABASE_URL && process.env.DB_ENGINE === 'sqlite' && process.env.NODE_ENV !== 'production';
+}
+
+export function getSqliteDb(): DatabaseSync {
+  if (process.env.DATABASE_URL) {
+    throw new Error('Refusing to open SQLite while DATABASE_URL is configured. PostgreSQL is authoritative and SQLite fallback is disabled.');
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Production refuses to open SQLite. Set DATABASE_URL for Neon PostgreSQL.');
+  }
+  if (process.env.DB_ENGINE !== 'sqlite') {
+    throw new Error('SQLite is disabled. Set DATABASE_URL for PostgreSQL, or DB_ENGINE=sqlite for an explicit local-development database. Silent SQLite fallback is not allowed.');
+  }
+  if (!sqliteDb) {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const dbFile = process.env.SQLITE_PATH || path.join(DATA_DIR, 'propertystudio.db');
+    sqliteDb = new DatabaseSync(dbFile);
+  }
+  return sqliteDb;
+}
+
+export const db: DatabaseSync = new Proxy({} as DatabaseSync, {
+  get(_target, prop) {
+    const real = getSqliteDb() as any;
+    const value = real[prop];
+    return typeof value === 'function' ? value.bind(real) : value;
+  }
+});
 
 // ==============================================================================
 // TYPE DEFINITIONS
@@ -99,7 +128,12 @@ export type UserRole =
   | 'PROPERTY_ADMIN'
   | 'AGENT'
   | 'PROPERTY_SEEKER'
-  | 'LAND_OWNER';
+  | 'LAND_OWNER'
+  | 'LANDOWNER'
+  | 'CHANNEL_PARTNER'
+  | 'RESELLER'
+  | 'RERA_AGENT'
+  | 'REAL_ESTATE_MEDIA';
 
 export interface DbUser {
   id: string;
@@ -406,16 +440,27 @@ export function canActorDisableOrDeleteUser(
 // ==============================================================================
 
 export async function initDatabase(): Promise<void> {
-  if (isPostgresAuthoritative()) {
-    console.log('[Database] Authoritative Engine: PostgreSQL (Neon / Managed)');
-    await runPostgresMigrations();
-    await pgEnsureInitialCommunities();
-    await pgBootstrapProductionAccounts();
-    console.log('[Database] PostgreSQL tables, indexes, and bootstrap accounts verified.');
-  } else {
-    console.log('[Database] Authoritative Engine: SQLite (Local Development Mode)');
-    sqliteInitDatabase();
+  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+    throw new Error('Production startup requires DATABASE_URL. Refusing to start on SQLite or an unconfigured database.');
   }
+  if (isPostgresAuthoritative()) {
+    const health = await checkPostgresHealth();
+    if (!health.connected) {
+      throw new Error(`Authoritative PostgreSQL is unavailable (${health.error || 'connection failed'}). Startup refused. SQLite fallback is disabled.`);
+    }
+    const schema = await checkSchemaReadiness();
+    if (!schema.ready) {
+      throw new Error(`PostgreSQL schema is not ready. Missing: ${schema.missing.join(', ') || 'unknown'}. Run npm run db:init. Startup does not migrate, seed, import, or bootstrap accounts.`);
+    }
+    console.log('[Database] PostgreSQL connected and schema ready. No automatic seed, import, or account bootstrap.');
+    return;
+  }
+  if (isSqliteExplicit()) {
+    console.log('[Database] Explicit local SQLite mode. No demo seed and no privileged bootstrap.');
+    sqliteInitDatabase();
+    return;
+  }
+  throw new Error('No authoritative database configured. Set DATABASE_URL for Neon PostgreSQL. SQLite is available only when DB_ENGINE=sqlite and DATABASE_URL is unset.');
 }
 
 // ==============================================================================
@@ -1143,8 +1188,7 @@ function sqliteInitDatabase(): void {
     );
   `);
 
-  sqliteEnsureInitialCommunities();
-  sqliteBootstrapProductionAccounts();
+  applySqliteAdditiveSchema(db);
 }
 
 function sqliteFindUserByEmail(email: string): DbUser | null {
@@ -1425,15 +1469,15 @@ function sqliteRecoverDeveloperAccount(recoverySecret: string, newPassword: stri
   sqliteRecoveryAttempts.count = 0;
   sqliteRecoveryAttempts.lockedUntil = 0;
 
-  const devEmail = (process.env.BOOTSTRAP_DEVELOPER_EMAIL || 'developer@propertystudio.org').trim().toLowerCase();
-  let devUser = sqliteFindUserByEmail(devEmail) || sqliteFindUserByEmail('charankolli.athmick@gmail.com');
+  const devEmail = process.env.BOOTSTRAP_DEVELOPER_EMAIL?.trim().toLowerCase();
+  if (!devEmail) {
+    return { success: false, error: 'BOOTSTRAP_DEVELOPER_EMAIL is not configured. Recovery will not guess an account.' };
+  }
+  const devUser = sqliteFindUserByEmail(devEmail);
 
   if (!devUser) {
-    sqliteBootstrapProductionAccounts();
-    devUser = sqliteFindUserByEmail(devEmail) || sqliteFindUserByEmail('charankolli.athmick@gmail.com');
+    return { success: false, error: 'Developer account is not provisioned. Run npm run bootstrap. Recovery does not create accounts.' };
   }
-
-  if (!devUser) return { success: false, error: 'Failed to locate Developer account' };
 
   sqliteResetPassword(devUser.id, newPassword);
   db.prepare("UPDATE users SET account_status = 'ACTIVE', updated_at = ? WHERE id = ?").run(new Date().toISOString(), devUser.id);
@@ -1452,12 +1496,17 @@ function sqliteRecoverDeveloperAccount(recoverySecret: string, newPassword: stri
 
 function sqliteBootstrapProductionAccounts(): void {
   const now = new Date().toISOString();
+  const devEmail = process.env.BOOTSTRAP_DEVELOPER_EMAIL?.trim().toLowerCase();
+  const devPassword = process.env.BOOTSTRAP_DEVELOPER_PASSWORD;
+  const adminEmail = process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD;
+  if (!devEmail || !devPassword || !adminEmail || !adminPassword) {
+    throw new Error('Bootstrap requires BOOTSTRAP_DEVELOPER_EMAIL, BOOTSTRAP_DEVELOPER_PASSWORD, BOOTSTRAP_SUPER_ADMIN_EMAIL, and BOOTSTRAP_SUPER_ADMIN_PASSWORD. Refusing to invent credentials.');
+  }
 
-  const devEmail = (process.env.BOOTSTRAP_DEVELOPER_EMAIL || 'developer@propertystudio.org').trim().toLowerCase();
-  let existingDev = sqliteFindUserByEmail(devEmail);
+  const existingDev = sqliteFindUserByEmail(devEmail);
 
   if (!existingDev) {
-    const devPassword = process.env.BOOTSTRAP_DEVELOPER_PASSWORD || 'DevStudio@Reddy2026!';
     const { hash, salt } = hashPassword(devPassword);
     const devId = 'user_dev_' + crypto.randomBytes(4).toString('hex');
     const publicId = 'dev_' + crypto.randomBytes(3).toString('hex');
@@ -1468,11 +1517,11 @@ function sqliteBootstrapProductionAccounts(): void {
     `).run(
       devId,
       publicId,
-      'Swamy Reddy Javidi (Platform Owner)',
+      'Platform Developer',
       devEmail,
-      '+91 98490 12890',
-      '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
-      'Property Studio Secretariat',
+      '',
+      '',
+      'Property Studio',
       hash,
       salt,
       now,
@@ -1490,11 +1539,9 @@ function sqliteBootstrapProductionAccounts(): void {
     });
   }
 
-  const adminEmail = (process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL || 'admin@propertystudio.org').trim().toLowerCase();
-  let existingAdmin = sqliteFindUserByEmail(adminEmail);
+  const existingAdmin = sqliteFindUserByEmail(adminEmail);
 
   if (!existingAdmin) {
-    const adminPassword = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD || 'SuperAdmin@Reddy2026!';
     const { hash, salt } = hashPassword(adminPassword);
     const adminId = 'user_admin_' + crypto.randomBytes(4).toString('hex');
     const publicId = 'admin_' + crypto.randomBytes(3).toString('hex');
@@ -1505,11 +1552,11 @@ function sqliteBootstrapProductionAccounts(): void {
     `).run(
       adminId,
       publicId,
-      'Property Studio Super Administrator',
+      'Platform Super Admin',
       adminEmail,
-      '+91 98490 12890',
-      '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
-      'Property Studio Administration',
+      '',
+      '',
+      'Property Studio',
       hash,
       salt,
       now,
@@ -1527,11 +1574,6 @@ function sqliteBootstrapProductionAccounts(): void {
     });
   }
 
-  const ownerEmail = 'charankolli.athmick@gmail.com'.toLowerCase();
-  const ownerUser = sqliteFindUserByEmail(ownerEmail);
-  if (ownerUser) {
-    db.prepare("UPDATE users SET role = 'DEVELOPER', is_verified = 1, email_verified = 1, phone_verified = 1 WHERE email = ?").run(ownerEmail);
-  }
 }
 
 function sqliteCreateSession(userId: string, userAgent?: string, ipAddress?: string): { token: string; session: DbSession } {
@@ -1782,7 +1824,7 @@ function sqliteGetAllPosts(params?: {
   offset?: number;
   currentUserId?: string;
 }): any[] {
-  let query = "SELECT p.* FROM community_posts p WHERE p.status = 'PUBLISHED'";
+  let query = "SELECT p.* FROM community_posts p WHERE p.status IN ('APPROVED', 'PUBLISHED')";
   const args: any[] = [];
 
   if (params?.communityId) {
@@ -1908,7 +1950,7 @@ function sqliteCreatePost(post: {
       media_type, media_url, thumbnail_url, duration, status, upvotes, comments_count,
       is_pinned, is_flagged, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', 0, 0, 0, 0, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', 0, 0, 0, 0, ?, ?)
   `);
 
   stmt.run(
@@ -1938,8 +1980,9 @@ function sqliteCreatePost(post: {
     title: post.title,
     authorName: post.authorName,
     communityId: post.communityId,
-    mediaType: post.mediaType || 'POST'
-  });
+    mediaType: post.mediaType || 'POST',
+    status: 'PENDING_APPROVAL'
+  }, post.authorId || null);
 
   return sqliteGetPostById(id);
 }
@@ -1962,7 +2005,7 @@ function sqliteUpdatePost(
 
   db.prepare(`
     UPDATE community_posts
-    SET title = ?, content = ?, links = ?, attachments = ?, updated_at = ?
+    SET title = ?, content = ?, links = ?, attachments = ?, status = 'PENDING_APPROVAL', updated_at = ?
     WHERE id = ?
   `).run(title, content, links, attachments, now, postId);
 
@@ -2381,73 +2424,7 @@ function sqliteGetCommunityEventsSince(sinceTimestamp: string, targetUserId?: st
 }
 
 function sqliteEnsureInitialCommunities(): void {
-  const count = db.prepare('SELECT COUNT(*) as count FROM communities').get() as { count: number };
-  if (count.count > 0) return;
-
-  const now = new Date().toISOString();
-  const starterCommunities = [
-    {
-      id: 'comm_neopolis_hub',
-      name: 'Kokapet Neopolis Residents & Investors Hub',
-      slug: 'kokapet-neopolis-hub',
-      description: 'Official verified forum for Kokapet Neopolis high-rise owners, floor plate investors, and future residents. Ground telemetry, construction milestone verifications, and civil infrastructure reviews.',
-      category: 'Micro-Market Hub',
-      location: 'Neopolis, Kokapet, Hyderabad',
-      created_by_id: 'user_dev_root',
-      created_by_name: 'Swamy Reddy Javidi',
-      status: 'APPROVED',
-      rejection_reason: '',
-      member_count: 342,
-      icon: 'Building2',
-      banner_image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
-      rules: '1. No speculative spam. 2. Verify RERA numbers before quoting delay metrics. 3. Respect resident privacy.'
-    },
-    {
-      id: 'comm_financial_district',
-      name: 'Financial District High-Rise Owners Forum',
-      slug: 'financial-district-owners',
-      description: 'The premier community destination for luxury tower owners in Nanakramguda and Financial District. Discussions on commercial rental yields, property tax assessments, and clubhouse operations.',
-      category: 'Residential Luxury',
-      location: 'Financial District, Nanakramguda',
-      created_by_id: 'user_dev_root',
-      created_by_name: 'Swamy Reddy Javidi',
-      status: 'APPROVED',
-      rejection_reason: '',
-      member_count: 218,
-      icon: 'ShieldCheck',
-      banner_image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
-      rules: '1. Verified deed holders given primary speaking stage. 2. High standards of civil discourse.'
-    },
-    {
-      id: 'comm_tellapur_builders',
-      name: 'Tellapur Town Builders & Landowners Community',
-      slug: 'tellapur-town-builders',
-      description: 'A dynamic community unifying villa developers, plotted land holders, and RERA certified channel partners operating in Tellapur and Kollur expansion zones.',
-      category: 'Town Development',
-      location: 'Tellapur, Western Corridor',
-      created_by_id: 'user_dev_root',
-      created_by_name: 'Swamy Reddy Javidi',
-      status: 'APPROVED',
-      rejection_reason: '',
-      member_count: 175,
-      icon: 'Users',
-      banner_image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-      rules: '1. All land surveys must cite revenue village survey numbers. 2. No anonymous broker solicitation.'
-    }
-  ];
-
-  const insert = db.prepare(`
-    INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  for (const c of starterCommunities) {
-    insert.run(
-      c.id, c.name, c.slug, c.description, c.category, c.location,
-      c.created_by_id, c.created_by_name, c.status, c.rejection_reason,
-      c.member_count, c.icon, c.banner_image, c.rules, now, now
-    );
-  }
+  // Intentionally empty. Local schema initialization must not seed communities.
 }
 
 function sqliteGetAllCommunities(status?: string): DbCommunity[] {
@@ -2607,22 +2584,16 @@ function sqliteGetConferenceDetails(): DbConferenceDetails {
   const found = stmt.get() as unknown as DbConferenceDetails;
   if (found) return found;
 
-  const now = new Date().toISOString();
-  db.prepare(`
-    INSERT INTO conference_details (id, title, subtitle, date, time, stream_url, status, agenda, updated_at)
-    VALUES ('conf_main', 'Neopolis High-Rise Layout Launch & Institutional Investor Summit 2026', 'The Crown Residences & Commercial Sky-Park (Neopolis Phase II)', 'October 24, 2026', '11:00 AM - 01:30 PM IST', 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'SCHEDULED', '[]', ?)
-  `).run(now);
-
   return {
-    id: 'conf_main',
-    title: 'Neopolis High-Rise Layout Launch & Institutional Investor Summit 2026',
-    subtitle: 'The Crown Residences & Commercial Sky-Park (Neopolis Phase II)',
-    date: 'October 24, 2026',
-    time: '11:00 AM - 01:30 PM IST',
-    stream_url: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-    status: 'SCHEDULED',
+    id: '',
+    title: '',
+    subtitle: '',
+    date: '',
+    time: '',
+    stream_url: '',
+    status: 'UNSCHEDULED',
     agenda: '[]',
-    updated_at: now
+    updated_at: new Date().toISOString()
   };
 }
 

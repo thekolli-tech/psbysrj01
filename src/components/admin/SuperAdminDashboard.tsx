@@ -57,6 +57,7 @@ interface ManagedPost {
   upvotes: number;
   isPinned: boolean;
   isFlagged: boolean;
+  status?: string;
   createdAt: string;
   replies: Array<{
     id: string;
@@ -152,11 +153,25 @@ export const SuperAdminDashboard: React.FC = () => {
         setLiveUsers(uData.users || []);
       }
 
-      // 2. Fetch Posts
-      const postRes = await fetch('/api/community/posts');
+      const postRes = await fetch('/api/admin/moderation/queue');
       if (postRes.ok) {
         const pData = await postRes.json();
-        setLivePosts(pData.posts || []);
+        const queued = Array.isArray(pData.posts) ? pData.posts : [];
+        setLivePosts(queued.map((p: any) => ({
+          id: p.id,
+          authorId: p.author_id,
+          authorName: p.author_name,
+          authorRole: p.author_role,
+          topic: p.topic,
+          title: p.title,
+          content: p.content,
+          status: p.status,
+          upvotes: Number(p.upvotes || 0),
+          isPinned: Boolean(p.is_pinned),
+          isFlagged: Boolean(p.is_flagged),
+          createdAt: p.created_at,
+          replies: []
+        })));
       }
     } catch (e) {
       console.warn('Using client-side fallback data', e);
@@ -183,7 +198,7 @@ export const SuperAdminDashboard: React.FC = () => {
       return;
     }
 
-    const res = provisionPropertyAdmin(pmoForm.name, pmoForm.email, pmoForm.phone || '+91 98000 00000', pmoForm.propertyId);
+    const res = provisionPropertyAdmin(pmoForm.name, pmoForm.email, pmoForm.phone, pmoForm.propertyId);
     if (res.success) {
       setPmoStatusMessage({ type: 'success', text: res.message });
       setPmoForm({ name: '', email: '', phone: '', propertyId: properties[0]?.id || '' });
@@ -355,7 +370,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 </span>
                 <span className="text-xs text-emerald-400 font-mono flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Live Server & SQLite Database
+                  Live server database
                 </span>
               </div>
               <h1 className="text-2xl font-black text-white mt-1 font-display">
@@ -899,6 +914,40 @@ export const SuperAdminDashboard: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono text-slate-500">{p.status || 'PENDING_APPROVAL'}</span>
+                      <button
+                        onClick={async () => {
+                          const res = await fetch(`/api/admin/posts/${p.id}/moderation`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 'APPROVED' })
+                          });
+                          if (res.ok) {
+                            showToast('Post approved');
+                            refreshServerData();
+                          }
+                        }}
+                        className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const reason = window.prompt('Rejection reason') || '';
+                          const res = await fetch(`/api/admin/posts/${p.id}/moderation`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 'REJECTED', reason })
+                          });
+                          if (res.ok) {
+                            showToast('Post rejected');
+                            refreshServerData();
+                          }
+                        }}
+                        className="px-2 py-1 rounded-lg bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold"
+                      >
+                        Reject
+                      </button>
                       <button
                         onClick={() => handleTogglePinPost(p.id, p.isPinned)}
                         className={`p-1.5 rounded-lg border text-xs font-bold transition-colors ${
@@ -969,18 +1018,9 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
 
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 text-xs">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Primary Super Admin Email</span>
-                <span className="text-sm font-mono font-bold text-slate-900 mt-0.5 block">admin@propertystudio.org</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Host Alias Email</span>
-                <span className="text-xs font-mono text-slate-700 block">swamy.reddy@propertystudio.in</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Owner Email Alias</span>
-                <span className="text-xs font-mono text-slate-700 block">charankolli.athmick@gmail.com</span>
-              </div>
+              <p className="text-slate-700 leading-relaxed">
+                Privileged accounts are created only by the server bootstrap command. Email addresses and passwords are not stored in the application bundle.
+              </p>
             </div>
 
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs">
