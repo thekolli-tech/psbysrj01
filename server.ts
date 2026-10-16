@@ -64,10 +64,10 @@ import {
   deleteCommunity,
   updateLastLogin
 } from './src/server/db.ts';
-import { checkPostgresHealth, checkSchemaReadiness } from './src/server/postgres.ts';
+import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
 import { sendRealSmsOtp, getNotificationGatewayStatus, configuredSmsProviders } from './src/server/notifications.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
-import { issueEmailOtp } from './src/server/emailOtp.ts';
+import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
@@ -330,9 +330,9 @@ app.post('/api/auth/send-email-otp', async (req: Request, res: Response): Promis
     }
     const issued = await issueEmailOtp(email, 'EMAIL_VERIFICATION');
     if (!issued.sent) {
-      res.status(502).json({
-        error: 'Verification email was not delivered. No account was created and the unused code was discarded.'
-      });
+      console.warn(`[Property Studio] Verification email was not issued (${issued.code}).`);
+      const failure = publicEmailOtpFailure(issued.code);
+      res.status(failure.status).json({ error: failure.error, code: failure.code });
       return;
     }
 
@@ -651,17 +651,33 @@ app.get('/api/notifications/status', (_req: Request, res: Response): void => {
 
 // Database, Authoritative Engine & Integration Health Check
 app.get('/api/database/status', async (_req: Request, res: Response): Promise<void> => {
-  const report = await buildHealthReport();
-  const pgStatus = isPostgresAuthoritative() ? await checkPostgresHealth() : { connected: false };
-  const schema = isPostgresAuthoritative() ? await checkSchemaReadiness() : null;
-  res.status(report.httpStatus).json({
-    success: report.httpStatus === 200,
-    authoritativeDatabase: report.body,
-    integrations: {
-      postgres: { ...pgStatus, schemaReady: schema?.ready ?? false, missingTables: schema?.missing ?? [] },
-      mongodb: { configured: false, connected: false, role: 'NOT_USED' }
+  try {
+    const report = await buildHealthReport();
+    const pgStatus = isPostgresAuthoritative() ? await checkPostgresHealth() : { connected: false as const };
+    const schema = isPostgresAuthoritative() ? await checkSchemaReadiness() : null;
+    if ('error' in pgStatus && pgStatus.error) {
+      console.error(`[Property Studio] Database status check failed: ${pgStatus.error}`);
     }
-  });
+    if (schema?.error) {
+      console.error(`[Property Studio] Schema status check failed: ${schema.error}`);
+    }
+    res.status(report.httpStatus).json({
+      success: report.httpStatus === 200,
+      authoritativeDatabase: report.body,
+      integrations: {
+        postgres: {
+          connected: pgStatus.connected,
+          latencyMs: 'latencyMs' in pgStatus ? pgStatus.latencyMs : undefined,
+          schemaReady: schema?.ready ?? false,
+          missingTables: schema?.missing ?? []
+        },
+        mongodb: { configured: false, connected: false, role: 'NOT_USED' }
+      }
+    });
+  } catch (err) {
+    console.error('[Property Studio] Database status failed:', redactDatabaseError(err instanceof Error ? err.message : 'status failed'));
+    res.status(503).json({ success: false, error: 'Database status is unavailable.' });
+  }
 });
 
 app.get('/api/mongodb/status', (_req: Request, res: Response): void => {
@@ -1363,8 +1379,18 @@ app.put('/api/conference', requireAdmin, async (req: Request, res: Response): Pr
 });
 
 app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
-  const report = await buildHealthReport();
-  res.status(report.httpStatus).json(report.body);
+  try {
+    const report = await buildHealthReport();
+    res.status(report.httpStatus).json(report.body);
+  } catch (err) {
+    console.error('[Property Studio] Health report failed:', redactDatabaseError(err instanceof Error ? err.message : 'health failed'));
+    res.status(503).json({
+      status: 'UNAVAILABLE',
+      authoritativeDatabase: 'unconfigured',
+      sqliteFallback: false,
+      database: { connected: false, schemaReady: false, missingTables: [], code: 'DATABASE_STARTUP_FAILED' }
+    });
+  }
 });
 
 registerPlatformRoutes(app, { requireAuth, requireAdmin });

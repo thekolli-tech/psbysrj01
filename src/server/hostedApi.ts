@@ -29,15 +29,67 @@ interface HostedApp {
   (req: IncomingMessage, res: ServerResponse): unknown;
 }
 
-const DATABASE_UNAVAILABLE = {
-  error: 'The registration service is unavailable. No account was created.',
-  code: 'SERVICE_UNAVAILABLE'
-} as const;
-
 const REQUEST_FAILED = {
   error: 'The server could not complete that request. No account was created.',
   code: 'REQUEST_FAILED'
 } as const;
+
+export type DatabaseStartupCode =
+  | 'DATABASE_NOT_CONFIGURED'
+  | 'DATABASE_UNREACHABLE'
+  | 'SCHEMA_NOT_READY'
+  | 'DATABASE_STARTUP_FAILED';
+
+export interface DatabaseStartupFailure {
+  error: string;
+  code: DatabaseStartupCode;
+  logDetail: string;
+}
+
+/** Maps a startup exception to a public code. The log detail never keeps a connection string. */
+export function classifyDatabaseStartupFailure(error: unknown): DatabaseStartupFailure {
+  const raw = error instanceof Error ? error.message : String(error || 'Database startup failed');
+  const logDetail = raw
+    .replace(/postgres(?:ql)?:\/\/[^\s'")]+/gi, 'postgresql://[redacted]')
+    .slice(0, 300);
+  if (/DATABASE_URL|No authoritative database configured/i.test(raw)) {
+    return {
+      code: 'DATABASE_NOT_CONFIGURED',
+      error: 'Registration is not configured for this deployment. No account was created.',
+      logDetail
+    };
+  }
+  if (/schema is not ready/i.test(raw)) {
+    return {
+      code: 'SCHEMA_NOT_READY',
+      error: 'The registration database schema is not ready. No account was created.',
+      logDetail
+    };
+  }
+  if (/PostgreSQL is unavailable|connection failed|ECONN|ETIMEDOUT|timeout/i.test(raw)) {
+    return {
+      code: 'DATABASE_UNREACHABLE',
+      error: 'The registration database could not be reached. No account was created.',
+      logDetail
+    };
+  }
+  return {
+    code: 'DATABASE_STARTUP_FAILED',
+    error: 'The registration service is unavailable. No account was created.',
+    logDetail
+  };
+}
+
+function requestPath(url: string | undefined, rewrite: (value: string | undefined) => string): string {
+  const rewritten = rewrite(url);
+  const queryIndex = rewritten.indexOf('?');
+  return queryIndex === -1 ? rewritten : rewritten.slice(0, queryIndex);
+}
+
+function isReadOnlyHealth(req: IncomingMessage, rewrite: (value: string | undefined) => string): boolean {
+  const method = (req.method || 'GET').toUpperCase();
+  return (method === 'GET' || method === 'HEAD') && requestPath(req.url, rewrite) === '/api/health';
+}
 
 function endJson(res: ServerResponse, statusCode: number, payload: { error: string; code: string }, settled: () => boolean): void {
   if (settled() || res.writableEnded || res.destroyed) return;
@@ -90,8 +142,20 @@ export function createHostedApiHandler(deps: {
           } catch {
             endJson(res, 500, REQUEST_FAILED, isSettled);
           }
-        }, () => {
-          endJson(res, 503, DATABASE_UNAVAILABLE, isSettled);
+        }, (error: unknown) => {
+          const failure = classifyDatabaseStartupFailure(error);
+          console.error(`[Property Studio] Database startup failed (${failure.code}): ${failure.logDetail}`);
+          if (settled || res.writableEnded || res.destroyed) return;
+          if (isReadOnlyHealth(req, deps.expressPathForHostedRequest)) {
+            try {
+              req.url = deps.expressPathForHostedRequest(req.url);
+              deps.app(req, res);
+            } catch {
+              endJson(res, 500, REQUEST_FAILED, isSettled);
+            }
+            return;
+          }
+          endJson(res, 503, { error: failure.error, code: failure.code }, isSettled);
         });
     });
   };

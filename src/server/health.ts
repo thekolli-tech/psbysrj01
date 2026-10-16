@@ -1,7 +1,31 @@
 import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { getSqliteDb, isPostgresAuthoritative, isSqliteExplicit } from './db.ts';
 import { paymentsStatus } from './commerce.ts';
+import { configuredSmsProviders, emailFromAddress } from './notifications.ts';
 import { REQUIRED_TABLES } from './platformSchema.ts';
+
+function configurationFlags(): {
+  database: boolean;
+  emailProvider: boolean;
+  emailSender: boolean;
+  otpPepper: boolean;
+  sms: boolean;
+} {
+  return {
+    database: Boolean(process.env.DATABASE_URL),
+    emailProvider: Boolean(process.env.RESEND_API_KEY),
+    emailSender: /@propertystudio\.org\b/i.test(emailFromAddress()),
+    otpPepper: Boolean(process.env.OTP_HASH_SECRET),
+    sms: configuredSmsProviders().length > 0
+  };
+}
+
+function databaseCode(configured: boolean, connected: boolean, schemaReady: boolean): string | null {
+  if (!configured) return 'DATABASE_NOT_CONFIGURED';
+  if (!connected) return 'DATABASE_UNREACHABLE';
+  if (!schemaReady) return 'SCHEMA_NOT_READY';
+  return null;
+}
 
 function sqliteSchemaStatus(): { ready: boolean; missing: string[] } {
   const rows = getSqliteDb().prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as { name: string }[];
@@ -20,6 +44,10 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
     const schema = connection.connected
       ? await checkSchemaReadiness()
       : { ready: false, missing: [], connected: false, error: connection.error };
+    const driverError = connection.error || schema.error;
+    if (driverError) {
+      console.error(`[Property Studio] Database health check failed: ${driverError}`);
+    }
     const ok = connection.connected && schema.ready;
     return {
       httpStatus: ok ? 200 : 503,
@@ -32,8 +60,9 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
           schemaReady: schema.ready,
           missingTables: schema.missing,
           latencyMs: connection.latencyMs,
-          error: connection.error || schema.error || null
+          code: databaseCode(true, connection.connected, schema.ready)
         },
+        configuration: configurationFlags(),
         payments,
         uptime,
         timestamp
@@ -50,7 +79,13 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
         authoritativeDatabase: 'sqlite',
         sqliteFallback: false,
         explicitLocalSqlite: true,
-        database: { connected: true, schemaReady: schema.ready, missingTables: schema.missing },
+        database: {
+          connected: true,
+          schemaReady: schema.ready,
+          missingTables: schema.missing,
+          code: schema.ready ? null : 'SCHEMA_NOT_READY'
+        },
+        configuration: configurationFlags(),
         payments,
         uptime,
         timestamp
@@ -64,11 +99,16 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
       status: 'UNAVAILABLE',
       authoritativeDatabase: 'unconfigured',
       sqliteFallback: false,
-      database: { connected: false, schemaReady: false, missingTables: [] },
+      database: {
+        connected: false,
+        schemaReady: false,
+        missingTables: [],
+        code: 'DATABASE_NOT_CONFIGURED'
+      },
+      configuration: configurationFlags(),
       payments,
       uptime,
-      timestamp,
-      error: 'Set DATABASE_URL for Neon PostgreSQL. SQLite is available only when DB_ENGINE=sqlite and NODE_ENV is not production.'
+      timestamp
     }
   };
 }

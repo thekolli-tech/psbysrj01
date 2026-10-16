@@ -25,9 +25,10 @@ export function getPostgresPool(): pg.Pool | null {
 
   if (!poolInstance) {
     const isSslDisabled = process.env.PGSSLMODE === 'disable' || process.env.DATABASE_URL.includes('sslmode=disable');
+    const serverlessPool = process.env.VERCEL ? 1 : 10;
     poolInstance = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max: Number(process.env.PG_POOL_MAX) || 10,
+      max: Number(process.env.PG_POOL_MAX) || serverlessPool,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000, // 10s for Neon cold-start wake-up
       ssl: isSslDisabled ? false : { rejectUnauthorized: process.env.PGSSL_REJECT_UNAUTHORIZED !== 'false' }

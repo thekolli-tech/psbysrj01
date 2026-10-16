@@ -103,6 +103,7 @@ queued('mocked Resend delivery, provider failure, and sender guard', async () =>
       return new Response('{}', { status: 200 });
     });
     assert.equal(missing.sent, false);
+    if (!missing.sent) assert.equal(missing.code, 'EMAIL_NOT_CONFIGURED');
     assert.equal(called, false);
     assert.equal(await findUserByEmail('missing-key@example.com'), null);
 
@@ -114,11 +115,13 @@ queued('mocked Resend delivery, provider failure, and sender guard', async () =>
       return new Response('{}', { status: 200 });
     });
     assert.equal(wrongFrom.sent, false);
+    if (!wrongFrom.sent) assert.equal(wrongFrom.code, 'EMAIL_SENDER_INVALID');
     assert.equal(wrongFromCalled, false);
 
     process.env.EMAIL_FROM = 'Property Studio <otp@propertystudio.org>';
     const failed = await issueEmailOtp('provider-down@example.com', 'EMAIL_VERIFICATION', async () => new Response('no', { status: 422 }));
     assert.equal(failed.sent, false);
+    if (!failed.sent) assert.equal(failed.code, 'EMAIL_DELIVERY_FAILED');
     assert.equal(await verifyOtp('provider-down@example.com', 'EMAIL_VERIFICATION', '123456'), false);
     const leftover = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM otps WHERE target = ? AND consumed_at IS NULL').get('provider-down@example.com') as { count: number };
     assert.equal(Number(leftover.count), 0);
@@ -132,6 +135,7 @@ queued('mocked Resend delivery, provider failure, and sender guard', async () =>
       return new Response('{}', { status: 200 });
     });
     assert.equal(blocked.sent, false);
+    if (!blocked.sent) assert.equal(blocked.code, 'OTP_NOT_CONFIGURED');
     assert.equal(pepperFetch, false);
     const pepperRows = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM otps WHERE target = ?').get('no-pepper@example.com') as { count: number };
     assert.equal(Number(pepperRows.count), 0);
@@ -324,6 +328,31 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   assert.equal(owner.status, 200, owner.raw);
   assert.equal((await findUserByEmail(ownerEmail))?.role, 'LANDOWNER');
 
+  const savedKey = process.env.RESEND_API_KEY;
+  const savedFrom = process.env.EMAIL_FROM;
+  const savedPepper = process.env.OTP_HASH_SECRET;
+  delete process.env.RESEND_API_KEY;
+  const missingProvider = await api('/api/auth/send-email-otp', { email: 'missing-provider@example.com' });
+  process.env.RESEND_API_KEY = savedKey;
+  assert.equal(missingProvider.status, 503);
+  assert.equal(missingProvider.json.code, 'EMAIL_NOT_CONFIGURED');
+  assert.equal(missingProvider.json.success, undefined);
+  assert.equal(await findUserByEmail('missing-provider@example.com'), null);
+
+  process.env.EMAIL_FROM = 'Person <person@example.com>';
+  const badSender = await api('/api/auth/send-email-otp', { email: 'bad-sender@example.com' });
+  process.env.EMAIL_FROM = savedFrom;
+  assert.equal(badSender.status, 503);
+  assert.equal(badSender.json.code, 'EMAIL_SENDER_INVALID');
+  assert.equal(await findUserByEmail('bad-sender@example.com'), null);
+
+  delete process.env.OTP_HASH_SECRET;
+  const missingPepper = await api('/api/auth/send-email-otp', { email: 'missing-pepper@example.com' });
+  process.env.OTP_HASH_SECRET = savedPepper;
+  assert.equal(missingPepper.status, 503);
+  assert.equal(missingPepper.json.code, 'OTP_NOT_CONFIGURED');
+  assert.equal(await findUserByEmail('missing-pepper@example.com'), null);
+
   const { sendRealSmsOtp } = await import('../src/server/notifications.ts');
   process.env.FAST2SMS_API_KEY = 'test-sms-key-not-real';
   const previousFetch = globalThis.fetch;
@@ -350,7 +379,10 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   const failedEmail = 'provider-fail@example.com';
   const failedSend = await api('/api/auth/send-email-otp', { email: failedEmail });
   assert.equal(failedSend.status, 502);
+  assert.equal(failedSend.json.code, 'EMAIL_DELIVERY_FAILED');
+  assert.equal(failedSend.json.success, undefined);
   assert.equal(failedSend.raw.includes('re_test_mock_key'), false);
+  assert.equal(failedSend.raw.includes('upstream down'), false);
   const failedRegister = await api('/api/auth/register', {
     name: 'Should Not Exist',
     email: failedEmail,

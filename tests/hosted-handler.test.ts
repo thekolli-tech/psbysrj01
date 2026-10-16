@@ -133,10 +133,15 @@ test('hosted handler stays pending until the response is written', async () => {
 
 test('database startup failure returns the JSON contract after the response finishes', async () => {
   let appCalled = false;
+  const logged: string[] = [];
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => {
+    logged.push(args.map((item) => String(item)).join(' '));
+  };
   const server = await openServer(() => {
     appCalled = true;
   }, async () => {
-    throw new Error('postgresql://user:secret@127.0.0.1/neondb');
+    throw new Error('connect ECONNREFUSED postgresql://user:secret@127.0.0.1/neondb');
   });
 
   try {
@@ -146,13 +151,64 @@ test('database startup failure returns the JSON contract after the response fini
     assert.equal(response.status, 503);
     assert.match(response.type, /application\/json/);
     assert.deepEqual(JSON.parse(response.body), {
-      error: 'The registration service is unavailable. No account was created.',
-      code: 'SERVICE_UNAVAILABLE'
+      error: 'The registration database could not be reached. No account was created.',
+      code: 'DATABASE_UNREACHABLE'
     });
     assert.equal(response.body.includes('secret'), false);
     assert.equal(response.body.includes('postgresql://'), false);
+    assert.match(logged.join('\n'), /DATABASE_UNREACHABLE/);
+    assert.match(logged.join('\n'), /postgresql:\/\/\[redacted\]/);
+    assert.equal(logged.join('\n').includes('secret'), false);
     assert.deepEqual(result, { completed: true });
     assert.deepEqual(server.events, ['end', 'settled']);
+  } finally {
+    console.error = originalError;
+    await server.close();
+  }
+});
+
+test('a missing database configuration blocks registration and still serves health', async () => {
+  let seenUrl = '';
+  const server = await openServer((req, res) => {
+    seenUrl = req.url || '';
+    res.statusCode = 503;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({
+      status: 'UNAVAILABLE',
+      database: { connected: false, schemaReady: false, code: 'DATABASE_NOT_CONFIGURED' }
+    }));
+  }, async () => {
+    throw new Error('Production startup requires DATABASE_URL. Refusing to start on SQLite or an unconfigured database.');
+  });
+
+  try {
+    const response = await get(server.port, '/health');
+    const result = await withTimeout(server.pending(), 'health during startup failure');
+    assert.equal(seenUrl, '/api/health');
+    assert.equal(response.status, 503);
+    assert.equal(JSON.parse(response.body).database.code, 'DATABASE_NOT_CONFIGURED');
+    assert.equal(response.body.includes('DATABASE_URL'), false);
+    assert.deepEqual(result, { completed: true });
+  } finally {
+    await server.close();
+  }
+});
+
+test('registration stays closed when startup fails for a reason other than health', async () => {
+  let appCalled = false;
+  const server = await openServer(() => {
+    appCalled = true;
+  }, async () => {
+    throw new Error('PostgreSQL schema is not ready. Missing: otps. Run npm run db:init.');
+  });
+
+  try {
+    const response = await get(server.port, '/api/auth/send-email-otp');
+    await withTimeout(server.pending(), 'schema startup failure');
+    assert.equal(appCalled, false);
+    assert.equal(response.status, 503);
+    assert.equal(JSON.parse(response.body).code, 'SCHEMA_NOT_READY');
+    assert.equal(response.body.includes('otps'), false);
   } finally {
     await server.close();
   }

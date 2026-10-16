@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { readApiResponse } from '../src/lib/apiResponse.ts';
-import { expressPathForHostedRequest } from '../src/server/hostedApi.ts';
+import { classifyDatabaseStartupFailure, expressPathForHostedRequest } from '../src/server/hostedApi.ts';
 
 test('hosted API paths keep the Express /api prefix', () => {
   assert.equal(expressPathForHostedRequest('/auth/send-email-otp'), '/api/auth/send-email-otp');
@@ -32,6 +32,31 @@ test('Vercel JSON 404 object is not shown as a token error', async () => {
   assert.equal(parsed.error.includes('[object Object]'), false);
   assert.equal(parsed.error.includes('Unexpected token'), false);
   assert.match(parsed.error, /No account was created/);
+});
+
+test('startup failures keep a safe public code and a redacted log detail', () => {
+  const missing = classifyDatabaseStartupFailure(new Error('Production startup requires DATABASE_URL. Refusing to start on SQLite.'));
+  assert.equal(missing.code, 'DATABASE_NOT_CONFIGURED');
+  assert.match(missing.error, /No account was created/);
+
+  const offline = classifyDatabaseStartupFailure(new Error('Authoritative PostgreSQL is unavailable (connect ECONNREFUSED postgresql://app:s3cret@ep-example.neon.tech/neondb). Startup refused.'));
+  assert.equal(offline.code, 'DATABASE_UNREACHABLE');
+  assert.equal(offline.logDetail.includes('s3cret'), false);
+  assert.match(offline.logDetail, /postgresql:\/\/\[redacted\]/);
+
+  const schema = classifyDatabaseStartupFailure(new Error('PostgreSQL schema is not ready. Missing: otps.'));
+  assert.equal(schema.code, 'SCHEMA_NOT_READY');
+  assert.equal(schema.error.includes('otps'), false);
+});
+
+test('application JSON 503 is shown instead of the host 404 message', async () => {
+  const response = new Response(JSON.stringify({
+    error: 'Registration is not configured for this deployment. No account was created.',
+    code: 'DATABASE_NOT_CONFIGURED'
+  }), { status: 503, headers: { 'content-type': 'application/json' } });
+  const parsed = await readApiResponse(response);
+  assert.equal(parsed.error, 'Registration is not configured for this deployment. No account was created.');
+  assert.equal(parsed.error.includes('not available on this site yet'), false);
 });
 
 test('Vercel deployment wires /api to the Express server bundle', () => {
