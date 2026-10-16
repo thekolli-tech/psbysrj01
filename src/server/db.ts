@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
 import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { applySqliteAdditiveSchema } from './platformSchema.ts';
 import { OTP_MAX_ATTEMPTS, OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, otpMatches, sealOtp } from './otpCrypto.ts';
@@ -73,8 +72,10 @@ import {
   pgUpdateConferenceDetails
 } from './postgresRepo.ts';
 
+type SqliteDatabase = import('node:sqlite').DatabaseSync;
+
 const DATA_DIR = path.resolve(process.cwd(), 'data');
-let sqliteDb: DatabaseSync | null = null;
+let sqliteDb: SqliteDatabase | null = null;
 
 /**
  * Returns true if managed PostgreSQL is designated as authoritative via DATABASE_URL.
@@ -89,7 +90,7 @@ export function isSqliteExplicit(): boolean {
   return !process.env.DATABASE_URL && process.env.DB_ENGINE === 'sqlite' && process.env.NODE_ENV !== 'production';
 }
 
-export function getSqliteDb(): DatabaseSync {
+export function getSqliteDb(): SqliteDatabase {
   if (process.env.DATABASE_URL) {
     throw new Error('Refusing to open SQLite while DATABASE_URL is configured. PostgreSQL is authoritative and SQLite fallback is disabled.');
   }
@@ -104,12 +105,16 @@ export function getSqliteDb(): DatabaseSync {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     const dbFile = process.env.SQLITE_PATH || path.join(DATA_DIR, 'propertystudio.db');
-    sqliteDb = new DatabaseSync(dbFile);
+    // A static import would evaluate node:sqlite while the Neon bundle loads.
+    // import() is asynchronous, and SQLite callers are synchronous, so the
+    // builtin is loaded here only after the checks above have passed.
+    const sqlite = process.getBuiltinModule('node:' + 'sqlite') as typeof import('node:sqlite');
+    sqliteDb = new sqlite.DatabaseSync(dbFile);
   }
   return sqliteDb;
 }
 
-export const db: DatabaseSync = new Proxy({} as DatabaseSync, {
+export const db: SqliteDatabase = new Proxy({} as SqliteDatabase, {
   get(_target, prop) {
     const real = getSqliteDb() as any;
     const value = real[prop];

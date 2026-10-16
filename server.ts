@@ -66,7 +66,7 @@ import {
 } from './src/server/db.ts';
 import { checkPostgresHealth, checkSchemaReadiness } from './src/server/postgres.ts';
 import { sendRealSmsOtp, getNotificationGatewayStatus, configuredSmsProviders } from './src/server/notifications.ts';
-import { expressPathForHostedRequest } from './src/server/hostedApi.ts';
+import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp } from './src/server/emailOtp.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
@@ -1423,4 +1423,4 @@ if (entry.endsWith('server.ts') || entry.endsWith('server.js')) {
   });
 }
 
-export { app, initDatabase, expressPathForHostedRequest };
+export { app, initDatabase, expressPathForHostedRequest, createHostedApiHandler };
