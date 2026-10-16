@@ -12,7 +12,7 @@ export async function issueEmailOtp(
   type: OtpPurpose,
   fetchImpl: typeof fetch = fetch
 ): Promise<{ sent: true; expiresAt: number; provider: string } | { sent: false; error: string }> {
-  if (process.env.NODE_ENV === 'production' && !process.env.OTP_HASH_SECRET) {
+  if (!process.env.OTP_HASH_SECRET) {
     return { sent: false, error: 'OTP_HASH_SECRET is not configured.' };
   }
   const { otp, expiresAt } = await generateOtp(email, type);

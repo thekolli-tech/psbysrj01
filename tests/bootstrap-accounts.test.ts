@@ -4,7 +4,7 @@ import test from 'node:test';
 
 /**
  * Local SQLite only. Passwords here are fixtures, not the production credentials.
- * This test does not set DATABASE_URL and does not contact Neon.
+ * DATABASE_URL is pinned to an empty string so scripts/bootstrap.ts cannot load the workspace .env and write to Neon.
  */
 
 const dbPath = `/tmp/ps-bootstrap-accounts-${process.pid}.db`;
@@ -26,7 +26,7 @@ function runTsx(args: string[], env: NodeJS.ProcessEnv): { status: number | null
 
 function baseEnv(extra: Record<string, string>): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, ...extra, NODE_ENV: 'test', DB_ENGINE: 'sqlite', SQLITE_PATH: dbPath };
-  delete env.DATABASE_URL;
+  env.DATABASE_URL = '';
   return env;
 }
 

@@ -379,34 +379,22 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promi
       return;
     }
 
-    const existingUser = await findUserByEmail(email);
-    if (!existingUser) {
-      res.json({
-        success: true,
-        message: 'If an active account exists with this email address, a password reset code has been dispatched.'
-      });
-      return;
-    }
-
-    const issued = await issueEmailOtp(email, 'PASSWORD_RESET');
-    if (!issued.sent) {
-      res.status(502).json({
-        error: 'Password reset email was not delivered. The unused code was discarded.'
-      });
-      return;
-    }
-
-    res.json({
+    const acknowledgement = {
       success: true,
-      message: 'If an active account exists with this email address, a password reset code has been dispatched.',
-      expiresAt: issued.expiresAt,
-      deliveredVia: issued.provider
-    });
-  } catch (err: any) {
-    if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
-      res.status(429).json({ error: err.message });
-      return;
+      message: 'If an active account exists with this email address, a password reset code has been dispatched.'
+    };
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
+      try {
+        await issueEmailOtp(email, 'PASSWORD_RESET');
+      } catch (err: any) {
+        if (!(err instanceof OtpCooldownError) && err?.name !== 'OtpCooldownError') {
+          console.warn('[Property Studio] Password reset email was not issued.');
+        }
+      }
     }
+    res.json(acknowledgement);
+  } catch {
     res.status(500).json({ error: 'Unable to process password reset request' });
   }
 });

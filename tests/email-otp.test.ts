@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 import { OtpCooldownError } from '../src/server/otpCrypto.ts';
 import { redactDatabaseError } from '../src/server/postgres.ts';
+import { allowRequest } from '../src/server/rateLimit.ts';
 
 /**
  * Mocked Resend plus local SQLite.
@@ -12,7 +13,8 @@ import { redactDatabaseError } from '../src/server/postgres.ts';
  */
 
 process.env.NODE_ENV = 'test';
-delete process.env.DATABASE_URL;
+// Empty, not deleted. Importing server.ts loads dotenv, which would fill a missing DATABASE_URL from .env and attach these tests to Neon.
+process.env.DATABASE_URL = '';
 process.env.DB_ENGINE = 'sqlite';
 process.env.SQLITE_PATH = `/tmp/ps-email-otp-${process.pid}.db`;
 process.env.OTP_HASH_SECRET = 'test-pepper-not-used-in-production';
@@ -20,7 +22,7 @@ delete process.env.RESEND_API_KEY;
 delete process.env.EMAIL_FROM;
 delete process.env.RESEND_FROM;
 
-const { initDatabase, generateOtp, verifyOtp, findUserByEmail, getSqliteDb } = await import('../src/server/db.ts');
+const { initDatabase, generateOtp, verifyOtp, findUserByEmail, createUser, getSqliteDb } = await import('../src/server/db.ts');
 const { issueEmailOtp } = await import('../src/server/emailOtp.ts');
 await initDatabase();
 
@@ -38,6 +40,7 @@ queued('OTP hash, expiry, reuse, attempts, and cooldown on local SQLite', async 
   assert.equal(row.otp_raw, null);
   assert.equal(row.otp_hash.includes(issued.otp), false);
   assert.match(row.otp_hash, /^[a-f0-9]{32}\.[a-f0-9]{64}$/);
+  assert.match(issued.otp, /^\d{6}$/);
   assert.equal(await verifyOtp(email, 'EMAIL_VERIFICATION', issued.otp), true);
   assert.equal(await verifyOtp(email, 'EMAIL_VERIFICATION', issued.otp), false);
 
@@ -121,12 +124,27 @@ queued('mocked Resend delivery, provider failure, and sender guard', async () =>
     assert.equal(Number(leftover.count), 0);
 
     const previousEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    process.env.NODE_ENV = 'test';
     delete process.env.OTP_HASH_SECRET;
-    const blocked = await issueEmailOtp('no-pepper@example.com', 'EMAIL_VERIFICATION', async () => new Response('{}', { status: 200 }));
+    let pepperFetch = false;
+    const blocked = await issueEmailOtp('no-pepper@example.com', 'EMAIL_VERIFICATION', async () => {
+      pepperFetch = true;
+      return new Response('{}', { status: 200 });
+    });
+    assert.equal(blocked.sent, false);
+    assert.equal(pepperFetch, false);
+    const pepperRows = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM otps WHERE target = ?').get('no-pepper@example.com') as { count: number };
+    assert.equal(Number(pepperRows.count), 0);
+
+    process.env.NODE_ENV = 'production';
+    const blockedProd = await issueEmailOtp('no-pepper-prod@example.com', 'EMAIL_VERIFICATION', async () => {
+      pepperFetch = true;
+      return new Response('{}', { status: 200 });
+    });
     process.env.NODE_ENV = previousEnv;
     process.env.OTP_HASH_SECRET = 'test-pepper-not-used-in-production';
-    assert.equal(blocked.sent, false);
+    assert.equal(blockedProd.sent, false);
+    assert.equal(pepperFetch, false);
   } finally {
     console.log = originalLog;
     console.warn = originalWarn;
@@ -135,6 +153,14 @@ queued('mocked Resend delivery, provider failure, and sender guard', async () =>
     process.env.EMAIL_FROM = 'Property Studio <otp@propertystudio.org>';
     process.env.RESEND_API_KEY = 're_test_mock_key';
   }
+});
+
+queued('email OTP requests stop after 8 attempts in 15 minutes', async () => {
+  const key = 'email-otp:203.0.113.10:rate-unit@example.com';
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    assert.equal(allowRequest(key, 8, 15 * 60 * 1000), true);
+  }
+  assert.equal(allowRequest(key, 8, 15 * 60 * 1000), false);
 });
 
 queued('database errors do not retain a PostgreSQL connection string', async () => {
@@ -158,6 +184,10 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     return originalFetch(url, init);
   }) as typeof fetch;
 
+  if (process.env.DATABASE_URL) {
+    throw new Error('Refusing to import the server while DATABASE_URL is set. OTP tests stay on local SQLite.');
+  }
+  process.env.DATABASE_URL = '';
   const { app } = await import('../server.ts');
   const server = app.listen(0);
   await once(server, 'listening');
@@ -206,7 +236,54 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   const user = await findUserByEmail(email);
   assert.equal(user?.email_verified, 1);
 
+  const unknownReset = await api('/api/auth/forgot-password', { email: 'nobody-reset@example.com' });
+  assert.equal(unknownReset.status, 200);
+  const deliveriesBeforeReset = deliveries.length;
+  await createUser({
+    name: 'Reset User',
+    email: 'reset-user@example.com',
+    password: 'Longpassword1!',
+    role: 'PROPERTY_SEEKER',
+    isVerified: true
+  });
+  const knownReset = await api('/api/auth/forgot-password', { email: 'reset-user@example.com' });
+  assert.equal(knownReset.status, 200);
+  assert.deepEqual(knownReset.json, unknownReset.json);
+  assert.equal(knownReset.json.expiresAt, undefined);
+  assert.equal(knownReset.json.deliveredVia, undefined);
+  assert.equal(deliveries.length, deliveriesBeforeReset + 1);
+  const resetHtml = deliveries[deliveries.length - 1].html;
+  const resetCode = resetHtml.match(/>(\d{6})</)?.[1] || '';
+  assert.equal(knownReset.raw.includes(resetCode), false);
+  const cooledReset = await api('/api/auth/forgot-password', { email: 'reset-user@example.com' });
+  assert.deepEqual(cooledReset.json, unknownReset.json);
+  assert.equal(deliveries.length, deliveriesBeforeReset + 1);
+
+  const rateEmail = 'rate-limit@example.com';
+  const firstRate = await api('/api/auth/send-email-otp', { email: rateEmail });
+  assert.equal(firstRate.status, 200, firstRate.raw);
+  for (let attempt = 0; attempt < 7; attempt += 1) {
+    const waiting = await api('/api/auth/send-email-otp', { email: rateEmail });
+    assert.equal(waiting.status, 429);
+    assert.match(waiting.json.error, /Please wait/);
+  }
+  const capped = await api('/api/auth/send-email-otp', { email: rateEmail });
+  assert.equal(capped.status, 429);
+  assert.equal(capped.json.error, 'Too many attempts. Wait and try again.');
+
+  await createUser({
+    name: 'Reset Failure',
+    email: 'reset-fail@example.com',
+    password: 'Longpassword1!',
+    role: 'PROPERTY_SEEKER',
+    isVerified: true
+  });
   globalThis.fetch = (async () => new Response('upstream down', { status: 503 })) as typeof fetch;
+  const failedReset = await api('/api/auth/forgot-password', { email: 'reset-fail@example.com' });
+  assert.equal(failedReset.status, 200);
+  assert.deepEqual(failedReset.json, unknownReset.json);
+  const failedResetRows = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM otps WHERE target = ? AND consumed_at IS NULL').get('reset-fail@example.com') as { count: number };
+  assert.equal(Number(failedResetRows.count), 0);
   const failedEmail = 'provider-fail@example.com';
   const failedSend = await api('/api/auth/send-email-otp', { email: failedEmail });
   assert.equal(failedSend.status, 502);

@@ -5,7 +5,8 @@ import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 
 process.env.NODE_ENV = 'test';
-delete process.env.DATABASE_URL;
+// Empty, not deleted. Importing server.ts loads dotenv, which would fill a missing DATABASE_URL from .env and attach these tests to Neon.
+process.env.DATABASE_URL = '';
 process.env.DB_ENGINE = 'sqlite';
 process.env.SQLITE_PATH = `/tmp/ps-http-workflows-${process.pid}.db`;
 delete process.env.PAYMENT_PROVIDER;
@@ -21,6 +22,10 @@ await createUser({ name: 'Admin', email: 'admin.workflow@example.com', role: 'SU
 await createUser({ name: 'Partner', email: 'partner.workflow@example.com', role: 'CHANNEL_PARTNER', password, isVerified: true });
 await createUser({ name: 'Seeker', email: 'seeker.workflow@example.com', role: 'PROPERTY_SEEKER', password, isVerified: true });
 
+if (process.env.DATABASE_URL) {
+  throw new Error('Refusing to import the server while DATABASE_URL is set. Workflow tests stay on local SQLite.');
+}
+process.env.DATABASE_URL = '';
 const { app } = await import('../server.ts');
 const server = app.listen(0);
 await once(server, 'listening');
