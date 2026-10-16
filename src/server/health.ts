@@ -1,8 +1,36 @@
 import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { getSqliteDb, isPostgresAuthoritative, isSqliteExplicit } from './db.ts';
 import { paymentsStatus } from './commerce.ts';
-import { configuredSmsProviders, emailFromAddress } from './notifications.ts';
+import { configuredSmsProviders } from './notifications.ts';
 import { REQUIRED_TABLES } from './platformSchema.ts';
+
+function nonEmpty(name: string): boolean {
+  const value = process.env[name];
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/** Presence only. Names are the keys; values, lengths, and secrets are never copied. */
+export function environmentPresence(): {
+  DATABASE_URL: boolean;
+  RESEND_API_KEY: boolean;
+  OTP_HASH_SECRET: boolean;
+  EMAIL_FROM: boolean;
+} {
+  return {
+    DATABASE_URL: nonEmpty('DATABASE_URL'),
+    RESEND_API_KEY: nonEmpty('RESEND_API_KEY'),
+    OTP_HASH_SECRET: nonEmpty('OTP_HASH_SECRET'),
+    EMAIL_FROM: nonEmpty('EMAIL_FROM')
+  };
+}
+
+function deploymentIdentity(): { commit: string | null; ref: string | null; target: string | null } {
+  return {
+    commit: process.env.VERCEL_GIT_COMMIT_SHA?.trim() || null,
+    ref: process.env.VERCEL_GIT_COMMIT_REF?.trim() || null,
+    target: process.env.VERCEL_ENV?.trim() || null
+  };
+}
 
 function configurationFlags(): {
   database: boolean;
@@ -11,12 +39,25 @@ function configurationFlags(): {
   otpPepper: boolean;
   sms: boolean;
 } {
+  const configuredSender = (process.env.EMAIL_FROM || process.env.RESEND_FROM || '').trim();
   return {
-    database: Boolean(process.env.DATABASE_URL),
-    emailProvider: Boolean(process.env.RESEND_API_KEY),
-    emailSender: /@propertystudio\.org\b/i.test(emailFromAddress()),
-    otpPepper: Boolean(process.env.OTP_HASH_SECRET),
+    database: nonEmpty('DATABASE_URL'),
+    emailProvider: nonEmpty('RESEND_API_KEY'),
+    emailSender: configuredSender.length > 0 && /@propertystudio\.org\b/i.test(configuredSender),
+    otpPepper: nonEmpty('OTP_HASH_SECRET'),
     sms: configuredSmsProviders().length > 0
+  };
+}
+
+function publicDiagnostics(): {
+  configuration: ReturnType<typeof configurationFlags>;
+  environment: ReturnType<typeof environmentPresence>;
+  deployment: ReturnType<typeof deploymentIdentity>;
+} {
+  return {
+    configuration: configurationFlags(),
+    environment: environmentPresence(),
+    deployment: deploymentIdentity()
   };
 }
 
@@ -62,7 +103,7 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
           latencyMs: connection.latencyMs,
           code: databaseCode(true, connection.connected, schema.ready)
         },
-        configuration: configurationFlags(),
+        ...publicDiagnostics(),
         payments,
         uptime,
         timestamp
@@ -85,7 +126,7 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
           missingTables: schema.missing,
           code: schema.ready ? null : 'SCHEMA_NOT_READY'
         },
-        configuration: configurationFlags(),
+        ...publicDiagnostics(),
         payments,
         uptime,
         timestamp
@@ -105,7 +146,7 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
         missingTables: [],
         code: 'DATABASE_NOT_CONFIGURED'
       },
-      configuration: configurationFlags(),
+      ...publicDiagnostics(),
       payments,
       uptime,
       timestamp
