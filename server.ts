@@ -56,6 +56,7 @@ import {
   generateOtp,
   verifyOtp,
   isTargetVerified,
+  discardUnconsumedOtp,
   getAllCommunities,
   getCommunityById,
   createCommunity,
@@ -64,7 +65,8 @@ import {
   updateLastLogin
 } from './src/server/db.ts';
 import { checkPostgresHealth, checkSchemaReadiness } from './src/server/postgres.ts';
-import { sendRealSmsOtp, getNotificationGatewayStatus } from './src/server/notifications.ts';
+import { sendRealSmsOtp, getNotificationGatewayStatus, configuredSmsProviders } from './src/server/notifications.ts';
+import { expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp } from './src/server/emailOtp.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
@@ -443,25 +445,51 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response): Promis
   }
 });
 
-// Send Phone OTP
+// Send Phone OTP. Property Seeker registration cannot finish without a real provider delivery.
 app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
+  const phone = String(req.body?.phone || '').trim();
+  if (rejectIfRateLimited(req, res, 'phone-otp', phone)) return;
   try {
-    const { phone } = req.body;
-    if (!phone || phone.trim().length < 8) {
+    if (phone.length < 8) {
       res.status(400).json({ error: 'Valid mobile number is required' });
       return;
     }
+    if (configuredSmsProviders().length === 0) {
+      res.status(503).json({
+        error: 'SMS verification is not configured. No code was sent and no account was created.',
+        code: 'SMS_NOT_CONFIGURED'
+      });
+      return;
+    }
     const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
-    const dispatchResult = await sendRealSmsOtp(phone.trim(), otp);
-
+    const dispatchResult = await sendRealSmsOtp(phone, otp);
+    if (!dispatchResult.success) {
+      await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
+      res.status(502).json({
+        error: 'The SMS provider did not accept the verification code. No code remains active and no account was created.',
+        code: 'SMS_DELIVERY_FAILED'
+      });
+      return;
+    }
     res.json({
       success: true,
-      message: `Property Studio SMS verification OTP dispatched to ${phone}.`,
+      message: 'SMS verification code dispatched. Check the mobile number you entered.',
       expiresAt,
       deliveredVia: dispatchResult.provider
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
+      res.status(429).json({ error: err.message });
+      return;
+    }
+    if (phone) {
+      try {
+        await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
+      } catch {
+        // The caller still receives a generic failure and no code.
+      }
+    }
+    res.status(500).json({ error: 'Unable to send a verification code.' });
   }
 });
 
@@ -1341,6 +1369,10 @@ app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
 
 registerPlatformRoutes(app, { requireAuth, requireAdmin });
 
+app.use('/api', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
 // ==============================================================================
 // VITE DEV SERVER & PRODUCTION STATIC SERVING
 // ==============================================================================
@@ -1391,4 +1423,4 @@ if (entry.endsWith('server.ts') || entry.endsWith('server.js')) {
   });
 }
 
-export { app };
+export { app, initDatabase, expressPathForHostedRequest };

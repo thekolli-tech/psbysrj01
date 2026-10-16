@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { postLoginDestination } from '../../shared/policy';
+import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
 import {
   LogIn,
@@ -44,6 +45,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [organizationInput, setOrganizationInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const submitting = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Email OTP verification state
@@ -76,62 +78,75 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMsg(null);
+    submitting.current = true;
     setLoading(true);
 
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
           email: emailInput.trim(),
           password: passwordInput
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Authentication failed');
+      const result = await readApiResponse(response);
+      const user = result.data?.user as { name?: string; role?: string } | undefined;
+      if (!result.ok || !user) {
+        throw new Error(result.error || 'Authentication failed');
       }
 
-      // Success! Update AppContext state
-      login(data.user);
-      showToast(`Welcome back, ${data.user.name}!`);
+      login(user as Parameters<typeof login>[0]);
+      showToast(`Welcome back, ${user.name}!`);
 
-      setActiveView(postLoginDestination(data.user.role));
+      setActiveView(postLoginDestination(user.role));
 
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Invalid credentials. Please verify your email and password.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
 
   const handleSendPhoneOtp = async () => {
+    if (submitting.current) return;
     if (!phoneInput.trim() || phoneInput.trim().length < 8) {
       setErrorMsg('Please enter a valid mobile number first.');
       return;
     }
     setErrorMsg(null);
+    submitting.current = true;
+    setLoading(true);
     try {
       const res = await fetch('/api/auth/send-phone-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ phone: phoneInput.trim() })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to dispatch SMS verification code');
+      const result = await readApiResponse(res);
+      if (!result.ok || result.data?.success !== true) {
+        setPhoneOtpSent(false);
+        throw new Error(result.error || 'SMS verification was not sent.');
+      }
       setPhoneOtpSent(true);
       setPhoneCountdown(60);
-      showToast(`SMS OTP dispatched to ${phoneInput.trim()}`);
+      showToast('SMS verification code sent. Check the mobile number you entered.');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to dispatch mobile OTP');
+      setErrorMsg(err.message || 'SMS verification was not sent.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
     }
   };
 
   const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMsg(null);
 
     if (!nameInput.trim() || !emailInput.trim() || !passwordInput) {
@@ -153,44 +168,49 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       }
     }
 
+    submitting.current = true;
     setLoading(true);
     try {
       const res = await fetch('/api/auth/send-email-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ email: emailInput.trim() })
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to send verification code');
+      const result = await readApiResponse(res);
+      if (!result.ok || result.data?.success !== true) {
+        throw new Error(result.error || 'Failed to send verification code');
       }
 
       setOtpSent(true);
       setCountdown(60);
-      showToast(`Property Studio verification code sent to ${emailInput.trim()}`);
+      showToast('Property Studio verification code sent. Check the inbox for that address.');
 
-      // If Property Seeker, also automatically dispatch SMS OTP to the required mobile number
       if (roleInput === 'PROPERTY_SEEKER' && phoneInput.trim()) {
-        fetch('/api/auth/send-phone-otp', {
+        const phoneRes = await fetch('/api/auth/send-phone-otp', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
           body: JSON.stringify({ phone: phoneInput.trim() })
-        }).then(r => r.json()).then(d => {
-          if (d.success) {
-            setPhoneOtpSent(true);
-            setPhoneCountdown(60);
-          }
-        }).catch(() => {});
+        });
+        const phoneResult = await readApiResponse(phoneRes);
+        if (!phoneResult.ok || phoneResult.data?.success !== true) {
+          setPhoneOtpSent(false);
+          setErrorMsg(phoneResult.error || 'SMS verification was not sent. No account was created.');
+        } else {
+          setPhoneOtpSent(true);
+          setPhoneCountdown(60);
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to send verification code.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
 
   const handleVerifyOtpAndRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMsg(null);
 
     if (!otpInput.trim() || otpInput.trim().length < 4) {
@@ -206,11 +226,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       }
     }
 
+    submitting.current = true;
     setLoading(true);
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
           name: nameInput.trim(),
           email: emailInput.trim(),
@@ -223,17 +244,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Registration failed');
+      const result = await readApiResponse(response);
+      const user = result.data?.user as Parameters<typeof login>[0] | undefined;
+      if (!result.ok || !user) {
+        throw new Error(result.error || 'Registration failed');
       }
 
-      login(data.user);
-      showToast(`Account successfully registered and verified! Welcome, ${data.user.name}`);
+      login(user);
+      showToast(`Account successfully registered and verified! Welcome, ${user.name}`);
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Verification failed. Please check the OTP code.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
@@ -548,7 +571,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         )}
                       </div>
                       <p className="text-amber-900 text-[11px] leading-relaxed">
-                        SMS code dispatched to <strong className="font-mono text-amber-950">{phoneInput}</strong>.
+                        {phoneOtpSent
+                          ? 'SMS code sent to the mobile number you entered. The account is created only after both codes are verified.'
+                          : 'A mobile verification code is required. It is sent only when an SMS provider accepts it.'}
                       </p>
                       <div>
                         <label className="block font-bold text-amber-950 mb-1">

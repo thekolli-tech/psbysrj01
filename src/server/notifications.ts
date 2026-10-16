@@ -71,9 +71,20 @@ export async function sendRealEmailOtp(toEmail: string, otp: string, _recipientN
   return sendResendOtp(toEmail, otp);
 }
 
+/** Providers with enough configuration to attempt a real SMS send. */
+export function configuredSmsProviders(): string[] {
+  const providers: string[] = [];
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) providers.push('Twilio');
+  if (process.env.FAST2SMS_API_KEY) providers.push('Fast2SMS');
+  if (process.env.MSG91_AUTH_KEY && process.env.MSG91_TEMPLATE_ID) providers.push('MSG91');
+  if (process.env.TWOFACTOR_API_KEY) providers.push('2Factor');
+  if (process.env.TEXTLOCAL_API_KEY) providers.push('Textlocal');
+  return providers;
+}
+
 /**
- * Dispatches real-time SMS OTP to user's real mobile number.
- * Automatically checks Twilio, Fast2SMS (India), MSG91, or logs to secure SMS gateway.
+ * Sends a phone verification code through a configured SMS provider.
+ * Returns failure when no provider is configured or every attempt is rejected.
  */
 export async function sendRealSmsOtp(toPhone: string, otp: string): Promise<SmsDispatchResult> {
   const cleanPhone = toPhone.trim().replace(/[\s-]/g, '');
@@ -105,7 +116,7 @@ export async function sendRealSmsOtp(toPhone: string, otp: string): Promise<SmsD
         console.log(`[Property Studio] Real SMS OTP sent to ${cleanPhone} from Property Studio via Twilio. SID: ${data.sid}`);
         return { success: true, provider: 'twilio', messageId: data.sid };
       } else {
-        console.warn('[Property Studio] Twilio SMS error:', data);
+        console.warn(`[Property Studio] Twilio SMS was not accepted. Status ${res.status}.`);
       }
     } catch (err: any) {
       console.warn('[Property Studio] Twilio dispatch failed:', err.message);
@@ -196,21 +207,10 @@ export async function sendRealSmsOtp(toPhone: string, otp: string): Promise<SmsD
     }
   }
 
-  // 6. Default Real-time Gateway Logger
-  console.log(`=======================================================`);
-  console.log(`[PROPERTY STUDIO REAL-TIME SMS OTP DISPATCH]`);
-  console.log(`Sender:        Property Studio`);
-  console.log(`Mobile Number: ${cleanPhone}`);
-  console.log(`Security:      Hashed OTP generated & queued for cellular dispatch [PROTECTED]`);
-  console.log(`Status:        Dispatched from Property Studio cellular carrier queue`);
-  console.log(`Note:          OTP is strictly originating from Property Studio.`);
-  console.log(`=======================================================`);
-
-  return {
-    success: true,
-    provider: 'property_studio_gateway',
-    messageId: `ps_sms_${Date.now()}`
-  };
+  if (configuredSmsProviders().length === 0) {
+    return { success: false, provider: 'unconfigured', error: 'SMS provider is not configured.' };
+  }
+  return { success: false, provider: 'unconfigured', error: 'SMS provider did not accept the verification message.' };
 }
 
 /**
@@ -221,12 +221,7 @@ export function getNotificationGatewayStatus() {
   const resendReady = Boolean(process.env.RESEND_API_KEY) && /@propertystudio\.org\b/i.test(from);
   const emailProviders: string[] = resendReady ? ['Resend'] : [];
 
-  const smsProviders: string[] = [];
-  if (process.env.TWILIO_ACCOUNT_SID) smsProviders.push('Twilio');
-  if (process.env.FAST2SMS_API_KEY) smsProviders.push('Fast2SMS');
-  if (process.env.MSG91_AUTH_KEY) smsProviders.push('MSG91');
-  if (process.env.TWOFACTOR_API_KEY) smsProviders.push('2Factor');
-  if (process.env.TEXTLOCAL_API_KEY) smsProviders.push('Textlocal');
+  const smsProviders = configuredSmsProviders();
 
   return {
     emailConfigured: emailProviders.length > 0,

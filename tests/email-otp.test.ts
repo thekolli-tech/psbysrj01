@@ -198,16 +198,24 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   async function api(path: string, body: unknown) {
     const response = await originalFetch(`http://127.0.0.1:${port}${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', accept: '*/*' },
       body: JSON.stringify(body)
     });
-    const json = await response.json();
-    return { status: response.status, json, raw: JSON.stringify(json) };
+    const text = await response.text();
+    let json: any = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      json = null;
+    }
+    return { status: response.status, json, raw: text, contentType: response.headers.get('content-type') || '' };
   }
 
   const email = 'register-mock@example.com';
   const sent = await api('/api/auth/send-email-otp', { email });
   assert.equal(sent.status, 200, sent.raw);
+  assert.match(sent.contentType, /application\/json/);
+  assert.equal(sent.raw.includes('The page could not be found'), false);
   assert.equal(deliveries.length, 1);
   assert.equal(deliveries[0].from, 'Property Studio <otp@propertystudio.org>');
   assert.equal(sent.json.otp, undefined);
@@ -270,6 +278,61 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   const capped = await api('/api/auth/send-email-otp', { email: rateEmail });
   assert.equal(capped.status, 429);
   assert.equal(capped.json.error, 'Too many attempts. Wait and try again.');
+
+  const missing = await api('/api/auth/does-not-exist', {});
+  assert.equal(missing.status, 404);
+  assert.match(missing.contentType, /application\/json/);
+  assert.equal(missing.json.error, 'Not found');
+  assert.equal(missing.raw.includes('The page could not be found'), false);
+
+  const sms = await api('/api/auth/send-phone-otp', { phone: '+919800011199' });
+  assert.equal(sms.status, 503);
+  assert.equal(sms.json.code, 'SMS_NOT_CONFIGURED');
+  assert.equal(sms.json.success, undefined);
+  assert.match(sms.contentType, /application\/json/);
+  const smsRows = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM otps WHERE target = ?').get('+919800011199') as { count: number };
+  assert.equal(Number(smsRows.count), 0);
+  assert.equal(await findUserByEmail('seeker-bypass@example.com'), null);
+
+  const seekerEmail = 'seeker-bypass@example.com';
+  const seekerSent = await api('/api/auth/send-email-otp', { email: seekerEmail });
+  assert.equal(seekerSent.status, 200, seekerSent.raw);
+  const seekerCode = deliveries[deliveries.length - 1].html.match(/>(\d{6})</)?.[1] || '';
+  const seekerBypass = await api('/api/auth/register', {
+    name: 'Seeker Bypass',
+    email: seekerEmail,
+    password: 'Longpassword1!',
+    role: 'PROPERTY_SEEKER',
+    phone: '+919800011199',
+    otp: seekerCode,
+    phoneVerified: true
+  });
+  assert.equal(seekerBypass.status, 400);
+  assert.equal(await findUserByEmail(seekerEmail), null);
+
+  const ownerEmail = 'landowner-register@example.com';
+  const ownerSent = await api('/api/auth/send-email-otp', { email: ownerEmail });
+  assert.equal(ownerSent.status, 200, ownerSent.raw);
+  const ownerCode = deliveries[deliveries.length - 1].html.match(/>(\d{6})</)?.[1] || '';
+  const owner = await api('/api/auth/register', {
+    name: 'Land Owner',
+    email: ownerEmail,
+    password: 'Longpassword1!',
+    role: 'LANDOWNER',
+    otp: ownerCode
+  });
+  assert.equal(owner.status, 200, owner.raw);
+  assert.equal((await findUserByEmail(ownerEmail))?.role, 'LANDOWNER');
+
+  const { sendRealSmsOtp } = await import('../src/server/notifications.ts');
+  process.env.FAST2SMS_API_KEY = 'test-sms-key-not-real';
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ return: false }), { status: 422, headers: { 'content-type': 'application/json' } })) as typeof fetch;
+  const rejectedSms = await sendRealSmsOtp('+919800011188', '654321');
+  globalThis.fetch = previousFetch;
+  delete process.env.FAST2SMS_API_KEY;
+  assert.equal(rejectedSms.success, false);
+  assert.equal(JSON.stringify(rejectedSms).includes('654321'), false);
 
   await createUser({
     name: 'Reset Failure',
