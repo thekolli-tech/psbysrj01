@@ -17,12 +17,16 @@ import { CorporateConferenceView } from './components/conference/CorporateConfer
 import { MarketTrendsView } from './components/trends/MarketTrendsView';
 import { CommunityForumView } from './components/community/CommunityForum';
 import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
+import { DeveloperDashboard } from './components/admin/DeveloperDashboard';
+import { ProfessionalDashboard } from './components/admin/ProfessionalDashboard';
 import { PropertyAdminDashboard } from './components/admin/PropertyAdminDashboard';
+import { canAccessProfessionalSurface, isPropertySeeker } from './shared/policy';
 import { StudioBroadcastView } from './components/studio/StudioBroadcastView';
 import { ContactPropertyAdmin } from './components/contact/ContactPropertyAdmin';
 import { PropertyStudioSupportDesk } from './components/support/PropertyStudioSupportDesk';
 import { SupportDeskButton } from './components/support/SupportDeskButton';
 import { AuthRequiredCard } from './components/common/AuthRequiredCard';
+import { BrandLogo } from './components/common/BrandLogo';
 import { Property } from './types';
 import { ShieldAlert, Building, LifeBuoy, ArrowRight, Lock, Phone, Mail, ShieldCheck, ExternalLink } from 'lucide-react';
 
@@ -134,7 +138,7 @@ const AppContent: React.FC = () => {
 
         {/* Member-Gated Modules: only visible after login */}
         {activeView === 'LEADS_MARKET' && (
-          isLoggedIn ? (
+          isLoggedIn && !isPropertySeeker(currentUser.role) ? (
             <LeadMarketplace onOpenWalletModal={() => setWalletModalOpen(true)} />
           ) : (
             <AuthRequiredCard view="LEADS_MARKET" onOpenLoginModal={() => setLoginModalOpen(true)} />
@@ -217,6 +221,27 @@ const AppContent: React.FC = () => {
         )}
 
         {/* Super Admin & Developer Dashboard with Role Guard */}
+        {activeView === 'DEVELOPER' && (
+          currentUser.role === 'DEVELOPER' && isLoggedIn ? (
+            <DeveloperDashboard />
+          ) : (
+            <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 text-center">
+              <h2 className="text-xl font-bold text-slate-900">Developer access required</h2>
+            </div>
+          )
+        )}
+
+        {activeView === 'PROFESSIONAL' && (
+          isLoggedIn && canAccessProfessionalSurface(currentUser.role) && !isPropertySeeker(currentUser.role) ? (
+            <ProfessionalDashboard />
+          ) : (
+            <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-2">
+              <h2 className="text-xl font-bold text-slate-900">Professional access required</h2>
+              <p className="text-xs text-slate-600">Property seekers use project discovery. This workspace is not available for that role.</p>
+            </div>
+          )
+        )}
+
         {activeView === 'ADMIN' && (
           (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEVELOPER') && isLoggedIn ? (
             <SuperAdminDashboard />
@@ -298,13 +323,8 @@ const AppContent: React.FC = () => {
       <footer className="bg-white border-t border-slate-200 py-10 px-4 sm:px-6 lg:px-8 mt-auto">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div>
-              <span className="text-base font-bold text-slate-900 block font-display">
-                Property Studio by Swamy Reddy Javidi
-              </span>
-              <p className="text-xs text-slate-500 font-mono mt-0.5">
-                REAL ESTATE · VISUAL STORIES · MARKET TRENDS & INSIGHTS
-              </p>
+            <div className="space-y-3">
+              <BrandLogo variant="compact" size="xl" />
               <p className="text-[11px] text-slate-500 mt-1">
                 Official Secretariat: <a href="mailto:info@propertystudio.org" className="text-amber-700 font-mono font-bold hover:underline">info@propertystudio.org</a> · Western Corridor Financial District, Hyderabad
               </p>

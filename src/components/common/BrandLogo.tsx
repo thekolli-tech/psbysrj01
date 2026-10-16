@@ -7,55 +7,27 @@ interface BrandLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
+const SIZE_CLASS = {
+  sm: 'h-9',
+  md: 'h-16',
+  lg: 'h-20',
+  xl: 'h-28'
+} as const;
+
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   className = '',
   variant = 'full',
   size = 'md'
 }) => {
-  if (variant === 'compact') {
-    return (
-      <div className={`flex items-center gap-2.5 ${className}`}>
-        <img
-          src={ASSET_IMAGES.officialLogo}
-          alt="Property Studio Logo"
-          className="h-10 w-10 object-contain shrink-0"
-          referrerPolicy="no-referrer"
-        />
-        <div className="flex flex-col text-left">
-          <div className="flex items-center text-sm font-black tracking-tight leading-none font-display">
-            <span className="text-[#000000]">PROPERTY</span>
-            <span className="text-[#B48529] ml-1">STUDIO</span>
-          </div>
-          <span className="text-[9px] font-bold tracking-wider text-[#B48529] uppercase mt-0.5 font-mono">
-            BY SWAMY REDDY JAVIDI
-          </span>
-        </div>
-      </div>
-    );
-  }
+  const frame = variant === 'full'
+    ? 'w-full h-auto max-w-[420px]'
+    : `${SIZE_CLASS[size]} w-auto`;
 
-  if (variant === 'icon-only') {
-    return (
-      <div className={`relative shrink-0 flex items-center justify-center ${className}`}>
-        <img
-          src={ASSET_IMAGES.officialLogo}
-          alt="Property Studio Logo"
-          className="h-10 w-10 object-contain"
-          referrerPolicy="no-referrer"
-        />
-      </div>
-    );
-  }
-
-  // Full variant matching Image 2 exactly
   return (
-    <div className={`flex flex-col items-center text-center ${className}`}>
-      <img
-        src={ASSET_IMAGES.officialLogo}
-        alt="Property Studio by Swamy Reddy Javidi"
-        className="w-full max-w-[360px] h-auto object-contain mx-auto"
-        referrerPolicy="no-referrer"
-      />
-    </div>
+    <img
+      src={ASSET_IMAGES.officialLogo}
+      alt="Property Studio by Swamy Reddy Javidi"
+      className={`${frame} object-contain ${className}`}
+    />
   );
 };

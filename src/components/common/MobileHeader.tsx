@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
-import { ASSET_IMAGES } from '../../data/mockData';
+import { BrandLogo } from './BrandLogo';
 import { Wallet, LogIn, ChevronLeft, ShieldAlert, Building, KeyRound } from 'lucide-react';
 
 interface MobileHeaderProps {
@@ -20,8 +20,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     activeView,
     setActiveView,
     walletBalance,
-    isLoggedIn,
-    scrollProgress
+    isLoggedIn
   } = useApp();
 
   const getTitle = (view: ViewType): string => {
@@ -42,42 +41,33 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     }
   };
 
-  const isScrolled = scrollProgress > 0.15;
-
   return (
     <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3.5 h-14 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        {activeView !== 'HOME' ? (
+      <div className="flex items-center gap-2 min-w-0">
+        {activeView !== 'HOME' && (
           <button
             onClick={() => setActiveView('HOME')}
             className="p-1 -ml-1 text-slate-700 hover:text-slate-900 rounded-lg active:scale-95 transition-transform cursor-pointer"
+            aria-label="Back to home"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-        ) : (
-          <div className="flex items-center">
-            {isScrolled ? (
-              <img
-                src={ASSET_IMAGES.officialLogo}
-                alt="Property Studio"
-                className="h-8 w-auto object-contain transition-all duration-300"
-              />
-            ) : (
-              <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center text-amber-400 font-bold text-xs">
-                PS
-              </div>
-            )}
+        )}
+        <button
+          onClick={() => setActiveView('HOME')}
+          className="shrink-0"
+          aria-label="Property Studio home"
+        >
+          <BrandLogo variant="compact" size="sm" />
+        </button>
+
+        {activeView !== 'HOME' && (
+          <div className="truncate ml-1">
+            <h1 className="text-sm font-bold text-slate-900 truncate tracking-tight">
+              {getTitle(activeView)}
+            </h1>
           </div>
         )}
-
-        <div className="truncate ml-1">
-          <h1 className="text-sm font-bold text-slate-900 truncate tracking-tight">
-            {getTitle(activeView)}
-          </h1>
-          <span className="text-[10px] text-slate-500 font-medium block -mt-0.5">
-            by Swamy Reddy Javidi
-          </span>
-        </div>
       </div>
 
       <div className="flex items-center gap-2">

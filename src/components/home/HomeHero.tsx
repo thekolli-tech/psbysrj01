@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ASSET_IMAGES } from '../../data/mockData';
 import { OfficialBrandCard } from '../common/OfficialBrandCard';
@@ -71,11 +71,21 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
     return true;
   });
 
-  // Scroll interpolation values (progress is 0 at top, 1 at ~280px scroll)
-  const personOpacity = Math.max(0, 1 - scrollProgress * 1.5);
-  const personScale = Math.max(0.75, 1 - scrollProgress * 0.25);
-  const logoOpacity = Math.min(1, Math.max(0, (scrollProgress - 0.25) * 1.6));
-  const logoScale = Math.min(1, 0.85 + scrollProgress * 0.15);
+  const [wideLayout, setWideLayout] = useState(true);
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)');
+    const apply = () => setWideLayout(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+
+  const morph = wideLayout ? scrollProgress : 0;
+  const personOpacity = Math.max(0, 1 - morph * 1.5);
+  const personScale = Math.max(0.75, 1 - morph * 0.25);
+  const logoOpacity = Math.min(1, Math.max(0, (morph - 0.25) * 1.6));
+  const logoScale = Math.min(1, 0.85 + morph * 0.15);
 
   return (
     <div className="space-y-16 pb-12">
@@ -92,7 +102,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
             {/* Left 6 cols: Brand Manifesto & Audio Lead */}
-            <div className="lg:col-span-6 space-y-6">
+            <div className="lg:col-span-6 space-y-6 order-2 lg:order-1">
               <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold tracking-wide">
                 <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
                 <span className="uppercase font-mono">REAL ESTATE MEDIA & DATA INTELLIGENCE</span>
@@ -202,7 +212,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
             </div>
 
             {/* Right 6 cols: Dynamic Host Card Morphing Container */}
-            <div className="lg:col-span-6 relative">
+            <div className="lg:col-span-6 relative order-1 lg:order-2">
               <div className="relative mx-auto max-w-md lg:max-w-lg aspect-square rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden p-2.5 transition-all duration-300">
                 <div className="relative w-full h-full rounded-2xl overflow-hidden bg-white flex items-center justify-center">
                   {/* LAYER 1: Official Brand Card with Person */}
@@ -242,11 +252,11 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                     <div className="px-2.5 py-1 bg-white/90 backdrop-blur-md rounded-full border border-slate-200 text-[10px] font-bold text-slate-600 shadow-xs flex items-center gap-1.5">
                       <ChevronDown
                         className={`w-3.5 h-3.5 text-amber-600 transition-transform duration-300 ${
-                          scrollProgress > 0.5 ? 'rotate-180' : 'animate-bounce'
+                          morph > 0.5 ? 'rotate-180' : 'animate-bounce'
                         }`}
                       />
                       <span>
-                        {scrollProgress > 0.5 ? 'Logo Docked' : 'Scroll to Morph Logo'}
+                        {morph > 0.5 ? 'Logo Docked' : wideLayout ? 'Scroll to Morph Logo' : 'Official Host Card'}
                       </span>
                     </div>
                   </div>
@@ -254,10 +264,12 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               </div>
 
               <div className="text-center mt-3 text-xs text-slate-400 font-medium">
-                {scrollProgress > 0.5 ? (
+                {morph > 0.5 ? (
                   <span className="text-amber-700 font-bold">✓ Official Property Studio emblem anchored to navigation</span>
-                ) : (
+                ) : wideLayout ? (
                   <span>↓ Scroll down to watch the host card smoothly morph into the official logo</span>
+                ) : (
+                  <span>Official host card for Property Studio by Swamy Reddy Javidi</span>
                 )}
               </div>
             </div>

@@ -49,6 +49,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
   const [microMarket, setMicroMarket] = useState('Neopolis, Kokapet');
   const [tier, setTier] = useState<LeadTier>('PREMIUM');
   const [requirements, setRequirements] = useState('');
+  const [consentGranted, setConsentGranted] = useState(false);
 
   // Mobile number OTP verification state
   const [phoneVerified, setPhoneVerified] = useState(false);
@@ -129,13 +130,20 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
       showToast('Please provide seeker name, phone, and requirements.');
       return;
     }
+    if (!consentGranted) {
+      showToast('Consent is required before contact details can be shared with professionals.');
+      return;
+    }
 
     const price = leadPrices[tier] || 750;
 
     createBuyerLead({
       seekerName: name.trim(),
       seekerPhone: phone.trim(),
-      seekerEmail: email.trim() || `${name.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+      seekerEmail: email.trim(),
+      consentGranted: true,
+      consentVersion: '2026-10-15',
+      consentPurpose: 'Share my contact details with eligible verified professionals solely to respond to this property enquiry.',
       budget,
       budgetMinLakhs: 450,
       microMarket,
@@ -151,6 +159,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
     setPhone('');
     setEmail('');
     setRequirements('');
+    setConsentGranted(false);
     setPhoneVerified(false);
     setPhoneOtpSent(false);
     setPhoneOtpInput('');
@@ -625,6 +634,18 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                   required
                 />
               </div>
+
+              <label className="flex items-start gap-2 p-3 rounded-xl border border-amber-200 bg-amber-50 text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={consentGranted}
+                  onChange={e => setConsentGranted(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  I understand my name, phone, and email will be stored and shared with eligible verified professionals only after they complete the required payment and eligibility checks. Consent version 2026-10-15. Purpose: respond to this property enquiry.
+                </span>
+              </label>
 
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
