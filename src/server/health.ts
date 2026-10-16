@@ -87,7 +87,7 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
       : { ready: false, missing: [], connected: false, error: connection.error };
     const driverError = connection.error || schema.error;
     if (driverError) {
-      console.error(`[Property Studio] Database health check failed: ${driverError}`);
+      console.error(`[Property Studio] Database health check failed (${connection.failure || 'UNKNOWN'}): ${driverError}`);
     }
     const ok = connection.connected && schema.ready;
     return {
@@ -101,7 +101,8 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
           schemaReady: schema.ready,
           missingTables: schema.missing,
           latencyMs: connection.latencyMs,
-          code: databaseCode(true, connection.connected, schema.ready)
+          code: databaseCode(true, connection.connected, schema.ready),
+          failure: connection.connected ? null : (connection.failure || 'UNKNOWN')
         },
         ...publicDiagnostics(),
         payments,
@@ -124,7 +125,8 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
           connected: true,
           schemaReady: schema.ready,
           missingTables: schema.missing,
-          code: schema.ready ? null : 'SCHEMA_NOT_READY'
+          code: schema.ready ? null : 'SCHEMA_NOT_READY',
+          failure: null
         },
         ...publicDiagnostics(),
         payments,
@@ -144,7 +146,8 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
         connected: false,
         schemaReady: false,
         missingTables: [],
-        code: 'DATABASE_NOT_CONFIGURED'
+        code: 'DATABASE_NOT_CONFIGURED',
+        failure: null
       },
       ...publicDiagnostics(),
       payments,

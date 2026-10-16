@@ -18,6 +18,53 @@ export function redactDatabaseError(message: string): string {
     .slice(0, 300);
 }
 
+export type DatabaseConnectionFailure =
+  | 'CONNECTION_TIMEOUT'
+  | 'AUTHENTICATION_FAILED'
+  | 'DNS_FAILURE'
+  | 'NETWORK_FAILURE'
+  | 'DATABASE_MISSING'
+  | 'TLS_FAILED'
+  | 'UNKNOWN';
+
+/** Classifies a driver error without retaining its message, host, or credentials. */
+export function classifyDatabaseConnectionFailure(error: unknown): DatabaseConnectionFailure {
+  const candidate = error as { code?: string; message?: string };
+  const code = String(candidate?.code || '');
+  const message = String(candidate?.message || '');
+  if (
+    code === 'ETIMEDOUT' ||
+    code === '57014' ||
+    /connection timeout|timeout exceeded|Connection terminated due to connection timeout|query_wait_timeout/i.test(message)
+  ) {
+    return 'CONNECTION_TIMEOUT';
+  }
+  if (code === '28P01' || /password authentication failed|authentication failed|SASL|SCRAM/i.test(message)) {
+    return 'AUTHENTICATION_FAILED';
+  }
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'DNS_FAILURE';
+  if (code === '3D000' || /database ".+" does not exist/i.test(message)) return 'DATABASE_MISSING';
+  if (
+    code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+    code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+    code === 'CERT_HAS_EXPIRED' ||
+    code.startsWith('ERR_TLS') ||
+    /certificate|unable to verify|self[- ]signed|altnames|ERR_TLS/i.test(message)
+  ) {
+    return 'TLS_FAILED';
+  }
+  if (
+    code === 'ECONNREFUSED' ||
+    code === 'ECONNRESET' ||
+    code === 'EHOSTUNREACH' ||
+    code === 'ENETUNREACH' ||
+    code === 'EPIPE'
+  ) {
+    return 'NETWORK_FAILURE';
+  }
+  return 'UNKNOWN';
+}
+
 export function getPostgresPool(): pg.Pool | null {
   if (!process.env.DATABASE_URL) {
     return null;
@@ -42,7 +89,12 @@ export function getPostgresPool(): pg.Pool | null {
   return poolInstance;
 }
 
-export async function checkPostgresHealth(): Promise<{ connected: boolean; latencyMs?: number; error?: string }> {
+export async function checkPostgresHealth(): Promise<{
+  connected: boolean;
+  latencyMs?: number;
+  error?: string;
+  failure?: DatabaseConnectionFailure;
+}> {
   const pool = getPostgresPool();
   if (!pool) {
     return { connected: false, error: 'DATABASE_URL is not configured' };
@@ -58,7 +110,12 @@ export async function checkPostgresHealth(): Promise<{ connected: boolean; laten
       client.release();
     }
   } catch (err: any) {
-    return { connected: false, error: redactDatabaseError(err.message || 'Failed to connect to PostgreSQL') };
+    const failure = classifyDatabaseConnectionFailure(err);
+    return {
+      connected: false,
+      failure,
+      error: redactDatabaseError(err?.message || 'Failed to connect to PostgreSQL')
+    };
   }
 }
 

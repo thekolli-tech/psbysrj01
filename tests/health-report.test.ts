@@ -13,7 +13,7 @@ const { buildHealthReport, environmentPresence } = await import('../src/server/h
 
 test('production health reports an unconfigured database without secrets', async () => {
   const report = await buildHealthReport();
-  const database = report.body.database as { connected: boolean; schemaReady: boolean; code: string };
+  const database = report.body.database as { connected: boolean; schemaReady: boolean; code: string; failure: string | null };
   const configuration = report.body.configuration as {
     database: boolean;
     emailProvider: boolean;
@@ -35,6 +35,7 @@ test('production health reports an unconfigured database without secrets', async
   assert.equal(database.connected, false);
   assert.equal(database.schemaReady, false);
   assert.equal(database.code, 'DATABASE_NOT_CONFIGURED');
+  assert.equal(database.failure, null);
   assert.equal(configuration.database, false);
   assert.equal(configuration.emailProvider, false);
   assert.equal(configuration.emailSender, false);

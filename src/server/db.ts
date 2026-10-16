@@ -455,7 +455,7 @@ export async function initDatabase(): Promise<void> {
   if (isPostgresAuthoritative()) {
     const health = await checkPostgresHealth();
     if (!health.connected) {
-      throw new Error(`Authoritative PostgreSQL is unavailable (${health.error || 'connection failed'}). Startup refused. SQLite fallback is disabled.`);
+      throw new Error(`Authoritative PostgreSQL is unavailable (${health.failure || 'UNKNOWN'}: ${health.error || 'connection failed'}). Startup refused. SQLite fallback is disabled.`);
     }
     const schema = await checkSchemaReadiness();
     if (!schema.ready) {
