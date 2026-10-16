@@ -55,7 +55,7 @@ import {
   updateConferenceDetails,
   generateOtp,
   verifyOtp,
-  isTargetVerified,
+  registerVerifiedUser,
   discardUnconsumedOtp,
   getAllCommunities,
   getCommunityById,
@@ -68,6 +68,7 @@ import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from '
 import { sendRealSmsOtp, getNotificationGatewayStatus, configuredSmsProviders } from './src/server/notifications.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
+import { RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
@@ -527,78 +528,64 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const isVerified = (await verifyOtp(email, 'EMAIL_VERIFICATION', otp)) || (await isTargetVerified(email, 'EMAIL_VERIFICATION'));
-    if (!isVerified) {
-      res.status(400).json({ error: 'Invalid or expired email verification code' });
+    const requestedRole = String(role || '').trim();
+    if (requestedRole === 'SUPER_ADMIN' || requestedRole === 'DEVELOPER') {
+      res.status(403).json({ error: 'That role cannot be registered through self-service. No account was created.' });
       return;
     }
 
-    const safeRole = selfServeStorageRole(role);
-
-    let isPhoneVerified = false;
-    if (safeRole === 'PROPERTY_SEEKER') {
-      if (!phone || phone.trim().length < 8) {
-        res.status(400).json({ error: 'Mobile phone number is mandatory for Property Seeker registration.' });
-        return;
-      }
-
-      const isMobileVerified = (phoneOtp && (await verifyOtp(phone.trim(), 'PHONE_VERIFICATION', phoneOtp))) ||
-                               (await isTargetVerified(phone.trim(), 'PHONE_VERIFICATION'));
-      if (!isMobileVerified) {
-        res.status(400).json({ error: 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.' });
-        return;
-      }
-      isPhoneVerified = true;
-    } else {
-      if (phone && phoneOtp) {
-        isPhoneVerified = Boolean((await verifyOtp(phone.trim(), 'PHONE_VERIFICATION', phoneOtp)) || (await isTargetVerified(phone.trim(), 'PHONE_VERIFICATION')));
-      }
+    const safeRole = selfServeStorageRole(requestedRole);
+    if (safeRole === 'PROPERTY_SEEKER' && (!phone || String(phone).trim().length < 8)) {
+      res.status(400).json({ error: 'Mobile phone number is mandatory for Property Seeker registration.' });
+      return;
     }
 
-    const newUser = await createUser({
+    const newUser = await registerVerifiedUser({
       name,
       email,
       password,
       role: safeRole,
       phone: phone?.trim() || '',
       organization: organization?.trim() || '',
-      isVerified: true
+      otp: String(otp),
+      phoneOtp: phoneOtp ? String(phoneOtp) : undefined,
+      requirePhone: safeRole === 'PROPERTY_SEEKER'
     });
-
-    if (!newUser) {
-      res.status(500).json({ error: 'Failed to create user' });
-      return;
-    }
-
-    if (isPhoneVerified) {
-      await updateUser(newUser.id, { phone_verified: 1 });
-      newUser.phone_verified = 1;
-    }
-
-    if (safeRole !== 'PROPERTY_SEEKER') {
-      await upsertProfessionalProfile({
-        userId: newUser.id,
-        role: safeRole,
-        organization: organization?.trim() || ''
-      });
-    }
 
     const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);
     res.cookie('ps_session', token, sessionCookieOptions());
 
+    if (safeRole !== 'PROPERTY_SEEKER') {
+      try {
+        await upsertProfessionalProfile({
+          userId: newUser.id,
+          role: safeRole,
+          organization: organization?.trim() || ''
+        });
+      } catch {
+        console.error('[Property Studio] The new account was created, but its professional profile was not.');
+      }
+    }
+
     const { password_hash, salt, ...safeUser } = newUser;
     res.json({
       success: true,
-      token,
       user: {
         ...safeUser,
         isVerified: true,
-        phone_verified: isPhoneVerified ? 1 : 0,
+        phone_verified: Number(newUser.phone_verified || 0),
         assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
       }
     });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || 'Registration failed' });
+    if (err instanceof RegistrationRejected || err?.name === 'RegistrationRejected') {
+      res.status(err.statusCode || 400).json({ error: err.message });
+      return;
+    }
+    const message = typeof err?.message === 'string' && !/postgres|sqlite|constraint|select |insert /i.test(err.message)
+      ? err.message
+      : 'Registration failed';
+    res.status(400).json({ error: message });
   }
 });
 

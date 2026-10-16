@@ -244,7 +244,17 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     otp: code
   });
   assert.equal(registered.status, 200, registered.raw);
+  assert.equal(registered.json.token, undefined);
   assert.equal(registered.raw.includes(code), false);
+  const replay = await api('/api/auth/register', {
+    name: 'Mock Registrant',
+    email,
+    password: 'Longpassword1!',
+    role: 'CHANNEL_PARTNER',
+    otp: code
+  });
+  assert.equal(replay.status, 400);
+  assert.equal(await findUserByEmail(email) !== null, true);
   const user = await findUserByEmail(email);
   assert.equal(user?.email_verified, 1);
 

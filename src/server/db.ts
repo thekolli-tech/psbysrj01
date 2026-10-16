@@ -3,7 +3,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { applySqliteAdditiveSchema } from './platformSchema.ts';
-import { OTP_MAX_ATTEMPTS, OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, otpMatches, sealOtp } from './otpCrypto.ts';
+import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
+import { claimOtpProofSync, type SyncOtpClaimRunner } from './otpClaim.ts';
+import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
 import {
   pgFindUserByEmail,
   pgFindUserById,
@@ -26,6 +28,7 @@ import {
   pgGenerateOtp,
   pgVerifyOtp,
   pgIsTargetVerified,
+  pgRegisterVerifiedUser,
   pgCreateAuditLog,
   pgGetAuditLogs,
   pgGetAllPosts,
@@ -638,6 +641,21 @@ export async function isTargetVerified(
 ): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgIsTargetVerified(target, type);
   return sqliteIsTargetVerified(target, type);
+}
+
+export async function registerVerifiedUser(data: {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  phone?: string;
+  organization?: string;
+  otp: string;
+  phoneOtp?: string;
+  requirePhone: boolean;
+}): Promise<DbUser> {
+  if (isPostgresAuthoritative()) return pgRegisterVerifiedUser(data);
+  return sqliteRegisterVerifiedUser(data);
 }
 
 export async function createAuditLog(entry: {
@@ -1693,75 +1711,132 @@ function sqliteRevokeAllUserSessions(userId: string): boolean {
   return true;
 }
 
-function sqliteGenerateOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'): { otp: string; expiresAt: number } {
-  const normalizedTarget = target.trim().toLowerCase();
+let sqliteTransactionDepth = 0;
 
-  const recentOtp = db.prepare(`
-    SELECT created_at FROM otps 
-    WHERE target = ? AND type = ? AND consumed_at IS NULL
-    ORDER BY created_at DESC 
-    LIMIT 1
-  `).get(normalizedTarget, type) as { created_at: string } | undefined;
-
-  if (recentOtp) {
-    const elapsed = Date.now() - new Date(recentOtp.created_at).getTime();
-    if (elapsed < OTP_RESEND_COOLDOWN_MS) {
-      const waitSeconds = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000);
-      throw new OtpCooldownError(waitSeconds);
+function sqliteTransaction<T>(fn: () => T): T {
+  const database = getSqliteDb();
+  const outer = sqliteTransactionDepth === 0;
+  if (outer) database.exec('BEGIN IMMEDIATE');
+  sqliteTransactionDepth += 1;
+  try {
+    const result = fn();
+    if (outer) database.exec('COMMIT');
+    return result;
+  } catch (error) {
+    if (outer) {
+      try {
+        database.exec('ROLLBACK');
+      } catch {
+        // The original error is the one the caller needs.
+      }
     }
+    throw error;
+  } finally {
+    sqliteTransactionDepth -= 1;
   }
+}
 
-  const otp = generateOtpCode();
-  const expiresAt = Date.now() + OTP_TTL_MS;
-  const id = `otp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-  const now = new Date().toISOString();
+function sqliteRunner(): SyncOtpClaimRunner {
+  const database = getSqliteDb();
+  return {
+    query(sql: string, params: unknown[]) {
+      const statement = database.prepare(sql);
+      const values = params as Array<string | number | null>;
+      if (/^\s*select/i.test(sql)) {
+        const rows = statement.all(...values) as Array<{ id: string; otp_hash: string; expires_at: number; attempt_count: number }>;
+        return { rows, changes: rows.length };
+      }
+      const result = statement.run(...values);
+      return { rows: [], changes: Number(result.changes || 0) };
+    }
+  };
+}
 
-  db.prepare('DELETE FROM otps WHERE target = ? AND type = ? AND consumed_at IS NULL').run(normalizedTarget, type);
-  db.prepare(`
-    INSERT INTO otps (id, target, type, otp_hash, otp_raw, expires_at, attempt_count, is_verified, consumed_at, created_at)
-    VALUES (?, ?, ?, ?, NULL, ?, 0, 0, NULL, ?)
-  `).run(id, normalizedTarget, type, sealOtp(otp), expiresAt, now);
+function sqliteGenerateOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'): { otp: string; expiresAt: number } {
+  return sqliteTransaction(() => {
+    const database = getSqliteDb();
+    const normalizedTarget = target.trim().toLowerCase();
+    const recentOtp = database.prepare(`
+      SELECT created_at FROM otps
+      WHERE target = ? AND type = ? AND consumed_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(normalizedTarget, type) as { created_at: string } | undefined;
 
-  return { otp, expiresAt };
+    if (recentOtp) {
+      const elapsed = Date.now() - new Date(recentOtp.created_at).getTime();
+      if (elapsed < OTP_RESEND_COOLDOWN_MS) {
+        const waitSeconds = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000);
+        throw new OtpCooldownError(waitSeconds);
+      }
+    }
+
+    const otp = generateOtpCode();
+    const expiresAt = Date.now() + OTP_TTL_MS;
+    const id = `otp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const now = new Date().toISOString();
+    database.prepare('DELETE FROM otps WHERE target = ? AND type = ? AND consumed_at IS NULL').run(normalizedTarget, type);
+    database.prepare(`
+      INSERT INTO otps (id, target, type, otp_hash, otp_raw, expires_at, attempt_count, is_verified, consumed_at, created_at)
+      VALUES (?, ?, ?, ?, NULL, ?, 0, 0, NULL, ?)
+    `).run(id, normalizedTarget, type, sealOtp(otp), expiresAt, now);
+    return { otp, expiresAt };
+  });
 }
 
 function sqliteVerifyOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET', code: string): boolean {
-  const normalizedTarget = target.trim().toLowerCase();
-  const record = db.prepare(`
-    SELECT * FROM otps 
-    WHERE target = ? AND type = ? AND consumed_at IS NULL
-    ORDER BY created_at DESC 
-    LIMIT 1
-  `).get(normalizedTarget, type) as DbOtp | undefined;
-
-  if (!record) return false;
-
-  if (record.attempt_count >= OTP_MAX_ATTEMPTS || Date.now() > record.expires_at) {
-    db.prepare('UPDATE otps SET consumed_at = ? WHERE id = ?').run(new Date().toISOString(), record.id);
-    return false;
-  }
-
-  if (!otpMatches(record.otp_hash, code)) {
-    const attempts = record.attempt_count + 1;
-    db.prepare('UPDATE otps SET attempt_count = ?, consumed_at = CASE WHEN ? >= ? THEN ? ELSE consumed_at END WHERE id = ?')
-      .run(attempts, attempts, OTP_MAX_ATTEMPTS, new Date().toISOString(), record.id);
-    return false;
-  }
-
-  db.prepare('UPDATE otps SET is_verified = 1, consumed_at = ? WHERE id = ?').run(new Date().toISOString(), record.id);
-  return true;
+  return sqliteTransaction(() => claimOtpProofSync(sqliteRunner(), target, type, code));
 }
 
-function sqliteIsTargetVerified(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'): boolean {
-  const stmt = db.prepare(`
-    SELECT * FROM otps 
-    WHERE target = ? AND type = ? AND is_verified = 1
-    ORDER BY created_at DESC 
-    LIMIT 1
-  `);
-  const record = stmt.get(target.trim().toLowerCase(), type) as DbOtp | undefined;
-  if (!record) return false;
-  return Date.now() - record.expires_at < 30 * 60 * 1000;
+function sqliteRegisterVerifiedUser(data: {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  phone?: string;
+  organization?: string;
+  otp: string;
+  phoneOtp?: string;
+  requirePhone: boolean;
+}): DbUser {
+  const email = data.email.trim().toLowerCase();
+  const phone = data.phone?.trim().toLowerCase() || '';
+  return sqliteTransaction(() => {
+    const emailOk = claimOtpProofSync(sqliteRunner(), email, 'EMAIL_VERIFICATION', data.otp, { issueGrant: false, allowGrantFallback: true });
+    if (!emailOk) throw new RegistrationRejected(400, 'Invalid or expired email verification code');
+    if (data.requirePhone) {
+      const phoneOk = Boolean(data.phoneOtp) && claimOtpProofSync(sqliteRunner(), phone, 'PHONE_VERIFICATION', String(data.phoneOtp), { issueGrant: false, allowGrantFallback: true });
+      if (!phoneOk) {
+        throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
+      }
+    }
+    try {
+      const user = sqliteCreateUser({
+        name: data.name,
+        email,
+        password: data.password,
+        role: data.role,
+        phone,
+        organization: data.organization,
+        isVerified: true
+      });
+      if (data.requirePhone) {
+        getSqliteDb().prepare('UPDATE users SET phone_verified = 1 WHERE id = ?').run(user.id);
+        user.phone_verified = 1;
+      }
+      return user;
+    } catch (error) {
+      if (isUniqueEmailError(error)) throw new RegistrationRejected(400, 'An account with this email address already exists');
+      throw error;
+    }
+  });
+}
+
+function sqliteIsTargetVerified(
+  _target: string,
+  _type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'
+): boolean {
+  return false;
 }
 
 function sqliteCreateAuditLog(entry: {
