@@ -3,13 +3,14 @@ import { getPostgresPool, queryPostgres } from './postgres.ts';
 import { getSqliteDb, isPostgresAuthoritative, isSqliteExplicit } from './db.ts';
 import { evaluateUnlock, type PaymentGate, type UnlockDecision } from '../shared/ledger.ts';
 import { resolveAvatarId } from '../shared/avatars.ts';
-import { paidContactAccessGranted, presentPhone } from '../shared/phonePrivacy.ts';
+import { paidContactAccessGranted, presentPhone, scrubPhoneFields } from '../shared/phonePrivacy.ts';
 import {
   initialVerificationStatus,
   isPublicListing,
   listingEligibleForLeads,
   maskEmail,
   maskName,
+  maskPhone,
   paymentGrantsAccess,
   paymentProviderStatus
 } from '../shared/policy.ts';
@@ -215,7 +216,9 @@ function mapListing(row: any): any {
 
 export async function listPublicListings(): Promise<any[]> {
   const rows = await listListingRows();
-  return rows.filter(row => isPublicListing(row.publication_status)).map(mapListing);
+  return rows
+    .filter(row => isPublicListing(row.publication_status))
+    .map(row => scrubPhoneFields(mapListing(row)));
 }
 
 export async function listOwnerListings(ownerId: string): Promise<any[]> {
@@ -337,9 +340,17 @@ export async function listLeadsForViewer(viewer: { id: string; role: string }): 
   }));
 }
 
+function hideStoredPhone(text: string, phone: string): string {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length < 8 || !text) return text;
+  const spaced = digits.split('').join('\\D*');
+  return text.replace(new RegExp(spaced, 'g'), maskPhone(phone));
+}
+
 function presentLead(row: any, viewer: { id: string; role: string }, opts: { revealed: boolean }): any {
   const revealed = opts.revealed;
   const phoneVisible = viewer.role === 'SUPER_ADMIN' || viewer.role === 'DEVELOPER' || row.seeker_id === viewer.id || paidContactAccessGranted();
+  const requirements = phoneVisible ? (row.requirements || '') : hideStoredPhone(row.requirements || '', row.phone);
   return {
     id: row.id,
     seekerName: revealed ? row.name : maskName(row.name),
@@ -353,7 +364,7 @@ function presentLead(row: any, viewer: { id: string; role: string }, opts: { rev
     propertyType: row.property_type,
     propertyId: row.property_id || '',
     timeframe: 'Next 30-45 Days',
-    requirements: row.requirements || '',
+    requirements,
     tier: row.tier || 'STANDARD',
     priceCredits: Number(row.price || 0),
     isUnlocked: revealed,

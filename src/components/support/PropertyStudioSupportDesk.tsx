@@ -67,8 +67,8 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
 
   const faqs = [
     {
-      q: 'How does the 100% Encrypted Data-Masking framework protect buyers?',
-      a: 'Unlike traditional listing portals that monetize your contact information by selling it to hundreds of cold callers, Property Studio strips your phone number and email behind an encrypted card. High-intent requirements are routed securely without spam.'
+      q: 'Who can see a Property Seeker mobile number?',
+      a: 'Ordinary users receive a masked number. Super Admin and Developer accounts can open the full number on the authorized account and lead screens. Wallet credits and lead unlocks do not reveal it in this release. This support note does not claim that stored data is encrypted.'
     },
     {
       q: 'How are projects audited under TG-RERA and HMDA compliance?',

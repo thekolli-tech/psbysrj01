@@ -190,11 +190,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           email: emailInput.trim(),
           password: passwordInput,
           role: roleInput,
-          phone: phoneInput.trim(),
           organization: organizationInput.trim(),
           otp: otpInput.trim(),
           acceptLegal: true,
-          ...(seekerRegistration ? { phoneOtp: phoneOtpInput.trim() } : {})
+          ...(seekerRegistration ? { phone: phoneInput.trim(), phoneOtp: phoneOtpInput.trim() } : {})
         })
       });
 
@@ -413,11 +412,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5">
+                    {seekerRegistration && (
                     <div>
                       <label className="block font-bold text-slate-700 mb-1">
-                        Contact Mobile {seekerRegistration
-                          ? <span className="font-normal text-[10px] text-amber-700">(E.164, required)</span>
-                          : <span className="font-normal text-[10px] text-slate-400">(Optional)</span>}
+                        Contact Mobile <span className="font-normal text-[10px] text-amber-700">(E.164, required)</span>
                       </label>
                       <input
                         type="tel"
@@ -425,10 +423,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         onChange={e => setPhoneInput(e.target.value)}
                         placeholder="e.g. +14155552671"
                         className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        required={seekerRegistration}
+                        required
                       />
                     </div>
-                    <div>
+                    )}
+                    <div className={seekerRegistration ? '' : 'col-span-2'}>
                       <label className="block font-bold text-slate-700 mb-1">
                         {roleInput === 'LANDOWNER' ? 'Land Parcel' : roleInput === 'RERA_AGENT' || roleInput === 'CHANNEL_PARTNER' ? 'Agency / RERA' : 'Organization'} <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
                       </label>

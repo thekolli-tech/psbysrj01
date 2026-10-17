@@ -297,6 +297,23 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
       acceptLegal: true
     });
     assert.equal(owner.status, 200, owner.raw);
+    const squatEmail = 'squat.landowner@example.com';
+    const squatPhone = '+15557654321';
+    assert.equal((await api('POST', '/api/auth/send-email-otp', { email: squatEmail })).status, 200);
+    const squat = await api('POST', '/api/auth/register', {
+      name: 'Number Squatter',
+      email: squatEmail,
+      password: 'Longpassword1!',
+      role: 'LANDOWNER',
+      phone: squatPhone,
+      otp: emailCode(),
+      acceptLegal: true
+    });
+    assert.equal(squat.status, 400, squat.raw);
+    assert.equal(squat.json.code, 'PHONE_NOT_ACCEPTED');
+    assert.equal(squat.raw.includes(squatPhone), false);
+    assert.equal(await findUserByEmail(squatEmail), null);
+    assert.equal(await findUserByPhone(squatPhone), null);
     assert.equal(Number((await findUserByEmail(ownerEmail))?.phone_verified || 0), 0);
     assert.equal(owner.json.user.avatar, DEFAULT_AVATAR_ID);
 
@@ -341,7 +358,8 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
       micro_market: 'Kokapet',
       consentGranted: true,
       consentVersion: '2026-10-15',
-      consentPurpose: 'enquiry response'
+      consentPurpose: 'enquiry response',
+      requirements: `Please call ${SECRET_PHONE} about this plot.`
     }, seekerCookie);
     assert.equal(enquiry.status, 201, enquiry.raw);
     const stored = getSqliteDb().prepare('SELECT phone FROM buyer_leads WHERE id = ?').get(enquiry.json.leadId) as { phone: string };
@@ -427,6 +445,27 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
     assert.equal(comment.status, 200, comment.raw);
     const comments = await api('GET', `/api/community/posts/${post.json.post.id}/comments`);
     assert.equal(comments.raw.includes(SECRET_PHONE), false);
+
+    const listingPhone = '+15551230000';
+    const createdListing = await api('POST', '/api/properties', {
+      title: 'Privacy listing',
+      phone: listingPhone,
+      contactPhone: listingPhone,
+      mobile: listingPhone
+    }, cookies.CHANNEL_PARTNER);
+    assert.equal(createdListing.status, 201, createdListing.raw);
+    const approvedListing = await api('PATCH', `/api/admin/listings/${createdListing.json.listing.id}/publication`, { status: 'APPROVED' }, cookies.SUPER_ADMIN);
+    assert.equal(approvedListing.status, 200, approvedListing.raw);
+    const publicListings = await api('GET', '/api/properties');
+    assert.equal(publicListings.status, 200, publicListings.raw);
+    assert.equal(publicListings.raw.includes('Privacy listing'), true);
+    assert.equal(publicListings.raw.includes('5551230000'), false);
+    const partnerListings = await api('GET', '/api/properties', undefined, cookies.CHANNEL_PARTNER);
+    assert.equal(partnerListings.raw.includes('5551230000'), false);
+    const ownerListings = await api('GET', '/api/me/listings', undefined, cookies.CHANNEL_PARTNER);
+    assert.equal(ownerListings.raw.includes('5551230000'), true);
+    const anonymousPartnerUsers = await api('GET', '/api/admin/users', undefined, cookies.CHANNEL_PARTNER);
+    assert.equal(anonymousPartnerUsers.status, 403);
 
     getSqliteDb().prepare(
       `INSERT INTO community_events (id, event_type, payload, target_user_id, created_at) VALUES (?, 'NOTE', ?, NULL, ?)`

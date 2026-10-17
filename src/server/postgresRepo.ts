@@ -725,6 +725,8 @@ export async function pgRegisterVerifiedUser(data: {
   otp: string;
   phoneOtp?: string;
   requirePhone: boolean;
+  legalConsentVersion: string;
+  legalConsentAt: string;
 }): Promise<DbUser> {
   const email = data.email.trim().toLowerCase();
   const phone = data.phone?.trim().toLowerCase() || '';
@@ -750,7 +752,9 @@ export async function pgRegisterVerifiedUser(data: {
         role: data.role,
         phone,
         organization: data.organization,
-        phoneVerified: data.requirePhone
+        phoneVerified: data.requirePhone,
+        legalConsentVersion: data.legalConsentVersion,
+        legalConsentAt: data.legalConsentAt
       });
     } catch (error) {
       if (isUniqueEmailError(error)) throw new RegistrationRejected(400, 'An account with this email address already exists');
@@ -767,6 +771,8 @@ async function insertPgUser(client: PoolClient, data: {
   phone: string;
   organization?: string;
   phoneVerified: boolean;
+  legalConsentVersion: string;
+  legalConsentAt: string;
 }): Promise<DbUser> {
   const id = `user_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const publicId = `usr_${crypto.randomBytes(4).toString('hex')}`;
@@ -777,8 +783,8 @@ async function insertPgUser(client: PoolClient, data: {
       id, public_id, name, email, phone, role, avatar, organization,
       wallet_balance, is_verified, email_verified, phone_verified,
       account_status, must_change_password, assigned_properties,
-      password_hash, salt, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,1,1,$9,'ACTIVE',0,'[]',$10,$11,$12,$13)
+      password_hash, salt, created_at, updated_at, legal_consent_version, legal_consent_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,1,1,$9,'ACTIVE',0,'[]',$10,$11,$12,$13,$14,$15)
     RETURNING *
   `, [
     id,
@@ -793,7 +799,9 @@ async function insertPgUser(client: PoolClient, data: {
     hash,
     salt,
     now,
-    now
+    now,
+    data.legalConsentVersion,
+    data.legalConsentAt
   ]);
   return mapUserRow(inserted.rows[0]);
 }

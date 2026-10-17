@@ -494,8 +494,9 @@ app.post('/api/auth/send-phone-otp', async (req: AuthenticatedRequest, res: Resp
 
 // Verify Phone OTP
 app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Promise<void> => {
+  const phone = normalizeE164(req.body?.phone);
+  if (rejectIfRateLimited(req, res, 'verify-phone-otp', phone || String(req.body?.phone || ''))) return;
   try {
-    const phone = normalizeE164(req.body?.phone);
     const otp = req.body?.otp;
     if (!phone || !otp) {
       res.status(400).json({ error: 'Phone number and verification code are required' });
@@ -548,6 +549,13 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       res.status(400).json({ error: 'A valid international mobile number in E.164 format is required.' });
       return;
     }
+    if (!seeker && normalizedPhone) {
+      res.status(400).json({
+        error: 'This registration uses email verification only. A mobile number was not saved and no account was created.',
+        code: 'PHONE_NOT_ACCEPTED'
+      });
+      return;
+    }
     if (seeker && !normalizedPhone) {
       res.status(400).json({ error: 'Property Seeker registration requires a valid international mobile number.' });
       return;
@@ -574,12 +582,9 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       organization: organization?.trim() || '',
       otp: String(otp),
       phoneOtp: seeker ? String(phoneOtp) : undefined,
-      requirePhone: seeker
-    });
-
-    await updateUser(newUser.id, {
-      legal_consent_version: LEGAL_CONSENT_VERSION,
-      legal_consent_at: acceptedAt
+      requirePhone: seeker,
+      legalConsentVersion: LEGAL_CONSENT_VERSION,
+      legalConsentAt: acceptedAt
     });
     await createAuditLog({
       actorId: newUser.id,

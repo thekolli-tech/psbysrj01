@@ -670,6 +670,8 @@ export async function registerVerifiedUser(data: {
   otp: string;
   phoneOtp?: string;
   requirePhone: boolean;
+  legalConsentVersion: string;
+  legalConsentAt: string;
 }): Promise<DbUser> {
   if (isPostgresAuthoritative()) return pgRegisterVerifiedUser(data);
   return sqliteRegisterVerifiedUser(data);
@@ -1819,6 +1821,8 @@ function sqliteRegisterVerifiedUser(data: {
   otp: string;
   phoneOtp?: string;
   requirePhone: boolean;
+  legalConsentVersion: string;
+  legalConsentAt: string;
 }): DbUser {
   const email = data.email.trim().toLowerCase();
   const phone = data.phone?.trim().toLowerCase() || '';
@@ -1845,6 +1849,11 @@ function sqliteRegisterVerifiedUser(data: {
         getSqliteDb().prepare('UPDATE users SET phone_verified = 1 WHERE id = ?').run(user.id);
         user.phone_verified = 1;
       }
+      getSqliteDb().prepare('UPDATE users SET legal_consent_version = ?, legal_consent_at = ? WHERE id = ?').run(
+        data.legalConsentVersion,
+        data.legalConsentAt,
+        user.id
+      );
       return user;
     } catch (error) {
       if (isUniqueEmailError(error)) throw new RegistrationRejected(400, 'An account with this email address already exists');

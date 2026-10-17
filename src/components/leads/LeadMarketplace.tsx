@@ -108,7 +108,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
         <div className="max-w-2xl">
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider mb-2 font-mono">
             <ShieldCheck className="w-4 h-4 text-amber-600" />
-            100% Encrypted Data-Masking Framework
+            Server-side phone masking
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-display">
             Sanitized Buyer Lead Marketplace
