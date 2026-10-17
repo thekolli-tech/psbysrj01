@@ -258,6 +258,12 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
 
     const takenEmail = 'second.seeker@example.com';
     assert.equal((await api('POST', '/api/auth/send-email-otp', { email: takenEmail })).status, 200);
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    const hiddenWhenUnconfigured = await api('POST', '/api/auth/send-phone-otp', { phone: SECRET_PHONE });
+    assert.equal(hiddenWhenUnconfigured.status, 503);
+    assert.equal(hiddenWhenUnconfigured.json.code, 'WHATSAPP_NOT_CONFIGURED');
+    assert.equal(hiddenWhenUnconfigured.raw.includes(SECRET_PHONE), false);
+    process.env.WHATSAPP_ACCESS_TOKEN = TOKEN;
     const takenAck = await api('POST', '/api/auth/send-phone-otp', { phone: SECRET_PHONE });
     assert.equal(takenAck.status, 200);
     assert.deepEqual(takenAck.json, { success: true, message: 'If this mobile number can be verified, a WhatsApp code has been sent.', deliveredVia: 'whatsapp' });

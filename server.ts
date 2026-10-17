@@ -68,6 +68,7 @@ import { getNotificationGatewayStatus } from './src/server/notifications.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { issuePhoneOtp } from './src/server/phoneOtp.ts';
+import { whatsAppSettings } from './src/server/whatsappOtp.ts';
 import { serializeAccount } from './src/server/accountView.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
@@ -456,6 +457,13 @@ app.post('/api/auth/send-phone-otp', async (req: AuthenticatedRequest, res: Resp
     deliveredVia: 'whatsapp'
   };
   try {
+    if (!whatsAppSettings()) {
+      res.status(503).json({
+        error: 'WhatsApp verification is not configured. No code was sent and no account was created.',
+        code: 'WHATSAPP_NOT_CONFIGURED'
+      });
+      return;
+    }
     const existing = await findUserByPhone(normalized);
     if (existing && existing.id !== req.user?.id) {
       res.json(acknowledgement);
