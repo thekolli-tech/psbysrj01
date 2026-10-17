@@ -162,8 +162,11 @@ test('twenty independent registrations, single-use OTP claims, and no token expo
       otp: codes.get(seekerEmail),
       phoneVerified: true
     });
-    assert.equal(bypass.status, 400);
-    assert.equal(await findUserByEmail(seekerEmail), null);
+    assert.equal(bypass.status, 200, bypass.raw);
+    const seeker = await findUserByEmail(seekerEmail);
+    assert.equal(seeker?.role, 'PROPERTY_SEEKER');
+    assert.equal(seeker?.email_verified, 1);
+    assert.equal(Number(seeker?.phone_verified || 0), 0);
 
     const privileged = await api('/api/auth/register', {
       name: 'Admin',

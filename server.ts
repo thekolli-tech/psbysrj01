@@ -517,7 +517,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
 app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
   if (rejectIfRateLimited(req, res, 'register', String(req.body?.email || ''))) return;
   try {
-    const { name, email, password, role, phone, organization, otp, phoneOtp } = req.body;
+    const { name, email, password, role, phone, organization, otp } = req.body;
     if (!name || !email || !password) {
       res.status(400).json({ error: 'Name, email, and password are required' });
       return;
@@ -535,10 +535,6 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
     }
 
     const safeRole = selfServeStorageRole(requestedRole);
-    if (safeRole === 'PROPERTY_SEEKER' && (!phone || String(phone).trim().length < 8)) {
-      res.status(400).json({ error: 'Mobile phone number is mandatory for Property Seeker registration.' });
-      return;
-    }
 
     const newUser = await registerVerifiedUser({
       name,
@@ -548,8 +544,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       phone: phone?.trim() || '',
       organization: organization?.trim() || '',
       otp: String(otp),
-      phoneOtp: phoneOtp ? String(phoneOtp) : undefined,
-      requirePhone: safeRole === 'PROPERTY_SEEKER'
+      requirePhone: false
     });
 
     const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);

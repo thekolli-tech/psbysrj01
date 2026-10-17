@@ -17,8 +17,7 @@ import {
   UserPlus,
   Mail,
   CheckCircle2,
-  RotateCcw,
-  Smartphone
+  RotateCcw
 } from 'lucide-react';
 
 interface LoginModalProps {
@@ -53,11 +52,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [otpInput, setOtpInput] = useState('');
   const [countdown, setCountdown] = useState(0);
 
-  // Mobile Phone OTP verification state (Mandatory for Property Seeker)
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
-  const [phoneOtpInput, setPhoneOtpInput] = useState('');
-  const [phoneCountdown, setPhoneCountdown] = useState(0);
-
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (countdown > 0) {
@@ -65,14 +59,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
     return () => clearTimeout(timer);
   }, [countdown]);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (phoneCountdown > 0) {
-      timer = setTimeout(() => setPhoneCountdown(c => c - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [phoneCountdown]);
 
   if (!isOpen) return null;
 
@@ -113,37 +99,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleSendPhoneOtp = async () => {
-    if (submitting.current) return;
-    if (!phoneInput.trim() || phoneInput.trim().length < 8) {
-      setErrorMsg('Please enter a valid mobile number first.');
-      return;
-    }
-    setErrorMsg(null);
-    submitting.current = true;
-    setLoading(true);
-    try {
-      const res = await fetch('/api/auth/send-phone-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ phone: phoneInput.trim() })
-      });
-      const result = await readApiResponse(res);
-      if (!result.ok || result.data?.success !== true) {
-        setPhoneOtpSent(false);
-        throw new Error(result.error || 'SMS verification was not sent.');
-      }
-      setPhoneOtpSent(true);
-      setPhoneCountdown(60);
-      showToast('SMS verification code sent. Check the mobile number you entered.');
-    } catch (err: any) {
-      setErrorMsg(err.message || 'SMS verification was not sent.');
-    } finally {
-      submitting.current = false;
-      setLoading(false);
-    }
-  };
-
   const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting.current) return;
@@ -157,15 +112,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     if (passwordInput.length < 6) {
       setErrorMsg('Password must be at least 6 characters.');
       return;
-    }
-
-    // Role-specific validation:
-    // Property Seeker requires phone number; other three do not.
-    if (roleInput === 'PROPERTY_SEEKER') {
-      if (!phoneInput.trim() || phoneInput.trim().length < 8) {
-        setErrorMsg('Mobile phone number is required for Property Seeker registration.');
-        return;
-      }
     }
 
     submitting.current = true;
@@ -184,22 +130,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       setOtpSent(true);
       setCountdown(60);
       showToast('Property Studio verification code sent. Check the inbox for that address.');
-
-      if (roleInput === 'PROPERTY_SEEKER' && phoneInput.trim()) {
-        const phoneRes = await fetch('/api/auth/send-phone-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify({ phone: phoneInput.trim() })
-        });
-        const phoneResult = await readApiResponse(phoneRes);
-        if (!phoneResult.ok || phoneResult.data?.success !== true) {
-          setPhoneOtpSent(false);
-          setErrorMsg(phoneResult.error || 'SMS verification was not sent. No account was created.');
-        } else {
-          setPhoneOtpSent(true);
-          setPhoneCountdown(60);
-        }
-      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to send verification code.');
     } finally {
@@ -218,14 +148,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    // Property Seeker requires Phone OTP verification
-    if (roleInput === 'PROPERTY_SEEKER') {
-      if (!phoneOtpInput.trim() || phoneOtpInput.trim().length < 4) {
-        setErrorMsg('Please enter the 6-digit mobile SMS OTP received on your phone.');
-        return;
-      }
-    }
-
     submitting.current = true;
     setLoading(true);
     try {
@@ -239,8 +161,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           role: roleInput,
           phone: phoneInput.trim(),
           organization: organizationInput.trim(),
-          otp: otpInput.trim(),
-          phoneOtp: roleInput === 'PROPERTY_SEEKER' ? phoneOtpInput.trim() : undefined
+          otp: otpInput.trim()
         })
       });
 
@@ -464,18 +385,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
                       <label className="block font-bold text-slate-700 mb-1">
-                        Contact Mobile {roleInput === 'PROPERTY_SEEKER' ? (
-                          <span className="text-red-500 font-bold text-[10px]">* Required</span>
-                        ) : (
-                          <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
-                        )}
+                        Contact Mobile <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
                       </label>
                       <input
                         type="tel"
                         value={phoneInput}
                         onChange={e => setPhoneInput(e.target.value)}
                         placeholder="e.g. +91 98490 12345"
-                        required={roleInput === 'PROPERTY_SEEKER'}
                         className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </div>
@@ -551,47 +467,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     />
                   </div>
 
-                  {roleInput === 'PROPERTY_SEEKER' && (
-                    <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-2xl text-xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-amber-950 flex items-center gap-1.5">
-                          <Smartphone className="w-4 h-4 text-amber-600" />
-                          Property Seeker Mobile SMS Verification
-                        </span>
-                        {phoneCountdown > 0 ? (
-                          <span className="text-[10px] text-amber-700 font-mono">Resend SMS in {phoneCountdown}s</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleSendPhoneOtp}
-                            className="text-[11px] text-amber-800 hover:underline font-bold"
-                          >
-                            {phoneOtpSent ? 'Resend SMS OTP' : 'Send SMS OTP'}
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-amber-900 text-[11px] leading-relaxed">
-                        {phoneOtpSent
-                          ? 'SMS code sent to the mobile number you entered. The account is created only after both codes are verified.'
-                          : 'A mobile verification code is required. It is sent only when an SMS provider accepts it.'}
-                      </p>
-                      <div>
-                        <label className="block font-bold text-amber-950 mb-1">
-                          Enter 6-Digit Mobile SMS OTP <span className="text-red-500">* Required</span>
-                        </label>
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={phoneOtpInput}
-                          onChange={e => setPhoneOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
-                          placeholder="• • • • • •"
-                          className="w-full text-center text-md tracking-[0.25em] font-mono font-bold px-3 py-2.5 bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-
                   <div className="flex items-center justify-between text-[11px] text-slate-500">
                     <span>Didn't receive the email from Property Studio?</span>
                     {countdown > 0 ? (
@@ -610,11 +485,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
                   <button
                     type="submit"
-                    disabled={loading || otpInput.length < 4 || (roleInput === 'PROPERTY_SEEKER' && phoneOtpInput.length < 4)}
+                    disabled={loading || otpInput.length < 4}
                     className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>{loading ? 'Verifying...' : roleInput === 'PROPERTY_SEEKER' ? 'Verify Email & Mobile to Register' : 'Verify Email & Create Account'}</span>
+                    <span>{loading ? 'Verifying...' : 'Verify Email & Create Account'}</span>
                   </button>
                 </form>
               )}
