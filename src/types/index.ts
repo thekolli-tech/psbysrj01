@@ -132,6 +132,7 @@ export interface Lead {
   id: string;
   seekerName: string; // Masked if locked: "S*** K***"
   seekerPhone: string; // Masked if locked: "+91 98****3421"
+  seekerAvatar?: string;
   seekerEmail: string; // Masked if locked: "s***@gmail.com"
   budget: string;
   budgetMinLakhs: number;
@@ -254,6 +255,7 @@ export interface CommunityPost {
   authorId?: string;
   authorName: string;
   authorRole: UserRole;
+  authorAvatar?: string;
   propertyId?: string;
   propertyName?: string;
   communityId?: string;

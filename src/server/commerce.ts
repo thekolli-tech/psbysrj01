@@ -2,13 +2,14 @@ import crypto from 'node:crypto';
 import { getPostgresPool, queryPostgres } from './postgres.ts';
 import { getSqliteDb, isPostgresAuthoritative, isSqliteExplicit } from './db.ts';
 import { evaluateUnlock, type PaymentGate, type UnlockDecision } from '../shared/ledger.ts';
+import { resolveAvatarId } from '../shared/avatars.ts';
+import { paidContactAccessGranted, presentPhone, redactPhoneDigits, scrubPhoneFields } from '../shared/phonePrivacy.ts';
 import {
   initialVerificationStatus,
   isPublicListing,
   listingEligibleForLeads,
   maskEmail,
   maskName,
-  maskPhone,
   paymentGrantsAccess,
   paymentProviderStatus
 } from '../shared/policy.ts';
@@ -214,7 +215,9 @@ function mapListing(row: any): any {
 
 export async function listPublicListings(): Promise<any[]> {
   const rows = await listListingRows();
-  return rows.filter(row => isPublicListing(row.publication_status)).map(mapListing);
+  return rows
+    .filter(row => isPublicListing(row.publication_status))
+    .map(row => scrubPhoneFields(mapListing(row)));
 }
 
 export async function listOwnerListings(ownerId: string): Promise<any[]> {
@@ -331,17 +334,20 @@ export async function listLeadsForViewer(viewer: { id: string; role: string }): 
   const unlocks = await unlocksForProfessional(viewer.id);
   const unlockedIds = new Set(unlocks.map(row => row.lead_id));
   const admin = viewer.role === 'SUPER_ADMIN' || viewer.role === 'DEVELOPER';
-  return rows.map(row => presentLead(row, {
+  return rows.map(row => presentLead(row, viewer, {
     revealed: admin || row.seeker_id === viewer.id || unlockedIds.has(row.id)
   }));
 }
 
-function presentLead(row: any, opts: { revealed: boolean }): any {
+function presentLead(row: any, viewer: { id: string; role: string }, opts: { revealed: boolean }): any {
   const revealed = opts.revealed;
+  const phoneVisible = viewer.role === 'SUPER_ADMIN' || viewer.role === 'DEVELOPER' || row.seeker_id === viewer.id || paidContactAccessGranted();
+  const requirements = phoneVisible ? (row.requirements || '') : redactPhoneDigits(row.requirements || '', row.phone);
   return {
     id: row.id,
     seekerName: revealed ? row.name : maskName(row.name),
-    seekerPhone: revealed ? row.phone : maskPhone(row.phone),
+    seekerPhone: phoneVisible ? presentPhone(row.phone, viewer, row.seeker_id) : presentPhone(row.phone, null, null),
+    seekerAvatar: resolveAvatarId(row.seeker_avatar),
     seekerEmail: revealed ? row.email : maskEmail(row.email),
     revealed,
     budget: row.budget,
@@ -350,7 +356,7 @@ function presentLead(row: any, opts: { revealed: boolean }): any {
     propertyType: row.property_type,
     propertyId: row.property_id || '',
     timeframe: 'Next 30-45 Days',
-    requirements: row.requirements || '',
+    requirements,
     tier: row.tier || 'STANDARD',
     priceCredits: Number(row.price || 0),
     isUnlocked: revealed,
@@ -362,11 +368,11 @@ function presentLead(row: any, opts: { revealed: boolean }): any {
 
 async function allLeadRows(): Promise<any[]> {
   if (isPostgresAuthoritative()) {
-    const res = await queryPostgres('SELECT * FROM buyer_leads ORDER BY created_at DESC');
+    const res = await queryPostgres('SELECT l.*, u.avatar AS seeker_avatar FROM buyer_leads l LEFT JOIN users u ON u.id = l.seeker_id ORDER BY l.created_at DESC');
     return res.rows;
   }
   requireSqlite();
-  return getSqliteDb().prepare('SELECT * FROM buyer_leads ORDER BY created_at DESC').all() as any[];
+  return getSqliteDb().prepare('SELECT l.*, u.avatar AS seeker_avatar FROM buyer_leads l LEFT JOIN users u ON u.id = l.seeker_id ORDER BY l.created_at DESC').all() as any[];
 }
 
 async function unlocksForProfessional(professionalId: string): Promise<any[]> {
@@ -392,9 +398,14 @@ export async function unlockLead(input: {
   return withSqliteLock(() => unlockLeadSqlite({ ...input, verified: Boolean(verified) }));
 }
 
+function unlockViewer(input: { professionalId: string; professionalRole: string }): { id: string; role: string } {
+  return { id: input.professionalId, role: input.professionalRole };
+}
+
 async function unlockLeadPostgres(input: {
   leadId: string;
   professionalId: string;
+  professionalRole: string;
   idempotencyKey: string;
   verified: boolean;
 }): Promise<{ revealed: boolean; charged: number; balance: number; lead: any }> {
@@ -453,7 +464,7 @@ async function unlockLeadPostgres(input: {
       revealed: true,
       charged: decision.charge,
       balance: Number(balanceRes.rows[0].wallet_balance),
-      lead: presentLead(lead, { revealed: true })
+      lead: presentLead(lead, unlockViewer(input), { revealed: true })
     };
   } catch (err) {
     await client.query('ROLLBACK');
@@ -466,6 +477,7 @@ async function unlockLeadPostgres(input: {
 async function unlockLeadSqlite(input: {
   leadId: string;
   professionalId: string;
+  professionalRole: string;
   idempotencyKey: string;
   verified: boolean;
 }): Promise<{ revealed: boolean; charged: number; balance: number; lead: any }> {
@@ -518,7 +530,7 @@ async function unlockLeadSqlite(input: {
       revealed: true,
       charged: decision.charge,
       balance: Number(balanceRow.wallet_balance),
-      lead: presentLead(lead, { revealed: true })
+      lead: presentLead(lead, unlockViewer(input), { revealed: true })
     };
   } catch (err) {
     db.exec('ROLLBACK');

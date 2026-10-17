@@ -3,7 +3,8 @@ import type { PoolClient } from 'pg';
 import { getPostgresPool, queryPostgres } from './postgres.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProof, type OtpClaimRunner } from './otpClaim.ts';
-import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
+import { resolveAvatarId } from '../shared/avatars.ts';
+import { isUniqueEmailError, isUniquePhoneError, RegistrationRejected } from './registrationError.ts';
 import type {
   UserRole,
   DbUser,
@@ -163,7 +164,7 @@ export async function pgCreateUser(data: {
     normalizedEmail,
     data.phone?.trim() || '',
     data.role || 'PROPERTY_SEEKER',
-    data.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+    data.avatar || 'avatar-01',
     data.organization?.trim() || '',
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
@@ -188,6 +189,8 @@ export async function pgUpdateUser(id: string, updates: Partial<{
   assigned_properties: string;
   email_verified: number;
   phone_verified: number;
+  legal_consent_version: string;
+  legal_consent_at: string;
 }>): Promise<DbUser | null> {
   const fields: string[] = [];
   const values: any[] = [];
@@ -722,6 +725,8 @@ export async function pgRegisterVerifiedUser(data: {
   otp: string;
   phoneOtp?: string;
   requirePhone: boolean;
+  legalConsentVersion: string;
+  legalConsentAt: string;
 }): Promise<DbUser> {
   const email = data.email.trim().toLowerCase();
   const phone = data.phone?.trim().toLowerCase() || '';
@@ -747,9 +752,12 @@ export async function pgRegisterVerifiedUser(data: {
         role: data.role,
         phone,
         organization: data.organization,
-        phoneVerified: data.requirePhone
+        phoneVerified: data.requirePhone,
+        legalConsentVersion: data.legalConsentVersion,
+        legalConsentAt: data.legalConsentAt
       });
     } catch (error) {
+      if (isUniquePhoneError(error)) throw new RegistrationRejected(400, 'Registration could not be completed.');
       if (isUniqueEmailError(error)) throw new RegistrationRejected(400, 'An account with this email address already exists');
       throw error;
     }
@@ -764,6 +772,8 @@ async function insertPgUser(client: PoolClient, data: {
   phone: string;
   organization?: string;
   phoneVerified: boolean;
+  legalConsentVersion: string;
+  legalConsentAt: string;
 }): Promise<DbUser> {
   const id = `user_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const publicId = `usr_${crypto.randomBytes(4).toString('hex')}`;
@@ -774,8 +784,8 @@ async function insertPgUser(client: PoolClient, data: {
       id, public_id, name, email, phone, role, avatar, organization,
       wallet_balance, is_verified, email_verified, phone_verified,
       account_status, must_change_password, assigned_properties,
-      password_hash, salt, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,1,1,$9,'ACTIVE',0,'[]',$10,$11,$12,$13)
+      password_hash, salt, created_at, updated_at, legal_consent_version, legal_consent_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,1,1,$9,'ACTIVE',0,'[]',$10,$11,$12,$13,$14,$15)
     RETURNING *
   `, [
     id,
@@ -784,13 +794,15 @@ async function insertPgUser(client: PoolClient, data: {
     data.email,
     data.phone,
     data.role,
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+    'avatar-01',
     data.organization?.trim() || '',
     data.phoneVerified ? 1 : 0,
     hash,
     salt,
     now,
-    now
+    now,
+    data.legalConsentVersion,
+    data.legalConsentAt
   ]);
   return mapUserRow(inserted.rows[0]);
 }
@@ -886,7 +898,7 @@ export async function pgGetAllPosts(params?: {
   offset?: number;
   currentUserId?: string;
 }): Promise<any[]> {
-  let query = "SELECT p.* FROM community_posts p WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = $1 AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
+  let query = "SELECT p.*, u.avatar AS author_avatar FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = $1 AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
   const args: any[] = [params?.currentUserId || ''];
   let paramIdx = 2;
 
@@ -923,6 +935,7 @@ export async function pgGetAllPosts(params?: {
     authorId: p.author_id,
     authorName: p.author_name,
     authorRole: p.author_role,
+    authorAvatar: resolveAvatarId(p.author_avatar),
     communityId: p.community_id,
     communityName: p.community_name,
     propertyId: p.property_id,
@@ -949,7 +962,7 @@ export async function pgGetAllPosts(params?: {
 }
 
 export async function pgGetPostById(postId: string, currentUserId?: string): Promise<any> {
-  const res = await queryPostgres('SELECT * FROM community_posts WHERE id = $1', [postId]);
+  const res = await queryPostgres('SELECT p.*, u.avatar AS author_avatar FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = $1', [postId]);
   if (res.rows.length === 0) return null;
   const p = res.rows[0];
 
@@ -960,6 +973,7 @@ export async function pgGetPostById(postId: string, currentUserId?: string): Pro
     authorId: p.author_id,
     authorName: p.author_name,
     authorRole: p.author_role,
+    authorAvatar: resolveAvatarId(p.author_avatar),
     communityId: p.community_id,
     communityName: p.community_name,
     propertyId: p.property_id,

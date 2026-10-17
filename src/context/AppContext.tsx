@@ -122,6 +122,7 @@ interface AppContextType {
   // Authentication & Guest Mode
   isLoggedIn: boolean;
   login: (user?: User) => void;
+  replaceSession: (user: User) => void;
   logout: () => void;
 
   // Scroll Progress for Hero Morph Animation
@@ -165,6 +166,7 @@ function mapLead(raw: any): Lead {
     id: raw.id,
     seekerName: raw.seekerName || 'Seeker',
     seekerPhone: raw.seekerPhone || '',
+    seekerAvatar: raw.seekerAvatar || '',
     seekerEmail: raw.seekerEmail || '',
     budget: raw.budget || '',
     budgetMinLakhs: Number(raw.budgetMinLakhs || 0),
@@ -380,6 +382,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     showToast('Signed in');
+  };
+
+  const replaceSession = (user: User) => {
+    setSessionUser(mapApiUser(user));
   };
 
   const logout = () => {
@@ -842,7 +848,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email,
       phone,
       role: 'PROPERTY_ADMIN',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      avatar: 'avatar-01',
       organization: `${targetProp.title} PMO`,
       assignedPropertyIds: [propertyId],
       walletBalance: 10000,
@@ -1028,6 +1034,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         showToast,
         isLoggedIn,
         login,
+        replaceSession,
         logout,
         scrollProgress
       }}

@@ -113,7 +113,7 @@ export async function sendRealSmsOtp(toPhone: string, otp: string): Promise<SmsD
 
       const data = await res.json();
       if (res.ok) {
-        console.log(`[Property Studio] Real SMS OTP sent to ${cleanPhone} from Property Studio via Twilio. SID: ${data.sid}`);
+        console.log('[Property Studio] SMS provider accepted a verification message via Twilio.');
         return { success: true, provider: 'twilio', messageId: data.sid };
       } else {
         console.warn(`[Property Studio] Twilio SMS was not accepted. Status ${res.status}.`);
@@ -146,7 +146,7 @@ export async function sendRealSmsOtp(toPhone: string, otp: string): Promise<SmsD
 
       const data = await res.json();
       if (res.ok && data.return) {
-        console.log(`[Property Studio] Real SMS OTP sent to ${cleanPhone} from Property Studio via Fast2SMS.`);
+        console.log('[Property Studio] SMS provider accepted a verification message via Fast2SMS.');
         return { success: true, provider: 'fast2sms', messageId: data.request_id };
       }
     } catch (err: any) {
@@ -163,7 +163,7 @@ export async function sendRealSmsOtp(toPhone: string, otp: string): Promise<SmsD
         { method: 'GET' }
       );
       if (res.ok) {
-        console.log(`[Property Studio] Real SMS OTP sent to ${cleanPhone} from Property Studio via MSG91.`);
+        console.log('[Property Studio] SMS provider accepted a verification message via MSG91.');
         return { success: true, provider: 'msg91' };
       }
     } catch (err: any) {
@@ -180,7 +180,7 @@ export async function sendRealSmsOtp(toPhone: string, otp: string): Promise<SmsD
       );
       const data = await res.json();
       if (res.ok && data.Status === 'Success') {
-        console.log(`[Property Studio] Real SMS OTP sent from Property Studio via 2Factor to ${digitsOnly}. Session: ${data.Details}`);
+        console.log('[Property Studio] SMS provider accepted a verification message via 2Factor.');
         return { success: true, provider: '2factor', messageId: data.Details };
       }
     } catch (err: any) {
@@ -199,7 +199,7 @@ export async function sendRealSmsOtp(toPhone: string, otp: string): Promise<SmsD
       params.append('sender', process.env.TEXTLOCAL_SENDER || 'PROPST');
       const res = await fetch('https://api.textlocal.in/send/?' + params.toString());
       if (res.ok) {
-        console.log(`[Property Studio] Real SMS OTP sent from Property Studio via Textlocal to ${digitsOnly}`);
+        console.log('[Property Studio] SMS provider accepted a verification message via Textlocal.');
         return { success: true, provider: 'textlocal' };
       }
     } catch (err: any) {

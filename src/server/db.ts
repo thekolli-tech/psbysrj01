@@ -5,7 +5,9 @@ import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { applySqliteAdditiveSchema } from './platformSchema.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProofSync, type SyncOtpClaimRunner } from './otpClaim.ts';
-import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
+import { resolveAvatarId } from '../shared/avatars.ts';
+import { isUniqueEmailError, isUniquePhoneError, RegistrationRejected } from './registrationError.ts';
+import { phoneDuplicateCountSql, phoneUniquenessPlan, phoneUniquenessSql } from './platformSchema.ts';
 import {
   pgFindUserByEmail,
   pgFindUserById,
@@ -486,6 +488,42 @@ export async function findUserById(id: string): Promise<DbUser | null> {
   return sqliteFindUserById(id);
 }
 
+export async function listProtectedPhones(): Promise<string[]> {
+  if (isPostgresAuthoritative()) {
+    const { queryPostgres } = await import('./postgres.ts');
+    const found = await queryPostgres<{ phone: string }>(
+      `SELECT DISTINCT phone FROM (
+         SELECT phone FROM users WHERE phone IS NOT NULL AND btrim(phone) <> ''
+         UNION
+         SELECT phone FROM buyer_leads WHERE phone IS NOT NULL AND btrim(phone) <> ''
+       ) protected_phones`
+    );
+    return found.rows.map(row => String(row.phone || '')).filter(Boolean);
+  }
+  const rows = getSqliteDb().prepare(
+    `SELECT DISTINCT phone FROM (
+       SELECT phone FROM users WHERE phone IS NOT NULL AND TRIM(phone) <> ''
+       UNION
+       SELECT phone FROM buyer_leads WHERE phone IS NOT NULL AND TRIM(phone) <> ''
+     )`
+  ).all() as Array<{ phone: string }>;
+  return rows.map(row => String(row.phone || '')).filter(Boolean);
+}
+
+export async function findUserByPhone(phone: string): Promise<DbUser | null> {
+  const normalized = phone.trim();
+  if (!normalized) return null;
+  if (isPostgresAuthoritative()) {
+    const { queryPostgres } = await import('./postgres.ts');
+    const found = await queryPostgres<{ id: string }>('SELECT id FROM users WHERE phone = $1 LIMIT 1', [normalized]);
+    if (!found.rows[0]) return null;
+    return findUserById(found.rows[0].id);
+  }
+  const row = getSqliteDb().prepare('SELECT id FROM users WHERE phone = ? LIMIT 1').get(normalized) as { id: string } | undefined;
+  if (!row) return null;
+  return findUserById(row.id);
+}
+
 export async function getActiveDeveloperCount(): Promise<number> {
   if (isPostgresAuthoritative()) return pgGetActiveDeveloperCount();
   return sqliteGetActiveDeveloperCount();
@@ -519,6 +557,8 @@ export async function updateUser(id: string, updates: Partial<{
   assigned_properties: string;
   email_verified: number;
   phone_verified: number;
+  legal_consent_version: string;
+  legal_consent_at: string;
 }>): Promise<DbUser | null> {
   if (isPostgresAuthoritative()) return pgUpdateUser(id, updates);
   return sqliteUpdateUser(id, updates);
@@ -653,6 +693,8 @@ export async function registerVerifiedUser(data: {
   otp: string;
   phoneOtp?: string;
   requirePhone: boolean;
+  legalConsentVersion: string;
+  legalConsentAt: string;
 }): Promise<DbUser> {
   if (isPostgresAuthoritative()) return pgRegisterVerifiedUser(data);
   return sqliteRegisterVerifiedUser(data);
@@ -1019,6 +1061,8 @@ function sqliteInitDatabase(): void {
       password_hash TEXT NOT NULL,
       salt TEXT NOT NULL,
       last_login_at TEXT,
+      legal_consent_version TEXT,
+      legal_consent_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -1229,6 +1273,17 @@ function sqliteInitDatabase(): void {
   `);
 
   applySqliteAdditiveSchema(db);
+  ensureSqlitePhoneUniqueness(db);
+}
+
+export function ensureSqlitePhoneUniqueness(database: Pick<SqliteDatabase, 'prepare' | 'exec'>): void {
+  const count = database.prepare(phoneDuplicateCountSql('sqlite')).get() as { duplicate_groups?: number } | undefined;
+  const plan = phoneUniquenessPlan(Number(count?.duplicate_groups || 0));
+  if (!plan.enforce) {
+    console.warn(`[Property Studio] Phone uniqueness index was not created. Duplicate non-empty phone groups: ${plan.duplicateGroups}. No rows were changed.`);
+    return;
+  }
+  database.exec(phoneUniquenessSql('sqlite'));
 }
 
 function sqliteFindUserByEmail(email: string): DbUser | null {
@@ -1292,7 +1347,7 @@ function sqliteCreateUser(data: {
     normalizedEmail,
     data.phone?.trim() || '',
     data.role || 'PROPERTY_SEEKER',
-    data.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+    data.avatar || 'avatar-01',
     data.organization?.trim() || '',
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
@@ -1315,6 +1370,8 @@ function sqliteUpdateUser(id: string, updates: Partial<{
   assigned_properties: string;
   email_verified: number;
   phone_verified: number;
+  legal_consent_version: string;
+  legal_consent_at: string;
 }>): DbUser | null {
   const fields: string[] = [];
   const values: any[] = [];
@@ -1798,6 +1855,8 @@ function sqliteRegisterVerifiedUser(data: {
   otp: string;
   phoneOtp?: string;
   requirePhone: boolean;
+  legalConsentVersion: string;
+  legalConsentAt: string;
 }): DbUser {
   const email = data.email.trim().toLowerCase();
   const phone = data.phone?.trim().toLowerCase() || '';
@@ -1824,8 +1883,14 @@ function sqliteRegisterVerifiedUser(data: {
         getSqliteDb().prepare('UPDATE users SET phone_verified = 1 WHERE id = ?').run(user.id);
         user.phone_verified = 1;
       }
+      getSqliteDb().prepare('UPDATE users SET legal_consent_version = ?, legal_consent_at = ? WHERE id = ?').run(
+        data.legalConsentVersion,
+        data.legalConsentAt,
+        user.id
+      );
       return user;
     } catch (error) {
+      if (isUniquePhoneError(error)) throw new RegistrationRejected(400, 'Registration could not be completed.');
       if (isUniqueEmailError(error)) throw new RegistrationRejected(400, 'An account with this email address already exists');
       throw error;
     }
@@ -1905,7 +1970,7 @@ function sqliteGetAllPosts(params?: {
   offset?: number;
   currentUserId?: string;
 }): any[] {
-  let query = "SELECT p.* FROM community_posts p WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
+  let query = "SELECT p.*, u.avatar AS author_avatar FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
   const args: any[] = [params?.currentUserId || ''];
 
   if (params?.communityId) {
@@ -1938,6 +2003,7 @@ function sqliteGetAllPosts(params?: {
     authorId: p.author_id,
     authorName: p.author_name,
     authorRole: p.author_role,
+    authorAvatar: resolveAvatarId((p as { author_avatar?: string }).author_avatar),
     communityId: p.community_id,
     communityName: p.community_name,
     propertyId: p.property_id,
@@ -1964,7 +2030,7 @@ function sqliteGetAllPosts(params?: {
 }
 
 function sqliteGetPostById(postId: string, currentUserId?: string): any {
-  const stmt = db.prepare('SELECT * FROM community_posts WHERE id = ?');
+  const stmt = db.prepare('SELECT p.*, u.avatar AS author_avatar FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ?');
   const p = stmt.get(postId) as DbCommunityPost | undefined;
   if (!p) return null;
 
@@ -1975,6 +2041,7 @@ function sqliteGetPostById(postId: string, currentUserId?: string): any {
     authorId: p.author_id,
     authorName: p.author_name,
     authorRole: p.author_role,
+    authorAvatar: resolveAvatarId((p as { author_avatar?: string }).author_avatar),
     communityId: p.community_id,
     communityName: p.community_name,
     propertyId: p.property_id,

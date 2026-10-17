@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { Avatar } from '../common/Avatar';
 import {
   Send,
   User,
@@ -22,7 +23,7 @@ export const LiveChatEngine: React.FC = () => {
       name: 'Vikram Sethi',
       role: 'Verified RERA Agent',
       badge: 'TS-RERA A02400001882',
-      avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=120&q=80',
+      avatar: 'avatar-03',
       online: true
     },
     {
@@ -30,7 +31,7 @@ export const LiveChatEngine: React.FC = () => {
       name: 'Rajiv Williams',
       role: 'Project PMO Director',
       badge: 'The Crown Neopolis',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80',
+      avatar: 'avatar-07',
       online: true
     },
     {
@@ -38,7 +39,7 @@ export const LiveChatEngine: React.FC = () => {
       name: 'Maheshwar Rao (MD)',
       role: 'Developer Managing Director',
       badge: 'Aparna Infra Corporate',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&q=80',
+      avatar: 'avatar-12',
       online: false
     }
   ];
@@ -80,11 +81,7 @@ export const LiveChatEngine: React.FC = () => {
                     }`}
                   >
                     <div className="relative">
-                      <img
-                        src={c.avatar}
-                        alt={c.name}
-                        className="w-10 h-10 rounded-full object-cover border border-slate-200"
-                      />
+                      <Avatar id={c.avatar} label={c.name} className="w-10 h-10 rounded-full border border-slate-200" />
                       {c.online && (
                         <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
                       )}
@@ -122,11 +119,7 @@ export const LiveChatEngine: React.FC = () => {
           {/* Active Contact Header */}
           <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img
-                src={activeContact.avatar}
-                alt={activeContact.name}
-                className="w-10 h-10 rounded-full object-cover border border-slate-200"
-              />
+              <Avatar id={activeContact.avatar} label={activeContact.name} className="w-10 h-10 rounded-full border border-slate-200" />
               <div>
                 <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   {activeContact.name}

@@ -6,6 +6,14 @@
     {
       "source": "/api/:path*",
       "destination": "/api/index?__ps_path=:path*"
+    },
+    {
+      "source": "/privacy-policy",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/terms-and-conditions",
+      "destination": "/index.html"
     }
   ],
   "functions": {

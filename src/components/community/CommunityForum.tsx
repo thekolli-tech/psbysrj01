@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CommunityPost } from '../../types';
 import { AudioStoryPlayer } from '../common/AudioStoryPlayer';
+import { Avatar } from '../common/Avatar';
 import {
   MessageSquare,
   ArrowBigUp,
@@ -437,6 +438,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   {/* Meta Header with Clean Typographic Separators (Zero-Pill Rule) */}
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-1.5 text-slate-500">
+                      <Avatar id={post.authorAvatar} label={post.authorName} className="w-7 h-7 rounded-lg" />
                       <span className="font-bold text-slate-900">{post.authorName}</span>
                       <span aria-hidden="true">·</span>
                       <span className="font-mono text-[11px] text-slate-600">u/{post.authorRole.toLowerCase()}</span>

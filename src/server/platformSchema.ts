@@ -28,6 +28,8 @@ ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS moderation_note TEXT;
 ALTER TABLE communities ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
 ALTER TABLE communities ADD COLUMN IF NOT EXISTS change_request TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities TEXT DEFAULT '[]';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS legal_consent_version VARCHAR(32);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS legal_consent_at TIMESTAMPTZ;
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS seeker_id VARCHAR(64);
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS property_id VARCHAR(64);
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS consent_granted SMALLINT DEFAULT 0;
@@ -132,6 +134,8 @@ const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE communities ADD COLUMN suspension_reason TEXT',
   'ALTER TABLE communities ADD COLUMN change_request TEXT',
   'ALTER TABLE users ADD COLUMN capabilities TEXT DEFAULT \'[]\'',
+  'ALTER TABLE users ADD COLUMN legal_consent_version TEXT',
+  'ALTER TABLE users ADD COLUMN legal_consent_at TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN seeker_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN property_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN consent_granted INTEGER DEFAULT 0',
@@ -227,6 +231,31 @@ export function applySqliteAdditiveSchema(database: { exec: (sql: string) => voi
       ('lead_price_HNI', '2000', datetime('now')),
       ('credit_packages', '[{"id":"credits_5","credits":5,"priceInr":1500},{"id":"credits_20","credits":20,"priceInr":5000}]', datetime('now'));
   `);
+}
+
+export const PHONE_UNIQUENESS_INDEX = 'uq_users_phone_nonempty';
+
+export function phoneDuplicateCountSql(dialect: 'sqlite' | 'pg'): string {
+  const trim = dialect === 'pg' ? 'btrim(phone)' : 'TRIM(phone)';
+  return `SELECT COUNT(*) AS duplicate_groups FROM (
+    SELECT phone FROM users
+    WHERE phone IS NOT NULL AND ${trim} <> ''
+    GROUP BY phone
+    HAVING COUNT(*) > 1
+  ) phone_duplicates`;
+}
+
+export function phoneUniquenessSql(dialect: 'sqlite' | 'pg'): string {
+  const trim = dialect === 'pg' ? 'btrim(phone)' : 'TRIM(phone)';
+  return `CREATE UNIQUE INDEX IF NOT EXISTS ${PHONE_UNIQUENESS_INDEX} ON users (phone) WHERE phone IS NOT NULL AND ${trim} <> ''`;
+}
+
+/**
+ * Creates the partial unique index only when every non-empty phone is already unique.
+ * Duplicate rows are counted and left unchanged.
+ */
+export function phoneUniquenessPlan(duplicateGroups: number): { enforce: boolean; duplicateGroups: number } {
+  return { enforce: duplicateGroups === 0, duplicateGroups };
 }
 
 export function schemaSqlIsNonDestructive(sql: string): boolean {

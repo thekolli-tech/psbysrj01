@@ -27,6 +27,8 @@ import { PropertyStudioSupportDesk } from './components/support/PropertyStudioSu
 import { SupportDeskButton } from './components/support/SupportDeskButton';
 import { AuthRequiredCard } from './components/common/AuthRequiredCard';
 import { BrandLogo } from './components/common/BrandLogo';
+import { LegalDocumentView } from './components/common/LegalDocumentView';
+import { legalDocumentForPath } from './shared/legal';
 import { Property } from './types';
 import { ShieldAlert, Building, LifeBuoy, ArrowRight, Lock, Phone, Mail, ShieldCheck, ExternalLink } from 'lucide-react';
 
@@ -65,6 +67,11 @@ const AppContent: React.FC = () => {
       document.body.classList.remove('apk-mode');
     }
   }, [deviceMode]);
+
+  const legalDocument = legalDocumentForPath(window.location.pathname);
+  if (legalDocument) {
+    return <LegalDocumentView document={legalDocument} />;
+  }
 
   // If STUDIO_IFP mode or activeView is STUDIO, render Studio Broadcast View
   if (deviceMode === 'STUDIO_IFP' || activeView === 'STUDIO') {
@@ -355,6 +362,12 @@ const AppContent: React.FC = () => {
                   Community Q&A
                 </button>
               )}
+              <a href="/privacy-policy" className="hover:text-slate-900">
+                Privacy Policy
+              </a>
+              <a href="/terms-and-conditions" className="hover:text-slate-900">
+                Terms & Conditions
+              </a>
               <button
                 onClick={() => setSupportOpen(true)}
                 className="text-amber-700 font-bold hover:underline cursor-pointer flex items-center gap-1"

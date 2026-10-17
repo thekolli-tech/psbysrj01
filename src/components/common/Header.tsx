@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
 import { isPlatformAdmin, isProfessionalRole, isPropertySeeker } from '../../shared/policy';
 import { BrandLogo } from './BrandLogo';
+import { Avatar } from './Avatar';
 import {
   Wallet,
   LogIn,
@@ -206,14 +207,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center gap-2.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-xs transition-colors shadow-sm cursor-pointer"
               title="Open Profile Control Panel & Password Settings"
             >
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="w-6 h-6 rounded-full object-cover border border-slate-200"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
-                }}
-              />
+              <Avatar id={currentUser.avatar} label={currentUser.name} className="w-6 h-6 rounded-full" />
               <div className="text-left hidden sm:block">
                 <span className="text-[11px] font-bold text-slate-900 block leading-tight truncate max-w-[100px]">
                   {currentUser.name}

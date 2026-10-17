@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { Avatar } from '../common/Avatar';
 import { ConstructionLog } from '../../types';
 import {
   Building2,
@@ -164,14 +165,7 @@ export const PropertyAdminDashboard: React.FC = () => {
 
             {/* Property Admin Session & Logout Button */}
             <div className="flex items-center gap-2.5 bg-indigo-900/90 pl-3 pr-2 py-1.5 rounded-xl border border-indigo-700 shadow-sm">
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="w-8 h-8 rounded-full object-cover border border-indigo-400/50"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
-                }}
-              />
+              <Avatar id={currentUser.avatar} label={currentUser.name} className="w-8 h-8 rounded-full border border-indigo-400/50" />
               <div className="text-left hidden sm:block pr-1">
                 <span className="text-xs font-bold text-white block leading-tight">{currentUser.name}</span>
                 <span className="text-[10px] text-indigo-300 block font-semibold leading-tight">PMO Admin</span>

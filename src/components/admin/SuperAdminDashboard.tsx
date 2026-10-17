@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { Avatar } from '../common/Avatar';
 import { LeadTier, UserRole } from '../../types';
 import {
   ShieldAlert,
@@ -398,14 +399,7 @@ export const SuperAdminDashboard: React.FC = () => {
 
             {/* Admin Session Details & Logout Button */}
             <div className="flex items-center gap-2.5 bg-slate-800/90 pl-3 pr-2 py-1.5 rounded-xl border border-slate-700 shadow-sm">
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="w-8 h-8 rounded-full object-cover border border-amber-500/60"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
-                }}
-              />
+              <Avatar id={currentUser.avatar} label={currentUser.name} className="w-8 h-8 rounded-full border border-amber-500/60" />
               <div className="text-left hidden md:block pr-1">
                 <span className="text-xs font-bold text-white block leading-tight">{currentUser.name}</span>
                 <span className="text-[10px] text-amber-400 block font-semibold leading-tight">Super Admin</span>
@@ -772,14 +766,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   filteredUsers.map(u => (
                     <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3.5 flex items-center gap-3">
-                        <img
-                          src={u.avatar}
-                          alt={u.name}
-                          className="w-9 h-9 rounded-xl object-cover border border-slate-200"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
-                          }}
-                        />
+                        <Avatar id={u.avatar} label={u.name} className="w-9 h-9 rounded-xl border border-slate-200" />
                         <div>
                           <div className="font-bold text-slate-900">{u.name}</div>
                           <div className="text-slate-500 font-mono text-[11px]">{u.email}</div>

@@ -82,7 +82,9 @@ test('Vercel deployment wires /api to the Express server bundle', () => {
   assert.equal(fs.existsSync(new URL('../api/[...path].js', import.meta.url)), false);
   assert.equal(config.outputDirectory, 'dist');
   assert.deepEqual(config.rewrites, [
-    { source: '/api/:path*', destination: '/api/index?__ps_path=:path*' }
+    { source: '/api/:path*', destination: '/api/index?__ps_path=:path*' },
+    { source: '/privacy-policy', destination: '/index.html' },
+    { source: '/terms-and-conditions', destination: '/index.html' }
   ]);
   assert.match(config.functions?.['api/**/*.js']?.includeFiles || '', /dist-server/);
   assert.match(handler, /initDatabase/);

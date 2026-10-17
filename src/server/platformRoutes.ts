@@ -9,6 +9,8 @@ import {
   isPropertySeeker,
   isSelfServeRole
 } from '../shared/policy.ts';
+import { canReadFullPhone, containsPhoneDigits, OWN_PHONE_CONTENT_MESSAGE } from '../shared/phonePrivacy.ts';
+import { presentPublicText } from './publicText.ts';
 import { revealAllowedAfterPayment } from './commerce.ts';
 import {
   CommerceError,
@@ -54,7 +56,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
   app.get('/api/properties', async (_req: Request, res: Response): Promise<void> => {
     try {
       const properties = await listPublicListings();
-      res.json({ properties });
+      res.json(await presentPublicText({ properties }, null));
     } catch (err) {
       sendError(res, err);
     }
@@ -75,6 +77,10 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         res.status(403).json({ error: 'Property seekers cannot publish listings.' });
         return;
       }
+      if (containsPhoneDigits(JSON.stringify(req.body || {}), req.user.phone)) {
+        res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
+        return;
+      }
       const listing = await createListing(req.user.id, req.body || {});
       await createAuditLog({
         actorId: req.user.id,
@@ -92,6 +98,10 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
 
   app.patch('/api/properties/:id', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
     try {
+      if (containsPhoneDigits(JSON.stringify(req.body || {}), req.user.phone)) {
+        res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
+        return;
+      }
       const listing = await updateOwnedListing(req.user.id, req.params.id, req.body || {});
       if (!listing) {
         res.status(404).json({ error: 'Listing not found' });
@@ -282,7 +292,16 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
       const visible = isPropertySeeker(req.user.role)
         ? leads.filter(lead => lead.revealed)
         : leads;
-      res.json({ leads: visible });
+      if (canReadFullPhone(req.user.role)) {
+        await createAuditLog({
+          actorId: req.user.id,
+          actorEmail: req.user.email,
+          actorRole: req.user.role,
+          action: 'PHONE_ACCESS',
+          details: { route: '/api/leads', count: visible.length }
+        });
+      }
+      res.json(await presentPublicText({ leads: visible }, req.user, { preservePhoneFields: true }));
     } catch (err) {
       sendError(res, err);
     }
@@ -291,14 +310,22 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
   app.post('/api/leads', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
     try {
       const body = req.body || {};
+      if (isPropertySeeker(req.user.role) && Number(req.user.phone_verified) !== 1) {
+        res.status(403).json({ error: 'Verify your mobile number before using this feature.', code: 'PHONE_NOT_VERIFIED' });
+        return;
+      }
       if (!body.name || !body.phone || !body.budget) {
         res.status(400).json({ error: 'Name, phone, and budget are required.' });
+        return;
+      }
+      if (containsPhoneDigits(`${body.name || ''}\n${body.requirements || ''}`, req.user.phone)) {
+        res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
         return;
       }
       const leadId = await createEnquiry({
         seekerId: req.user.id,
         name: body.name,
-        phone: body.phone,
+        phone: isPropertySeeker(req.user.role) ? req.user.phone : body.phone,
         email: body.email,
         budget: body.budget,
         propertyType: body.property_type || body.propertyType || '',
@@ -347,7 +374,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         targetId: req.params.id,
         details: { charged: result.charged }
       });
-      res.json({ success: true, ...result });
+      res.json(await presentPublicText({ success: true, ...result }, req.user, { preservePhoneFields: true }));
     } catch (err) {
       sendError(res, err);
     }
