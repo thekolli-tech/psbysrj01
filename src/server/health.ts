@@ -16,12 +16,16 @@ export function environmentPresence(): {
   RESEND_API_KEY: boolean;
   OTP_HASH_SECRET: boolean;
   EMAIL_FROM: boolean;
+  FAST2SMS_API_KEY: boolean;
+  FAST2SMS_OTP_ID: boolean;
 } {
   return {
     DATABASE_URL: nonEmpty('DATABASE_URL'),
     RESEND_API_KEY: nonEmpty('RESEND_API_KEY'),
     OTP_HASH_SECRET: nonEmpty('OTP_HASH_SECRET'),
-    EMAIL_FROM: nonEmpty('EMAIL_FROM')
+    EMAIL_FROM: nonEmpty('EMAIL_FROM'),
+    FAST2SMS_API_KEY: nonEmpty('FAST2SMS_API_KEY'),
+    FAST2SMS_OTP_ID: nonEmpty('FAST2SMS_OTP_ID')
   };
 }
 

@@ -66,6 +66,8 @@ import {
 } from './src/server/db.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
 import { sendRealSmsOtp, getNotificationGatewayStatus, configuredSmsProviders } from './src/server/notifications.ts';
+import { InvalidPhoneError } from './src/server/otpTarget.ts';
+import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
@@ -446,25 +448,33 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response): Promis
   }
 });
 
+function smsUnavailable(res: Response, code: 'SMS_NOT_CONFIGURED' | 'OTP_NOT_CONFIGURED'): void {
+  res.status(503).json({
+    error: 'SMS verification is not configured. No code was sent and no account was created.',
+    code
+  });
+}
+
 // Send Phone OTP. Property Seeker registration cannot finish without a real provider delivery.
 app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
-  const phone = String(req.body?.phone || '').trim();
-  if (rejectIfRateLimited(req, res, 'phone-otp', phone)) return;
+  const phone = normalizeIndianMobile(req.body?.phone);
+  if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
   try {
-    if (phone.length < 8) {
-      res.status(400).json({ error: 'Valid mobile number is required' });
+    if (!phone) {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    if (!String(process.env.OTP_HASH_SECRET || '').trim()) {
+      smsUnavailable(res, 'OTP_NOT_CONFIGURED');
       return;
     }
     if (configuredSmsProviders().length === 0) {
-      res.status(503).json({
-        error: 'SMS verification is not configured. No code was sent and no account was created.',
-        code: 'SMS_NOT_CONFIGURED'
-      });
+      smsUnavailable(res, 'SMS_NOT_CONFIGURED');
       return;
     }
     const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
     const dispatchResult = await sendRealSmsOtp(phone, otp);
-    if (!dispatchResult.success) {
+    if (!dispatchResult.success || dispatchResult.provider !== 'fast2sms') {
       await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
       res.status(502).json({
         error: 'The SMS provider did not accept the verification code. No code remains active and no account was created.',
@@ -476,11 +486,15 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
       success: true,
       message: 'SMS verification code dispatched. Check the mobile number you entered.',
       expiresAt,
-      deliveredVia: dispatchResult.provider
+      deliveredVia: 'fast2sms'
     });
   } catch (err: any) {
     if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
       res.status(429).json({ error: err.message });
+      return;
+    }
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
       return;
     }
     if (phone) {
@@ -494,10 +508,12 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
   }
 });
 
-// Verify Phone OTP
+// Verify Phone OTP. The resulting grant is bound to this normalized number.
 app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Promise<void> => {
+  const phone = normalizeIndianMobile(req.body?.phone);
+  const otp = String(req.body?.otp || '').trim();
+  if (rejectIfRateLimited(req, res, 'phone-otp-verify', phone || 'invalid')) return;
   try {
-    const { phone, otp } = req.body;
     if (!phone || !otp) {
       res.status(400).json({ error: 'Phone number and verification code are required' });
       return;
@@ -509,7 +525,11 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
     }
     res.json({ success: true, verified: true, message: 'Phone number successfully verified' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    res.status(500).json({ error: 'Unable to verify the code.' });
   }
 });
 
@@ -535,8 +555,14 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
     }
 
     const safeRole = selfServeStorageRole(requestedRole);
-    if (safeRole === 'PROPERTY_SEEKER' && (!phone || String(phone).trim().length < 8)) {
-      res.status(400).json({ error: 'Mobile phone number is mandatory for Property Seeker registration.' });
+    const seeker = safeRole === 'PROPERTY_SEEKER';
+    const canonicalPhone = seeker ? normalizeIndianMobile(phone) : null;
+    if (seeker && !canonicalPhone) {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    if (seeker && !String(phoneOtp || '').trim()) {
+      res.status(400).json({ error: 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.' });
       return;
     }
 
@@ -545,11 +571,11 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       email,
       password,
       role: safeRole,
-      phone: phone?.trim() || '',
+      phone: seeker ? canonicalPhone || '' : (phone?.trim() || ''),
       organization: organization?.trim() || '',
       otp: String(otp),
       phoneOtp: phoneOtp ? String(phoneOtp) : undefined,
-      requirePhone: safeRole === 'PROPERTY_SEEKER'
+      requirePhone: seeker
     });
 
     const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);
@@ -580,6 +606,10 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
   } catch (err: any) {
     if (err instanceof RegistrationRejected || err?.name === 'RegistrationRejected') {
       res.status(err.statusCode || 400).json({ error: err.message });
+      return;
+    }
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
       return;
     }
     const message = typeof err?.message === 'string' && !/postgres|sqlite|constraint|select |insert /i.test(err.message)

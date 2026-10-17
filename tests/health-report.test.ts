@@ -12,6 +12,8 @@ process.env.EMAIL_FROM = 'Person <person@example.com>';
 const { buildHealthReport, environmentPresence } = await import('../src/server/health.ts');
 
 test('production health reports an unconfigured database without secrets', async () => {
+  delete process.env.FAST2SMS_API_KEY;
+  delete process.env.FAST2SMS_OTP_ID;
   const report = await buildHealthReport();
   const database = report.body.database as { connected: boolean; schemaReady: boolean; code: string; failure: string | null };
   const configuration = report.body.configuration as {
@@ -26,6 +28,8 @@ test('production health reports an unconfigured database without secrets', async
     RESEND_API_KEY: boolean;
     OTP_HASH_SECRET: boolean;
     EMAIL_FROM: boolean;
+    FAST2SMS_API_KEY: boolean;
+    FAST2SMS_OTP_ID: boolean;
   };
   const body = JSON.stringify(report.body);
   assert.equal(report.httpStatus, 503);
@@ -45,7 +49,9 @@ test('production health reports an unconfigured database without secrets', async
     DATABASE_URL: false,
     RESEND_API_KEY: false,
     OTP_HASH_SECRET: false,
-    EMAIL_FROM: true
+    EMAIL_FROM: true,
+    FAST2SMS_API_KEY: false,
+    FAST2SMS_OTP_ID: false
   });
   assert.equal(body.includes('postgresql://'), false);
   assert.equal(body.includes('person@example.com'), false);
@@ -90,12 +96,16 @@ test('environment presence reports only whether each required name is non-empty'
   process.env.VERCEL_GIT_COMMIT_REF = 'cursor/fix-vercel-registration-otp-c4c9';
   process.env.VERCEL_ENV = 'preview';
   try {
+    delete process.env.FAST2SMS_API_KEY;
+    delete process.env.FAST2SMS_OTP_ID;
     const presence = environmentPresence();
     assert.deepEqual(presence, {
       DATABASE_URL: true,
       RESEND_API_KEY: true,
       OTP_HASH_SECRET: true,
-      EMAIL_FROM: true
+      EMAIL_FROM: true,
+      FAST2SMS_API_KEY: false,
+      FAST2SMS_OTP_ID: false
     });
     process.env.DATABASE_URL = '   ';
     assert.equal(environmentPresence().DATABASE_URL, false);

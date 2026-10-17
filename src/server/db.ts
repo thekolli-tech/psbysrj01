@@ -5,7 +5,9 @@ import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { applySqliteAdditiveSchema } from './platformSchema.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProofSync, type SyncOtpClaimRunner } from './otpClaim.ts';
+import { canonicalOtpTarget } from './otpTarget.ts';
 import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
+import { indianNationalDigits, storedPhoneMatches } from '../shared/indianMobile.ts';
 import {
   pgFindUserByEmail,
   pgFindUserById,
@@ -615,7 +617,7 @@ export async function discardUnconsumedOtp(
 }
 
 function sqliteDiscardUnconsumedOtp(target: string, type: string): void {
-  db.prepare('DELETE FROM otps WHERE target = ? AND type = ? AND consumed_at IS NULL').run(target.trim().toLowerCase(), type);
+  db.prepare('DELETE FROM otps WHERE target = ? AND type = ? AND consumed_at IS NULL').run(canonicalOtpTarget(type, target), type);
 }
 
 export async function generateOtp(
@@ -1755,7 +1757,7 @@ function sqliteRunner(): SyncOtpClaimRunner {
 function sqliteGenerateOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'): { otp: string; expiresAt: number } {
   return sqliteTransaction(() => {
     const database = getSqliteDb();
-    const normalizedTarget = target.trim().toLowerCase();
+    const normalizedTarget = canonicalOtpTarget(type, target);
     const recentOtp = database.prepare(`
       SELECT created_at FROM otps
       WHERE target = ? AND type = ? AND consumed_at IS NULL
@@ -1785,7 +1787,14 @@ function sqliteGenerateOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_V
 }
 
 function sqliteVerifyOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET', code: string): boolean {
-  return sqliteTransaction(() => claimOtpProofSync(sqliteRunner(), target, type, code));
+  const normalizedTarget = canonicalOtpTarget(type, target);
+  return sqliteTransaction(() => claimOtpProofSync(sqliteRunner(), normalizedTarget, type, code));
+}
+
+function sqlitePhoneTaken(e164: string): boolean {
+  if (!indianNationalDigits(e164)) return false;
+  const rows = getSqliteDb().prepare(`SELECT phone FROM users`).all() as Array<{ phone: string | null }>;
+  return rows.some((row) => storedPhoneMatches(row.phone, e164));
 }
 
 function sqliteRegisterVerifiedUser(data: {
@@ -1800,7 +1809,9 @@ function sqliteRegisterVerifiedUser(data: {
   requirePhone: boolean;
 }): DbUser {
   const email = data.email.trim().toLowerCase();
-  const phone = data.phone?.trim().toLowerCase() || '';
+  const phone = data.requirePhone
+    ? canonicalOtpTarget('PHONE_VERIFICATION', data.phone || '')
+    : (data.phone?.trim().toLowerCase() || '');
   return sqliteTransaction(() => {
     const emailOk = claimOtpProofSync(sqliteRunner(), email, 'EMAIL_VERIFICATION', data.otp, { issueGrant: false, allowGrantFallback: true });
     if (!emailOk) throw new RegistrationRejected(400, 'Invalid or expired email verification code');
@@ -1808,6 +1819,9 @@ function sqliteRegisterVerifiedUser(data: {
       const phoneOk = Boolean(data.phoneOtp) && claimOtpProofSync(sqliteRunner(), phone, 'PHONE_VERIFICATION', String(data.phoneOtp), { issueGrant: false, allowGrantFallback: true });
       if (!phoneOk) {
         throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
+      }
+      if (sqlitePhoneTaken(phone)) {
+        throw new RegistrationRejected(400, 'An account with this mobile number already exists');
       }
     }
     try {

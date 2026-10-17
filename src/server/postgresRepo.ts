@@ -3,7 +3,9 @@ import type { PoolClient } from 'pg';
 import { getPostgresPool, queryPostgres } from './postgres.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProof, type OtpClaimRunner } from './otpClaim.ts';
+import { canonicalOtpTarget } from './otpTarget.ts';
 import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
+import { indianNationalDigits } from '../shared/indianMobile.ts';
 import type {
   UserRole,
   DbUser,
@@ -622,7 +624,7 @@ export async function pgRevokeAllUserSessions(userId: string): Promise<boolean> 
 // ==============================================================================
 
 export async function pgDiscardUnconsumedOtp(target: string, type: string): Promise<void> {
-  await queryPostgres('DELETE FROM otps WHERE target = $1 AND type = $2 AND consumed_at IS NULL', [target.trim().toLowerCase(), type]);
+  await queryPostgres('DELETE FROM otps WHERE target = $1 AND type = $2 AND consumed_at IS NULL', [canonicalOtpTarget(type, target), type]);
 }
 
 function pgRunner(client: PoolClient): OtpClaimRunner {
@@ -662,7 +664,7 @@ export async function pgGenerateOtp(
   target: string,
   type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'
 ): Promise<{ otp: string; expiresAt: number }> {
-  const normalizedTarget = target.trim().toLowerCase();
+  const normalizedTarget = canonicalOtpTarget(type, target);
   return withPgTransaction([`otp:${type}:${normalizedTarget}`], async (client) => {
     const recentRes = await client.query(`
       SELECT created_at FROM otps
@@ -698,7 +700,7 @@ export async function pgVerifyOtp(
   type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET',
   code: string
 ): Promise<boolean> {
-  const normalizedTarget = target.trim().toLowerCase();
+  const normalizedTarget = canonicalOtpTarget(type, target);
   return withPgTransaction([`otp:${type}:${normalizedTarget}`], (client) => (
     claimOtpProof(pgRunner(client), 'pg', normalizedTarget, type, code)
   ));
@@ -724,10 +726,12 @@ export async function pgRegisterVerifiedUser(data: {
   requirePhone: boolean;
 }): Promise<DbUser> {
   const email = data.email.trim().toLowerCase();
-  const phone = data.phone?.trim().toLowerCase() || '';
+  const phone = data.requirePhone
+    ? canonicalOtpTarget('PHONE_VERIFICATION', data.phone || '')
+    : (data.phone?.trim().toLowerCase() || '');
   const locks = [`otp:EMAIL_VERIFICATION:${email}`, `otp:REGISTRATION_GRANT:${email}`];
   if (data.requirePhone) {
-    locks.push(`otp:PHONE_VERIFICATION:${phone}`, `otp:PHONE_REGISTRATION_GRANT:${phone}`);
+    locks.push(`otp:PHONE_VERIFICATION:${phone}`, `otp:PHONE_REGISTRATION_GRANT:${phone}`, `phone:${phone}`);
   }
   return withPgTransaction(locks, async (client) => {
     const runner = pgRunner(client);
@@ -737,6 +741,14 @@ export async function pgRegisterVerifiedUser(data: {
       const phoneOk = Boolean(data.phoneOtp) && await claimOtpProof(runner, 'pg', phone, 'PHONE_VERIFICATION', String(data.phoneOtp), { issueGrant: false, allowGrantFallback: true });
       if (!phoneOk) {
         throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
+      }
+      const national = indianNationalDigits(phone);
+      const taken = await client.query(
+        `SELECT id FROM users WHERE regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') IN ($1, $2, $3) LIMIT 1`,
+        [national, `0${national}`, `91${national}`]
+      );
+      if (taken.rows.length > 0) {
+        throw new RegistrationRejected(400, 'An account with this mobile number already exists');
       }
     }
     try {
