@@ -53,6 +53,39 @@ async function api(method: string, path: string, body?: unknown, cookie?: string
   return { status: response.status, json, cookie: session || cookie || '' };
 }
 
+async function readEventReplay(since: string, cookie?: string): Promise<string> {
+  const controller = new AbortController();
+  const killer = setTimeout(() => controller.abort(), 1200);
+  let text = '';
+  try {
+    const response = await fetch(`${base}/api/community/events`, {
+      headers: {
+        accept: 'text/event-stream',
+        'last-event-id': since,
+        ...(cookie ? { cookie } : {})
+      },
+      signal: controller.signal
+    });
+    const reader = response.body?.getReader();
+    if (!reader) return '';
+    const decoder = new TextDecoder();
+    const started = Date.now();
+    while (Date.now() - started < 700) {
+      const next = await Promise.race([
+        reader.read(),
+        new Promise<{ done: true; value?: Uint8Array }>(resolve => setTimeout(() => resolve({ done: true }), 200))
+      ]);
+      if (next.done || !next.value) break;
+      text += decoder.decode(next.value, { stream: true });
+    }
+    await reader.cancel().catch(() => undefined);
+  } finally {
+    clearTimeout(killer);
+    controller.abort();
+  }
+  return text;
+}
+
 async function login(email: string): Promise<string> {
   const result = await api('POST', '/api/auth/login', { email, password });
   assert.equal(result.status, 200, JSON.stringify(result.json));
@@ -137,6 +170,34 @@ test('HTTP role, moderation, listing, enquiry, and payment workflows', async (t)
   assert.equal((await api('PATCH', `/api/admin/posts/${post.json.post.id}/moderation`, { status: 'REJECTED', reason: 'Needs a source document' }, admin)).status, 200);
   assert.equal((await api('GET', `/api/community/posts/${post.json.post.id}`)).status, 404);
 
+  const visiblePost = await api('POST', '/api/community/posts', {
+    title: 'Approved layout note',
+    content: 'Public after approval.',
+    topic: 'LEGAL'
+  }, partner);
+  assert.equal(visiblePost.json.post.status, 'PENDING_APPROVAL');
+  assert.equal((await api('PATCH', `/api/admin/posts/${visiblePost.json.post.id}/moderation`, { status: 'APPROVED' }, admin)).status, 200);
+  assert.equal((await api('GET', '/api/community/posts')).json.posts.some((item: any) => item.id === visiblePost.json.post.id && item.status === 'APPROVED'), true);
+  const revisedTitle = 'Revised layout note pending reapproval';
+  const revised = await api('PUT', `/api/community/posts/${visiblePost.json.post.id}`, {
+    title: revisedTitle,
+    content: 'This revision must stay hidden until a Super Admin approves it again.'
+  }, partner);
+  assert.equal(revised.status, 200, JSON.stringify(revised.json));
+  assert.equal(revised.json.post.status, 'PENDING_APPROVAL');
+  const publicAfterEdit = await api('GET', '/api/community/posts');
+  assert.equal(publicAfterEdit.json.posts.some((item: any) => item.id === visiblePost.json.post.id), false);
+  assert.equal(JSON.stringify(publicAfterEdit.json).includes(revisedTitle), false);
+  assert.equal((await api('GET', `/api/community/posts/${visiblePost.json.post.id}`)).status, 404);
+  const authorView = await api('GET', `/api/community/posts/${visiblePost.json.post.id}`, undefined, partner);
+  assert.equal(authorView.status, 200);
+  assert.equal(authorView.json.post.status, 'PENDING_APPROVAL');
+  assert.equal(authorView.json.post.title, revisedTitle);
+  const publicReplay = await readEventReplay('1970-01-01T00:00:00.000Z');
+  assert.equal(publicReplay.includes(revisedTitle), false);
+  const authorReplay = await readEventReplay('1970-01-01T00:00:00.000Z', partner);
+  assert.equal(authorReplay.includes(revisedTitle), true);
+
   const edited = await api('PATCH', `/api/properties/${listing.json.listing.id}`, { title: 'Kokapet plot revised' }, partner);
   assert.equal(edited.json.listing.publicationStatus, 'PENDING');
   assert.equal((await api('GET', '/api/properties')).json.properties.some((item: any) => item.id === listing.json.listing.id), false);
@@ -169,15 +230,20 @@ test('HTTP role, moderation, listing, enquiry, and payment workflows', async (t)
   }, admin);
   assert.equal(credit.status, 200, JSON.stringify(credit.json));
 
-  const [first, secondUnlock] = await Promise.all([
-    api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-a' }),
-    api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-b' })
-  ]);
-  const charges = [first.json.charged, secondUnlock.json.charged].sort((a, b) => a - b);
-  assert.deepEqual(charges, [0, 300]);
-  assert.equal(first.json.lead.seekerPhone, '+919800011122');
-  const replay = await api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-a' });
-  assert.equal(replay.json.charged, 0);
+  const balanceAfterCredit = (await api('GET', '/api/auth/me', undefined, partner)).json.user.wallet_balance;
+  assert.equal(Number(balanceAfterCredit), 1000);
+  const blockedUnlock = await api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-a' });
+  assert.equal(blockedUnlock.status, 503);
+  assert.equal(blockedUnlock.json.code, 'NOT_CONFIGURED');
+  assert.equal(blockedUnlock.json.lead, undefined);
+  const repeatedUnlock = await api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-b' });
+  assert.equal(repeatedUnlock.status, 503);
+  assert.equal(repeatedUnlock.json.code, 'NOT_CONFIGURED');
+  const stillMasked = await api('GET', '/api/leads', undefined, partner);
+  const stillMaskedLead = stillMasked.json.leads.find((item: any) => item.id === enquiry.json.leadId);
+  assert.equal(stillMaskedLead.revealed, false);
+  assert.equal(String(stillMaskedLead.seekerPhone).includes('8000'), false);
+  assert.equal(Number((await api('GET', '/api/auth/me', undefined, partner)).json.user.wallet_balance), 1000);
 
   const checkout = await api('POST', '/api/billing/checkout', { amount: 500, purpose: 'WALLET_TOPUP' }, partner);
   assert.equal(checkout.status, 503);

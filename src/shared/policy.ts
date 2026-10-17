@@ -145,6 +145,22 @@ export function canViewModeratedContent(
   return canModerate(viewer.role);
 }
 
+/**
+ * Replay must not publish a pending edit. A title or body without a public
+ * status stays hidden, including rows recorded before status was stored.
+ */
+export function communityReplayVisible(
+  payload: Record<string, unknown> | null | undefined,
+  viewer?: Viewer | null
+): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const narrative = String(payload.title || payload.content || '').trim();
+  const status = typeof payload.status === 'string' ? payload.status : '';
+  if (!status) return narrative.length === 0;
+  const authorId = typeof payload.authorId === 'string' ? payload.authorId : null;
+  return canViewModeratedContent(status, authorId, viewer);
+}
+
 export function isPublicListing(status: string | null | undefined): boolean {
   return String(status || '') === 'APPROVED';
 }

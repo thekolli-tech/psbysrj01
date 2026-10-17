@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
-import { queryPostgres } from './postgres.ts';
-import { OTP_MAX_ATTEMPTS, OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, otpMatches, sealOtp } from './otpCrypto.ts';
+import type { PoolClient } from 'pg';
+import { getPostgresPool, queryPostgres } from './postgres.ts';
+import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
+import { claimOtpProof, type OtpClaimRunner } from './otpClaim.ts';
+import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
 import type {
   UserRole,
   DbUser,
@@ -622,39 +625,72 @@ export async function pgDiscardUnconsumedOtp(target: string, type: string): Prom
   await queryPostgres('DELETE FROM otps WHERE target = $1 AND type = $2 AND consumed_at IS NULL', [target.trim().toLowerCase(), type]);
 }
 
+function pgRunner(client: PoolClient): OtpClaimRunner {
+  return {
+    async query(sql: string, params: unknown[]) {
+      const result = await client.query(sql, params as never[]);
+      return { rows: result.rows, changes: result.rowCount ?? 0 };
+    }
+  };
+}
+
+async function withPgTransaction<T>(lockKeys: string[], fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const pool = getPostgresPool();
+  if (!pool) throw new Error('PostgreSQL connection unavailable: DATABASE_URL is not configured.');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const lockKey of [...lockKeys].sort()) {
+      await client.query(`SELECT pg_advisory_xact_lock(('x' || substr(md5($1), 1, 16))::bit(64)::bigint)`, [lockKey]);
+    }
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // The connection is already unusable. The thrown error is the original failure.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function pgGenerateOtp(
   target: string,
   type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'
 ): Promise<{ otp: string; expiresAt: number }> {
   const normalizedTarget = target.trim().toLowerCase();
+  return withPgTransaction([`otp:${type}:${normalizedTarget}`], async (client) => {
+    const recentRes = await client.query(`
+      SELECT created_at FROM otps
+      WHERE target = $1 AND type = $2 AND consumed_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+      FOR UPDATE
+    `, [normalizedTarget, type]);
 
-  const recentRes = await queryPostgres(`
-    SELECT created_at FROM otps 
-    WHERE target = $1 AND type = $2 AND consumed_at IS NULL
-    ORDER BY created_at DESC 
-    LIMIT 1
-  `, [normalizedTarget, type]);
-
-  if (recentRes.rows.length > 0) {
-    const elapsed = Date.now() - new Date(recentRes.rows[0].created_at).getTime();
-    if (elapsed < OTP_RESEND_COOLDOWN_MS) {
-      const waitSeconds = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000);
-      throw new OtpCooldownError(waitSeconds);
+    if (recentRes.rows.length > 0) {
+      const elapsed = Date.now() - new Date(recentRes.rows[0].created_at).getTime();
+      if (elapsed < OTP_RESEND_COOLDOWN_MS) {
+        const waitSeconds = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000);
+        throw new OtpCooldownError(waitSeconds);
+      }
     }
-  }
 
-  const otp = generateOtpCode();
-  const expiresAt = Date.now() + OTP_TTL_MS;
-  const id = `otp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-  const now = new Date().toISOString();
-
-  await queryPostgres('DELETE FROM otps WHERE target = $1 AND type = $2 AND consumed_at IS NULL', [normalizedTarget, type]);
-  await queryPostgres(`
-    INSERT INTO otps (id, target, type, otp_hash, otp_raw, expires_at, attempt_count, is_verified, consumed_at, created_at)
-    VALUES ($1, $2, $3, $4, NULL, $5, 0, 0, NULL, $6)
-  `, [id, normalizedTarget, type, sealOtp(otp), expiresAt, now]);
-
-  return { otp, expiresAt };
+    const otp = generateOtpCode();
+    const expiresAt = Date.now() + OTP_TTL_MS;
+    const id = `otp_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const now = new Date().toISOString();
+    await client.query('DELETE FROM otps WHERE target = $1 AND type = $2 AND consumed_at IS NULL', [normalizedTarget, type]);
+    await client.query(`
+      INSERT INTO otps (id, target, type, otp_hash, otp_raw, expires_at, attempt_count, is_verified, consumed_at, created_at)
+      VALUES ($1, $2, $3, $4, NULL, $5, 0, 0, NULL, $6)
+    `, [id, normalizedTarget, type, sealOtp(otp), expiresAt, now]);
+    return { otp, expiresAt };
+  });
 }
 
 export async function pgVerifyOtp(
@@ -663,46 +699,100 @@ export async function pgVerifyOtp(
   code: string
 ): Promise<boolean> {
   const normalizedTarget = target.trim().toLowerCase();
-  const res = await queryPostgres(`
-    SELECT * FROM otps 
-    WHERE target = $1 AND type = $2 AND consumed_at IS NULL
-    ORDER BY created_at DESC 
-    LIMIT 1
-  `, [normalizedTarget, type]);
-
-  if (res.rows.length === 0) return false;
-  const record = res.rows[0];
-
-  if (Number(record.attempt_count) >= OTP_MAX_ATTEMPTS || Date.now() > Number(record.expires_at)) {
-    await queryPostgres('UPDATE otps SET consumed_at = $1 WHERE id = $2', [new Date().toISOString(), record.id]);
-    return false;
-  }
-
-  if (!otpMatches(record.otp_hash, code)) {
-    const attempts = Number(record.attempt_count) + 1;
-    const consumedAt = attempts >= OTP_MAX_ATTEMPTS ? new Date().toISOString() : null;
-    await queryPostgres('UPDATE otps SET attempt_count = $1, consumed_at = COALESCE($2, consumed_at) WHERE id = $3', [attempts, consumedAt, record.id]);
-    return false;
-  }
-
-  await queryPostgres('UPDATE otps SET is_verified = 1, consumed_at = $1 WHERE id = $2', [new Date().toISOString(), record.id]);
-  return true;
+  return withPgTransaction([`otp:${type}:${normalizedTarget}`], (client) => (
+    claimOtpProof(pgRunner(client), 'pg', normalizedTarget, type, code)
+  ));
 }
 
+/** Consumed OTP rows are not registration authorization. Claims are single-use. */
 export async function pgIsTargetVerified(
-  target: string,
-  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'
+  _target: string,
+  _type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'
 ): Promise<boolean> {
-  const res = await queryPostgres(`
-    SELECT * FROM otps 
-    WHERE target = $1 AND type = $2 AND is_verified = 1
-    ORDER BY created_at DESC 
-    LIMIT 1
-  `, [target.trim().toLowerCase(), type]);
+  return false;
+}
 
-  if (res.rows.length === 0) return false;
-  const record = res.rows[0];
-  return Date.now() - Number(record.expires_at) < 30 * 60 * 1000;
+export async function pgRegisterVerifiedUser(data: {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  phone?: string;
+  organization?: string;
+  otp: string;
+  phoneOtp?: string;
+  requirePhone: boolean;
+}): Promise<DbUser> {
+  const email = data.email.trim().toLowerCase();
+  const phone = data.phone?.trim().toLowerCase() || '';
+  const locks = [`otp:EMAIL_VERIFICATION:${email}`, `otp:REGISTRATION_GRANT:${email}`];
+  if (data.requirePhone) {
+    locks.push(`otp:PHONE_VERIFICATION:${phone}`, `otp:PHONE_REGISTRATION_GRANT:${phone}`);
+  }
+  return withPgTransaction(locks, async (client) => {
+    const runner = pgRunner(client);
+    const emailOk = await claimOtpProof(runner, 'pg', email, 'EMAIL_VERIFICATION', data.otp, { issueGrant: false, allowGrantFallback: true });
+    if (!emailOk) throw new RegistrationRejected(400, 'Invalid or expired email verification code');
+    if (data.requirePhone) {
+      const phoneOk = Boolean(data.phoneOtp) && await claimOtpProof(runner, 'pg', phone, 'PHONE_VERIFICATION', String(data.phoneOtp), { issueGrant: false, allowGrantFallback: true });
+      if (!phoneOk) {
+        throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
+      }
+    }
+    try {
+      return await insertPgUser(client, {
+        name: data.name,
+        email,
+        password: data.password,
+        role: data.role,
+        phone,
+        organization: data.organization,
+        phoneVerified: data.requirePhone
+      });
+    } catch (error) {
+      if (isUniqueEmailError(error)) throw new RegistrationRejected(400, 'An account with this email address already exists');
+      throw error;
+    }
+  });
+}
+
+async function insertPgUser(client: PoolClient, data: {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  phone: string;
+  organization?: string;
+  phoneVerified: boolean;
+}): Promise<DbUser> {
+  const id = `user_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  const publicId = `usr_${crypto.randomBytes(4).toString('hex')}`;
+  const { hash, salt } = hashPassword(data.password);
+  const now = new Date().toISOString();
+  const inserted = await client.query(`
+    INSERT INTO users (
+      id, public_id, name, email, phone, role, avatar, organization,
+      wallet_balance, is_verified, email_verified, phone_verified,
+      account_status, must_change_password, assigned_properties,
+      password_hash, salt, created_at, updated_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,1,1,$9,'ACTIVE',0,'[]',$10,$11,$12,$13)
+    RETURNING *
+  `, [
+    id,
+    publicId,
+    data.name.trim(),
+    data.email,
+    data.phone,
+    data.role,
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+    data.organization?.trim() || '',
+    data.phoneVerified ? 1 : 0,
+    hash,
+    salt,
+    now,
+    now
+  ]);
+  return mapUserRow(inserted.rows[0]);
 }
 
 // ==============================================================================
@@ -984,7 +1074,12 @@ export async function pgUpdatePost(
     WHERE id = $6
   `, [title, content, links, attachments, now, postId]);
 
-  await pgRecordCommunityEvent('POST_UPDATED', { id: postId, title });
+  await pgRecordCommunityEvent('POST_UPDATED', {
+    id: postId,
+    title,
+    status: 'PENDING_APPROVAL',
+    authorId: post.author_id
+  }, post.author_id || null);
   return pgGetPostById(postId);
 }
 

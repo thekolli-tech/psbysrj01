@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-test('SQLite lead unlock charges once', async () => {
+test('SQLite wallet credit cannot unlock a lead while payments are unconfigured', async () => {
   const dbPath = '/tmp/propertystudio-unlock-test.db';
   fs.rmSync(dbPath, { force: true });
   delete process.env.DATABASE_URL;
@@ -34,6 +34,33 @@ test('SQLite lead unlock charges once', async () => {
     consentPurpose: 'enquiry response'
   });
 
+  delete process.env.PAYMENT_PROVIDER;
+  delete process.env.PAYMENT_WEBHOOK_SECRET;
+  await assert.rejects(
+    () => unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'blocked' }),
+    (error: any) => error.code === 'NOT_CONFIGURED' && error.status === 503
+  );
+  process.env.PAYMENT_PROVIDER = 'test-provider';
+  await assert.rejects(
+    () => unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'provider-only' }),
+    (error: any) => error.code === 'NOT_CONFIGURED' && error.status === 503
+  );
+  delete process.env.PAYMENT_PROVIDER;
+  process.env.PAYMENT_WEBHOOK_SECRET = 'test-webhook-secret';
+  await assert.rejects(
+    () => unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'secret-only' }),
+    (error: any) => error.code === 'NOT_CONFIGURED' && error.status === 503
+  );
+  delete process.env.PAYMENT_WEBHOOK_SECRET;
+  const blockedBalance = getSqliteDb().prepare('SELECT wallet_balance FROM users WHERE id = ?').get(professional.id) as { wallet_balance: number };
+  assert.equal(Number(blockedBalance.wallet_balance), 1000);
+  const blockedUnlocks = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM lead_unlocks').get() as { count: number };
+  assert.equal(Number(blockedUnlocks.count), 0);
+  const blockedDebits = getSqliteDb().prepare(`SELECT COUNT(*) AS count FROM wallet_ledger WHERE reference_type = 'LEAD_UNLOCK'`).get() as { count: number };
+  assert.equal(Number(blockedDebits.count), 0);
+
+  process.env.PAYMENT_PROVIDER = 'test-provider';
+  process.env.PAYMENT_WEBHOOK_SECRET = 'test-webhook-secret';
   const [first, second] = await Promise.all([
     unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'k1' }),
     unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'k2' })
@@ -42,7 +69,17 @@ test('SQLite lead unlock charges once', async () => {
   assert.deepEqual(charges, [0, 300]);
   const balance = getSqliteDb().prepare('SELECT wallet_balance FROM users WHERE id = ?').get(professional.id) as { wallet_balance: number };
   assert.equal(Number(balance.wallet_balance), 700);
-  const ledger = getSqliteDb().prepare('SELECT COUNT(*) as count FROM wallet_ledger WHERE user_id = ?').get(professional.id) as { count: number };
+  const ledger = getSqliteDb().prepare('SELECT COUNT(*) as count FROM wallet_ledger WHERE user_id = ? AND reference_type = ?').get(professional.id, 'LEAD_UNLOCK') as { count: number };
   assert.equal(Number(ledger.count), 1);
-  assert.equal(first.lead.seekerPhone.includes('1111') || second.lead.seekerPhone.includes('1111'), true);
+
+  delete process.env.PAYMENT_PROVIDER;
+  delete process.env.PAYMENT_WEBHOOK_SECRET;
+  const retained = await unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'retained' });
+  assert.equal(retained.charged, 0);
+  assert.equal(retained.revealed, true);
+  assert.equal(String(retained.lead.seekerPhone).includes('1111'), true);
+  const retainedBalance = getSqliteDb().prepare('SELECT wallet_balance FROM users WHERE id = ?').get(professional.id) as { wallet_balance: number };
+  assert.equal(Number(retainedBalance.wallet_balance), 700);
+  const retainedUnlocks = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM lead_unlocks').get() as { count: number };
+  assert.equal(Number(retainedUnlocks.count), 1);
 });

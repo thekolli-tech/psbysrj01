@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { postLoginDestination } from '../../shared/policy';
+import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
 import {
   LogIn,
@@ -16,8 +17,7 @@ import {
   UserPlus,
   Mail,
   CheckCircle2,
-  RotateCcw,
-  Smartphone
+  RotateCcw
 } from 'lucide-react';
 
 interface LoginModalProps {
@@ -44,17 +44,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [organizationInput, setOrganizationInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const submitting = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Email OTP verification state
   const [otpSent, setOtpSent] = useState(false);
   const [otpInput, setOtpInput] = useState('');
   const [countdown, setCountdown] = useState(0);
-
-  // Mobile Phone OTP verification state (Mandatory for Property Seeker)
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
-  const [phoneOtpInput, setPhoneOtpInput] = useState('');
-  const [phoneCountdown, setPhoneCountdown] = useState(0);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -64,74 +60,48 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (phoneCountdown > 0) {
-      timer = setTimeout(() => setPhoneCountdown(c => c - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [phoneCountdown]);
-
   if (!isOpen) return null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMsg(null);
+    submitting.current = true;
     setLoading(true);
 
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
           email: emailInput.trim(),
           password: passwordInput
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Authentication failed');
+      const result = await readApiResponse(response);
+      const user = result.data?.user as { name?: string; role?: string } | undefined;
+      if (!result.ok || !user) {
+        throw new Error(result.error || 'Authentication failed');
       }
 
-      // Success! Update AppContext state
-      login(data.user);
-      showToast(`Welcome back, ${data.user.name}!`);
+      login(user as Parameters<typeof login>[0]);
+      showToast(`Welcome back, ${user.name}!`);
 
-      setActiveView(postLoginDestination(data.user.role));
+      setActiveView(postLoginDestination(user.role));
 
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Invalid credentials. Please verify your email and password.');
     } finally {
+      submitting.current = false;
       setLoading(false);
-    }
-  };
-
-  const handleSendPhoneOtp = async () => {
-    if (!phoneInput.trim() || phoneInput.trim().length < 8) {
-      setErrorMsg('Please enter a valid mobile number first.');
-      return;
-    }
-    setErrorMsg(null);
-    try {
-      const res = await fetch('/api/auth/send-phone-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneInput.trim() })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to dispatch SMS verification code');
-      setPhoneOtpSent(true);
-      setPhoneCountdown(60);
-      showToast(`SMS OTP dispatched to ${phoneInput.trim()}`);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to dispatch mobile OTP');
     }
   };
 
   const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMsg(null);
 
     if (!nameInput.trim() || !emailInput.trim() || !passwordInput) {
@@ -144,53 +114,33 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    // Role-specific validation:
-    // Property Seeker requires phone number; other three do not.
-    if (roleInput === 'PROPERTY_SEEKER') {
-      if (!phoneInput.trim() || phoneInput.trim().length < 8) {
-        setErrorMsg('Mobile phone number is required for Property Seeker registration.');
-        return;
-      }
-    }
-
+    submitting.current = true;
     setLoading(true);
     try {
       const res = await fetch('/api/auth/send-email-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ email: emailInput.trim() })
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to send verification code');
+      const result = await readApiResponse(res);
+      if (!result.ok || result.data?.success !== true) {
+        throw new Error(result.error || 'Failed to send verification code');
       }
 
       setOtpSent(true);
       setCountdown(60);
-      showToast(`Property Studio verification code sent to ${emailInput.trim()}`);
-
-      // If Property Seeker, also automatically dispatch SMS OTP to the required mobile number
-      if (roleInput === 'PROPERTY_SEEKER' && phoneInput.trim()) {
-        fetch('/api/auth/send-phone-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: phoneInput.trim() })
-        }).then(r => r.json()).then(d => {
-          if (d.success) {
-            setPhoneOtpSent(true);
-            setPhoneCountdown(60);
-          }
-        }).catch(() => {});
-      }
+      showToast('Property Studio verification code sent. Check the inbox for that address.');
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to send verification code.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
 
   const handleVerifyOtpAndRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMsg(null);
 
     if (!otpInput.trim() || otpInput.trim().length < 4) {
@@ -198,19 +148,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    // Property Seeker requires Phone OTP verification
-    if (roleInput === 'PROPERTY_SEEKER') {
-      if (!phoneOtpInput.trim() || phoneOtpInput.trim().length < 4) {
-        setErrorMsg('Please enter the 6-digit mobile SMS OTP received on your phone.');
-        return;
-      }
-    }
-
+    submitting.current = true;
     setLoading(true);
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
           name: nameInput.trim(),
           email: emailInput.trim(),
@@ -218,22 +161,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           role: roleInput,
           phone: phoneInput.trim(),
           organization: organizationInput.trim(),
-          otp: otpInput.trim(),
-          phoneOtp: roleInput === 'PROPERTY_SEEKER' ? phoneOtpInput.trim() : undefined
+          otp: otpInput.trim()
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Registration failed');
+      const result = await readApiResponse(response);
+      const user = result.data?.user as Parameters<typeof login>[0] | undefined;
+      if (!result.ok || !user) {
+        throw new Error(result.error || 'Registration failed');
       }
 
-      login(data.user);
-      showToast(`Account successfully registered and verified! Welcome, ${data.user.name}`);
+      login(user);
+      showToast(`Account successfully registered and verified! Welcome, ${user.name}`);
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Verification failed. Please check the OTP code.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
@@ -441,18 +385,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
                       <label className="block font-bold text-slate-700 mb-1">
-                        Contact Mobile {roleInput === 'PROPERTY_SEEKER' ? (
-                          <span className="text-red-500 font-bold text-[10px]">* Required</span>
-                        ) : (
-                          <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
-                        )}
+                        Contact Mobile <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
                       </label>
                       <input
                         type="tel"
                         value={phoneInput}
                         onChange={e => setPhoneInput(e.target.value)}
                         placeholder="e.g. +91 98490 12345"
-                        required={roleInput === 'PROPERTY_SEEKER'}
                         className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </div>
@@ -528,45 +467,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     />
                   </div>
 
-                  {roleInput === 'PROPERTY_SEEKER' && (
-                    <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-2xl text-xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-amber-950 flex items-center gap-1.5">
-                          <Smartphone className="w-4 h-4 text-amber-600" />
-                          Property Seeker Mobile SMS Verification
-                        </span>
-                        {phoneCountdown > 0 ? (
-                          <span className="text-[10px] text-amber-700 font-mono">Resend SMS in {phoneCountdown}s</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleSendPhoneOtp}
-                            className="text-[11px] text-amber-800 hover:underline font-bold"
-                          >
-                            {phoneOtpSent ? 'Resend SMS OTP' : 'Send SMS OTP'}
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-amber-900 text-[11px] leading-relaxed">
-                        SMS code dispatched to <strong className="font-mono text-amber-950">{phoneInput}</strong>.
-                      </p>
-                      <div>
-                        <label className="block font-bold text-amber-950 mb-1">
-                          Enter 6-Digit Mobile SMS OTP <span className="text-red-500">* Required</span>
-                        </label>
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={phoneOtpInput}
-                          onChange={e => setPhoneOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
-                          placeholder="• • • • • •"
-                          className="w-full text-center text-md tracking-[0.25em] font-mono font-bold px-3 py-2.5 bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-
                   <div className="flex items-center justify-between text-[11px] text-slate-500">
                     <span>Didn't receive the email from Property Studio?</span>
                     {countdown > 0 ? (
@@ -585,11 +485,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
                   <button
                     type="submit"
-                    disabled={loading || otpInput.length < 4 || (roleInput === 'PROPERTY_SEEKER' && phoneOtpInput.length < 4)}
+                    disabled={loading || otpInput.length < 4}
                     className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>{loading ? 'Verifying...' : roleInput === 'PROPERTY_SEEKER' ? 'Verify Email & Mobile to Register' : 'Verify Email & Create Account'}</span>
+                    <span>{loading ? 'Verifying...' : 'Verify Email & Create Account'}</span>
                   </button>
                 </form>
               )}
