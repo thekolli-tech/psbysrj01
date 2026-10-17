@@ -156,6 +156,8 @@ export async function runPostgresMigrations(): Promise<boolean> {
         password_hash TEXT NOT NULL,
         salt TEXT NOT NULL,
         last_login_at TIMESTAMPTZ,
+        legal_consent_version VARCHAR(32),
+        legal_consent_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );

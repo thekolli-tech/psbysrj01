@@ -105,7 +105,8 @@ test('twenty independent registrations, single-use OTP claims, and no token expo
       email: `Parallel-Register@example.com`,
       password: 'Longpassword1!',
       role: 'LANDOWNER',
-      otp: parallelCode
+      otp: parallelCode,
+      acceptLegal: true
     })));
     assert.equal(parallelRegisters.filter((result) => result.status === 200).length, 1);
     assert.equal(parallelRegisters.every((result) => result.json?.token === undefined), true);
@@ -118,7 +119,8 @@ test('twenty independent registrations, single-use OTP claims, and no token expo
       email,
       password: 'Longpassword1!',
       role: 'LANDOWNER',
-      otp: codes.get(email)
+      otp: codes.get(email),
+      acceptLegal: true
     })));
     assert.equal(registered.filter((result) => result.status === 200).length, 20);
     const distinctUsers = getSqliteDb().prepare(`SELECT COUNT(DISTINCT email) AS count FROM users WHERE email LIKE 'flow-%@example.com'`).get() as { count: number };
@@ -160,7 +162,8 @@ test('twenty independent registrations, single-use OTP claims, and no token expo
       role: 'PROPERTY_SEEKER',
       phone: '+919800011122',
       otp: codes.get(seekerEmail),
-      phoneVerified: true
+      phoneVerified: true,
+      acceptLegal: true
     });
     assert.equal(bypass.status, 400, bypass.raw);
     assert.equal(await findUserByEmail(seekerEmail), null);

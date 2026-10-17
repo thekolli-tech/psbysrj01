@@ -494,7 +494,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                   className="mt-0.5"
                 />
                 <span>
-                  I understand my name, phone, and email will be stored and shared with eligible verified professionals only after they complete the required payment and eligibility checks. Consent version 2026-10-15. Purpose: respond to this property enquiry.
+                  I agree that this enquiry may be stored so it can be processed. Property Seeker phone numbers are not shown to ordinary users. Payment-based lead access is not available in this release. See the <a href="/privacy-policy" className="font-bold text-amber-800 underline">Privacy Policy</a> and <a href="/terms-and-conditions" className="font-bold text-amber-800 underline">Terms & Conditions</a>. Consent version 2026-10-15.
                 </span>
               </label>
 

@@ -534,6 +534,8 @@ export async function updateUser(id: string, updates: Partial<{
   assigned_properties: string;
   email_verified: number;
   phone_verified: number;
+  legal_consent_version: string;
+  legal_consent_at: string;
 }>): Promise<DbUser | null> {
   if (isPostgresAuthoritative()) return pgUpdateUser(id, updates);
   return sqliteUpdateUser(id, updates);
@@ -1034,6 +1036,8 @@ function sqliteInitDatabase(): void {
       password_hash TEXT NOT NULL,
       salt TEXT NOT NULL,
       last_login_at TEXT,
+      legal_consent_version TEXT,
+      legal_consent_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -1330,6 +1334,8 @@ function sqliteUpdateUser(id: string, updates: Partial<{
   assigned_properties: string;
   email_verified: number;
   phone_verified: number;
+  legal_consent_version: string;
+  legal_consent_at: string;
 }>): DbUser | null {
   const fields: string[] = [];
   const values: any[] = [];

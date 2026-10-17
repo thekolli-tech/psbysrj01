@@ -52,6 +52,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [otpSent, setOtpSent] = useState(false);
   const [otpInput, setOtpInput] = useState('');
   const [phoneOtpInput, setPhoneOtpInput] = useState('');
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const seekerRegistration = roleInput === 'PROPERTY_SEEKER';
 
@@ -173,6 +174,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       setErrorMsg('Please enter the 6-digit WhatsApp verification code.');
       return;
     }
+    if (!acceptedLegal) {
+      setErrorMsg('Accept the Privacy Policy and Terms & Conditions before creating an account.');
+      return;
+    }
 
     submitting.current = true;
     setLoading(true);
@@ -188,6 +193,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           phone: phoneInput.trim(),
           organization: organizationInput.trim(),
           otp: otpInput.trim(),
+          acceptLegal: true,
           ...(seekerRegistration ? { phoneOtp: phoneOtpInput.trim() } : {})
         })
       });
@@ -512,6 +518,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </div>
                   )}
 
+                  <label className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={acceptedLegal}
+                      onChange={event => setAcceptedLegal(event.target.checked)}
+                      className="mt-0.5"
+                      required
+                    />
+                    <span>
+                      I accept the <a href="/privacy-policy" className="font-bold text-amber-700 underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and <a href="/terms-and-conditions" className="font-bold text-amber-700 underline" target="_blank" rel="noopener noreferrer">Terms & Conditions</a>. This box is not selected for you.
+                    </span>
+                  </label>
+
                   <div className="flex items-center justify-between text-[11px] text-slate-500">
                     <span>Didn't receive the email from Property Studio?</span>
                     {countdown > 0 ? (
@@ -530,7 +549,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
                   <button
                     type="submit"
-                    disabled={loading || otpInput.length < 4 || (seekerRegistration && phoneOtpInput.length < 4)}
+                    disabled={loading || !acceptedLegal || otpInput.length < 4 || (seekerRegistration && phoneOtpInput.length < 4)}
                     className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -544,7 +563,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
         {/* Footer */}
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>Official Secretariat: info@propertystudio.org</span>
+          <span className="flex flex-wrap gap-3">
+            <a href="/privacy-policy" className="font-bold text-amber-700 hover:underline">Privacy Policy</a>
+            <a href="/terms-and-conditions" className="font-bold text-amber-700 hover:underline">Terms</a>
+            <span>Official Secretariat: info@propertystudio.org</span>
+          </span>
           <button
             onClick={onClose}
             className="font-bold text-slate-800 hover:text-slate-950"

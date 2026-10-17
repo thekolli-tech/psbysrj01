@@ -69,6 +69,8 @@ import { createHostedApiHandler, expressPathForHostedRequest } from './src/serve
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { issuePhoneOtp } from './src/server/phoneOtp.ts';
 import { whatsAppSettings } from './src/server/whatsappOtp.ts';
+import { LEGAL_CONSENT_VERSION, legalDocumentForPath } from './src/shared/legal.ts';
+import { renderLegalHtml } from './src/server/legalHtml.ts';
 import { serializeAccount } from './src/server/accountView.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
@@ -531,6 +533,14 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       return;
     }
 
+    if (req.body?.acceptLegal !== true) {
+      res.status(400).json({
+        error: 'Accept the Privacy Policy and Terms & Conditions to create an account.',
+        code: 'LEGAL_CONSENT_REQUIRED'
+      });
+      return;
+    }
+
     const safeRole = selfServeStorageRole(requestedRole);
     const seeker = safeRole === 'PROPERTY_SEEKER';
     const normalizedPhone = normalizeE164(phone);
@@ -554,6 +564,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       }
     }
 
+    const acceptedAt = new Date().toISOString();
     const newUser = await registerVerifiedUser({
       name,
       email,
@@ -564,6 +575,20 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       otp: String(otp),
       phoneOtp: seeker ? String(phoneOtp) : undefined,
       requirePhone: seeker
+    });
+
+    await updateUser(newUser.id, {
+      legal_consent_version: LEGAL_CONSENT_VERSION,
+      legal_consent_at: acceptedAt
+    });
+    await createAuditLog({
+      actorId: newUser.id,
+      actorEmail: newUser.email,
+      actorRole: newUser.role,
+      action: 'LEGAL_CONSENT_ACCEPTED',
+      targetId: newUser.id,
+      targetEmail: newUser.email,
+      details: { version: LEGAL_CONSENT_VERSION, acceptedAt }
     });
 
     const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);
@@ -1457,6 +1482,18 @@ registerPlatformRoutes(app, { requireAuth, requireAdmin });
 app.use('/api', (_req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found' });
 });
+
+function sendLegalPage(req: Request, res: Response): void {
+  const document = legalDocumentForPath(req.path);
+  if (!document) {
+    res.status(404).type('html').send('Not found');
+    return;
+  }
+  res.status(200).type('html').send(renderLegalHtml(document));
+}
+
+app.get('/privacy-policy', sendLegalPage);
+app.get('/terms-and-conditions', sendLegalPage);
 
 // ==============================================================================
 // VITE DEV SERVER & PRODUCTION STATIC SERVING

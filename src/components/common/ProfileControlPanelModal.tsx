@@ -288,6 +288,11 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                 </div>
               </div>
 
+              <p className="text-[11px] text-slate-500">
+                <a href="/privacy-policy" className="font-bold text-amber-700 underline">Privacy Policy</a>
+                {' · '}
+                <a href="/terms-and-conditions" className="font-bold text-amber-700 underline">Terms & Conditions</a>
+              </p>
               <div className="space-y-2">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Studio avatar</span>
                 <AvatarPicker value={currentUser.avatar} onChange={saveAvatar} />

@@ -189,6 +189,8 @@ export async function pgUpdateUser(id: string, updates: Partial<{
   assigned_properties: string;
   email_verified: number;
   phone_verified: number;
+  legal_consent_version: string;
+  legal_consent_at: string;
 }>): Promise<DbUser | null> {
   const fields: string[] = [];
   const values: any[] = [];

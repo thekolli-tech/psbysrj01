@@ -221,7 +221,8 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
       phone: SECRET_PHONE,
       otp: seekerEmailCode,
       phoneVerified: true,
-      phoneOtp: '000000'
+      phoneOtp: '000000',
+      acceptLegal: true
     });
     assert.equal(bypass.status, 400, bypass.raw);
     assert.equal(await findUserByEmail(seekerEmail), null);
@@ -236,7 +237,8 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
       phone: '+1 415 555 2671',
       otp: seekerEmailCode,
       phoneOtp: phoneCode(),
-      phoneVerified: false
+      phoneVerified: false,
+      acceptLegal: true
     });
     assert.equal(registered.status, 200, registered.raw);
     assert.equal(registered.json.token, undefined);
@@ -253,7 +255,8 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
       role: 'PROPERTY_SEEKER',
       phone: SECRET_PHONE,
       otp: seekerEmailCode,
-      phoneOtp: phoneCode()
+      phoneOtp: phoneCode(),
+      acceptLegal: true
     })).status, 400);
 
     const takenEmail = 'second.seeker@example.com';
@@ -275,7 +278,8 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
       role: 'PROPERTY_SEEKER',
       phone: SECRET_PHONE,
       otp: emailCode(),
-      phoneOtp: '000000'
+      phoneOtp: '000000',
+      acceptLegal: true
     });
     assert.equal(taken.status, 400);
     assert.equal(taken.json.error, 'Registration could not be completed.');
@@ -289,7 +293,8 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
       password: 'Longpassword1!',
       role: 'LANDOWNER',
       otp: emailCode(),
-      phoneVerified: true
+      phoneVerified: true,
+      acceptLegal: true
     });
     assert.equal(owner.status, 200, owner.raw);
     assert.equal(Number((await findUserByEmail(ownerEmail))?.phone_verified || 0), 0);

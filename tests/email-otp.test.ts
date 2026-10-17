@@ -241,7 +241,8 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     email,
     password: 'Longpassword1!',
     role: 'CHANNEL_PARTNER',
-    otp: code
+    otp: code,
+    acceptLegal: true
   });
   assert.equal(registered.status, 200, registered.raw);
   assert.equal(registered.json.token, undefined);
@@ -251,7 +252,8 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     email,
     password: 'Longpassword1!',
     role: 'CHANNEL_PARTNER',
-    otp: code
+    otp: code,
+    acceptLegal: true
   });
   assert.equal(replay.status, 400);
   assert.equal(await findUserByEmail(email) !== null, true);
@@ -339,7 +341,8 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     phone: '+14155550199',
     otp: seekerCode,
     phoneVerified: true,
-    phoneOtp: '000000'
+    phoneOtp: '000000',
+    acceptLegal: true
   });
   assert.equal(seekerRegistered.status, 400, seekerRegistered.raw);
   assert.equal(await findUserByEmail(seekerEmail), null);
@@ -349,7 +352,8 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     password: 'Longpassword1!',
     role: 'PROPERTY_SEEKER',
     phone: '+14155550199',
-    otp: seekerCode
+    otp: seekerCode,
+    acceptLegal: true
   });
   assert.equal(seekerReplay.status, 400);
   assert.equal(await findUserByEmail(seekerEmail), null);
@@ -363,7 +367,8 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     email: ownerFallbackEmail,
     password: 'Longpassword1!',
     role: 'CHANNEL_PARTNER',
-    otp: ownerFallbackCode
+    otp: ownerFallbackCode,
+    acceptLegal: true
   });
   assert.equal(ownerFallback.status, 200, ownerFallback.raw);
 
@@ -407,7 +412,8 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     email: ownerEmail,
     password: 'Longpassword1!',
     role: 'LANDOWNER',
-    otp: ownerCode
+    otp: ownerCode,
+    acceptLegal: true
   });
   assert.equal(owner.status, 200, owner.raw);
   assert.equal((await findUserByEmail(ownerEmail))?.role, 'LANDOWNER');
