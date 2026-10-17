@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { postLoginDestination } from '../../shared/policy';
+import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
 import {
   LogIn,
@@ -44,6 +45,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [organizationInput, setOrganizationInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const submitting = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Email OTP verification state
@@ -76,62 +78,75 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMsg(null);
+    submitting.current = true;
     setLoading(true);
 
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
           email: emailInput.trim(),
           password: passwordInput
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Authentication failed');
+      const result = await readApiResponse(response);
+      const user = result.data?.user as { name?: string; role?: string } | undefined;
+      if (!result.ok || !user) {
+        throw new Error(result.error || 'Authentication failed');
       }
 
-      // Success! Update AppContext state
-      login(data.user);
-      showToast(`Welcome back, ${data.user.name}!`);
+      login(user as Parameters<typeof login>[0]);
+      showToast(`Welcome back, ${user.name}!`);
 
-      setActiveView(postLoginDestination(data.user.role));
+      setActiveView(postLoginDestination(user.role));
 
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Invalid credentials. Please verify your email and password.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
 
   const handleSendPhoneOtp = async () => {
+    if (submitting.current) return;
     if (!phoneInput.trim() || phoneInput.trim().length < 8) {
       setErrorMsg('Please enter a valid mobile number first.');
       return;
     }
     setErrorMsg(null);
+    submitting.current = true;
+    setLoading(true);
     try {
       const res = await fetch('/api/auth/send-phone-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ phone: phoneInput.trim() })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to dispatch SMS verification code');
+      const result = await readApiResponse(res);
+      if (!result.ok || result.data?.success !== true) {
+        setPhoneOtpSent(false);
+        throw new Error(result.error || 'WhatsApp verification was not sent.');
+      }
       setPhoneOtpSent(true);
       setPhoneCountdown(60);
-      showToast(`SMS OTP dispatched to ${phoneInput.trim()}`);
+      showToast('WhatsApp verification code sent. Check WhatsApp on the mobile number you entered.');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to dispatch mobile OTP');
+      setErrorMsg(err.message || 'WhatsApp verification was not sent.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
     }
   };
 
   const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMsg(null);
 
     if (!nameInput.trim() || !emailInput.trim() || !passwordInput) {
@@ -153,44 +168,49 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       }
     }
 
+    submitting.current = true;
     setLoading(true);
     try {
       const res = await fetch('/api/auth/send-email-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ email: emailInput.trim() })
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to send verification code');
+      const result = await readApiResponse(res);
+      if (!result.ok || result.data?.success !== true) {
+        throw new Error(result.error || 'Failed to send verification code');
       }
 
       setOtpSent(true);
       setCountdown(60);
-      showToast(`Property Studio verification code sent to ${emailInput.trim()}`);
+      showToast('Property Studio verification code sent. Check the inbox for that address.');
 
-      // If Property Seeker, also automatically dispatch SMS OTP to the required mobile number
       if (roleInput === 'PROPERTY_SEEKER' && phoneInput.trim()) {
-        fetch('/api/auth/send-phone-otp', {
+        const phoneRes = await fetch('/api/auth/send-phone-otp', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
           body: JSON.stringify({ phone: phoneInput.trim() })
-        }).then(r => r.json()).then(d => {
-          if (d.success) {
-            setPhoneOtpSent(true);
-            setPhoneCountdown(60);
-          }
-        }).catch(() => {});
+        });
+        const phoneResult = await readApiResponse(phoneRes);
+        if (!phoneResult.ok || phoneResult.data?.success !== true) {
+          setPhoneOtpSent(false);
+          setErrorMsg(phoneResult.error || 'WhatsApp verification was not sent. No account was created.');
+        } else {
+          setPhoneOtpSent(true);
+          setPhoneCountdown(60);
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to send verification code.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
 
   const handleVerifyOtpAndRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
     setErrorMsg(null);
 
     if (!otpInput.trim() || otpInput.trim().length < 4) {
@@ -201,16 +221,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     // Property Seeker requires Phone OTP verification
     if (roleInput === 'PROPERTY_SEEKER') {
       if (!phoneOtpInput.trim() || phoneOtpInput.trim().length < 4) {
-        setErrorMsg('Please enter the 6-digit mobile SMS OTP received on your phone.');
+        setErrorMsg('Please enter the 6-digit WhatsApp code received on your phone.');
         return;
       }
     }
 
+    submitting.current = true;
     setLoading(true);
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
           name: nameInput.trim(),
           email: emailInput.trim(),
@@ -223,17 +244,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Registration failed');
+      const result = await readApiResponse(response);
+      const user = result.data?.user as Parameters<typeof login>[0] | undefined;
+      if (!result.ok || !user) {
+        throw new Error(result.error || 'Registration failed');
       }
 
-      login(data.user);
-      showToast(`Account successfully registered and verified! Welcome, ${data.user.name}`);
+      login(user);
+      showToast(`Account successfully registered and verified! Welcome, ${user.name}`);
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Verification failed. Please check the OTP code.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   };
@@ -533,26 +556,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-amber-950 flex items-center gap-1.5">
                           <Smartphone className="w-4 h-4 text-amber-600" />
-                          Property Seeker Mobile SMS Verification
+                          Property Seeker WhatsApp Verification
                         </span>
                         {phoneCountdown > 0 ? (
-                          <span className="text-[10px] text-amber-700 font-mono">Resend SMS in {phoneCountdown}s</span>
+                          <span className="text-[10px] text-amber-700 font-mono">Resend WhatsApp code in {phoneCountdown}s</span>
                         ) : (
                           <button
                             type="button"
                             onClick={handleSendPhoneOtp}
                             className="text-[11px] text-amber-800 hover:underline font-bold"
                           >
-                            {phoneOtpSent ? 'Resend SMS OTP' : 'Send SMS OTP'}
+                            {phoneOtpSent ? 'Resend WhatsApp code' : 'Send WhatsApp code'}
                           </button>
                         )}
                       </div>
                       <p className="text-amber-900 text-[11px] leading-relaxed">
-                        SMS code dispatched to <strong className="font-mono text-amber-950">{phoneInput}</strong>.
+                        {phoneOtpSent
+                          ? 'WhatsApp code sent to the mobile number you entered. The account is created only after both codes are verified.'
+                          : 'A WhatsApp verification code is required. It is sent only when WhatsApp accepts it.'}
                       </p>
                       <div>
                         <label className="block font-bold text-amber-950 mb-1">
-                          Enter 6-Digit Mobile SMS OTP <span className="text-red-500">* Required</span>
+                          Enter 6-Digit WhatsApp Code <span className="text-red-500">* Required</span>
                         </label>
                         <input
                           type="text"

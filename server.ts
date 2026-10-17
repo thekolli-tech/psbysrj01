@@ -55,7 +55,8 @@ import {
   updateConferenceDetails,
   generateOtp,
   verifyOtp,
-  isTargetVerified,
+  registerVerifiedUser,
+  discardUnconsumedOtp,
   getAllCommunities,
   getCommunityById,
   createCommunity,
@@ -63,9 +64,13 @@ import {
   deleteCommunity,
   updateLastLogin
 } from './src/server/db.ts';
-import { checkPostgresHealth, checkSchemaReadiness } from './src/server/postgres.ts';
-import { sendRealSmsOtp, getNotificationGatewayStatus } from './src/server/notifications.ts';
-import { issueEmailOtp } from './src/server/emailOtp.ts';
+import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
+import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders } from './src/server/notifications.ts';
+import { InvalidPhoneError } from './src/server/otpTarget.ts';
+import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
+import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
+import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
+import { RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
@@ -328,9 +333,9 @@ app.post('/api/auth/send-email-otp', async (req: Request, res: Response): Promis
     }
     const issued = await issueEmailOtp(email, 'EMAIL_VERIFICATION');
     if (!issued.sent) {
-      res.status(502).json({
-        error: 'Verification email was not delivered. No account was created and the unused code was discarded.'
-      });
+      console.warn(`[Property Studio] Verification email was not issued (${issued.code}).`);
+      const failure = publicEmailOtpFailure(issued.code);
+      res.status(failure.status).json({ error: failure.error, code: failure.code });
       return;
     }
 
@@ -443,44 +448,88 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response): Promis
   }
 });
 
-// Send Phone OTP
+function whatsAppUnavailable(res: Response, code: 'WHATSAPP_NOT_CONFIGURED' | 'OTP_NOT_CONFIGURED'): void {
+  res.status(503).json({
+    error: 'WhatsApp verification is not configured. No code was sent and no account was created.',
+    code
+  });
+}
+
+// Send the phone OTP through WhatsApp. Property Seeker registration cannot finish without provider acceptance.
 app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
+  const phone = normalizeIndianMobile(req.body?.phone);
+  if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
   try {
-    const { phone } = req.body;
-    if (!phone || phone.trim().length < 8) {
-      res.status(400).json({ error: 'Valid mobile number is required' });
+    if (!phone) {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    if (!String(process.env.OTP_HASH_SECRET || '').trim()) {
+      whatsAppUnavailable(res, 'OTP_NOT_CONFIGURED');
+      return;
+    }
+    if (configuredWhatsAppProviders().length === 0) {
+      whatsAppUnavailable(res, 'WHATSAPP_NOT_CONFIGURED');
       return;
     }
     const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
-    const dispatchResult = await sendRealSmsOtp(phone.trim(), otp);
-
+    const dispatchResult = await sendWhatsAppOtp(phone, otp);
+    if (!dispatchResult.success || dispatchResult.provider !== 'whatsapp') {
+      await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
+      res.status(502).json({
+        error: 'WhatsApp did not accept the verification code. No code remains active and no account was created.',
+        code: 'WHATSAPP_DELIVERY_FAILED'
+      });
+      return;
+    }
     res.json({
       success: true,
-      message: `Property Studio SMS verification OTP dispatched to ${phone}.`,
+      message: 'WhatsApp verification code dispatched. Check WhatsApp on the mobile number you entered.',
       expiresAt,
-      deliveredVia: dispatchResult.provider
+      deliveredVia: 'whatsapp'
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
+      res.status(429).json({ error: err.message });
+      return;
+    }
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    if (phone) {
+      try {
+        await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
+      } catch {
+        // The caller still receives a generic failure and no code.
+      }
+    }
+    res.status(500).json({ error: 'Unable to send a verification code.' });
   }
 });
 
-// Verify Phone OTP
+// Verify Phone OTP. The resulting grant is bound to this normalized number.
 app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Promise<void> => {
+  const phone = normalizeIndianMobile(req.body?.phone);
+  const otp = String(req.body?.otp || '').trim();
+  if (rejectIfRateLimited(req, res, 'phone-otp-verify', phone || 'invalid')) return;
   try {
-    const { phone, otp } = req.body;
     if (!phone || !otp) {
       res.status(400).json({ error: 'Phone number and verification code are required' });
       return;
     }
     const isValid = await verifyOtp(phone, 'PHONE_VERIFICATION', otp);
     if (!isValid) {
-      res.status(400).json({ error: 'Invalid or expired SMS OTP code' });
+      res.status(400).json({ error: 'Invalid or expired WhatsApp code' });
       return;
     }
     res.json({ success: true, verified: true, message: 'Phone number successfully verified' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    res.status(500).json({ error: 'Unable to verify the code.' });
   }
 });
 
@@ -499,78 +548,74 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const isVerified = (await verifyOtp(email, 'EMAIL_VERIFICATION', otp)) || (await isTargetVerified(email, 'EMAIL_VERIFICATION'));
-    if (!isVerified) {
-      res.status(400).json({ error: 'Invalid or expired email verification code' });
+    const requestedRole = String(role || '').trim();
+    if (requestedRole === 'SUPER_ADMIN' || requestedRole === 'DEVELOPER') {
+      res.status(403).json({ error: 'That role cannot be registered through self-service. No account was created.' });
       return;
     }
 
-    const safeRole = selfServeStorageRole(role);
-
-    let isPhoneVerified = false;
-    if (safeRole === 'PROPERTY_SEEKER') {
-      if (!phone || phone.trim().length < 8) {
-        res.status(400).json({ error: 'Mobile phone number is mandatory for Property Seeker registration.' });
-        return;
-      }
-
-      const isMobileVerified = (phoneOtp && (await verifyOtp(phone.trim(), 'PHONE_VERIFICATION', phoneOtp))) ||
-                               (await isTargetVerified(phone.trim(), 'PHONE_VERIFICATION'));
-      if (!isMobileVerified) {
-        res.status(400).json({ error: 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.' });
-        return;
-      }
-      isPhoneVerified = true;
-    } else {
-      if (phone && phoneOtp) {
-        isPhoneVerified = Boolean((await verifyOtp(phone.trim(), 'PHONE_VERIFICATION', phoneOtp)) || (await isTargetVerified(phone.trim(), 'PHONE_VERIFICATION')));
-      }
+    const safeRole = selfServeStorageRole(requestedRole);
+    const seeker = safeRole === 'PROPERTY_SEEKER';
+    const canonicalPhone = seeker ? normalizeIndianMobile(phone) : null;
+    if (seeker && !canonicalPhone) {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    if (seeker && !String(phoneOtp || '').trim()) {
+      res.status(400).json({ error: 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.' });
+      return;
     }
 
-    const newUser = await createUser({
+    const newUser = await registerVerifiedUser({
       name,
       email,
       password,
       role: safeRole,
-      phone: phone?.trim() || '',
+      phone: seeker ? canonicalPhone || '' : (phone?.trim() || ''),
       organization: organization?.trim() || '',
-      isVerified: true
+      otp: String(otp),
+      phoneOtp: phoneOtp ? String(phoneOtp) : undefined,
+      requirePhone: seeker
     });
-
-    if (!newUser) {
-      res.status(500).json({ error: 'Failed to create user' });
-      return;
-    }
-
-    if (isPhoneVerified) {
-      await updateUser(newUser.id, { phone_verified: 1 });
-      newUser.phone_verified = 1;
-    }
-
-    if (safeRole !== 'PROPERTY_SEEKER') {
-      await upsertProfessionalProfile({
-        userId: newUser.id,
-        role: safeRole,
-        organization: organization?.trim() || ''
-      });
-    }
 
     const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);
     res.cookie('ps_session', token, sessionCookieOptions());
 
+    if (safeRole !== 'PROPERTY_SEEKER') {
+      try {
+        await upsertProfessionalProfile({
+          userId: newUser.id,
+          role: safeRole,
+          organization: organization?.trim() || ''
+        });
+      } catch {
+        console.error('[Property Studio] The new account was created, but its professional profile was not.');
+      }
+    }
+
     const { password_hash, salt, ...safeUser } = newUser;
     res.json({
       success: true,
-      token,
       user: {
         ...safeUser,
         isVerified: true,
-        phone_verified: isPhoneVerified ? 1 : 0,
+        phone_verified: Number(newUser.phone_verified || 0),
         assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
       }
     });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || 'Registration failed' });
+    if (err instanceof RegistrationRejected || err?.name === 'RegistrationRejected') {
+      res.status(err.statusCode || 400).json({ error: err.message });
+      return;
+    }
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    const message = typeof err?.message === 'string' && !/postgres|sqlite|constraint|select |insert /i.test(err.message)
+      ? err.message
+      : 'Registration failed';
+    res.status(400).json({ error: message });
   }
 });
 
@@ -623,17 +668,33 @@ app.get('/api/notifications/status', (_req: Request, res: Response): void => {
 
 // Database, Authoritative Engine & Integration Health Check
 app.get('/api/database/status', async (_req: Request, res: Response): Promise<void> => {
-  const report = await buildHealthReport();
-  const pgStatus = isPostgresAuthoritative() ? await checkPostgresHealth() : { connected: false };
-  const schema = isPostgresAuthoritative() ? await checkSchemaReadiness() : null;
-  res.status(report.httpStatus).json({
-    success: report.httpStatus === 200,
-    authoritativeDatabase: report.body,
-    integrations: {
-      postgres: { ...pgStatus, schemaReady: schema?.ready ?? false, missingTables: schema?.missing ?? [] },
-      mongodb: { configured: false, connected: false, role: 'NOT_USED' }
+  try {
+    const report = await buildHealthReport();
+    const pgStatus = isPostgresAuthoritative() ? await checkPostgresHealth() : { connected: false as const };
+    const schema = isPostgresAuthoritative() ? await checkSchemaReadiness() : null;
+    if ('error' in pgStatus && pgStatus.error) {
+      console.error(`[Property Studio] Database status check failed: ${pgStatus.error}`);
     }
-  });
+    if (schema?.error) {
+      console.error(`[Property Studio] Schema status check failed: ${schema.error}`);
+    }
+    res.status(report.httpStatus).json({
+      success: report.httpStatus === 200,
+      authoritativeDatabase: report.body,
+      integrations: {
+        postgres: {
+          connected: pgStatus.connected,
+          latencyMs: 'latencyMs' in pgStatus ? pgStatus.latencyMs : undefined,
+          schemaReady: schema?.ready ?? false,
+          missingTables: schema?.missing ?? []
+        },
+        mongodb: { configured: false, connected: false, role: 'NOT_USED' }
+      }
+    });
+  } catch (err) {
+    console.error('[Property Studio] Database status failed:', redactDatabaseError(err instanceof Error ? err.message : 'status failed'));
+    res.status(503).json({ success: false, error: 'Database status is unavailable.' });
+  }
 });
 
 app.get('/api/mongodb/status', (_req: Request, res: Response): void => {
@@ -1335,11 +1396,25 @@ app.put('/api/conference', requireAdmin, async (req: Request, res: Response): Pr
 });
 
 app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
-  const report = await buildHealthReport();
-  res.status(report.httpStatus).json(report.body);
+  try {
+    const report = await buildHealthReport();
+    res.status(report.httpStatus).json(report.body);
+  } catch (err) {
+    console.error('[Property Studio] Health report failed:', redactDatabaseError(err instanceof Error ? err.message : 'health failed'));
+    res.status(503).json({
+      status: 'UNAVAILABLE',
+      authoritativeDatabase: 'unconfigured',
+      sqliteFallback: false,
+      database: { connected: false, schemaReady: false, missingTables: [], code: 'DATABASE_STARTUP_FAILED' }
+    });
+  }
 });
 
 registerPlatformRoutes(app, { requireAuth, requireAdmin });
+
+app.use('/api', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'Not found' });
+});
 
 // ==============================================================================
 // VITE DEV SERVER & PRODUCTION STATIC SERVING
@@ -1391,4 +1466,4 @@ if (entry.endsWith('server.ts') || entry.endsWith('server.js')) {
   });
 }
 
-export { app };
+export { app, initDatabase, expressPathForHostedRequest, createHostedApiHandler };

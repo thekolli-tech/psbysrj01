@@ -80,13 +80,13 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send SMS OTP');
+        throw new Error(data.error || 'Failed to send WhatsApp code');
       }
       setPhoneOtpSent(true);
       setPhoneCountdown(60);
-      showToast(`Property Studio SMS verification code sent to ${phone.trim()}`);
+      showToast('WhatsApp verification code sent. Check WhatsApp on the mobile number you entered.');
     } catch (err: any) {
-      showToast(err.message || 'Error sending SMS OTP');
+      showToast(err.message || 'Error sending WhatsApp code');
     } finally {
       setPhoneLoading(false);
     }
@@ -494,7 +494,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                       <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2 animate-in fade-in duration-200">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="font-bold text-amber-900">
-                            Enter 6-Digit Property Studio SMS Code sent to {phone}
+                            Enter the 6-digit WhatsApp code sent to this mobile number
                           </span>
                           {phoneCountdown > 0 ? (
                             <span className="text-slate-500 font-mono">Resend: {phoneCountdown}s</span>
