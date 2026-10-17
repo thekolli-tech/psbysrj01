@@ -317,6 +317,15 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   });
   assert.equal(privileged.status, 403);
   assert.equal(await findUserByEmail('not-admin@example.com'), null);
+  const developerSignup = await api('/api/auth/register', {
+    name: 'Not A Developer',
+    email: 'not-developer@example.com',
+    password: 'Longpassword1!',
+    role: 'DEVELOPER',
+    otp: '123456'
+  });
+  assert.equal(developerSignup.status, 403);
+  assert.equal(await findUserByEmail('not-developer@example.com'), null);
 
   const seekerEmail = 'seeker-email-only@example.com';
   const seekerSent = await api('/api/auth/send-email-otp', { email: seekerEmail });
@@ -368,6 +377,14 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   const afterLogout = await originalFetch(`http://127.0.0.1:${port}/api/auth/me`, { headers: { cookie: sessionCookie, accept: 'application/json' } });
   const afterLogoutJson = await afterLogout.json() as { user?: unknown };
   assert.equal(afterLogoutJson.user, null);
+  const revokedNotifications = await originalFetch(`http://127.0.0.1:${port}/api/notifications`, {
+    headers: { cookie: sessionCookie, accept: 'application/json' }
+  });
+  assert.equal(revokedNotifications.status, 401);
+  const anonymousNotifications = await originalFetch(`http://127.0.0.1:${port}/api/notifications`, {
+    headers: { accept: 'application/json' }
+  });
+  assert.equal(anonymousNotifications.status, 401);
 
   const ownerEmail = 'landowner-register@example.com';
   const ownerSent = await api('/api/auth/send-email-otp', { email: ownerEmail });

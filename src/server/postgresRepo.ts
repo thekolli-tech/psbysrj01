@@ -1074,7 +1074,12 @@ export async function pgUpdatePost(
     WHERE id = $6
   `, [title, content, links, attachments, now, postId]);
 
-  await pgRecordCommunityEvent('POST_UPDATED', { id: postId, title });
+  await pgRecordCommunityEvent('POST_UPDATED', {
+    id: postId,
+    title,
+    status: 'PENDING_APPROVAL',
+    authorId: post.author_id
+  }, post.author_id || null);
   return pgGetPostById(postId);
 }
 

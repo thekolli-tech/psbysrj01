@@ -40,6 +40,18 @@ test('SQLite wallet credit cannot unlock a lead while payments are unconfigured'
     () => unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'blocked' }),
     (error: any) => error.code === 'NOT_CONFIGURED' && error.status === 503
   );
+  process.env.PAYMENT_PROVIDER = 'test-provider';
+  await assert.rejects(
+    () => unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'provider-only' }),
+    (error: any) => error.code === 'NOT_CONFIGURED' && error.status === 503
+  );
+  delete process.env.PAYMENT_PROVIDER;
+  process.env.PAYMENT_WEBHOOK_SECRET = 'test-webhook-secret';
+  await assert.rejects(
+    () => unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'secret-only' }),
+    (error: any) => error.code === 'NOT_CONFIGURED' && error.status === 503
+  );
+  delete process.env.PAYMENT_WEBHOOK_SECRET;
   const blockedBalance = getSqliteDb().prepare('SELECT wallet_balance FROM users WHERE id = ?').get(professional.id) as { wallet_balance: number };
   assert.equal(Number(blockedBalance.wallet_balance), 1000);
   const blockedUnlocks = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM lead_unlocks').get() as { count: number };

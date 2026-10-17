@@ -4,6 +4,7 @@ import {
   bootstrapPlan,
   canAccessProfessionalSurface,
   canViewModeratedContent,
+  communityReplayVisible,
   initialVerificationStatus,
   isPropertySeeker,
   isPublicListing,
@@ -47,6 +48,11 @@ test('Production policy', async (t) => {
     assert.equal(canViewModeratedContent('PENDING_APPROVAL', 'author', { id: 'author', role: 'LANDOWNER' }), true);
     assert.equal(canViewModeratedContent('PENDING_APPROVAL', 'author', { id: 'admin', role: 'SUPER_ADMIN' }), true);
     assert.equal(canViewModeratedContent('APPROVED', 'author', null), true);
+    assert.equal(communityReplayVisible({ title: 'Revised before approval' }, null), false);
+    assert.equal(communityReplayVisible({ title: 'Revised before approval', status: 'PENDING_APPROVAL', authorId: 'author' }, null), false);
+    assert.equal(communityReplayVisible({ title: 'Revised before approval', status: 'PENDING_APPROVAL', authorId: 'author' }, { id: 'author', role: 'LANDOWNER' }), true);
+    assert.equal(communityReplayVisible({ title: 'Public note', status: 'APPROVED', authorId: 'author' }, null), true);
+    assert.equal(communityReplayVisible({ postId: 'post_1', upvotes: 2 }, null), true);
   });
 
   await t.test('listings are public only when approved', () => {
@@ -73,6 +79,9 @@ test('Production policy', async (t) => {
     assert.equal(paymentGrantsAccess('PENDING'), false);
     assert.equal(paymentGrantsAccess('VERIFIED'), true);
     assert.equal(paymentProviderStatus({}), 'NOT_CONFIGURED');
+    assert.equal(paymentProviderStatus({ PAYMENT_PROVIDER: 'configured' }), 'NOT_CONFIGURED');
+    assert.equal(paymentProviderStatus({ PAYMENT_WEBHOOK_SECRET: 'configured' }), 'NOT_CONFIGURED');
+    assert.equal(paymentProviderStatus({ PAYMENT_PROVIDER: 'configured', PAYMENT_WEBHOOK_SECRET: 'configured' }), 'CONFIGURED');
     const denied = evaluateUnlock(
       { balance: 5000, alreadyUnlocked: false, idempotencyReplay: false },
       { price: 300, verifiedProfessional: true, consentRecorded: true, listingEligible: true, paymentGate: 'FAILED' }
