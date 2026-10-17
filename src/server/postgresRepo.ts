@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import { getPostgresPool, queryPostgres } from './postgres.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProof, type OtpClaimRunner } from './otpClaim.ts';
+import { resolveAvatarId } from '../shared/avatars.ts';
 import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
 import type {
   UserRole,
@@ -163,7 +164,7 @@ export async function pgCreateUser(data: {
     normalizedEmail,
     data.phone?.trim() || '',
     data.role || 'PROPERTY_SEEKER',
-    data.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+    data.avatar || 'avatar-01',
     data.organization?.trim() || '',
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
@@ -784,7 +785,7 @@ async function insertPgUser(client: PoolClient, data: {
     data.email,
     data.phone,
     data.role,
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+    'avatar-01',
     data.organization?.trim() || '',
     data.phoneVerified ? 1 : 0,
     hash,
@@ -886,7 +887,7 @@ export async function pgGetAllPosts(params?: {
   offset?: number;
   currentUserId?: string;
 }): Promise<any[]> {
-  let query = "SELECT p.* FROM community_posts p WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = $1 AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
+  let query = "SELECT p.*, u.avatar AS author_avatar FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = $1 AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
   const args: any[] = [params?.currentUserId || ''];
   let paramIdx = 2;
 
@@ -923,6 +924,7 @@ export async function pgGetAllPosts(params?: {
     authorId: p.author_id,
     authorName: p.author_name,
     authorRole: p.author_role,
+    authorAvatar: resolveAvatarId(p.author_avatar),
     communityId: p.community_id,
     communityName: p.community_name,
     propertyId: p.property_id,
@@ -949,7 +951,7 @@ export async function pgGetAllPosts(params?: {
 }
 
 export async function pgGetPostById(postId: string, currentUserId?: string): Promise<any> {
-  const res = await queryPostgres('SELECT * FROM community_posts WHERE id = $1', [postId]);
+  const res = await queryPostgres('SELECT p.*, u.avatar AS author_avatar FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = $1', [postId]);
   if (res.rows.length === 0) return null;
   const p = res.rows[0];
 
@@ -960,6 +962,7 @@ export async function pgGetPostById(postId: string, currentUserId?: string): Pro
     authorId: p.author_id,
     authorName: p.author_name,
     authorRole: p.author_role,
+    authorAvatar: resolveAvatarId(p.author_avatar),
     communityId: p.community_id,
     communityName: p.community_name,
     propertyId: p.property_id,

@@ -53,10 +53,9 @@ import {
   deleteLead,
   getConferenceDetails,
   updateConferenceDetails,
-  generateOtp,
+  findUserByPhone,
   verifyOtp,
   registerVerifiedUser,
-  discardUnconsumedOtp,
   getAllCommunities,
   getCommunityById,
   createCommunity,
@@ -65,15 +64,20 @@ import {
   updateLastLogin
 } from './src/server/db.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
-import { sendRealSmsOtp, getNotificationGatewayStatus, configuredSmsProviders } from './src/server/notifications.ts';
+import { getNotificationGatewayStatus } from './src/server/notifications.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
+import { issuePhoneOtp } from './src/server/phoneOtp.ts';
+import { serializeAccount } from './src/server/accountView.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
 import { canViewModeratedContent, communityReplayVisible, selfServeStorageRole } from './src/shared/policy.ts';
+import { isAllowedAvatar } from './src/shared/avatars.ts';
+import { normalizeE164 } from './src/shared/phone.ts';
+import { scrubPhoneFields } from './src/shared/phonePrivacy.ts';
 import { allowRequest, clientKey } from './src/server/rateLimit.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -175,8 +179,15 @@ interface SseClient {
 
 const sseClients = new Set<SseClient>();
 
+function accountResponse(user: any, viewer = { id: user?.id, role: user?.role }) {
+  return {
+    ...serializeAccount(user, viewer),
+    isVerified: Boolean(user?.is_verified)
+  };
+}
+
 export function broadcastSseEvent(eventType: string, data: any, targetUserId?: string): void {
-  const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+  const payload = `event: ${eventType}\ndata: ${JSON.stringify(scrubPhoneFields(data))}\n\n`;
   for (const client of sseClients) {
     if (!targetUserId || client.userId === targetUserId) {
       try {
@@ -222,7 +233,7 @@ app.get('/api/community/events', async (req: AuthenticatedRequest, res: Response
         if (!communityReplayVisible(payload, req.user)) {
           continue;
         }
-        res.write(`event: ${ev.event_type}\ndata: ${ev.payload}\n\n`);
+        res.write(`event: ${ev.event_type}\ndata: ${JSON.stringify(scrubPhoneFields(payload))}\n\n`);
       }
     } catch (_e) {}
   }
@@ -276,15 +287,7 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
     // Set secure HttpOnly cookie
     res.cookie('ps_session', token, sessionCookieOptions());
 
-    const { password_hash, salt, ...safeUser } = user;
-    res.json({
-      success: true,
-      user: {
-        ...safeUser,
-        isVerified: Boolean(safeUser.is_verified),
-        assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
-      }
-    });
+    res.json({ success: true, user: accountResponse(user) });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Server error during login' });
   }
@@ -305,14 +308,7 @@ app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
     res.json({ user: null });
     return;
   }
-  const { password_hash, salt, ...safeUser } = req.user;
-  res.json({
-    user: {
-      ...safeUser,
-      isVerified: Boolean(safeUser.is_verified),
-      assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
-    }
-  });
+  res.json({ user: accountResponse(req.user) });
 });
 
 // Send Email OTP for Account Registration
@@ -447,48 +443,40 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response): Promis
 });
 
 // Send Phone OTP. Property Seeker registration cannot finish without a real provider delivery.
-app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
-  const phone = String(req.body?.phone || '').trim();
-  if (rejectIfRateLimited(req, res, 'phone-otp', phone)) return;
+app.post('/api/auth/send-phone-otp', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const normalized = normalizeE164(req.body?.phone);
+  if (!normalized) {
+    res.status(400).json({ error: 'A valid international mobile number in E.164 format is required.' });
+    return;
+  }
+  if (rejectIfRateLimited(req, res, 'phone-otp', normalized)) return;
+  const acknowledgement = {
+    success: true,
+    message: 'If this mobile number can be verified, a WhatsApp code has been sent.',
+    deliveredVia: 'whatsapp'
+  };
   try {
-    if (phone.length < 8) {
-      res.status(400).json({ error: 'Valid mobile number is required' });
+    const existing = await findUserByPhone(normalized);
+    if (existing && existing.id !== req.user?.id) {
+      res.json(acknowledgement);
       return;
     }
-    if (configuredSmsProviders().length === 0) {
-      res.status(503).json({
-        error: 'SMS verification is not configured. No code was sent and no account was created.',
-        code: 'SMS_NOT_CONFIGURED'
+    const issued = await issuePhoneOtp(normalized);
+    if (!issued.sent) {
+      const status = issued.code === 'WHATSAPP_NOT_CONFIGURED' ? 503 : 502;
+      res.status(status).json({
+        error: issued.code === 'WHATSAPP_NOT_CONFIGURED'
+          ? 'WhatsApp verification is not configured. No code was sent and no account was created.'
+          : 'WhatsApp did not accept the verification code. No code remains active and no account was created.',
+        code: issued.code
       });
       return;
     }
-    const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
-    const dispatchResult = await sendRealSmsOtp(phone, otp);
-    if (!dispatchResult.success) {
-      await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
-      res.status(502).json({
-        error: 'The SMS provider did not accept the verification code. No code remains active and no account was created.',
-        code: 'SMS_DELIVERY_FAILED'
-      });
-      return;
-    }
-    res.json({
-      success: true,
-      message: 'SMS verification code dispatched. Check the mobile number you entered.',
-      expiresAt,
-      deliveredVia: dispatchResult.provider
-    });
+    res.json(acknowledgement);
   } catch (err: any) {
     if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
       res.status(429).json({ error: err.message });
       return;
-    }
-    if (phone) {
-      try {
-        await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
-      } catch {
-        // The caller still receives a generic failure and no code.
-      }
     }
     res.status(500).json({ error: 'Unable to send a verification code.' });
   }
@@ -497,14 +485,15 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
 // Verify Phone OTP
 app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { phone, otp } = req.body;
+    const phone = normalizeE164(req.body?.phone);
+    const otp = req.body?.otp;
     if (!phone || !otp) {
       res.status(400).json({ error: 'Phone number and verification code are required' });
       return;
     }
     const isValid = await verifyOtp(phone, 'PHONE_VERIFICATION', otp);
     if (!isValid) {
-      res.status(400).json({ error: 'Invalid or expired SMS OTP code' });
+      res.status(400).json({ error: 'Invalid or expired WhatsApp verification code' });
       return;
     }
     res.json({ success: true, verified: true, message: 'Phone number successfully verified' });
@@ -517,7 +506,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
 app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
   if (rejectIfRateLimited(req, res, 'register', String(req.body?.email || ''))) return;
   try {
-    const { name, email, password, role, phone, organization, otp } = req.body;
+    const { name, email, password, role, phone, organization, otp, phoneOtp } = req.body;
     if (!name || !email || !password) {
       res.status(400).json({ error: 'Name, email, and password are required' });
       return;
@@ -535,16 +524,38 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
     }
 
     const safeRole = selfServeStorageRole(requestedRole);
+    const seeker = safeRole === 'PROPERTY_SEEKER';
+    const normalizedPhone = normalizeE164(phone);
+    if (phone && String(phone).trim() && !normalizedPhone) {
+      res.status(400).json({ error: 'A valid international mobile number in E.164 format is required.' });
+      return;
+    }
+    if (seeker && !normalizedPhone) {
+      res.status(400).json({ error: 'Property Seeker registration requires a valid international mobile number.' });
+      return;
+    }
+    if (seeker && !phoneOtp) {
+      res.status(400).json({ error: 'WhatsApp verification code is required for Property Seeker registration.' });
+      return;
+    }
+    if (normalizedPhone) {
+      const taken = await findUserByPhone(normalizedPhone);
+      if (taken) {
+        res.status(400).json({ error: 'Registration could not be completed.' });
+        return;
+      }
+    }
 
     const newUser = await registerVerifiedUser({
       name,
       email,
       password,
       role: safeRole,
-      phone: phone?.trim() || '',
+      phone: normalizedPhone || '',
       organization: organization?.trim() || '',
       otp: String(otp),
-      requirePhone: false
+      phoneOtp: seeker ? String(phoneOtp) : undefined,
+      requirePhone: seeker
     });
 
     const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);
@@ -562,16 +573,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       }
     }
 
-    const { password_hash, salt, ...safeUser } = newUser;
-    res.json({
-      success: true,
-      user: {
-        ...safeUser,
-        isVerified: true,
-        phone_verified: Number(newUser.phone_verified || 0),
-        assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
-      }
-    });
+    res.json({ success: true, user: accountResponse(newUser) });
   } catch (err: any) {
     if (err instanceof RegistrationRejected || err?.name === 'RegistrationRejected') {
       res.status(err.statusCode || 400).json({ error: err.message });
@@ -689,14 +691,20 @@ app.post('/api/admin/reverse-sync-to-sqlite', requireAdmin, (_req: Authenticated
 // ==============================================================================
 
 // Get all users
-app.get('/api/admin/users', requireAdmin, async (_req: Request, res: Response): Promise<void> => {
+app.get('/api/admin/users', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const users = await getAllUsers();
+    await createAuditLog({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email,
+      actorRole: req.user?.role,
+      action: 'PHONE_ACCESS',
+      details: { route: '/api/admin/users', count: users.length }
+    });
     res.json({
-      users: users.map(u => ({
-        ...u,
-        isVerified: Boolean(u.is_verified),
-        assignedPropertyIds: JSON.parse(u.assigned_properties || '[]')
+      users: users.map(u => accountResponse(u, {
+        id: req.user?.id,
+        role: req.user?.role
       }))
     });
   } catch (err: any) {
@@ -710,6 +718,11 @@ app.post('/api/admin/users', requireAdmin, async (req: AuthenticatedRequest, res
     const { name, email, phone, role, organization, password } = req.body;
     if (!name || !email) {
       res.status(400).json({ error: 'Name and email are required' });
+      return;
+    }
+    const normalizedPhone = phone ? normalizeE164(phone) : '';
+    if (phone && !normalizedPhone) {
+      res.status(400).json({ error: 'A valid international mobile number in E.164 format is required.' });
       return;
     }
     const existing = await findUserByEmail(email);
@@ -730,7 +743,7 @@ app.post('/api/admin/users', requireAdmin, async (req: AuthenticatedRequest, res
     const newUser = await createUser({
       name,
       email,
-      phone,
+      phone: normalizedPhone || '',
       role: role || 'PROPERTY_SEEKER',
       organization,
       password: password || undefined,
@@ -747,7 +760,10 @@ app.post('/api/admin/users', requireAdmin, async (req: AuthenticatedRequest, res
       details: { role: newUser.role }
     });
 
-    res.json({ success: true, user: newUser });
+    res.json({
+      success: true,
+      user: accountResponse(newUser, { id: req.user.id, role: req.user.role })
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -811,7 +827,7 @@ app.patch('/api/admin/users/:id/role', requireAdmin, async (req: AuthenticatedRe
       return;
     }
 
-    res.json({ success: true, user: result.user });
+    res.json({ success: true, user: accountResponse(result.user, { id: req.user.id, role: req.user.role }) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1186,7 +1202,7 @@ app.get('/api/notifications', requireAuth, async (req: AuthenticatedRequest, res
   try {
     const notifications = await getUserNotifications(req.user.id);
     const unreadCount = await getUnreadNotificationCount(req.user.id);
-    res.json({ notifications, unreadCount });
+    res.json(scrubPhoneFields({ notifications, unreadCount }));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1372,6 +1388,59 @@ app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
       sqliteFallback: false,
       database: { connected: false, schemaReady: false, missingTables: [], code: 'DATABASE_STARTUP_FAILED' }
     });
+  }
+});
+
+app.post('/api/auth/change-phone', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const phone = normalizeE164(req.body?.phone);
+    const otp = String(req.body?.otp || '');
+    if (!phone || !otp) {
+      res.status(400).json({ error: 'Mobile number and WhatsApp verification code are required.' });
+      return;
+    }
+    const taken = await findUserByPhone(phone);
+    if (taken && taken.id !== req.user.id) {
+      res.status(400).json({ error: 'That mobile number cannot be used.' });
+      return;
+    }
+    const valid = await verifyOtp(phone, 'PHONE_VERIFICATION', otp);
+    if (!valid) {
+      res.status(400).json({ error: 'Invalid or expired WhatsApp verification code.' });
+      return;
+    }
+    const updated = await updateUser(req.user.id, { phone, phone_verified: 1 });
+    await createAuditLog({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      actorRole: req.user.role,
+      action: 'PHONE_CHANGED',
+      targetId: req.user.id,
+      details: { verified: true }
+    });
+    req.user = updated;
+    res.json({ success: true, user: accountResponse(updated) });
+  } catch {
+    res.status(400).json({ error: 'The mobile number could not be changed.' });
+  }
+});
+
+app.patch('/api/me/avatar', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const avatarId = String(req.body?.avatarId || '');
+    if (!isAllowedAvatar(avatarId)) {
+      res.status(400).json({ error: 'Choose an avatar from the studio library.' });
+      return;
+    }
+    const before = req.user;
+    const updated = await updateUser(req.user.id, { avatar: avatarId });
+    if (!updated || updated.role !== before.role || Number(updated.phone_verified) !== Number(before.phone_verified) || Number(updated.email_verified) !== Number(before.email_verified)) {
+      res.status(409).json({ error: 'Avatar selection did not change account verification.' });
+      return;
+    }
+    res.json({ success: true, user: accountResponse(updated) });
+  } catch {
+    res.status(400).json({ error: 'The avatar could not be saved.' });
   }
 });
 

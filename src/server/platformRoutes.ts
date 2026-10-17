@@ -9,6 +9,7 @@ import {
   isPropertySeeker,
   isSelfServeRole
 } from '../shared/policy.ts';
+import { canReadFullPhone } from '../shared/phonePrivacy.ts';
 import { revealAllowedAfterPayment } from './commerce.ts';
 import {
   CommerceError,
@@ -282,6 +283,15 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
       const visible = isPropertySeeker(req.user.role)
         ? leads.filter(lead => lead.revealed)
         : leads;
+      if (canReadFullPhone(req.user.role)) {
+        await createAuditLog({
+          actorId: req.user.id,
+          actorEmail: req.user.email,
+          actorRole: req.user.role,
+          action: 'PHONE_ACCESS',
+          details: { route: '/api/leads', count: visible.length }
+        });
+      }
       res.json({ leads: visible });
     } catch (err) {
       sendError(res, err);
@@ -291,6 +301,10 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
   app.post('/api/leads', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
     try {
       const body = req.body || {};
+      if (isPropertySeeker(req.user.role) && Number(req.user.phone_verified) !== 1) {
+        res.status(403).json({ error: 'Verify your mobile number before using this feature.', code: 'PHONE_NOT_VERIFIED' });
+        return;
+      }
       if (!body.name || !body.phone || !body.budget) {
         res.status(400).json({ error: 'Name, phone, and budget are required.' });
         return;
@@ -298,7 +312,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
       const leadId = await createEnquiry({
         seekerId: req.user.id,
         name: body.name,
-        phone: body.phone,
+        phone: isPropertySeeker(req.user.role) ? req.user.phone : body.phone,
         email: body.email,
         budget: body.budget,
         propertyType: body.property_type || body.propertyType || '',

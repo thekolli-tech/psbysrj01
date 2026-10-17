@@ -301,7 +301,7 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
 
   const sms = await api('/api/auth/send-phone-otp', { phone: '+919800011199' });
   assert.equal(sms.status, 503);
-  assert.equal(sms.json.code, 'SMS_NOT_CONFIGURED');
+  assert.equal(sms.json.code, 'WHATSAPP_NOT_CONFIGURED');
   assert.equal(sms.json.success, undefined);
   assert.match(sms.contentType, /application\/json/);
   const smsRows = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM otps WHERE target = ?').get('+919800011199') as { count: number };
@@ -336,39 +336,51 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     email: seekerEmail,
     password: 'Longpassword1!',
     role: 'PROPERTY_SEEKER',
+    phone: '+14155550199',
     otp: seekerCode,
     phoneVerified: true,
     phoneOtp: '000000'
   });
-  assert.equal(seekerRegistered.status, 200, seekerRegistered.raw);
-  assert.equal(seekerRegistered.json.token, undefined);
-  const seekerUser = await findUserByEmail(seekerEmail);
-  assert.equal(seekerUser?.role, 'PROPERTY_SEEKER');
-  assert.equal(seekerUser?.email_verified, 1);
-  assert.equal(Number(seekerUser?.phone_verified || 0), 0);
+  assert.equal(seekerRegistered.status, 400, seekerRegistered.raw);
+  assert.equal(await findUserByEmail(seekerEmail), null);
   const seekerReplay = await api('/api/auth/register', {
     name: 'Email Only Seeker',
     email: seekerEmail,
     password: 'Longpassword1!',
     role: 'PROPERTY_SEEKER',
+    phone: '+14155550199',
     otp: seekerCode
   });
   assert.equal(seekerReplay.status, 400);
+  assert.equal(await findUserByEmail(seekerEmail), null);
+
+  const ownerFallbackEmail = 'seeker-login-standin@example.com';
+  const ownerFallbackSent = await api('/api/auth/send-email-otp', { email: ownerFallbackEmail });
+  assert.equal(ownerFallbackSent.status, 200, ownerFallbackSent.raw);
+  const ownerFallbackCode = deliveries[deliveries.length - 1].html.match(/>(\d{6})</)?.[1] || '';
+  const ownerFallback = await api('/api/auth/register', {
+    name: 'Email Only Partner',
+    email: ownerFallbackEmail,
+    password: 'Longpassword1!',
+    role: 'CHANNEL_PARTNER',
+    otp: ownerFallbackCode
+  });
+  assert.equal(ownerFallback.status, 200, ownerFallback.raw);
 
   const seekerLogin = await originalFetch(`http://127.0.0.1:${port}/api/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ email: seekerEmail, password: 'Longpassword1!' })
+    body: JSON.stringify({ email: ownerFallbackEmail, password: 'Longpassword1!' })
   });
   const seekerLoginJson = await seekerLogin.json() as { user?: { role?: string }; token?: string };
   assert.equal(seekerLogin.status, 200);
-  assert.equal(seekerLoginJson.user?.role, 'PROPERTY_SEEKER');
+  assert.equal(seekerLoginJson.user?.role, 'CHANNEL_PARTNER');
   assert.equal(seekerLoginJson.token, undefined);
   const sessionCookie = String(seekerLogin.headers.get('set-cookie') || '').split(';')[0];
   assert.match(sessionCookie, /^ps_session=/);
   const seekerMe = await originalFetch(`http://127.0.0.1:${port}/api/auth/me`, { headers: { cookie: sessionCookie, accept: 'application/json' } });
   const seekerMeJson = await seekerMe.json() as { user?: { email?: string } };
-  assert.equal(seekerMeJson.user?.email, seekerEmail);
+  assert.equal(seekerMeJson.user?.email, ownerFallbackEmail);
   const seekerLogout = await originalFetch(`http://127.0.0.1:${port}/api/auth/logout`, {
     method: 'POST',
     headers: { cookie: sessionCookie, accept: 'application/json' }

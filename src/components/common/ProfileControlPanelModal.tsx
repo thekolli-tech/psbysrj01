@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { readApiResponse } from '../../lib/apiResponse';
+import { Avatar, AvatarPicker } from './Avatar';
 import {
   User,
   ShieldCheck,
@@ -27,7 +29,7 @@ interface ProfileControlPanelModalProps {
 }
 
 export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, logout, setActiveView, walletBalance, showToast } = useApp();
+  const { currentUser, logout, setActiveView, walletBalance, showToast, replaceSession } = useApp();
 
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'CHANGE_PASSWORD'>('PROFILE');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -38,6 +40,9 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [nextPhone, setNextPhone] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false);
 
   if (!isOpen) return null;
 
@@ -85,6 +90,81 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
       setConfirmPassword('');
     } catch (err: any) {
       setErrorMsg(err.message || 'Error updating password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveAvatar = async (avatarId: string) => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+    try {
+      const response = await fetch('/api/me/avatar', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ avatarId })
+      });
+      const result = await readApiResponse(response);
+      const user = result.data?.user as Parameters<typeof replaceSession>[0] | undefined;
+      if (!result.ok || !user) throw new Error(result.error || 'The avatar could not be saved.');
+      replaceSession(user);
+      setSuccessMsg('Avatar updated. Your role and verification were not changed.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'The avatar could not be saved.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendPhoneCode = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    if (!nextPhone.trim().startsWith('+')) {
+      setErrorMsg('Enter the new mobile number in international format, starting with + and the country code.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch('/api/auth/send-phone-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ phone: nextPhone.trim() })
+      });
+      const result = await readApiResponse(response);
+      if (!result.ok || result.data?.success !== true) {
+        throw new Error(result.error || 'WhatsApp verification is not available.');
+      }
+      setPhoneCodeSent(true);
+      showToast('If this number can be verified, a WhatsApp code has been sent.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'WhatsApp verification is not available.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const changePhone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+    try {
+      const response = await fetch('/api/auth/change-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ phone: nextPhone.trim(), otp: phoneCode.trim() })
+      });
+      const result = await readApiResponse(response);
+      const user = result.data?.user as Parameters<typeof replaceSession>[0] | undefined;
+      if (!result.ok || !user) throw new Error(result.error || 'The mobile number could not be changed.');
+      replaceSession(user);
+      setNextPhone('');
+      setPhoneCode('');
+      setPhoneCodeSent(false);
+      setSuccessMsg('Mobile number updated. The previous number is no longer verified for this account.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'The mobile number could not be changed.');
     } finally {
       setLoading(false);
     }
@@ -155,16 +235,21 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
         <div className="p-6">
           {activeTab === 'PROFILE' && (
             <div className="space-y-5">
+              {errorMsg && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+              {successMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>{successMsg}</span>
+                </div>
+              )}
               {/* Profile Card */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center gap-4">
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-14 h-14 rounded-2xl object-cover border border-slate-300 shadow-sm"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
-                  }}
-                />
+                <Avatar id={currentUser.avatar} label={currentUser.name} className="w-14 h-14 rounded-2xl border border-slate-300 shadow-sm" />
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-slate-900">{currentUser.name}</span>
@@ -202,6 +287,44 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                   </div>
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Studio avatar</span>
+                <AvatarPicker value={currentUser.avatar} onChange={saveAvatar} />
+              </div>
+
+              <form onSubmit={changePhone} className="space-y-2 p-3 rounded-xl border border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Change mobile number</span>
+                <p className="text-[11px] text-slate-500">A new WhatsApp code replaces the previous verification. The number is saved only after the server accepts the code.</p>
+                <input
+                  type="tel"
+                  value={nextPhone}
+                  onChange={e => { setNextPhone(e.target.value); setPhoneCodeSent(false); }}
+                  placeholder="+14155552671"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl"
+                />
+                {phoneCodeSent && (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={phoneCode}
+                    onChange={e => setPhoneCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="WhatsApp code"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl font-mono tracking-widest"
+                  />
+                )}
+                <div className="flex gap-2">
+                  <button type="button" onClick={sendPhoneCode} disabled={loading} className="px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-50">
+                    Send WhatsApp code
+                  </button>
+                  {phoneCodeSent && (
+                    <button type="submit" disabled={loading || phoneCode.length < 4} className="px-3 py-2 rounded-lg bg-amber-600 text-white text-xs font-bold disabled:opacity-50">
+                      Save number
+                    </button>
+                  )}
+                </div>
+              </form>
 
               {/* Super Admin Quick Link */}
               {currentUser.role === 'SUPER_ADMIN' && (

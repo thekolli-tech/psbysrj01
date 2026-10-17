@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { postLoginDestination } from '../../shared/policy';
 import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
+import { Avatar } from './Avatar';
 import {
   LogIn,
   LogOut,
@@ -50,7 +51,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   // Email OTP verification state
   const [otpSent, setOtpSent] = useState(false);
   const [otpInput, setOtpInput] = useState('');
+  const [phoneOtpInput, setPhoneOtpInput] = useState('');
   const [countdown, setCountdown] = useState(0);
+  const seekerRegistration = roleInput === 'PROPERTY_SEEKER';
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -114,9 +117,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
+    if (seekerRegistration && !phoneInput.trim().startsWith('+')) {
+      setErrorMsg('Property Seekers must enter a mobile number in international format, starting with + and the country code.');
+      return;
+    }
+
     submitting.current = true;
     setLoading(true);
     try {
+      if (seekerRegistration) {
+        const phoneRes = await fetch('/api/auth/send-phone-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ phone: phoneInput.trim() })
+        });
+        const phoneResult = await readApiResponse(phoneRes);
+        if (!phoneResult.ok || phoneResult.data?.success !== true) {
+          throw new Error(phoneResult.error || 'WhatsApp verification is not available. No account was created.');
+        }
+      }
+
       const res = await fetch('/api/auth/send-email-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', accept: 'application/json' },
@@ -129,7 +149,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
       setOtpSent(true);
       setCountdown(60);
-      showToast('Property Studio verification code sent. Check the inbox for that address.');
+      showToast(seekerRegistration
+        ? 'Verification codes were sent to your email and WhatsApp.'
+        : 'Property Studio verification code sent. Check the inbox for that address.');
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to send verification code.');
     } finally {
@@ -147,6 +169,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       setErrorMsg('Please enter the 6-digit email verification code received.');
       return;
     }
+    if (seekerRegistration && phoneOtpInput.trim().length < 4) {
+      setErrorMsg('Please enter the 6-digit WhatsApp verification code.');
+      return;
+    }
 
     submitting.current = true;
     setLoading(true);
@@ -161,7 +187,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           role: roleInput,
           phone: phoneInput.trim(),
           organization: organizationInput.trim(),
-          otp: otpInput.trim()
+          otp: otpInput.trim(),
+          ...(seekerRegistration ? { phoneOtp: phoneOtpInput.trim() } : {})
         })
       });
 
@@ -214,14 +241,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             /* Logged in state */
             <div className="space-y-4">
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-3">
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-12 h-12 rounded-xl object-cover border border-slate-300"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
-                  }}
-                />
+                <Avatar id={currentUser.avatar} label={currentUser.name} className="w-12 h-12 rounded-xl border border-slate-300" />
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">{currentUser.name}</h4>
                   <span className="text-[10px] font-mono text-amber-900 bg-amber-100 px-2 py-0.5 rounded font-semibold inline-block mt-0.5">
@@ -339,7 +359,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                 <form onSubmit={handleSendEmailOtp} className="space-y-3.5">
                   <div className="bg-amber-50/80 p-2.5 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Email OTP verification is mandatory for verified account registration.</span>
+                    <span>
+                      {seekerRegistration
+                        ? 'Property Seekers verify both email and WhatsApp before an account is created.'
+                        : 'Email OTP verification is mandatory. Other roles do not require WhatsApp.'}
+                    </span>
                   </div>
 
                   <div>
@@ -385,14 +409,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
                       <label className="block font-bold text-slate-700 mb-1">
-                        Contact Mobile <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
+                        Contact Mobile {seekerRegistration
+                          ? <span className="font-normal text-[10px] text-amber-700">(E.164, required)</span>
+                          : <span className="font-normal text-[10px] text-slate-400">(Optional)</span>}
                       </label>
                       <input
                         type="tel"
                         value={phoneInput}
                         onChange={e => setPhoneInput(e.target.value)}
-                        placeholder="e.g. +91 98490 12345"
+                        placeholder="e.g. +14155552671"
                         className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        required={seekerRegistration}
                       />
                     </div>
                     <div>
@@ -427,7 +454,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <Mail className="w-4 h-4 text-amber-400" />
-                    <span>{loading ? 'Sending Code...' : 'Send Email Verification Code'}</span>
+                    <span>{loading ? 'Sending Code...' : seekerRegistration ? 'Send Email and WhatsApp Codes' : 'Send Email Verification Code'}</span>
                   </button>
                 </form>
               ) : (
@@ -467,6 +494,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     />
                   </div>
 
+                  {seekerRegistration && (
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        Enter 6-Digit WhatsApp Verification Code
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={phoneOtpInput}
+                        onChange={e => setPhoneOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="• • • • • •"
+                        className="w-full text-center text-lg tracking-[0.3em] font-mono font-bold px-3.5 py-3 border-2 border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                        required
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1">Sent on WhatsApp to {phoneInput}. This code is required for Property Seeker registration.</p>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between text-[11px] text-slate-500">
                     <span>Didn't receive the email from Property Studio?</span>
                     {countdown > 0 ? (
@@ -485,11 +530,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
                   <button
                     type="submit"
-                    disabled={loading || otpInput.length < 4}
+                    disabled={loading || otpInput.length < 4 || (seekerRegistration && phoneOtpInput.length < 4)}
                     className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>{loading ? 'Verifying...' : 'Verify Email & Create Account'}</span>
+                    <span>{loading ? 'Verifying...' : seekerRegistration ? 'Verify Email and WhatsApp' : 'Verify Email & Create Account'}</span>
                   </button>
                 </form>
               )}

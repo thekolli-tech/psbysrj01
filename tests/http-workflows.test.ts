@@ -13,14 +13,15 @@ delete process.env.PAYMENT_PROVIDER;
 delete process.env.PAYMENT_WEBHOOK_SECRET;
 delete process.env.PAYMENT_API_KEY;
 
-const { initDatabase, createUser } = await import('../src/server/db.ts');
+const { initDatabase, createUser, getSqliteDb } = await import('../src/server/db.ts');
 await initDatabase();
 
 const password = 'WorkflowPass123!';
 await createUser({ name: 'Dev', email: 'dev.workflow@example.com', role: 'DEVELOPER', password, isVerified: true });
 await createUser({ name: 'Admin', email: 'admin.workflow@example.com', role: 'SUPER_ADMIN', password, isVerified: true });
 await createUser({ name: 'Partner', email: 'partner.workflow@example.com', role: 'CHANNEL_PARTNER', password, isVerified: true });
-await createUser({ name: 'Seeker', email: 'seeker.workflow@example.com', role: 'PROPERTY_SEEKER', password, isVerified: true });
+await createUser({ name: 'Seeker', email: 'seeker.workflow@example.com', role: 'PROPERTY_SEEKER', password, isVerified: true, phone: '+919800011122' });
+getSqliteDb().prepare('UPDATE users SET phone_verified = 1 WHERE email = ?').run('seeker.workflow@example.com');
 
 if (process.env.DATABASE_URL) {
   throw new Error('Refusing to import the server while DATABASE_URL is set. Workflow tests stay on local SQLite.');

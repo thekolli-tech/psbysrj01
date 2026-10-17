@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MediaItem } from '../../types';
+import { Avatar } from '../common/Avatar';
 import {
   Play,
   Video,
@@ -339,7 +340,10 @@ export const MediaEngine: React.FC<{
               {activeComments.map(c => (
                 <div key={c.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-900">{c.authorName}</span>
+                    <span className="font-bold text-slate-900 inline-flex items-center gap-2">
+                      <Avatar id={c.authorAvatar} label={c.authorName} className="w-6 h-6 rounded-full" />
+                      {c.authorName}
+                    </span>
                     <span className="text-[10px] text-slate-400">{c.timestamp}</span>
                   </div>
                   <p className="text-xs text-slate-600">{c.text}</p>

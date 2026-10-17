@@ -77,7 +77,8 @@ test('SQLite wallet credit cannot unlock a lead while payments are unconfigured'
   const retained = await unlockLead({ leadId, professionalId: professional.id, professionalRole: 'CHANNEL_PARTNER', idempotencyKey: 'retained' });
   assert.equal(retained.charged, 0);
   assert.equal(retained.revealed, true);
-  assert.equal(String(retained.lead.seekerPhone).includes('1111'), true);
+  assert.equal(String(retained.lead.seekerPhone).includes('90000'), false);
+  assert.equal(retained.lead.seekerPhone, '******1111');
   const retainedBalance = getSqliteDb().prepare('SELECT wallet_balance FROM users WHERE id = ?').get(professional.id) as { wallet_balance: number };
   assert.equal(Number(retainedBalance.wallet_balance), 700);
   const retainedUnlocks = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM lead_unlocks').get() as { count: number };

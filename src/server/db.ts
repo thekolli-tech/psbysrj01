@@ -5,6 +5,7 @@ import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { applySqliteAdditiveSchema } from './platformSchema.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProofSync, type SyncOtpClaimRunner } from './otpClaim.ts';
+import { resolveAvatarId } from '../shared/avatars.ts';
 import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
 import {
   pgFindUserByEmail,
@@ -484,6 +485,20 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
 export async function findUserById(id: string): Promise<DbUser | null> {
   if (isPostgresAuthoritative()) return pgFindUserById(id);
   return sqliteFindUserById(id);
+}
+
+export async function findUserByPhone(phone: string): Promise<DbUser | null> {
+  const normalized = phone.trim();
+  if (!normalized) return null;
+  if (isPostgresAuthoritative()) {
+    const { queryPostgres } = await import('./postgres.ts');
+    const found = await queryPostgres<{ id: string }>('SELECT id FROM users WHERE phone = $1 LIMIT 1', [normalized]);
+    if (!found.rows[0]) return null;
+    return findUserById(found.rows[0].id);
+  }
+  const row = getSqliteDb().prepare('SELECT id FROM users WHERE phone = ? LIMIT 1').get(normalized) as { id: string } | undefined;
+  if (!row) return null;
+  return findUserById(row.id);
 }
 
 export async function getActiveDeveloperCount(): Promise<number> {
@@ -1292,7 +1307,7 @@ function sqliteCreateUser(data: {
     normalizedEmail,
     data.phone?.trim() || '',
     data.role || 'PROPERTY_SEEKER',
-    data.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+    data.avatar || 'avatar-01',
     data.organization?.trim() || '',
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
@@ -1905,7 +1920,7 @@ function sqliteGetAllPosts(params?: {
   offset?: number;
   currentUserId?: string;
 }): any[] {
-  let query = "SELECT p.* FROM community_posts p WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
+  let query = "SELECT p.*, u.avatar AS author_avatar FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
   const args: any[] = [params?.currentUserId || ''];
 
   if (params?.communityId) {
@@ -1938,6 +1953,7 @@ function sqliteGetAllPosts(params?: {
     authorId: p.author_id,
     authorName: p.author_name,
     authorRole: p.author_role,
+    authorAvatar: resolveAvatarId((p as { author_avatar?: string }).author_avatar),
     communityId: p.community_id,
     communityName: p.community_name,
     propertyId: p.property_id,
@@ -1964,7 +1980,7 @@ function sqliteGetAllPosts(params?: {
 }
 
 function sqliteGetPostById(postId: string, currentUserId?: string): any {
-  const stmt = db.prepare('SELECT * FROM community_posts WHERE id = ?');
+  const stmt = db.prepare('SELECT p.*, u.avatar AS author_avatar FROM community_posts p LEFT JOIN users u ON u.id = p.author_id WHERE p.id = ?');
   const p = stmt.get(postId) as DbCommunityPost | undefined;
   if (!p) return null;
 
@@ -1975,6 +1991,7 @@ function sqliteGetPostById(postId: string, currentUserId?: string): any {
     authorId: p.author_id,
     authorName: p.author_name,
     authorRole: p.author_role,
+    authorAvatar: resolveAvatarId((p as { author_avatar?: string }).author_avatar),
     communityId: p.community_id,
     communityName: p.community_name,
     propertyId: p.property_id,

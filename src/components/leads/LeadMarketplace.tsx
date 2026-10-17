@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { LeadTier } from '../../types';
+import { Avatar } from '../common/Avatar';
 import {
   Lock,
   Unlock,
@@ -10,13 +11,11 @@ import {
   Clock,
   ShieldCheck,
   CheckCircle,
-  CheckCircle2,
   MessageSquare,
   Plus,
   Trash2,
   X,
-  Filter,
-  RotateCcw
+  Filter
 } from 'lucide-react';
 
 interface LeadMarketplaceProps {
@@ -50,73 +49,8 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
   const [tier, setTier] = useState<LeadTier>('PREMIUM');
   const [requirements, setRequirements] = useState('');
   const [consentGranted, setConsentGranted] = useState(false);
-
-  // Mobile number OTP verification state
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
-  const [phoneOtpInput, setPhoneOtpInput] = useState('');
-  const [phoneLoading, setPhoneLoading] = useState(false);
-  const [phoneCountdown, setPhoneCountdown] = useState(0);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (phoneCountdown > 0) {
-      timer = setTimeout(() => setPhoneCountdown(c => c - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [phoneCountdown]);
-
-  const handleSendPhoneOtp = async () => {
-    if (!phone.trim() || phone.trim().length < 8) {
-      showToast('Please enter a valid 10-digit mobile number first.');
-      return;
-    }
-    setPhoneLoading(true);
-    try {
-      const res = await fetch('/api/auth/send-phone-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim() })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to send SMS OTP');
-      }
-      setPhoneOtpSent(true);
-      setPhoneCountdown(60);
-      showToast(`Property Studio SMS verification code sent to ${phone.trim()}`);
-    } catch (err: any) {
-      showToast(err.message || 'Error sending SMS OTP');
-    } finally {
-      setPhoneLoading(false);
-    }
-  };
-
-  const handleVerifyPhoneOtp = async () => {
-    if (!phoneOtpInput.trim() || phoneOtpInput.trim().length < 4) {
-      showToast('Please enter the 6-digit verification code.');
-      return;
-    }
-    setPhoneLoading(true);
-    try {
-      const res = await fetch('/api/auth/verify-phone-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), otp: phoneOtpInput.trim() })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Invalid or expired OTP code');
-      }
-      setPhoneVerified(true);
-      setPhoneOtpSent(false);
-      showToast(`Phone number verified successfully!`);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to verify OTP');
-    } finally {
-      setPhoneLoading(false);
-    }
-  };
+  const seekerAccount = currentUser.role === 'PROPERTY_SEEKER';
+  const accountPhoneVerified = Boolean(currentUser.phoneVerified);
 
   const filteredLeads = leads.filter(lead => {
     if (selectedTier !== 'ALL' && lead.tier !== selectedTier) return false;
@@ -126,7 +60,12 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
 
   const handlePostLead = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim() || !requirements.trim()) {
+    const contactPhone = seekerAccount ? currentUser.phone : phone.trim();
+    if (seekerAccount && !accountPhoneVerified) {
+      showToast('Verify your WhatsApp number in your profile before posting an enquiry.');
+      return;
+    }
+    if (!name.trim() || !contactPhone || !requirements.trim()) {
       showToast('Please provide seeker name, phone, and requirements.');
       return;
     }
@@ -139,7 +78,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
 
     createBuyerLead({
       seekerName: name.trim(),
-      seekerPhone: phone.trim(),
+      seekerPhone: contactPhone,
       seekerEmail: email.trim(),
       consentGranted: true,
       consentVersion: '2026-10-15',
@@ -160,9 +99,6 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
     setEmail('');
     setRequirements('');
     setConsentGranted(false);
-    setPhoneVerified(false);
-    setPhoneOtpSent(false);
-    setPhoneOtpInput('');
   };
 
   return (
@@ -178,7 +114,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
             Sanitized Buyer Lead Marketplace
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
-            Directly connect with qualified high-intent seekers looking for luxury apartments, sky villas, and commercial floors. PII is sanitized behind the paywall card with absolute immunity from spam calls.
+            Directly connect with qualified high-intent seekers looking for luxury apartments, sky villas, and commercial floors. Mobile numbers stay masked. Wallet credits and lead unlocks do not reveal them.
           </p>
         </div>
 
@@ -294,12 +230,15 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                   </div>
 
                   {/* Seeker Name & Budget */}
-                  <div>
+                  <div className="flex items-center gap-3">
+                    <Avatar id={lead.seekerAvatar} label={lead.seekerName} className="w-10 h-10 rounded-xl shrink-0" />
+                    <div>
                     <h3 className="text-base font-extrabold text-slate-900 leading-snug">
                       {lead.seekerName}
                     </h3>
                     <div className="text-sm font-black text-emerald-700 font-mono-numbers mt-0.5">
                       Budget: {lead.budget}
+                    </div>
                     </div>
                   </div>
 
@@ -444,114 +383,26 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                 </span>
               </div>
 
-              {/* Phone Verification Section */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block font-bold text-slate-700">
-                    Contact Mobile Number <span className="text-[11px] font-normal text-slate-500">(Optional verification)</span>
-                  </label>
-                  {phoneVerified && (
-                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Mobile Verified
-                    </span>
-                  )}
-                </div>
-
-                {!phoneVerified ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="tel"
-                        value={phone}
-                        disabled={phoneOtpSent}
-                        onChange={e => setPhone(e.target.value)}
-                        placeholder="e.g. +91 98490 12345"
-                        className="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:bg-slate-100"
-                        required
-                      />
-                      {!phoneOtpSent ? (
-                        <button
-                          type="button"
-                          onClick={handleSendPhoneOtp}
-                          disabled={phoneLoading || phone.trim().length < 8}
-                          className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl font-bold whitespace-nowrap transition-colors cursor-pointer"
-                        >
-                          {phoneLoading ? 'Sending...' : 'Verify Mobile'}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => { setPhoneOtpSent(false); setPhoneOtpInput(''); }}
-                          className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-[11px] transition-colors"
-                        >
-                          Change
-                        </button>
-                      )}
-                    </div>
-
-                    {phoneOtpSent && (
-                      <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2 animate-in fade-in duration-200">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-amber-900">
-                            Enter 6-Digit Property Studio SMS Code sent to {phone}
-                          </span>
-                          {phoneCountdown > 0 ? (
-                            <span className="text-slate-500 font-mono">Resend: {phoneCountdown}s</span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleSendPhoneOtp}
-                              className="text-amber-800 hover:underline font-bold flex items-center gap-1"
-                            >
-                              <RotateCcw className="w-3 h-3" />
-                              <span>Resend</span>
-                            </button>
-                          )}
-                        </div>
-
-                        <p className="text-[11px] text-amber-800 bg-amber-100/60 p-2 rounded-lg leading-relaxed">
-                          Enter the 6-digit verification code sent strictly from <strong>Property Studio</strong> to your mobile phone to verify this lead.
-                        </p>
-
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            maxLength={6}
-                            value={phoneOtpInput}
-                            onChange={e => setPhoneOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
-                            placeholder="• • • • • •"
-                            className="flex-1 px-3 py-2 border border-amber-300 rounded-xl text-center font-mono font-bold tracking-widest text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleVerifyPhoneOtp}
-                            disabled={phoneLoading || phoneOtpInput.length < 4}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold cursor-pointer transition-colors"
-                          >
-                            {phoneLoading ? 'Checking...' : 'Confirm'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                <label className="block font-bold text-slate-700">Contact mobile number</label>
+                {seekerAccount ? (
+                  <div className={`p-3 rounded-xl border ${accountPhoneVerified ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+                    <span className="font-mono font-bold">{currentUser.phone || 'No verified number'}</span>
+                    <p className="mt-1 text-[11px] leading-relaxed">
+                      {accountPhoneVerified
+                        ? 'This enquiry uses the WhatsApp-verified number on your account. A different number in this form is ignored.'
+                        : 'Verify your mobile number with WhatsApp in your profile before posting. A checkbox or code on this form does not verify the account.'}
+                    </p>
                   </div>
                 ) : (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-emerald-900 font-mono text-xs">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="font-bold">{phone}</span>
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-sans font-bold">
-                        OTP Verified
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setPhoneVerified(false); setPhoneOtpSent(false); }}
-                      className="text-[11px] text-slate-500 hover:text-slate-800 underline cursor-pointer"
-                    >
-                      Change Phone
-                    </button>
-                  </div>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="+14155552671"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
                 )}
               </div>
 
