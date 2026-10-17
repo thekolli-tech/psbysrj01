@@ -36,6 +36,9 @@ export function evaluateUnlock(state: UnlockState, rules: UnlockRules): UnlockDe
     reason
   });
 
+  if (state.alreadyUnlocked) {
+    return { outcome: 'REVEAL_NO_CHARGE', charge: 0, nextBalance: balance };
+  }
   if (!rules.verifiedProfessional) return deny('Professional verification is required before contact details can be revealed.');
   if (!rules.consentRecorded) return deny('Seeker consent was not recorded for this enquiry.');
   if (!rules.listingEligible) return deny('This listing is not approved for lead matching.');
@@ -44,7 +47,7 @@ export function evaluateUnlock(state: UnlockState, rules: UnlockRules): UnlockDe
   if (rules.paymentGate === 'FAILED') return deny('Payment was not verified.');
   if (rules.paymentGate === 'PENDING') return deny('Payment is still pending verification.');
 
-  if (state.alreadyUnlocked || state.idempotencyReplay) {
+  if (state.idempotencyReplay) {
     return { outcome: 'REVEAL_NO_CHARGE', charge: 0, nextBalance: balance };
   }
 

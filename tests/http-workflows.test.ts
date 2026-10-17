@@ -169,15 +169,20 @@ test('HTTP role, moderation, listing, enquiry, and payment workflows', async (t)
   }, admin);
   assert.equal(credit.status, 200, JSON.stringify(credit.json));
 
-  const [first, secondUnlock] = await Promise.all([
-    api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-a' }),
-    api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-b' })
-  ]);
-  const charges = [first.json.charged, secondUnlock.json.charged].sort((a, b) => a - b);
-  assert.deepEqual(charges, [0, 300]);
-  assert.equal(first.json.lead.seekerPhone, '+919800011122');
-  const replay = await api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-a' });
-  assert.equal(replay.json.charged, 0);
+  const balanceAfterCredit = (await api('GET', '/api/auth/me', undefined, partner)).json.user.wallet_balance;
+  assert.equal(Number(balanceAfterCredit), 1000);
+  const blockedUnlock = await api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-a' });
+  assert.equal(blockedUnlock.status, 503);
+  assert.equal(blockedUnlock.json.code, 'NOT_CONFIGURED');
+  assert.equal(blockedUnlock.json.lead, undefined);
+  const repeatedUnlock = await api('POST', `/api/leads/${enquiry.json.leadId}/unlock`, {}, partner, { 'Idempotency-Key': 'unlock-b' });
+  assert.equal(repeatedUnlock.status, 503);
+  assert.equal(repeatedUnlock.json.code, 'NOT_CONFIGURED');
+  const stillMasked = await api('GET', '/api/leads', undefined, partner);
+  const stillMaskedLead = stillMasked.json.leads.find((item: any) => item.id === enquiry.json.leadId);
+  assert.equal(stillMaskedLead.revealed, false);
+  assert.equal(String(stillMaskedLead.seekerPhone).includes('8000'), false);
+  assert.equal(Number((await api('GET', '/api/auth/me', undefined, partner)).json.user.wallet_balance), 1000);
 
   const checkout = await api('POST', '/api/billing/checkout', { amount: 500, purpose: 'WALLET_TOPUP' }, partner);
   assert.equal(checkout.status, 503);

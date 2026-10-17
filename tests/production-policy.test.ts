@@ -85,6 +85,31 @@ test('Production policy', async (t) => {
       { price: 300, verifiedProfessional: true, consentRecorded: true, listingEligible: true, paymentGate: 'NOT_CONFIGURED' }
     );
     assert.equal(unconfigured.outcome, 'DENY');
+    assert.equal(unconfigured.charge, 0);
+    assert.equal(unconfigured.nextBalance, 5000);
+    const retained = evaluateUnlock(
+      { balance: 5000, alreadyUnlocked: true, idempotencyReplay: false },
+      { price: 300, verifiedProfessional: true, consentRecorded: true, listingEligible: true, paymentGate: 'NOT_CONFIGURED' }
+    );
+    assert.equal(retained.outcome, 'REVEAL_NO_CHARGE');
+    assert.equal(retained.charge, 0);
+    assert.equal(retained.nextBalance, 5000);
+  });
+
+  await t.test('an unconfigured payment provider does not spend a wallet credit', async () => {
+    const wallet = new SerializedWallet(5000);
+    const decision = await wallet.unlock('lead-unconfigured', 'idem-unconfigured', {
+      price: 300,
+      verifiedProfessional: true,
+      consentRecorded: true,
+      listingEligible: true,
+      paymentGate: 'NOT_CONFIGURED'
+    });
+    assert.equal(decision.outcome, 'DENY');
+    assert.equal(decision.charge, 0);
+    assert.equal(wallet.balance, 5000);
+    assert.equal(wallet.ledger.length, 0);
+    assert.equal(wallet.unlocks.has('lead-unconfigured'), false);
   });
 
   await t.test('concurrent unlocks debit the wallet once', async () => {

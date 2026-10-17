@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { getPostgresPool, queryPostgres } from './postgres.ts';
 import { getSqliteDb, isPostgresAuthoritative, isSqliteExplicit } from './db.ts';
-import { evaluateUnlock, type PaymentGate } from '../shared/ledger.ts';
+import { evaluateUnlock, type PaymentGate, type UnlockDecision } from '../shared/ledger.ts';
 import {
   initialVerificationStatus,
   isPublicListing,
@@ -44,6 +44,22 @@ export function paymentsStatus(): 'CONFIGURED' | 'NOT_CONFIGURED' {
     PAYMENT_PROVIDER: process.env.PAYMENT_PROVIDER,
     PAYMENT_WEBHOOK_SECRET: process.env.PAYMENT_WEBHOOK_SECRET
   });
+}
+
+function unlockPaymentGate(): PaymentGate {
+  return paymentsStatus() === 'CONFIGURED' ? 'WALLET' : 'NOT_CONFIGURED';
+}
+
+function rejectUnlock(decision: UnlockDecision): void {
+  if (decision.outcome !== 'DENY') return;
+  if (decision.reason === 'Payment provider is NOT_CONFIGURED.') {
+    throw new CommerceError(
+      503,
+      'NOT_CONFIGURED',
+      'Payment provider is NOT_CONFIGURED. No charge was created and no contact details were revealed.'
+    );
+  }
+  throw new CommerceError(402, 'UNLOCK_DENIED', decision.reason || 'Unlock denied.');
 }
 
 export async function upsertProfessionalProfile(input: {
@@ -409,10 +425,10 @@ async function unlockLeadPostgres(input: {
         verifiedProfessional: input.verified,
         consentRecorded: Number(lead.consent_granted) === 1,
         listingEligible: listingOk,
-        paymentGate: 'WALLET'
+        paymentGate: unlockPaymentGate()
       }
     );
-    if (decision.outcome === 'DENY') throw new CommerceError(402, 'UNLOCK_DENIED', decision.reason || 'Unlock denied.');
+    rejectUnlock(decision);
     if (decision.outcome === 'DEBIT_AND_REVEAL') {
       const updated = await client.query(
         'UPDATE users SET wallet_balance = wallet_balance - $1, updated_at = $2 WHERE id = $3 AND wallet_balance >= $1 RETURNING wallet_balance',
@@ -476,10 +492,10 @@ async function unlockLeadSqlite(input: {
         verifiedProfessional: input.verified,
         consentRecorded: Number(lead.consent_granted) === 1,
         listingEligible: listingOk,
-        paymentGate: 'WALLET'
+        paymentGate: unlockPaymentGate()
       }
     );
-    if (decision.outcome === 'DENY') throw new CommerceError(402, 'UNLOCK_DENIED', decision.reason || 'Unlock denied.');
+    rejectUnlock(decision);
     if (decision.outcome === 'DEBIT_AND_REVEAL') {
       const updated = db.prepare(
         'UPDATE users SET wallet_balance = wallet_balance - ?, updated_at = ? WHERE id = ? AND wallet_balance >= ?'
