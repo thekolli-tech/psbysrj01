@@ -1,3 +1,4 @@
+import { describeDatabaseTarget } from './databaseTarget.ts';
 import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { getSqliteDb, isPostgresAuthoritative, isSqliteExplicit } from './db.ts';
 import { paymentsStatus } from './commerce.ts';
@@ -81,6 +82,7 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
   const uptime = process.uptime();
 
   if (isPostgresAuthoritative()) {
+    const target = await describeDatabaseTarget();
     const connection = await checkPostgresHealth();
     const schema = connection.connected
       ? await checkSchemaReadiness()
@@ -102,7 +104,8 @@ export async function buildHealthReport(): Promise<{ httpStatus: number; body: R
           missingTables: schema.missing,
           latencyMs: connection.latencyMs,
           code: databaseCode(true, connection.connected, schema.ready),
-          failure: connection.connected ? null : (connection.failure || 'UNKNOWN')
+          failure: connection.connected ? null : (connection.failure || 'UNKNOWN'),
+          target
         },
         ...publicDiagnostics(),
         payments,

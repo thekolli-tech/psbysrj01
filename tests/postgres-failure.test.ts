@@ -13,6 +13,7 @@ test('database connection failures are classified without retaining credentials'
     'AUTHENTICATION_FAILED'
   );
   assert.equal(classifyDatabaseConnectionFailure({ code: 'ENOTFOUND', message: 'getaddrinfo ENOTFOUND' }), 'DNS_FAILURE');
+  assert.equal(classifyDatabaseConnectionFailure({ code: 'EAI_AGAIN', message: 'getaddrinfo EAI_AGAIN' }), 'DNS_FAILURE');
   assert.equal(classifyDatabaseConnectionFailure({ code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' }), 'NETWORK_FAILURE');
   assert.equal(classifyDatabaseConnectionFailure({ code: 'ENETUNREACH', message: 'connect ENETUNREACH' }), 'NETWORK_FAILURE');
   assert.equal(
