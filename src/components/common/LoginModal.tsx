@@ -131,13 +131,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       const result = await readApiResponse(res);
       if (!result.ok || result.data?.success !== true) {
         setPhoneOtpSent(false);
-        throw new Error(result.error || 'SMS verification was not sent.');
+        throw new Error(result.error || 'WhatsApp verification was not sent.');
       }
       setPhoneOtpSent(true);
       setPhoneCountdown(60);
-      showToast('SMS verification code sent. Check the mobile number you entered.');
+      showToast('WhatsApp verification code sent. Check WhatsApp on the mobile number you entered.');
     } catch (err: any) {
-      setErrorMsg(err.message || 'SMS verification was not sent.');
+      setErrorMsg(err.message || 'WhatsApp verification was not sent.');
     } finally {
       submitting.current = false;
       setLoading(false);
@@ -194,7 +194,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         const phoneResult = await readApiResponse(phoneRes);
         if (!phoneResult.ok || phoneResult.data?.success !== true) {
           setPhoneOtpSent(false);
-          setErrorMsg(phoneResult.error || 'SMS verification was not sent. No account was created.');
+          setErrorMsg(phoneResult.error || 'WhatsApp verification was not sent. No account was created.');
         } else {
           setPhoneOtpSent(true);
           setPhoneCountdown(60);
@@ -221,7 +221,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     // Property Seeker requires Phone OTP verification
     if (roleInput === 'PROPERTY_SEEKER') {
       if (!phoneOtpInput.trim() || phoneOtpInput.trim().length < 4) {
-        setErrorMsg('Please enter the 6-digit mobile SMS OTP received on your phone.');
+        setErrorMsg('Please enter the 6-digit WhatsApp code received on your phone.');
         return;
       }
     }
@@ -556,28 +556,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-amber-950 flex items-center gap-1.5">
                           <Smartphone className="w-4 h-4 text-amber-600" />
-                          Property Seeker Mobile SMS Verification
+                          Property Seeker WhatsApp Verification
                         </span>
                         {phoneCountdown > 0 ? (
-                          <span className="text-[10px] text-amber-700 font-mono">Resend SMS in {phoneCountdown}s</span>
+                          <span className="text-[10px] text-amber-700 font-mono">Resend WhatsApp code in {phoneCountdown}s</span>
                         ) : (
                           <button
                             type="button"
                             onClick={handleSendPhoneOtp}
                             className="text-[11px] text-amber-800 hover:underline font-bold"
                           >
-                            {phoneOtpSent ? 'Resend SMS OTP' : 'Send SMS OTP'}
+                            {phoneOtpSent ? 'Resend WhatsApp code' : 'Send WhatsApp code'}
                           </button>
                         )}
                       </div>
                       <p className="text-amber-900 text-[11px] leading-relaxed">
                         {phoneOtpSent
-                          ? 'SMS code sent to the mobile number you entered. The account is created only after both codes are verified.'
-                          : 'A mobile verification code is required. It is sent only when an SMS provider accepts it.'}
+                          ? 'WhatsApp code sent to the mobile number you entered. The account is created only after both codes are verified.'
+                          : 'A WhatsApp verification code is required. It is sent only when WhatsApp accepts it.'}
                       </p>
                       <div>
                         <label className="block font-bold text-amber-950 mb-1">
-                          Enter 6-Digit Mobile SMS OTP <span className="text-red-500">* Required</span>
+                          Enter 6-Digit WhatsApp Code <span className="text-red-500">* Required</span>
                         </label>
                         <input
                           type="text"

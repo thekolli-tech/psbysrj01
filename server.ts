@@ -65,7 +65,7 @@ import {
   updateLastLogin
 } from './src/server/db.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
-import { sendRealSmsOtp, getNotificationGatewayStatus, configuredSmsProviders } from './src/server/notifications.ts';
+import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders } from './src/server/notifications.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
 import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
@@ -448,14 +448,14 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response): Promis
   }
 });
 
-function smsUnavailable(res: Response, code: 'SMS_NOT_CONFIGURED' | 'OTP_NOT_CONFIGURED'): void {
+function whatsAppUnavailable(res: Response, code: 'WHATSAPP_NOT_CONFIGURED' | 'OTP_NOT_CONFIGURED'): void {
   res.status(503).json({
-    error: 'SMS verification is not configured. No code was sent and no account was created.',
+    error: 'WhatsApp verification is not configured. No code was sent and no account was created.',
     code
   });
 }
 
-// Send Phone OTP. Property Seeker registration cannot finish without a real provider delivery.
+// Send the phone OTP through WhatsApp. Property Seeker registration cannot finish without provider acceptance.
 app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
   const phone = normalizeIndianMobile(req.body?.phone);
   if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
@@ -465,28 +465,28 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
       return;
     }
     if (!String(process.env.OTP_HASH_SECRET || '').trim()) {
-      smsUnavailable(res, 'OTP_NOT_CONFIGURED');
+      whatsAppUnavailable(res, 'OTP_NOT_CONFIGURED');
       return;
     }
-    if (configuredSmsProviders().length === 0) {
-      smsUnavailable(res, 'SMS_NOT_CONFIGURED');
+    if (configuredWhatsAppProviders().length === 0) {
+      whatsAppUnavailable(res, 'WHATSAPP_NOT_CONFIGURED');
       return;
     }
     const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
-    const dispatchResult = await sendRealSmsOtp(phone, otp);
-    if (!dispatchResult.success || dispatchResult.provider !== 'fast2sms') {
+    const dispatchResult = await sendWhatsAppOtp(phone, otp);
+    if (!dispatchResult.success || dispatchResult.provider !== 'whatsapp') {
       await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
       res.status(502).json({
-        error: 'The SMS provider did not accept the verification code. No code remains active and no account was created.',
-        code: 'SMS_DELIVERY_FAILED'
+        error: 'WhatsApp did not accept the verification code. No code remains active and no account was created.',
+        code: 'WHATSAPP_DELIVERY_FAILED'
       });
       return;
     }
     res.json({
       success: true,
-      message: 'SMS verification code dispatched. Check the mobile number you entered.',
+      message: 'WhatsApp verification code dispatched. Check WhatsApp on the mobile number you entered.',
       expiresAt,
-      deliveredVia: 'fast2sms'
+      deliveredVia: 'whatsapp'
     });
   } catch (err: any) {
     if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
@@ -520,7 +520,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
     }
     const isValid = await verifyOtp(phone, 'PHONE_VERIFICATION', otp);
     if (!isValid) {
-      res.status(400).json({ error: 'Invalid or expired SMS OTP code' });
+      res.status(400).json({ error: 'Invalid or expired WhatsApp code' });
       return;
     }
     res.json({ success: true, verified: true, message: 'Phone number successfully verified' });

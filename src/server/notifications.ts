@@ -1,6 +1,6 @@
-import { configuredSmsProviders, sendRealSmsOtp } from './smsOtp.ts';
+import { configuredWhatsAppProviders } from './whatsappOtp.ts';
 
-export { configuredSmsProviders, sendRealSmsOtp };
+export { configuredWhatsAppProviders, sendWhatsAppOtp } from './whatsappOtp.ts';
 
 export interface EmailDispatchResult {
   success: boolean;
@@ -9,7 +9,7 @@ export interface EmailDispatchResult {
   error?: string;
 }
 
-export type { SmsDispatchResult } from './smsOtp.ts';
+export type { WhatsAppDispatchResult } from './whatsappOtp.ts';
 
 /**
  * Registration and password-reset email codes are sent only through Resend
@@ -78,12 +78,12 @@ export function getNotificationGatewayStatus() {
   const resendReady = Boolean(process.env.RESEND_API_KEY) && /@propertystudio\.org\b/i.test(from);
   const emailProviders: string[] = resendReady ? ['Resend'] : [];
 
-  const smsProviders = configuredSmsProviders();
+  const whatsappProviders = configuredWhatsAppProviders();
 
   return {
     emailConfigured: emailProviders.length > 0,
     emailProviders,
-    smsConfigured: smsProviders.length > 0,
-    smsProviders
+    whatsappConfigured: whatsappProviders.length > 0,
+    whatsappProviders
   };
 }

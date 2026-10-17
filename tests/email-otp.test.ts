@@ -21,10 +21,11 @@ process.env.OTP_HASH_SECRET = 'test-pepper-not-used-in-production';
 delete process.env.RESEND_API_KEY;
 delete process.env.EMAIL_FROM;
 delete process.env.RESEND_FROM;
-delete process.env.FAST2SMS_API_KEY;
-delete process.env.FAST2SMS_OTP_ID;
-delete process.env.FAST2SMS_OTP_VARIABLES;
-delete process.env.FAST2SMS_SENDER_ID;
+delete process.env.WHATSAPP_ACCESS_TOKEN;
+delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+delete process.env.WHATSAPP_GRAPH_API_VERSION;
+delete process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE;
 
 const { initDatabase, generateOtp, verifyOtp, findUserByEmail, createUser, getSqliteDb } = await import('../src/server/db.ts');
 const { issueEmailOtp } = await import('../src/server/emailOtp.ts');
@@ -305,7 +306,7 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
 
   const sms = await api('/api/auth/send-phone-otp', { phone: '+919800011199' });
   assert.equal(sms.status, 503);
-  assert.equal(sms.json.code, 'SMS_NOT_CONFIGURED');
+  assert.equal(sms.json.code, 'WHATSAPP_NOT_CONFIGURED');
   assert.equal(sms.json.success, undefined);
   assert.match(sms.contentType, /application\/json/);
   const smsRows = getSqliteDb().prepare('SELECT COUNT(*) AS count FROM otps WHERE target = ?').get('+919800011199') as { count: number };
@@ -367,27 +368,36 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   assert.equal(missingPepper.json.code, 'OTP_NOT_CONFIGURED');
   assert.equal(await findUserByEmail('missing-pepper@example.com'), null);
 
-  const { sendRealSmsOtp } = await import('../src/server/notifications.ts');
-  process.env.FAST2SMS_API_KEY = 'test-sms-key-not-real';
-  delete process.env.FAST2SMS_OTP_ID;
+  const { sendWhatsAppOtp } = await import('../src/server/notifications.ts');
+  process.env.WHATSAPP_ACCESS_TOKEN = 'test-whatsapp-token-not-real';
+  delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+  delete process.env.WHATSAPP_GRAPH_API_VERSION;
+  delete process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE;
   let providerCalls = 0;
   const previousFetch = globalThis.fetch;
   globalThis.fetch = (async () => {
     providerCalls += 1;
-    return new Response(JSON.stringify({ return: false }), { status: 422, headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify({ error: { message: 'rejected', code: 190 } }), { status: 401 });
   }) as typeof fetch;
-  const missingTemplate = await sendRealSmsOtp('+919800011188', '654321');
+  const missingTemplate = await sendWhatsAppOtp('+919800011188', '654321');
   assert.equal(missingTemplate.success, false);
   assert.equal(providerCalls, 0);
-  process.env.FAST2SMS_OTP_ID = 'otp-template-test';
-  const rejectedSms = await sendRealSmsOtp('+919800011188', '654321');
+  process.env.WHATSAPP_PHONE_NUMBER_ID = '105954558954427';
+  process.env.WHATSAPP_OTP_TEMPLATE_NAME = 'verification_code';
+  process.env.WHATSAPP_GRAPH_API_VERSION = 'v26.0';
+  process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE = 'en_US';
+  const rejectedSms = await sendWhatsAppOtp('+919800011188', '654321');
   globalThis.fetch = previousFetch;
-  delete process.env.FAST2SMS_API_KEY;
-  delete process.env.FAST2SMS_OTP_ID;
+  delete process.env.WHATSAPP_ACCESS_TOKEN;
+  delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+  delete process.env.WHATSAPP_GRAPH_API_VERSION;
+  delete process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE;
   assert.equal(rejectedSms.success, false);
   assert.equal(providerCalls, 1);
   assert.equal(JSON.stringify(rejectedSms).includes('654321'), false);
-  assert.equal(JSON.stringify(rejectedSms).includes('test-sms-key-not-real'), false);
+  assert.equal(JSON.stringify(rejectedSms).includes('test-whatsapp-token-not-real'), false);
 
   await createUser({
     name: 'Reset Failure',
@@ -424,13 +434,15 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   }
 });
 
-queued('Property Seeker registration requires a real Fast2SMS OTP and an email OTP', async () => {
+queued('Property Seeker registration requires a real WhatsApp OTP and an email OTP', async () => {
   process.env.RESEND_API_KEY = 're_test_mock_key';
   process.env.EMAIL_FROM = 'Property Studio <otp@propertystudio.org>';
   process.env.OTP_HASH_SECRET = 'test-pepper-not-used-in-production';
-  delete process.env.FAST2SMS_API_KEY;
-  delete process.env.FAST2SMS_OTP_ID;
-  delete process.env.FAST2SMS_OTP_VARIABLES;
+  delete process.env.WHATSAPP_ACCESS_TOKEN;
+  delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+  delete process.env.WHATSAPP_GRAPH_API_VERSION;
+  delete process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE;
   delete process.env.PAYMENT_PROVIDER;
   delete process.env.PAYMENT_WEBHOOK_SECRET;
 
@@ -451,16 +463,20 @@ queued('Property Seeker registration requires a real Fast2SMS OTP and an email O
       emailCodes.set(String(body.to?.[0] || '').toLowerCase(), code);
       return new Response(JSON.stringify({ id: 'email_mock_sms' }), { status: 200, headers: { 'content-type': 'application/json' } });
     }
-    if (target === 'https://www.fast2sms.com/dev/otp/send') {
+    if (target === 'https://graph.facebook.com/v26.0/105954558954427/messages') {
       const headers = init?.headers as Record<string, string>;
       const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
       smsRequests.push({ body, authorization: headers.Authorization });
       if (smsMode === 'throw') throw new Error('provider network failure');
-      if (smsMode === 'reject') return new Response(JSON.stringify({ return: false, status_code: 401 }), { status: 401 });
-      if (smsMode === 'false') return new Response(JSON.stringify({ return: false, status_code: 200 }), { status: 200 });
-      return new Response(JSON.stringify({ return: true, status_code: 200, request_id: 'req_mock_sms', message: 'OTP sent successfully' }), { status: 200 });
+      if (smsMode === 'reject') return new Response(JSON.stringify({ error: { message: 'Invalid OAuth access token.', code: 190 } }), { status: 401 });
+      if (smsMode === 'false') return new Response(JSON.stringify({ messaging_product: 'whatsapp' }), { status: 200 });
+      return new Response(JSON.stringify({
+        messaging_product: 'whatsapp',
+        contacts: [{ input: body.to, wa_id: body.to }],
+        messages: [{ id: 'wamid.MOCK' }]
+      }), { status: 200 });
     }
-    throw new Error(`Refusing an unexpected network call during the SMS test: ${target}`);
+    throw new Error(`Refusing an unexpected network call during the WhatsApp test: ${target}`);
   }) as typeof fetch;
 
   const { app } = await import('../server.ts');
@@ -486,8 +502,9 @@ queued('Property Seeker registration requires a real Fast2SMS OTP and an email O
   }
 
   function phoneCode(national: string): string {
-    const match = [...smsRequests].reverse().find((request) => request.body.mobile === national);
-    return String(match?.body.otp || '');
+    const match = [...smsRequests].reverse().find((request) => request.body.to === `91${national}`);
+    const template = match?.body.template as { components?: Array<{ parameters?: Array<{ text?: string }> }> } | undefined;
+    return String(template?.components?.[0]?.parameters?.[0]?.text || '');
   }
 
   function releasePhoneCooldown(target: string): void {
@@ -505,31 +522,32 @@ queued('Property Seeker registration requires a real Fast2SMS OTP and an email O
 
     const unconfigured = await api('/api/auth/send-phone-otp', { phone: '+91 98000-11201' });
     assert.equal(unconfigured.status, 503);
-    assert.equal(unconfigured.json.code, 'SMS_NOT_CONFIGURED');
+    assert.equal(unconfigured.json.code, 'WHATSAPP_NOT_CONFIGURED');
     assert.equal(unconfigured.json.success, undefined);
     assert.equal(smsRequests.length, 0);
     const unconfiguredRows = getSqliteDb().prepare(`SELECT COUNT(*) AS count FROM otps WHERE target = ?`).get('+919800011201') as { count: number };
     assert.equal(Number(unconfiguredRows.count), 0);
 
-    process.env.FAST2SMS_API_KEY = 'test-sms-key-not-real';
+    process.env.WHATSAPP_ACCESS_TOKEN = 'test-whatsapp-token-not-real';
     const keyOnly = await api('/api/auth/send-phone-otp', { phone: '9800011201' });
     assert.equal(keyOnly.status, 503);
-    assert.equal(keyOnly.json.code, 'SMS_NOT_CONFIGURED');
+    assert.equal(keyOnly.json.code, 'WHATSAPP_NOT_CONFIGURED');
     assert.equal(smsRequests.length, 0);
 
-    delete process.env.FAST2SMS_API_KEY;
-    process.env.FAST2SMS_OTP_ID = 'otp-template-test';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = '105954558954427';
+    process.env.WHATSAPP_OTP_TEMPLATE_NAME = 'verification_code';
+    process.env.WHATSAPP_GRAPH_API_VERSION = 'v26.0';
     const templateOnly = await api('/api/auth/send-phone-otp', { phone: '9800011201' });
     assert.equal(templateOnly.status, 503);
-    assert.equal(templateOnly.json.code, 'SMS_NOT_CONFIGURED');
-    process.env.FAST2SMS_API_KEY = 'test-sms-key-not-real';
+    assert.equal(templateOnly.json.code, 'WHATSAPP_NOT_CONFIGURED');
+    process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE = 'en_US';
 
     smsMode = 'reject';
     const rejected = await api('/api/auth/send-phone-otp', { phone: '+919800011201' });
     assert.equal(rejected.status, 502);
-    assert.equal(rejected.json.code, 'SMS_DELIVERY_FAILED');
+    assert.equal(rejected.json.code, 'WHATSAPP_DELIVERY_FAILED');
     assert.equal(rejected.json.success, undefined);
-    assert.equal(rejected.raw.includes('test-sms-key-not-real'), false);
+    assert.equal(rejected.raw.includes('test-whatsapp-token-not-real'), false);
     assert.equal(rejected.raw.includes(phoneCode('9800011201')), false);
     const rejectedRows = getSqliteDb().prepare(`SELECT COUNT(*) AS count FROM otps WHERE target = ? AND consumed_at IS NULL`).get('+919800011201') as { count: number };
     assert.equal(Number(rejectedRows.count), 0);
@@ -542,23 +560,29 @@ queued('Property Seeker registration requires a real Fast2SMS OTP and an email O
     smsMode = 'throw';
     const thrown = await api('/api/auth/send-phone-otp', { phone: '09800011201' });
     assert.equal(thrown.status, 502);
-    assert.equal(thrown.json.code, 'SMS_DELIVERY_FAILED');
+    assert.equal(thrown.json.code, 'WHATSAPP_DELIVERY_FAILED');
 
     smsMode = 'accept';
     const callsBeforeCooldown = smsRequests.length;
     const firstFormatted = await api('/api/auth/send-phone-otp', { phone: '+91 98000-11202' });
     assert.equal(firstFormatted.status, 200, firstFormatted.raw);
     assert.equal(firstFormatted.json.success, true);
-    assert.equal(firstFormatted.json.deliveredVia, 'fast2sms');
+    assert.equal(firstFormatted.json.deliveredVia, 'whatsapp');
     assert.equal(firstFormatted.json.otp, undefined);
     const sentCode = phoneCode('9800011202');
     assert.match(sentCode, /^\d{6}$/);
     assert.equal(firstFormatted.raw.includes(sentCode), false);
-    assert.equal(smsRequests.at(-1)?.authorization, 'test-sms-key-not-real');
-    assert.equal(smsRequests.at(-1)?.body.sender_id, undefined);
-    assert.equal(smsRequests.at(-1)?.body.otp_id, 'otp-template-test');
-    assert.equal(smsRequests.at(-1)?.body.otp_expiry, 10);
-    assert.equal(smsRequests.at(-1)?.body.otp_length, 6);
+    assert.equal(smsRequests.at(-1)?.authorization, 'Bearer test-whatsapp-token-not-real');
+    const sentBody = smsRequests.at(-1)?.body as {
+      to?: string;
+      template?: { name?: string; language?: { code?: string }; components?: Array<{ parameters?: Array<{ text?: string }>; sub_type?: string }> };
+    };
+    assert.equal(sentBody.to, '919800011202');
+    assert.equal(sentBody.template?.name, 'verification_code');
+    assert.equal(sentBody.template?.language?.code, 'en_US');
+    assert.equal(sentBody.template?.components?.[0]?.parameters?.[0]?.text, sentCode);
+    assert.equal(sentBody.template?.components?.[1]?.sub_type, 'url');
+    assert.equal(sentBody.template?.components?.[1]?.parameters?.[0]?.text, sentCode);
     const stored = getSqliteDb().prepare(`SELECT otp_raw, otp_hash FROM otps WHERE target = ? AND type = 'PHONE_VERIFICATION' AND consumed_at IS NULL`).get('+919800011202') as { otp_raw: string | null; otp_hash: string };
     assert.equal(stored.otp_raw, null);
     assert.equal(stored.otp_hash.includes(sentCode), false);
@@ -803,12 +827,16 @@ queued('Property Seeker registration requires a real Fast2SMS OTP and an email O
 
     const health = await api('/api/health');
     assert.equal(health.json.payments, 'NOT_CONFIGURED');
-    assert.equal(health.json.configuration.sms, true);
-    assert.equal(health.json.environment.FAST2SMS_API_KEY, true);
-    assert.equal(health.json.environment.FAST2SMS_OTP_ID, true);
-    assert.equal(health.raw.includes('test-sms-key-not-real'), false);
-    assert.equal(health.raw.includes('otp-template-test'), false);
-    assert.equal(logs.join('\n').includes('test-sms-key-not-real'), false);
+    assert.equal(health.json.configuration.whatsapp, true);
+    assert.equal(health.json.environment.WHATSAPP_ACCESS_TOKEN, true);
+    assert.equal(health.json.environment.WHATSAPP_PHONE_NUMBER_ID, true);
+    assert.equal(health.json.environment.WHATSAPP_OTP_TEMPLATE_NAME, true);
+    assert.equal(health.json.environment.WHATSAPP_GRAPH_API_VERSION, true);
+    assert.equal(health.json.environment.WHATSAPP_OTP_TEMPLATE_LANGUAGE, true);
+    assert.equal(health.raw.includes('test-whatsapp-token-not-real'), false);
+    assert.equal(health.raw.includes('105954558954427'), false);
+    assert.equal(health.raw.includes('verification_code'), false);
+    assert.equal(logs.join('\n').includes('test-whatsapp-token-not-real'), false);
     assert.equal(logs.join('\n').includes(sentCode), false);
 
     for (let extra = 0; extra < 4; extra += 1) {
@@ -823,9 +851,11 @@ queued('Property Seeker registration requires a real Fast2SMS OTP and an email O
     console.log = originalLog;
     console.warn = originalWarn;
     globalThis.fetch = originalFetch;
-    delete process.env.FAST2SMS_API_KEY;
-    delete process.env.FAST2SMS_OTP_ID;
-    delete process.env.FAST2SMS_OTP_VARIABLES;
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+    delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+    delete process.env.WHATSAPP_GRAPH_API_VERSION;
+    delete process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE;
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
