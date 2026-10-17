@@ -3,7 +3,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import test from 'node:test';
-import { createHostedApiHandler, type HostedHandlerResult } from '../src/server/hostedApi.ts';
+import { createHostedApiHandler, expressPathForHostedRequest, type HostedHandlerResult } from '../src/server/hostedApi.ts';
 
 interface RunningServer {
   port: number;
@@ -26,11 +26,7 @@ function openServer(
   const handler = createHostedApiHandler({
     app,
     initDatabase,
-    expressPathForHostedRequest: (url) => {
-      const raw = url && url.length > 0 ? url : '/';
-      if (raw === '/api' || raw.startsWith('/api/')) return raw;
-      return `/api${raw.startsWith('/') ? raw : `/${raw}`}`;
-    }
+    expressPathForHostedRequest
   });
   const server = http.createServer((req, res) => {
     const originalEnd = res.end.bind(res);
@@ -94,6 +90,40 @@ function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
     });
   });
 }
+
+test('a rewritten nested registration path reaches the API route', async () => {
+  let seenUrl = '';
+  const server = await openServer((req, res) => {
+    seenUrl = req.url || '';
+    res.statusCode = 200;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ success: true }));
+  }, async () => undefined);
+
+  try {
+    const response = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const req = http.request({
+        host: '127.0.0.1',
+        port: server.port,
+        path: '/api/index?__ps_path=auth/send-email-otp',
+        method: 'POST',
+        headers: { 'content-type': 'application/json' }
+      }, (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => resolve({ status: res.statusCode || 0, body: Buffer.concat(chunks).toString('utf8') }));
+      });
+      req.on('error', reject);
+      req.end('{}');
+    });
+    await withTimeout(server.pending(), 'rewritten registration path');
+    assert.equal(seenUrl, '/api/auth/send-email-otp');
+    assert.equal(response.status, 200);
+    assert.deepEqual(JSON.parse(response.body), { success: true });
+  } finally {
+    await server.close();
+  }
+});
 
 test('hosted handler stays pending until the response is written', async () => {
   let settled = false;

@@ -4,14 +4,43 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
  * Vercel invokes one serverless function for every /api path.
  * Some hosts pass the path without the /api prefix. Express routes keep the prefix.
  */
+const ROUTE_MARKER = '__ps_path';
+
+function isCollapsedFunctionPath(path: string): boolean {
+  return path === '/api' || path === '/api/' || path === '/api/index' || path === '/api/index/';
+}
+
+/**
+ * Restores the public /api path after Vercel rewrites a nested route to the
+ * single function. A host query marker is accepted only on that function path.
+ */
 export function expressPathForHostedRequest(url: string | undefined): string {
   const raw = url && url.length > 0 ? url : '/';
-  const queryIndex = raw.indexOf('?');
-  const path = queryIndex === -1 ? raw : raw.slice(0, queryIndex);
-  const query = queryIndex === -1 ? '' : raw.slice(queryIndex);
-  if (path === '/api' || path.startsWith('/api/')) return raw;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw, 'http://localhost');
+  } catch {
+    return '/api';
+  }
+  const path = parsed.pathname || '/';
+  const marker = parsed.searchParams.get(ROUTE_MARKER);
+  if (marker && isCollapsedFunctionPath(path)) {
+    parsed.searchParams.delete(ROUTE_MARKER);
+    let normalized = marker;
+    try {
+      normalized = decodeURIComponent(marker);
+    } catch {
+      return '/api';
+    }
+    normalized = normalized.replace(/^\/+/, '');
+    if (!/^[A-Za-z0-9/_-]{1,200}$/.test(normalized) || normalized.includes('..')) return '/api';
+    const suffix = normalized.startsWith('api/') ? `/${normalized}` : `/api/${normalized}`;
+    const query = parsed.searchParams.toString();
+    return query ? `${suffix}?${query}` : suffix;
+  }
+  if (path === '/api' || path.startsWith('/api/')) return `${path}${parsed.search}`;
   const suffix = path.startsWith('/') ? path : `/${path}`;
-  return `/api${suffix}${query}`;
+  return `/api${suffix}${parsed.search}`;
 }
 
 export function registrationFailureMessage(status: number): string {

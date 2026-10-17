@@ -9,6 +9,16 @@ test('hosted API paths keep the Express /api prefix', () => {
   assert.equal(expressPathForHostedRequest('/api/auth/send-email-otp'), '/api/auth/send-email-otp');
   assert.equal(expressPathForHostedRequest('/api/health?ready=1'), '/api/health?ready=1');
   assert.equal(expressPathForHostedRequest('/auth/register?role=seeker'), '/api/auth/register?role=seeker');
+  assert.equal(
+    expressPathForHostedRequest('/api/index?__ps_path=auth/send-email-otp'),
+    '/api/auth/send-email-otp'
+  );
+  assert.equal(
+    expressPathForHostedRequest('/api/index?__ps_path=auth/send-email-otp&ready=1'),
+    '/api/auth/send-email-otp?ready=1'
+  );
+  assert.equal(expressPathForHostedRequest('/api/health?__ps_path=auth/register'), '/api/health?__ps_path=auth/register');
+  assert.equal(expressPathForHostedRequest('/api/index?__ps_path=../server.ts'), '/api');
 });
 
 test('plain-text Vercel 404 becomes a safe registration error', async () => {
@@ -65,12 +75,15 @@ test('Vercel deployment wires /api to the Express server bundle', () => {
     rewrites?: unknown;
     functions?: Record<string, { includeFiles?: string }>;
   };
-  const handler = fs.readFileSync(new URL('../api/[...path].js', import.meta.url), 'utf8');
+  const handler = fs.readFileSync(new URL('../api/index.js', import.meta.url), 'utf8');
   const hosted = fs.readFileSync(new URL('../src/server/hostedApi.ts', import.meta.url), 'utf8');
   const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { engines?: { node?: string } };
   const nodeVersion = fs.readFileSync(new URL('../.node-version', import.meta.url), 'utf8').trim();
+  assert.equal(fs.existsSync(new URL('../api/[...path].js', import.meta.url)), false);
   assert.equal(config.outputDirectory, 'dist');
-  assert.equal(config.rewrites, undefined);
+  assert.deepEqual(config.rewrites, [
+    { source: '/api/:path*', destination: '/api/index?__ps_path=:path*' }
+  ]);
   assert.match(config.functions?.['api/**/*.js']?.includeFiles || '', /dist-server/);
   assert.match(handler, /initDatabase/);
   assert.match(handler, /dist-server\/index\.mjs/);
