@@ -4,7 +4,7 @@ import { getPostgresPool, queryPostgres } from './postgres.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProof, type OtpClaimRunner } from './otpClaim.ts';
 import { resolveAvatarId } from '../shared/avatars.ts';
-import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
+import { isUniqueEmailError, isUniquePhoneError, RegistrationRejected } from './registrationError.ts';
 import type {
   UserRole,
   DbUser,
@@ -757,6 +757,7 @@ export async function pgRegisterVerifiedUser(data: {
         legalConsentAt: data.legalConsentAt
       });
     } catch (error) {
+      if (isUniquePhoneError(error)) throw new RegistrationRejected(400, 'Registration could not be completed.');
       if (isUniqueEmailError(error)) throw new RegistrationRejected(400, 'An account with this email address already exists');
       throw error;
     }

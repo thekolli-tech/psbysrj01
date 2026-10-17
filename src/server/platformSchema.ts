@@ -233,6 +233,31 @@ export function applySqliteAdditiveSchema(database: { exec: (sql: string) => voi
   `);
 }
 
+export const PHONE_UNIQUENESS_INDEX = 'uq_users_phone_nonempty';
+
+export function phoneDuplicateCountSql(dialect: 'sqlite' | 'pg'): string {
+  const trim = dialect === 'pg' ? 'btrim(phone)' : 'TRIM(phone)';
+  return `SELECT COUNT(*) AS duplicate_groups FROM (
+    SELECT phone FROM users
+    WHERE phone IS NOT NULL AND ${trim} <> ''
+    GROUP BY phone
+    HAVING COUNT(*) > 1
+  ) phone_duplicates`;
+}
+
+export function phoneUniquenessSql(dialect: 'sqlite' | 'pg'): string {
+  const trim = dialect === 'pg' ? 'btrim(phone)' : 'TRIM(phone)';
+  return `CREATE UNIQUE INDEX IF NOT EXISTS ${PHONE_UNIQUENESS_INDEX} ON users (phone) WHERE phone IS NOT NULL AND ${trim} <> ''`;
+}
+
+/**
+ * Creates the partial unique index only when every non-empty phone is already unique.
+ * Duplicate rows are counted and left unchanged.
+ */
+export function phoneUniquenessPlan(duplicateGroups: number): { enforce: boolean; duplicateGroups: number } {
+  return { enforce: duplicateGroups === 0, duplicateGroups };
+}
+
 export function schemaSqlIsNonDestructive(sql: string): boolean {
   const forbidden = /\b(DROP\s+TABLE|TRUNCATE|DELETE\s+FROM|INSERT\s+INTO\s+(users|communities|community_posts|buyer_leads|sessions|otps|payment_transactions)\b)/i;
   return !forbidden.test(sql);

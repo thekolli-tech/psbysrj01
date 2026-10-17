@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { POSTGRES_ADDITIVE_SQL, REQUIRED_TABLES } from './platformSchema.ts';
+import { phoneDuplicateCountSql, phoneUniquenessPlan, phoneUniquenessSql, POSTGRES_ADDITIVE_SQL, REQUIRED_TABLES } from './platformSchema.ts';
 
 // Register PostgreSQL type parsers for Neon compatibility
 // Type ID 1700 (NUMERIC/DECIMAL) -> JavaScript number
@@ -455,6 +455,17 @@ export async function runPostgresMigrations(): Promise<boolean> {
     await client.query(POSTGRES_ADDITIVE_SQL);
 
     await client.query('COMMIT');
+    try {
+      const count = await client.query(phoneDuplicateCountSql('pg'));
+      const plan = phoneUniquenessPlan(Number(count.rows[0]?.duplicate_groups || 0));
+      if (!plan.enforce) {
+        console.warn(`[Property Studio] Phone uniqueness index was not created. Duplicate non-empty phone groups: ${plan.duplicateGroups}. No rows were changed.`);
+      } else {
+        await client.query(phoneUniquenessSql('pg'));
+      }
+    } catch {
+      console.warn('[Property Studio] Phone uniqueness index was not created. No rows were changed.');
+    }
     console.log('[PostgreSQL Migration] All PostgreSQL tables, indexes, and constraints migrated successfully.');
     return true;
   } catch (err: any) {

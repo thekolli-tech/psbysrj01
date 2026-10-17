@@ -9,7 +9,8 @@ import {
   isPropertySeeker,
   isSelfServeRole
 } from '../shared/policy.ts';
-import { canReadFullPhone } from '../shared/phonePrivacy.ts';
+import { canReadFullPhone, containsPhoneDigits, OWN_PHONE_CONTENT_MESSAGE } from '../shared/phonePrivacy.ts';
+import { presentPublicText } from './publicText.ts';
 import { revealAllowedAfterPayment } from './commerce.ts';
 import {
   CommerceError,
@@ -55,7 +56,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
   app.get('/api/properties', async (_req: Request, res: Response): Promise<void> => {
     try {
       const properties = await listPublicListings();
-      res.json({ properties });
+      res.json(await presentPublicText({ properties }, null));
     } catch (err) {
       sendError(res, err);
     }
@@ -76,6 +77,10 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         res.status(403).json({ error: 'Property seekers cannot publish listings.' });
         return;
       }
+      if (containsPhoneDigits(JSON.stringify(req.body || {}), req.user.phone)) {
+        res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
+        return;
+      }
       const listing = await createListing(req.user.id, req.body || {});
       await createAuditLog({
         actorId: req.user.id,
@@ -93,6 +98,10 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
 
   app.patch('/api/properties/:id', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
     try {
+      if (containsPhoneDigits(JSON.stringify(req.body || {}), req.user.phone)) {
+        res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
+        return;
+      }
       const listing = await updateOwnedListing(req.user.id, req.params.id, req.body || {});
       if (!listing) {
         res.status(404).json({ error: 'Listing not found' });
@@ -292,7 +301,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
           details: { route: '/api/leads', count: visible.length }
         });
       }
-      res.json({ leads: visible });
+      res.json(await presentPublicText({ leads: visible }, req.user, { preservePhoneFields: true }));
     } catch (err) {
       sendError(res, err);
     }
@@ -307,6 +316,10 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
       }
       if (!body.name || !body.phone || !body.budget) {
         res.status(400).json({ error: 'Name, phone, and budget are required.' });
+        return;
+      }
+      if (containsPhoneDigits(`${body.name || ''}\n${body.requirements || ''}`, req.user.phone)) {
+        res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
         return;
       }
       const leadId = await createEnquiry({
@@ -361,7 +374,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         targetId: req.params.id,
         details: { charged: result.charged }
       });
-      res.json({ success: true, ...result });
+      res.json(await presentPublicText({ success: true, ...result }, req.user, { preservePhoneFields: true }));
     } catch (err) {
       sendError(res, err);
     }

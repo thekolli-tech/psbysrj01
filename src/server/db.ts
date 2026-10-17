@@ -6,7 +6,8 @@ import { applySqliteAdditiveSchema } from './platformSchema.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProofSync, type SyncOtpClaimRunner } from './otpClaim.ts';
 import { resolveAvatarId } from '../shared/avatars.ts';
-import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
+import { isUniqueEmailError, isUniquePhoneError, RegistrationRejected } from './registrationError.ts';
+import { phoneDuplicateCountSql, phoneUniquenessPlan, phoneUniquenessSql } from './platformSchema.ts';
 import {
   pgFindUserByEmail,
   pgFindUserById,
@@ -485,6 +486,28 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
 export async function findUserById(id: string): Promise<DbUser | null> {
   if (isPostgresAuthoritative()) return pgFindUserById(id);
   return sqliteFindUserById(id);
+}
+
+export async function listProtectedPhones(): Promise<string[]> {
+  if (isPostgresAuthoritative()) {
+    const { queryPostgres } = await import('./postgres.ts');
+    const found = await queryPostgres<{ phone: string }>(
+      `SELECT DISTINCT phone FROM (
+         SELECT phone FROM users WHERE phone IS NOT NULL AND btrim(phone) <> ''
+         UNION
+         SELECT phone FROM buyer_leads WHERE phone IS NOT NULL AND btrim(phone) <> ''
+       ) protected_phones`
+    );
+    return found.rows.map(row => String(row.phone || '')).filter(Boolean);
+  }
+  const rows = getSqliteDb().prepare(
+    `SELECT DISTINCT phone FROM (
+       SELECT phone FROM users WHERE phone IS NOT NULL AND TRIM(phone) <> ''
+       UNION
+       SELECT phone FROM buyer_leads WHERE phone IS NOT NULL AND TRIM(phone) <> ''
+     )`
+  ).all() as Array<{ phone: string }>;
+  return rows.map(row => String(row.phone || '')).filter(Boolean);
 }
 
 export async function findUserByPhone(phone: string): Promise<DbUser | null> {
@@ -1250,6 +1273,17 @@ function sqliteInitDatabase(): void {
   `);
 
   applySqliteAdditiveSchema(db);
+  ensureSqlitePhoneUniqueness(db);
+}
+
+export function ensureSqlitePhoneUniqueness(database: Pick<SqliteDatabase, 'prepare' | 'exec'>): void {
+  const count = database.prepare(phoneDuplicateCountSql('sqlite')).get() as { duplicate_groups?: number } | undefined;
+  const plan = phoneUniquenessPlan(Number(count?.duplicate_groups || 0));
+  if (!plan.enforce) {
+    console.warn(`[Property Studio] Phone uniqueness index was not created. Duplicate non-empty phone groups: ${plan.duplicateGroups}. No rows were changed.`);
+    return;
+  }
+  database.exec(phoneUniquenessSql('sqlite'));
 }
 
 function sqliteFindUserByEmail(email: string): DbUser | null {
@@ -1856,6 +1890,7 @@ function sqliteRegisterVerifiedUser(data: {
       );
       return user;
     } catch (error) {
+      if (isUniquePhoneError(error)) throw new RegistrationRejected(400, 'Registration could not be completed.');
       if (isUniqueEmailError(error)) throw new RegistrationRejected(400, 'An account with this email address already exists');
       throw error;
     }

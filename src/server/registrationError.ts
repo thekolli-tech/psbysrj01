@@ -9,8 +9,15 @@ export class RegistrationRejected extends Error {
   }
 }
 
+function errorText(error: unknown): string {
+  const candidate = error as { code?: string; message?: string; constraint?: string };
+  return `${candidate?.code || ''} ${candidate?.constraint || ''} ${candidate?.message || ''}`;
+}
+
 export function isUniqueEmailError(error: unknown): boolean {
-  const candidate = error as { code?: string; message?: string };
-  if (candidate?.code === '23505' || candidate?.code === 'SQLITE_CONSTRAINT_UNIQUE') return true;
-  return /unique constraint failed: users\.email|duplicate key value violates unique constraint/i.test(String(candidate?.message || ''));
+  return /users\.email|idx_users_lower_email|users_email_key/i.test(errorText(error));
+}
+
+export function isUniquePhoneError(error: unknown): boolean {
+  return /uq_users_phone_nonempty|users\.phone/i.test(errorText(error));
 }

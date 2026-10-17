@@ -110,7 +110,7 @@ export async function sendWhatsAppOtp(
     const data = await response.json().catch(() => null) as { error?: unknown; messages?: Array<{ id?: unknown }> } | null;
     const messageId = response.ok ? acceptedMessageId(data) : null;
     if (!messageId) {
-      console.warn(`[Property Studio] WhatsApp rejected the verification message with status ${response.status}.`);
+      console.warn(`[Property Studio] WhatsApp delivery failed (WHATSAPP_DELIVERY_FAILED, http ${response.status}).`);
       return { success: false, provider: 'whatsapp', error: 'WhatsApp did not accept the verification message.' };
     }
     console.log('[Property Studio] WhatsApp accepted the verification message.');

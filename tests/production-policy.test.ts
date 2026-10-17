@@ -15,14 +15,21 @@ import {
   postLoginDestination
 } from '../src/shared/policy.ts';
 import { evaluateUnlock, SerializedWallet } from '../src/shared/ledger.ts';
-import { ESSENTIAL_CONFIG_SQL, POSTGRES_ADDITIVE_SQL, schemaSqlIsNonDestructive } from '../src/server/platformSchema.ts';
+import { ESSENTIAL_CONFIG_SQL, PHONE_UNIQUENESS_INDEX, POSTGRES_ADDITIVE_SQL, phoneDuplicateCountSql, phoneUniquenessPlan, phoneUniquenessSql, schemaSqlIsNonDestructive } from '../src/server/platformSchema.ts';
 
 test('Production policy', async (t) => {
   await t.test('schema SQL does not drop tables or import business records', () => {
     assert.equal(schemaSqlIsNonDestructive(POSTGRES_ADDITIVE_SQL), true);
     assert.equal(schemaSqlIsNonDestructive(ESSENTIAL_CONFIG_SQL), true);
+    assert.equal(schemaSqlIsNonDestructive(phoneUniquenessSql('pg')), true);
+    assert.equal(schemaSqlIsNonDestructive(phoneUniquenessSql('sqlite')), true);
+    assert.equal(schemaSqlIsNonDestructive(phoneDuplicateCountSql('pg')), true);
+    assert.equal(POSTGRES_ADDITIVE_SQL.includes(PHONE_UNIQUENESS_INDEX), false);
+    assert.equal(phoneUniquenessPlan(0).enforce, true);
+    assert.equal(phoneUniquenessPlan(1).enforce, false);
     assert.match(ESSENTIAL_CONFIG_SQL, /INSERT INTO system_metadata/i);
     assert.doesNotMatch(POSTGRES_ADDITIVE_SQL, /DROP TABLE/i);
+    assert.doesNotMatch(phoneUniquenessSql('pg'), /DELETE|UPDATE|INSERT/i);
   });
 
   await t.test('bootstrap leaves existing accounts unchanged', () => {

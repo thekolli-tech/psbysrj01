@@ -72,7 +72,7 @@ import { whatsAppSettings } from './src/server/whatsappOtp.ts';
 import { LEGAL_CONSENT_VERSION, legalDocumentForPath } from './src/shared/legal.ts';
 import { renderLegalHtml } from './src/server/legalHtml.ts';
 import { serializeAccount } from './src/server/accountView.ts';
-import { RegistrationRejected } from './src/server/registrationError.ts';
+import { isUniquePhoneError, RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
@@ -80,7 +80,8 @@ import { buildHealthReport } from './src/server/health.ts';
 import { canViewModeratedContent, communityReplayVisible, selfServeStorageRole } from './src/shared/policy.ts';
 import { isAllowedAvatar } from './src/shared/avatars.ts';
 import { normalizeE164 } from './src/shared/phone.ts';
-import { scrubPhoneFields } from './src/shared/phonePrivacy.ts';
+import { containsPhoneDigits, OWN_PHONE_CONTENT_MESSAGE } from './src/shared/phonePrivacy.ts';
+import { presentPublicText } from './src/server/publicText.ts';
 import { allowRequest, clientKey } from './src/server/rateLimit.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -189,8 +190,9 @@ function accountResponse(user: any, viewer = { id: user?.id, role: user?.role })
   };
 }
 
-export function broadcastSseEvent(eventType: string, data: any, targetUserId?: string): void {
-  const payload = `event: ${eventType}\ndata: ${JSON.stringify(scrubPhoneFields(data))}\n\n`;
+export async function broadcastSseEvent(eventType: string, data: any, targetUserId?: string): Promise<void> {
+  const safe = await presentPublicText(data, null);
+  const payload = `event: ${eventType}\ndata: ${JSON.stringify(safe)}\n\n`;
   for (const client of sseClients) {
     if (!targetUserId || client.userId === targetUserId) {
       try {
@@ -236,7 +238,8 @@ app.get('/api/community/events', async (req: AuthenticatedRequest, res: Response
         if (!communityReplayVisible(payload, req.user)) {
           continue;
         }
-        res.write(`event: ${ev.event_type}\ndata: ${JSON.stringify(scrubPhoneFields(payload))}\n\n`);
+        const safePayload = await presentPublicText(payload, req.user);
+        res.write(`event: ${ev.event_type}\ndata: ${JSON.stringify(safePayload)}\n\n`);
       }
     } catch (_e) {}
   }
@@ -473,13 +476,15 @@ app.post('/api/auth/send-phone-otp', async (req: AuthenticatedRequest, res: Resp
     }
     const issued = await issuePhoneOtp(normalized);
     if (!issued.sent) {
-      const status = issued.code === 'WHATSAPP_NOT_CONFIGURED' ? 503 : 502;
-      res.status(status).json({
-        error: issued.code === 'WHATSAPP_NOT_CONFIGURED'
-          ? 'WhatsApp verification is not configured. No code was sent and no account was created.'
-          : 'WhatsApp did not accept the verification code. No code remains active and no account was created.',
-        code: issued.code
-      });
+      if (issued.code === 'WHATSAPP_NOT_CONFIGURED') {
+        res.status(503).json({
+          error: 'WhatsApp verification is not configured. No code was sent and no account was created.',
+          code: 'WHATSAPP_NOT_CONFIGURED'
+        });
+        return;
+      }
+      console.warn('[Property Studio] WhatsApp delivery failed (WHATSAPP_DELIVERY_FAILED). The verification code was discarded.');
+      res.json(acknowledgement);
       return;
     }
     res.json(acknowledgement);
@@ -758,9 +763,20 @@ app.post('/api/admin/users', requireAdmin, async (req: AuthenticatedRequest, res
       res.status(400).json({ error: 'Name and email are required' });
       return;
     }
+    if (req.body?.phoneVerified === true || req.body?.phone_verified === 1 || req.body?.phone_verified === true) {
+      res.status(400).json({
+        error: 'An administrator cannot mark a mobile number verified. The account was not created.',
+        code: 'PHONE_VERIFICATION_NOT_GRANTABLE'
+      });
+      return;
+    }
     const normalizedPhone = phone ? normalizeE164(phone) : '';
     if (phone && !normalizedPhone) {
       res.status(400).json({ error: 'A valid international mobile number in E.164 format is required.' });
+      return;
+    }
+    if (normalizedPhone && await findUserByPhone(normalizedPhone)) {
+      res.status(400).json({ error: 'That mobile number cannot be saved. No account was created.' });
       return;
     }
     const existing = await findUserByEmail(email);
@@ -795,7 +811,7 @@ app.post('/api/admin/users', requireAdmin, async (req: AuthenticatedRequest, res
       action: 'ADMIN_USER_CREATED',
       targetId: newUser.id,
       targetEmail: newUser.email,
-      details: { role: newUser.role }
+      details: { role: newUser.role, phoneProvided: Boolean(normalizedPhone), phoneVerified: Number(newUser.phone_verified || 0) }
     });
 
     res.json({
@@ -803,7 +819,11 @@ app.post('/api/admin/users', requireAdmin, async (req: AuthenticatedRequest, res
       user: accountResponse(newUser, { id: req.user.id, role: req.user.role })
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    if (isUniquePhoneError(err)) {
+      res.status(400).json({ error: 'That mobile number cannot be saved. No account was created.' });
+      return;
+    }
+    res.status(500).json({ error: 'The account could not be created.' });
   }
 });
 
@@ -856,6 +876,13 @@ app.patch('/api/admin/users/:id/role', requireAdmin, async (req: AuthenticatedRe
     const { role } = req.body;
     if (!role) {
       res.status(400).json({ error: 'New role is required' });
+      return;
+    }
+    if (req.body?.phoneVerified === true || req.body?.phone_verified === 1 || req.body?.phone_verified === true) {
+      res.status(400).json({
+        error: 'An administrator cannot mark a mobile number verified. The role was not changed.',
+        code: 'PHONE_VERIFICATION_NOT_GRANTABLE'
+      });
       return;
     }
 
@@ -935,7 +962,7 @@ app.get('/api/community/posts', async (req: AuthenticatedRequest, res: Response)
       currentUserId: req.user?.id
     });
 
-    res.json({ posts });
+    res.json(await presentPublicText({ posts }, req.user));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -949,7 +976,7 @@ app.get('/api/community/posts/:id', async (req: AuthenticatedRequest, res: Respo
       res.status(404).json({ error: 'Post not found' });
       return;
     }
-    res.json({ post });
+    res.json(await presentPublicText({ post }, req.user));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -961,6 +988,10 @@ app.post('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, 
     const { title, content, topic, communityId, communityName, propertyId, propertyName, links, attachments, mediaType, mediaUrl, thumbnailUrl, duration } = req.body;
     if (!title || !content || !topic) {
       res.status(400).json({ error: 'Title, content, and topic are required' });
+      return;
+    }
+    if (containsPhoneDigits(`${title}\n${content}`, req.user.phone)) {
+      res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
       return;
     }
 
@@ -983,8 +1014,8 @@ app.post('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, 
       duration
     });
 
-    broadcastSseEvent('POST_CREATED', { id: post.id, status: post.status }, req.user.id);
-    res.json({ success: true, post });
+    await broadcastSseEvent('POST_CREATED', { id: post.id, status: post.status }, req.user.id);
+    res.json(await presentPublicText({ success: true, post }, req.user));
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -994,13 +1025,19 @@ app.post('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, 
 app.put('/api/community/posts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
+    const nextTitle = req.body?.title;
+    const nextContent = req.body?.content;
+    if (containsPhoneDigits(`${nextTitle || ''}\n${nextContent || ''}`, req.user.phone)) {
+      res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
+      return;
+    }
     const updated = await updatePost(req.params.id, req.user.id, req.body, isElevated);
     if (!updated) {
       res.status(403).json({ error: 'Unauthorized to edit this post' });
       return;
     }
-    broadcastSseEvent('POST_UPDATED', { id: updated.id, status: updated.status }, req.user.id);
-    res.json({ success: true, post: updated });
+    await broadcastSseEvent('POST_UPDATED', { id: updated.id, status: updated.status }, req.user.id);
+    res.json(await presentPublicText({ success: true, post: updated }, req.user));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1015,7 +1052,7 @@ app.delete('/api/community/posts/:id', requireAuth, async (req: AuthenticatedReq
       res.status(403).json({ error: 'Unauthorized to delete this post' });
       return;
     }
-    broadcastSseEvent('POST_DELETED', { id: req.params.id });
+    await broadcastSseEvent('POST_DELETED', { id: req.params.id });
     res.json({ success: true, message: 'Post removed' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1027,7 +1064,7 @@ app.patch('/api/community/posts/:id/pin', requireAdmin, async (req: Request, res
   try {
     const { isPinned } = req.body;
     await pinPost(req.params.id, Boolean(isPinned));
-    broadcastSseEvent('POST_UPDATED', { id: req.params.id, isPinned });
+    await broadcastSseEvent('POST_UPDATED', { id: req.params.id, isPinned });
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1055,6 +1092,10 @@ app.post('/api/community/posts/:id/reply', requireAuth, async (req: Authenticate
       res.status(400).json({ error: 'Comment content cannot be empty' });
       return;
     }
+    if (containsPhoneDigits(content, req.user.phone)) {
+      res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
+      return;
+    }
     const parentPost = await getPostById(req.params.id, req.user?.id);
     if (!parentPost || !canViewModeratedContent(parentPost.status, parentPost.authorId, req.user)) {
       res.status(404).json({ error: 'Post not found' });
@@ -1068,7 +1109,7 @@ app.post('/api/community/posts/:id/reply', requireAuth, async (req: Authenticate
       authorRole: req.user.role,
       content
     });
-    res.json({ success: true, comment });
+    res.json(await presentPublicText({ success: true, comment }, req.user));
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -1097,7 +1138,7 @@ app.post('/api/community/posts/:id/like', requireAuth, async (req: Authenticated
     }
     const result = await togglePostLike(req.params.id, req.user.id);
     if (post.status === 'APPROVED' || post.status === 'PUBLISHED') {
-      broadcastSseEvent('LIKE_CHANGED', { postId: req.params.id, upvotes: result.upvotes });
+      await broadcastSseEvent('LIKE_CHANGED', { postId: req.params.id, upvotes: result.upvotes });
     }
     res.json({ success: true, ...result });
   } catch (err: any) {
@@ -1118,7 +1159,7 @@ app.get('/api/community/posts/:id/comments', async (req: AuthenticatedRequest, r
       return;
     }
     const comments = await getCommentsForPost(req.params.id, req.user?.id);
-    res.json({ comments });
+    res.json(await presentPublicText({ comments }, req.user));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1130,6 +1171,10 @@ app.post('/api/community/posts/:id/comments', requireAuth, async (req: Authentic
     const { content, parentId } = req.body;
     if (!content || !content.trim()) {
       res.status(400).json({ error: 'Comment content cannot be empty' });
+      return;
+    }
+    if (containsPhoneDigits(String(content), req.user.phone)) {
+      res.status(400).json({ error: OWN_PHONE_CONTENT_MESSAGE, code: 'OWN_PHONE_IN_CONTENT' });
       return;
     }
     const parentPost = await getPostById(req.params.id, req.user?.id);
@@ -1148,9 +1193,9 @@ app.post('/api/community/posts/:id/comments', requireAuth, async (req: Authentic
     });
 
     if (parentPost.status === 'APPROVED' || parentPost.status === 'PUBLISHED') {
-      broadcastSseEvent('COMMENT_CREATED', comment);
+      await broadcastSseEvent('COMMENT_CREATED', comment);
     }
-    res.json({ success: true, comment });
+    res.json(await presentPublicText({ success: true, comment }, req.user));
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -1165,7 +1210,7 @@ app.delete('/api/community/comments/:id', requireAuth, async (req: Authenticated
       res.status(403).json({ error: 'Unauthorized to delete this comment' });
       return;
     }
-    broadcastSseEvent('COMMENT_DELETED', { id: req.params.id });
+    await broadcastSseEvent('COMMENT_DELETED', { id: req.params.id });
     res.json({ success: true, message: 'Comment removed' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1240,7 +1285,7 @@ app.get('/api/notifications', requireAuth, async (req: AuthenticatedRequest, res
   try {
     const notifications = await getUserNotifications(req.user.id);
     const unreadCount = await getUnreadNotificationCount(req.user.id);
-    res.json(scrubPhoneFields({ notifications, unreadCount }));
+    res.json(await presentPublicText({ notifications, unreadCount }, req.user));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1430,8 +1475,9 @@ app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
 });
 
 app.post('/api/auth/change-phone', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const phone = normalizeE164(req.body?.phone);
+  if (rejectIfRateLimited(req, res, 'change-phone', phone || String(req.body?.phone || ''))) return;
   try {
-    const phone = normalizeE164(req.body?.phone);
     const otp = String(req.body?.otp || '');
     if (!phone || !otp) {
       res.status(400).json({ error: 'Mobile number and WhatsApp verification code are required.' });

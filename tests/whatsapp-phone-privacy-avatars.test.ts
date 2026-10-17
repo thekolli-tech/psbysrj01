@@ -5,7 +5,8 @@ import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 import { AVATARS, DEFAULT_AVATAR_ID, isAllowedAvatar, resolveAvatarId } from '../src/shared/avatars.ts';
 import { normalizeE164, whatsAppRecipient } from '../src/shared/phone.ts';
-import { canReadFullPhone, paidContactAccessGranted, presentPhone, scrubPhoneFields } from '../src/shared/phonePrivacy.ts';
+import { canReadFullPhone, containsPhoneDigits, paidContactAccessGranted, presentPhone, redactPhoneDigits, scrubPhoneFields } from '../src/shared/phonePrivacy.ts';
+import { isUniqueEmailError, isUniquePhoneError } from '../src/server/registrationError.ts';
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = '';
@@ -51,12 +52,22 @@ test('E.164, avatar allowlist, and phone privacy helpers', () => {
   const scrubbed = scrubPhoneFields({ phone: SECRET_PHONE, nested: { mobile: SECRET_PHONE, title: 'kept' } }) as { title?: string; nested: { title: string } };
   assert.equal(JSON.stringify(scrubbed).includes('4155552671'), false);
   assert.equal(scrubbed.nested.title, 'kept');
+  assert.equal(containsPhoneDigits('Call +1 (415) 555-2671 today', SECRET_PHONE), true);
+  assert.equal(containsPhoneDigits('Plot 415555 is 2671 sq ft', SECRET_PHONE), false);
+  assert.equal(redactPhoneDigits('Call +1 415 555 2671 today', SECRET_PHONE).includes('4155552671'), false);
+  assert.equal(redactPhoneDigits('Call +1 415 555 2671 today', SECRET_PHONE).includes('******2671'), true);
+  assert.equal(isUniquePhoneError({ code: '23505', constraint: 'uq_users_phone_nonempty', message: 'duplicate key' }), true);
+  assert.equal(isUniquePhoneError({ message: 'UNIQUE constraint failed: users.phone' }), true);
+  assert.equal(isUniqueEmailError({ code: '23505', message: 'duplicate key value violates unique constraint' }), false);
+  assert.equal(isUniqueEmailError({ constraint: 'users_email_key', message: 'duplicate key' }), true);
 });
 
 test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => {
-  const { initDatabase, createUser, findUserByEmail, findUserByPhone, getSqliteDb } = await import('../src/server/db.ts');
+  const { initDatabase, createUser, ensureSqlitePhoneUniqueness, findUserByEmail, findUserByPhone, getSqliteDb } = await import('../src/server/db.ts');
   const { sendWhatsAppOtp, whatsAppSettings } = await import('../src/server/whatsappOtp.ts');
   await initDatabase();
+  const liveIndex = getSqliteDb().prepare(`SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'uq_users_phone_nonempty'`).get() as { name?: string } | undefined;
+  assert.equal(liveIndex?.name, 'uq_users_phone_nonempty');
   assert.equal(whatsAppSettings(), null);
   const unconfigured = await sendWhatsAppOtp(SECRET_PHONE, '123456', async () => {
     throw new Error('network must not be called');
@@ -156,14 +167,26 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
 
     whatsappStatus = 400;
     const rejected = await api('POST', '/api/auth/send-phone-otp', { phone: '+14155550101' });
-    assert.equal(rejected.status, 502);
-    assert.equal(rejected.json.code, 'WHATSAPP_DELIVERY_FAILED');
+    const deliveryAck = {
+      success: true,
+      message: 'If this mobile number can be verified, a WhatsApp code has been sent.',
+      deliveredVia: 'whatsapp'
+    };
+    assert.equal(rejected.status, 200);
+    assert.deepEqual(rejected.json, deliveryAck);
+    assert.equal(rejected.raw.includes('14155550101'), false);
     const rejectedRows = getSqliteDb().prepare(`SELECT COUNT(*) AS count FROM otps WHERE target = ? AND consumed_at IS NULL`).get('+14155550101') as { count: number };
     assert.equal(Number(rejectedRows.count), 0);
+    assert.equal(logs.some(line => line.includes('WHATSAPP_DELIVERY_FAILED')), true);
+    assert.equal(logs.some(line => line.includes('14155550101') || line.includes(TOKEN) || line.includes(phoneCode())), false);
 
     whatsappStatus = 302;
     const redirected = await api('POST', '/api/auth/send-phone-otp', { phone: '+14155550102' });
-    assert.equal(redirected.status, 502);
+    assert.equal(redirected.status, 200);
+    assert.deepEqual(redirected.json, deliveryAck);
+    assert.equal(redirected.raw.includes('14155550102'), false);
+    const redirectedRows = getSqliteDb().prepare(`SELECT COUNT(*) AS count FROM otps WHERE target = ? AND consumed_at IS NULL`).get('+14155550102') as { count: number };
+    assert.equal(Number(redirectedRows.count), 0);
     whatsappStatus = 200;
 
     const seekerEmail = 'seeker.whatsapp@example.com';
@@ -331,8 +354,21 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
       ['COMMUNITY_MODERATOR', 'mod.privacy@example.com'],
       ['PROPERTY_SEEKER', 'other.seeker@example.com']
     ];
+    const rolePhones: Record<string, string> = {
+      SUPER_ADMIN: '+19995550001',
+      DEVELOPER: '+19995550002',
+      PROPERTY_ADMIN: '+19995550003',
+      AGENT: '+19995550004',
+      CHANNEL_PARTNER: '+19995550000',
+      RESELLER: '+19995550005',
+      RERA_AGENT: '+19995550006',
+      LANDOWNER: '+19995550007',
+      REAL_ESTATE_MEDIA: '+19995550008',
+      COMMUNITY_MODERATOR: '+19995550009',
+      PROPERTY_SEEKER: '+19995550010'
+    };
     for (const [role, email] of roleEmails) {
-      await createUser({ name: role, email, role: role as any, password, isVerified: true, phone: '+19995550000' });
+      await createUser({ name: role, email, role: role as any, password, isVerified: true, phone: rolePhones[role] });
     }
     const cookies: Record<string, string> = {};
     for (const [role, email] of roleEmails) cookies[role] = await login(email, password);
@@ -349,6 +385,18 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
     assert.equal(blockedLead.status, 403);
     assert.equal(blockedLead.json.code, 'PHONE_NOT_VERIFIED');
 
+    const ownEnquiry = await api('POST', '/api/leads', {
+      name: 'WhatsApp Seeker',
+      phone: SECRET_PHONE,
+      budget: '80 lakhs',
+      consentGranted: true,
+      requirements: `Please call ${SECRET_PHONE} about this plot.`
+    }, seekerCookie);
+    assert.equal(ownEnquiry.status, 400);
+    assert.equal(ownEnquiry.json.code, 'OWN_PHONE_IN_CONTENT');
+    assert.equal(ownEnquiry.raw.includes(SECRET_PHONE), false);
+    assert.equal(Number((getSqliteDb().prepare('SELECT COUNT(*) AS count FROM buyer_leads').get() as { count: number }).count), 0);
+
     const enquiry = await api('POST', '/api/leads', {
       name: 'WhatsApp Seeker',
       phone: '+19995550000',
@@ -359,7 +407,7 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
       consentGranted: true,
       consentVersion: '2026-10-15',
       consentPurpose: 'enquiry response',
-      requirements: `Please call ${SECRET_PHONE} about this plot.`
+      requirements: 'South-facing plot near the metro. No number in this note.'
     }, seekerCookie);
     assert.equal(enquiry.status, 201, enquiry.raw);
     const stored = getSqliteDb().prepare('SELECT phone FROM buyer_leads WHERE id = ?').get(enquiry.json.leadId) as { phone: string };
@@ -446,9 +494,53 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
     const comments = await api('GET', `/api/community/posts/${post.json.post.id}/comments`);
     assert.equal(comments.raw.includes(SECRET_PHONE), false);
 
+    const ownPost = await api('POST', '/api/community/posts', {
+      title: 'Call me',
+      content: `Reach ${SECRET_PHONE} after six.`,
+      topic: 'LEGAL'
+    }, seekerCookie);
+    assert.equal(ownPost.status, 400);
+    assert.equal(ownPost.json.code, 'OWN_PHONE_IN_CONTENT');
+    assert.equal(ownPost.raw.includes(SECRET_PHONE), false);
+    assert.equal(Number((getSqliteDb().prepare(`SELECT COUNT(*) AS count FROM community_posts WHERE content LIKE '%4155552671%'`).get() as { count: number }).count), 0);
+
+    const quoted = await api('POST', '/api/community/posts', {
+      title: 'Site visit',
+      content: `The buyer mentioned ${SECRET_PHONE} during the visit.`,
+      topic: 'LEGAL'
+    }, cookies.CHANNEL_PARTNER);
+    assert.equal(quoted.status, 200, quoted.raw);
+    assert.equal(quoted.raw.includes('4155552671'), false);
+    const storedQuote = getSqliteDb().prepare('SELECT content FROM community_posts WHERE id = ?').get(quoted.json.post.id) as { content: string };
+    assert.equal(storedQuote.content.includes('4155552671'), true);
+    assert.equal((await api('PATCH', `/api/admin/posts/${quoted.json.post.id}/moderation`, { status: 'APPROVED' }, cookies.SUPER_ADMIN)).status, 200);
+    const maskedPosts = await api('GET', '/api/community/posts');
+    assert.equal(maskedPosts.raw.includes('4155552671'), false);
+    assert.equal(maskedPosts.raw.includes('******2671'), true);
+    const adminPosts = await api('GET', '/api/community/posts', undefined, cookies.SUPER_ADMIN);
+    assert.equal(adminPosts.raw.includes(SECRET_PHONE), true);
+    const ownComment = await api('POST', `/api/community/posts/${quoted.json.post.id}/comments`, { content: `My number is ${SECRET_PHONE}` }, seekerCookie);
+    assert.equal(ownComment.status, 400);
+    assert.equal(ownComment.json.code, 'OWN_PHONE_IN_CONTENT');
+    const quotedComment = await api('POST', `/api/community/posts/${quoted.json.post.id}/comments`, { content: `Noted ${SECRET_PHONE} for the file.` }, cookies.CHANNEL_PARTNER);
+    assert.equal(quotedComment.status, 200, quotedComment.raw);
+    assert.equal(quotedComment.raw.includes('4155552671'), false);
+    const storedComment = getSqliteDb().prepare('SELECT content FROM community_comments WHERE id = ?').get(quotedComment.json.comment.id) as { content: string };
+    assert.equal(storedComment.content.includes('4155552671'), true);
+    const publicComments = await api('GET', `/api/community/posts/${quoted.json.post.id}/comments`);
+    assert.equal(publicComments.raw.includes('4155552671'), false);
+
+    const ownListing = await api('POST', '/api/properties', {
+      title: 'Call +1 999 555 0000'
+    }, cookies.CHANNEL_PARTNER);
+    assert.equal(ownListing.status, 400);
+    assert.equal(ownListing.json.code, 'OWN_PHONE_IN_CONTENT');
+    assert.equal(Number((getSqliteDb().prepare(`SELECT COUNT(*) AS count FROM property_listings WHERE title LIKE '%999 555 0000%'`).get() as { count: number }).count), 0);
+
     const listingPhone = '+15551230000';
     const createdListing = await api('POST', '/api/properties', {
       title: 'Privacy listing',
+      description: `Owner note mentions ${SECRET_PHONE} for follow-up.`,
       phone: listingPhone,
       contactPhone: listingPhone,
       mobile: listingPhone
@@ -460,16 +552,20 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
     assert.equal(publicListings.status, 200, publicListings.raw);
     assert.equal(publicListings.raw.includes('Privacy listing'), true);
     assert.equal(publicListings.raw.includes('5551230000'), false);
+    assert.equal(publicListings.raw.includes('4155552671'), false);
+    const storedListing = getSqliteDb().prepare('SELECT payload FROM property_listings WHERE id = ?').get(createdListing.json.listing.id) as { payload: string };
+    assert.equal(storedListing.payload.includes('4155552671'), true);
     const partnerListings = await api('GET', '/api/properties', undefined, cookies.CHANNEL_PARTNER);
     assert.equal(partnerListings.raw.includes('5551230000'), false);
     const ownerListings = await api('GET', '/api/me/listings', undefined, cookies.CHANNEL_PARTNER);
     assert.equal(ownerListings.raw.includes('5551230000'), true);
+    assert.equal(ownerListings.raw.includes('4155552671'), true);
     const anonymousPartnerUsers = await api('GET', '/api/admin/users', undefined, cookies.CHANNEL_PARTNER);
     assert.equal(anonymousPartnerUsers.status, 403);
 
     getSqliteDb().prepare(
       `INSERT INTO community_events (id, event_type, payload, target_user_id, created_at) VALUES (?, 'NOTE', ?, NULL, ?)`
-    ).run('evt_phone_leak', JSON.stringify({ phone: SECRET_PHONE, mobile: SECRET_PHONE, note: 'visible-note' }), '2020-01-01T00:00:00.000Z');
+    ).run('evt_phone_leak', JSON.stringify({ phone: SECRET_PHONE, mobile: SECRET_PHONE, note: `visible-note ${SECRET_PHONE}` }), '2020-01-01T00:00:00.000Z');
     const controller = new AbortController();
     const replayResponse = await originalFetch(`${base}/api/community/events`, {
       headers: { accept: 'text/event-stream', 'last-event-id': '1970-01-01T00:00:00.000Z' },
@@ -490,9 +586,17 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
     controller.abort();
     assert.equal(replay.includes('visible-note'), true);
     assert.equal(replay.includes('4155552671'), false);
+    const storedEvent = getSqliteDb().prepare('SELECT payload FROM community_events WHERE id = ?').get('evt_phone_leak') as { payload: string };
+    assert.equal(storedEvent.payload.includes('4155552671'), true);
 
+    const noted = await api('POST', `/api/community/posts/${quoted.json.post.id}/comments`, { content: `File note ${SECRET_PHONE}.` }, cookies.LANDOWNER);
+    assert.equal(noted.status, 200, noted.raw);
     const notifications = await api('GET', '/api/notifications', undefined, seekerCookie);
     assert.equal(notifications.raw.includes('password_hash'), false);
+    const partnerNotes = await api('GET', '/api/notifications', undefined, cookies.CHANNEL_PARTNER);
+    assert.equal(partnerNotes.raw.includes('4155552671'), false);
+    const storedNote = getSqliteDb().prepare(`SELECT message FROM notifications WHERE message LIKE '%4155552671%' LIMIT 1`).get() as { message: string } | undefined;
+    assert.equal(Boolean(storedNote?.message.includes('4155552671')), true);
     const audit = await api('GET', '/api/admin/audit-logs?action=PHONE_ACCESS', undefined, cookies.DEVELOPER);
     assert.equal(audit.status, 200, audit.raw);
     assert.equal(audit.raw.includes('PHONE_ACCESS'), true);
@@ -512,6 +616,119 @@ test('WhatsApp OTP, phone privacy, avatars, and deferred payments', async () => 
     const changedAudit = await api('GET', '/api/admin/audit-logs?action=PHONE_CHANGED', undefined, cookies.DEVELOPER);
     assert.equal(changedAudit.raw.includes(newPhone), false);
     assert.equal(changedAudit.raw.includes(phoneCode()), false);
+    let changeLimited = false;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const attemptResult = await api('POST', '/api/auth/change-phone', { phone: newPhone, otp: '000000' }, seekerCookie);
+      if (attemptResult.status === 429) {
+        changeLimited = true;
+        assert.equal(attemptResult.raw.includes(newPhone), false);
+        break;
+      }
+      assert.equal(attemptResult.status, 400, attemptResult.raw);
+    }
+    assert.equal(changeLimited, true);
+
+    const legacyEnquiry = await api('POST', '/api/leads', {
+      name: 'Legacy Seeker',
+      phone: newPhone,
+      budget: '40 lakhs',
+      consentGranted: true,
+      consentVersion: '2026-10-15',
+      consentPurpose: 'enquiry response',
+      requirements: 'A quiet lane. The asking figure is 4150 per sq ft.'
+    }, seekerCookie);
+    assert.equal(legacyEnquiry.status, 201, legacyEnquiry.raw);
+    const partnerId = partnerMe.json.user.id;
+    const balanceBefore = Number((getSqliteDb().prepare('SELECT wallet_balance FROM users WHERE id = ?').get(partnerId) as { wallet_balance: number }).wallet_balance);
+    getSqliteDb().prepare('UPDATE users SET wallet_balance = wallet_balance + 5000 WHERE id = ?').run(partnerId);
+    const walletOnly = await api('POST', `/api/leads/${legacyEnquiry.json.leadId}/unlock`, {}, cookies.CHANNEL_PARTNER, { 'Idempotency-Key': 'legacy-wallet-only' });
+    assert.equal(walletOnly.status, 503, walletOnly.raw);
+    assert.equal(walletOnly.json.code, 'NOT_CONFIGURED');
+    assert.equal(walletOnly.raw.includes('4155552671'), false);
+    assert.equal(walletOnly.raw.includes(newPhone), false);
+    const balanceAfterDeny = Number((getSqliteDb().prepare('SELECT wallet_balance FROM users WHERE id = ?').get(partnerId) as { wallet_balance: number }).wallet_balance);
+    assert.equal(balanceAfterDeny, balanceBefore + 5000);
+    assert.equal(Number((getSqliteDb().prepare('SELECT COUNT(*) AS count FROM lead_unlocks WHERE lead_id = ?').get(legacyEnquiry.json.leadId) as { count: number }).count), 0);
+    getSqliteDb().prepare(
+      `INSERT INTO lead_unlocks (id, lead_id, professional_id, idempotency_key, amount, ledger_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run('unlock_legacy_row', legacyEnquiry.json.leadId, partnerId, 'legacy-existing-row', 300, 'ledger_legacy_row', new Date().toISOString());
+    const legacyUnlock = await api('POST', `/api/leads/${legacyEnquiry.json.leadId}/unlock`, {}, cookies.CHANNEL_PARTNER, { 'Idempotency-Key': 'legacy-existing-attempt' });
+    assert.equal(legacyUnlock.status, 200, legacyUnlock.raw);
+    assert.equal(legacyUnlock.json.charged, 0);
+    assert.equal(legacyUnlock.json.lead.seekerPhone, `******${newPhone.slice(-4)}`);
+    assert.equal(legacyUnlock.raw.includes(newPhone.replace(/\D/g, '')), false);
+    assert.equal(legacyUnlock.json.lead.seekerName, 'Legacy Seeker');
+    const balanceAfterLegacy = Number((getSqliteDb().prepare('SELECT wallet_balance FROM users WHERE id = ?').get(partnerId) as { wallet_balance: number }).wallet_balance);
+    assert.equal(balanceAfterLegacy, balanceBefore + 5000);
+    const legacyList = await api('GET', '/api/leads', undefined, cookies.CHANNEL_PARTNER);
+    assert.equal(legacyList.raw.includes(newPhone.replace(/\D/g, '')), false);
+
+    const granted = await api('POST', '/api/admin/users', {
+      name: 'Grant Seeker',
+      email: 'grant.seeker@example.com',
+      phone: '+14155550901',
+      role: 'PROPERTY_SEEKER',
+      password: 'Longpassword1!',
+      phoneVerified: true
+    }, cookies.SUPER_ADMIN);
+    assert.equal(granted.status, 400);
+    assert.equal(granted.json.code, 'PHONE_VERIFICATION_NOT_GRANTABLE');
+    assert.equal(await findUserByEmail('grant.seeker@example.com'), null);
+    const createdAdminSeeker = await api('POST', '/api/admin/users', {
+      name: 'Admin Seeker',
+      email: 'admin.seeker@example.com',
+      phone: '+14155550902',
+      role: 'PROPERTY_SEEKER',
+      password: 'Longpassword1!'
+    }, cookies.SUPER_ADMIN);
+    assert.equal(createdAdminSeeker.status, 200, createdAdminSeeker.raw);
+    assert.equal(createdAdminSeeker.json.user.phone_verified, 0);
+    const createdAudit = await api('GET', '/api/admin/audit-logs?action=ADMIN_USER_CREATED', undefined, cookies.DEVELOPER);
+    assert.equal(createdAudit.raw.includes('14155550902'), false);
+    assert.equal(createdAudit.raw.includes('phoneVerified'), true);
+    const adminSeekerCookie = await login('admin.seeker@example.com');
+    const adminSeekerLead = await api('POST', '/api/leads', {
+      name: 'Admin Seeker',
+      phone: '+14155550902',
+      budget: '20 lakhs',
+      consentGranted: true
+    }, adminSeekerCookie);
+    assert.equal(adminSeekerLead.status, 403);
+    assert.equal(adminSeekerLead.json.code, 'PHONE_NOT_VERIFIED');
+    const roleGrant = await api('PATCH', `/api/admin/users/${createdAdminSeeker.json.user.id}/role`, {
+      role: 'AGENT',
+      phoneVerified: true
+    }, cookies.SUPER_ADMIN);
+    assert.equal(roleGrant.status, 400);
+    assert.equal(roleGrant.json.code, 'PHONE_VERIFICATION_NOT_GRANTABLE');
+    const unchangedSeeker = await findUserByEmail('admin.seeker@example.com');
+    assert.equal(unchangedSeeker?.role, 'PROPERTY_SEEKER');
+    assert.equal(Number(unchangedSeeker?.phone_verified), 0);
+
+    const sqlite = process.getBuiltinModule('node:sqlite') as typeof import('node:sqlite');
+    const side = new sqlite.DatabaseSync(`/tmp/ps-phone-unique-${process.pid}.db`);
+    side.exec('CREATE TABLE users (id TEXT PRIMARY KEY, phone TEXT)');
+    ensureSqlitePhoneUniqueness(side);
+    assert.equal((side.prepare(`SELECT name FROM sqlite_master WHERE name = 'uq_users_phone_nonempty'`).get() as { name?: string } | undefined)?.name, 'uq_users_phone_nonempty');
+    side.prepare(`INSERT INTO users (id, phone) VALUES ('blank-a', '')`).run();
+    side.prepare(`INSERT INTO users (id, phone) VALUES ('blank-b', '   ')`).run();
+    side.prepare(`INSERT INTO users (id, phone) VALUES ('one', '+15550001111')`).run();
+    assert.throws(() => side.prepare(`INSERT INTO users (id, phone) VALUES ('two', '+15550001111')`).run());
+    side.exec('DROP INDEX uq_users_phone_nonempty');
+    side.prepare(`INSERT INTO users (id, phone) VALUES ('two', '+15550001111')`).run();
+    const uniquenessWarnings: string[] = [];
+    const previousWarn = console.warn;
+    console.warn = (...args: unknown[]) => { uniquenessWarnings.push(args.map(String).join(' ')); };
+    ensureSqlitePhoneUniqueness(side);
+    console.warn = previousWarn;
+    assert.equal(side.prepare(`SELECT name FROM sqlite_master WHERE name = 'uq_users_phone_nonempty'`).get(), undefined);
+    assert.equal(Number((side.prepare(`SELECT COUNT(*) AS count FROM users WHERE phone = '+15550001111'`).get() as { count: number }).count), 2);
+    assert.equal(uniquenessWarnings.some(line => line.includes('Duplicate non-empty phone groups: 1')), true);
+    assert.equal(uniquenessWarnings.some(line => line.includes('+15550001111') || line.includes('15550001111')), false);
+    side.prepare(`DELETE FROM users WHERE id = 'two'`).run();
+    ensureSqlitePhoneUniqueness(side);
+    assert.equal((side.prepare(`SELECT name FROM sqlite_master WHERE name = 'uq_users_phone_nonempty'`).get() as { name?: string } | undefined)?.name, 'uq_users_phone_nonempty');
+    side.close();
 
     const badAvatar = await api('PATCH', '/api/me/avatar', { avatarId: 'https://example.com/a.png' }, seekerCookie);
     assert.equal(badAvatar.status, 400);
