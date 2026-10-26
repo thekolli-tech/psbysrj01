@@ -421,7 +421,7 @@ export async function saveRegistrationToMongo(
         email_verified: Boolean(user.email_verified),
         phone_verified: Boolean(user.phone_verified),
         email_channel: 'RESEND_EMAIL_OTP',
-        phone_channel: user.role === 'PROPERTY_SEEKER' ? 'SMS_CARRIER_OTP' : undefined,
+        phone_channel: user.role === 'PROPERTY_SEEKER' ? 'WHATSAPP_OTP' : undefined,
         verified_at: now
       },
       client_metadata: {

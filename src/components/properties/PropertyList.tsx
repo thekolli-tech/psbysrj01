@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Property } from '../../types';
+import { PropertyCategorySelect } from './PropertyCategorySelect';
+import { ALL_PROPERTY_TYPES, displayPropertyType, matchesPropertyTypeFilter } from '../../shared/propertyCategories';
 import { CorridorMapView } from './CorridorMapView';
 import { PropertyCompareModal } from './PropertyCompareModal';
 import { PropertyDetailModal } from './PropertyDetailModal';
@@ -45,15 +47,14 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
   const [comparedPropertyIds, setComparedPropertyIds] = useState<string[]>([]);
 
   // Filter states
-  const [filterType, setFilterType] = useState<string>('ALL');
+  const [filterType, setFilterType] = useState<string>(ALL_PROPERTY_TYPES);
   const [filterMarket, setFilterMarket] = useState<string>('ALL');
   const [minProgress, setMinProgress] = useState<number>(0);
 
-  const propertyTypes = ['ALL', 'Sky Villa', 'Luxury High-Rise', 'Grade-A Commercial', 'Gated Villa Community'];
   const microMarkets = ['ALL', 'Neopolis', 'Kokapet', 'Financial District', 'Tellapur'];
 
   const filtered = properties.filter(p => {
-    if (filterType !== 'ALL' && p.propertyType !== filterType) return false;
+    if (!matchesPropertyTypeFilter(p.propertyType, filterType)) return false;
     if (filterMarket !== 'ALL' && !p.microMarket.toLowerCase().includes(filterMarket.toLowerCase())) return false;
     if (p.progressPercent < minProgress) return false;
     return true;
@@ -122,20 +123,18 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Asset Type Filter Tabs */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-bold text-slate-400 mr-2 uppercase tracking-wide font-mono">Asset Type:</span>
-            {propertyTypes.map(t => (
-              <button
-                key={t}
-                onClick={() => setFilterType(t)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  filterType === t
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+            <label htmlFor="project-property-type" className="text-xs font-bold text-slate-400 mr-2 uppercase tracking-wide font-mono">
+              Property type
+            </label>
+            <PropertyCategorySelect
+              id="project-property-type"
+              ariaLabel="Property type"
+              includeAll
+              value={filterType}
+              storedValues={properties.map(property => property.propertyType)}
+              onChange={setFilterType}
+              className="w-full sm:w-72 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-800 border border-slate-300"
+            />
           </div>
 
           {/* Micro-Market Segmented Control */}
@@ -212,7 +211,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
             </p>
             <button
               onClick={() => {
-                setFilterType('ALL');
+                setFilterType(ALL_PROPERTY_TYPES);
                 setFilterMarket('ALL');
                 setMinProgress(0);
               }}
@@ -248,7 +247,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
                     {/* Top Status & Verification Controls */}
                     <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between">
                       <span className="text-[11px] font-bold uppercase tracking-wider bg-slate-950/90 text-amber-400 px-3 py-1 rounded-xl border border-amber-500/30 font-mono">
-                        {property.propertyType}
+                        {displayPropertyType(property.propertyType)}
                       </span>
 
                       <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CommunityPost } from '../../types';
+import { communityPostShareUrl, isCommunityPostId, readCommunitySearch } from '../../shared/communityEngagement';
 import { AudioStoryPlayer } from '../common/AudioStoryPlayer';
 import {
   MessageSquare,
@@ -60,8 +61,14 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   });
   const [commSubmitting, setCommSubmitting] = useState(false);
 
-  // Voting tracking per post: net score and user vote state (1, -1, 0)
-  const [votesState, setVotesState] = useState<Record<string, { score: number; userVote: 1 | -1 | 0 }>>({});
+  const [questionQuery, setQuestionQuery] = useState('');
+  const [engagement, setEngagement] = useState<Record<string, {
+    agreeCount: number;
+    disagreeCount: number;
+    userVote: 1 | -1 | 0;
+    followerCount: number;
+    following: boolean;
+  }>>({});
 
   const [newPostForm, setNewPostForm] = useState({
     title: '',
@@ -112,36 +119,88 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     }
   };
 
-  const handleVote = (postId: string, direction: 1 | -1) => {
+  const savedEngagement = (post: CommunityPost) => engagement[post.id] || {
+    agreeCount: post.agreeCount || 0,
+    disagreeCount: post.disagreeCount || 0,
+    userVote: post.userVote || 0,
+    followerCount: post.followerCount || 0,
+    following: Boolean(post.following)
+  };
+
+  const handleVote = async (post: CommunityPost, direction: 1 | -1) => {
     if (!isLoggedIn) {
       showToast('Please sign in to vote on community discussions.');
       onOpenLoginModal?.();
       return;
     }
-
-    setVotesState(prev => {
-      const current = prev[postId] || { score: 10, userVote: 0 };
-      let newScore = current.score;
-      let newVote: 1 | -1 | 0 = direction;
-
-      if (current.userVote === direction) {
-        // Toggle off
-        newScore -= direction;
-        newVote = 0;
-      } else if (current.userVote === 0) {
-        newScore += direction;
-        newVote = direction;
-      } else {
-        // Switching from -1 to 1 or vice versa
-        newScore += direction * 2;
-        newVote = direction;
-      }
-
-      return {
+    try {
+      const response = await fetch(`/api/community/posts/${post.id}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vote: direction })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Vote was not saved.');
+      const current = savedEngagement(post);
+      setEngagement(prev => ({
         ...prev,
-        [postId]: { score: newScore, userVote: newVote }
-      };
-    });
+        [post.id]: {
+          ...current,
+          agreeCount: Number(data.agreeCount || 0),
+          disagreeCount: Number(data.disagreeCount || 0),
+          userVote: data.userVote === 1 || data.userVote === -1 ? data.userVote : 0
+        }
+      }));
+    } catch (err: any) {
+      showToast(err.message || 'Vote was not saved.');
+    }
+  };
+
+  const handleFollow = async (post: CommunityPost) => {
+    if (!isLoggedIn) {
+      showToast('Please sign in to follow a discussion.');
+      onOpenLoginModal?.();
+      return;
+    }
+    try {
+      const response = await fetch(`/api/community/posts/${post.id}/follow`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Follow was not saved.');
+      const current = savedEngagement(post);
+      setEngagement(prev => ({
+        ...prev,
+        [post.id]: {
+          ...current,
+          followerCount: Number(data.followerCount || 0),
+          following: Boolean(data.following)
+        }
+      }));
+      showToast(data.following ? 'You are following this discussion.' : 'You unfollowed this discussion.');
+    } catch (err: any) {
+      showToast(err.message || 'Follow was not saved.');
+    }
+  };
+
+  const handleShare = async (post: CommunityPost) => {
+    const url = communityPostShareUrl(window.location.origin, post.id);
+    if (!url) {
+      showToast('This discussion does not have a public link.');
+      return;
+    }
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: post.title, url });
+        return;
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('Discussion link copied.');
+    } catch {
+      showToast('The discussion link could not be copied.');
+    }
   };
 
   const handlePostSubmit = (e: React.FormEvent) => {
@@ -203,10 +262,32 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     setActiveReplyBox(null);
   };
 
+  const parsedSearch = readCommunitySearch(questionQuery);
+  const searchError = 'error' in parsedSearch ? parsedSearch.error : '';
+  const searchTerm = 'error' in parsedSearch ? '' : parsedSearch.q;
+
   const filteredPosts = communityPosts.filter(p => {
-    if (selectedTopic === 'ALL') return true;
-    return p.topic === selectedTopic;
+    if (selectedTopic !== 'ALL' && p.topic !== selectedTopic) return false;
+    if (searchError) return false;
+    if (!searchTerm) return true;
+    return `${p.title}\n${p.content}`.toLowerCase().includes(searchTerm.toLowerCase());
   });
+
+  const netVotes = (post: CommunityPost) => {
+    const row = engagement[post.id];
+    return (row?.agreeCount ?? post.agreeCount ?? 0) - (row?.disagreeCount ?? post.disagreeCount ?? 0);
+  };
+  const visiblePosts = [...filteredPosts].sort((a, b) => {
+    if (sortMode === 'NEW') return String(b.createdAt).localeCompare(String(a.createdAt));
+    if (sortMode === 'TOP') return netVotes(b) - netVotes(a) || String(b.createdAt).localeCompare(String(a.createdAt));
+    return Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || netVotes(b) - netVotes(a) || String(b.createdAt).localeCompare(String(a.createdAt));
+  });
+
+  useEffect(() => {
+    const postId = new URLSearchParams(window.location.search).get('post') || '';
+    if (!isCommunityPostId(postId)) return;
+    document.getElementById(`community-post-${postId}`)?.scrollIntoView({ block: 'start' });
+  }, [communityPosts]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -331,6 +412,29 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
         </div>
       </div>
 
+      <form
+        role="search"
+        className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2"
+        onSubmit={event => event.preventDefault()}
+      >
+        <label htmlFor="community-question-search" className="block text-xs font-bold text-slate-700">
+          Search questions
+        </label>
+        <input
+          id="community-question-search"
+          value={questionQuery}
+          maxLength={80}
+          onChange={event => setQuestionQuery(event.target.value)}
+          placeholder="Search approved question titles and text"
+          className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+        />
+        {searchError ? (
+          <p role="alert" className="text-xs text-red-700">{searchError}</p>
+        ) : (
+          <p className="text-[11px] text-slate-500">Search matches question titles and text already visible to you.</p>
+        )}
+      </form>
+
       {/* Sorting & Topic Tabs (Reddit Style) */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         {/* Sort modes */}
@@ -384,25 +488,29 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
 
       {/* Reddit-Style Post Feed or Clean Empty State */}
       <div className="space-y-4">
-        {filteredPosts.length > 0 ? (
-          filteredPosts.map(post => {
-            const vote = votesState[post.id] || { score: post.upvotes, userVote: 0 };
+        {visiblePosts.length > 0 ? (
+          visiblePosts.map(post => {
+            const row = savedEngagement(post);
+            const vote = { score: row.agreeCount - row.disagreeCount, userVote: row.userVote };
 
             return (
               <div
                 key={post.id}
+                id={`community-post-${post.id}`}
                 className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col md:flex-row"
               >
                 {/* Left Column: Reddit-Style Upvote / Downvote Pillar */}
                 <div className="w-full md:w-16 bg-slate-50/80 p-3 md:py-5 border-b md:border-b-0 md:border-r border-slate-200 flex md:flex-col items-center justify-between md:justify-start gap-2 shrink-0">
                   <button
-                    onClick={() => handleVote(post.id, 1)}
+                    type="button"
+                    onClick={() => handleVote(post, 1)}
+                    aria-pressed={vote.userVote === 1}
+                    aria-label={vote.userVote === 1 ? 'Remove agree vote' : 'Agree'}
                     className={`p-1.5 rounded-lg transition-colors active:scale-95 cursor-pointer ${
                       vote.userVote === 1
                         ? 'text-amber-600 bg-amber-100'
                         : 'text-slate-400 hover:text-amber-600 hover:bg-slate-200'
                     }`}
-                    title="Upvote"
                   >
                     <ArrowBigUp className="w-6 h-6 fill-current" />
                   </button>
@@ -415,18 +523,21 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                         ? 'text-blue-600'
                         : 'text-slate-800'
                     }`}
+                    aria-label={`${row.agreeCount} agree, ${row.disagreeCount} disagree`}
                   >
                     {vote.score}
                   </span>
 
                   <button
-                    onClick={() => handleVote(post.id, -1)}
+                    type="button"
+                    onClick={() => handleVote(post, -1)}
+                    aria-pressed={vote.userVote === -1}
+                    aria-label={vote.userVote === -1 ? 'Remove disagree vote' : 'Disagree'}
                     className={`p-1.5 rounded-lg transition-colors active:scale-95 cursor-pointer ${
                       vote.userVote === -1
                         ? 'text-blue-600 bg-blue-100'
                         : 'text-slate-400 hover:text-blue-600 hover:bg-slate-200'
                     }`}
-                    title="Downvote"
                   >
                     <ArrowBigDown className="w-6 h-6 fill-current" />
                   </button>
@@ -440,6 +551,12 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                       <span className="font-bold text-slate-900">{post.authorName}</span>
                       <span aria-hidden="true">·</span>
                       <span className="font-mono text-[11px] text-slate-600">u/{post.authorRole.toLowerCase()}</span>
+                      {post.authorProfession ? (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span className="text-slate-700">{post.authorProfession}</span>
+                        </>
+                      ) : null}
                       <span aria-hidden="true">·</span>
                       <span className="font-mono text-[11px] text-slate-400">{post.createdAt}</span>
                     </div>
@@ -539,10 +656,19 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                         <span>{post.replies ? post.replies.length : 0} Comments</span>
                       </button>
                       <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(window.location.href);
-                          showToast('Discussion link copied to clipboard!');
-                        }}
+                        type="button"
+                        onClick={() => handleFollow(post)}
+                        aria-pressed={row.following}
+                        aria-label={row.following ? 'Unfollow this discussion' : 'Follow this discussion'}
+                        className="flex items-center gap-1.5 hover:text-slate-900 py-1 cursor-pointer"
+                      >
+                        <Bookmark className={`w-4 h-4 ${row.following ? 'text-amber-600 fill-current' : 'text-slate-400'}`} />
+                        <span>{row.following ? 'Following' : 'Follow'}{row.followerCount > 0 ? ` (${row.followerCount})` : ''}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleShare(post)}
+                        aria-label={`Share this discussion: ${post.title}`}
                         className="flex items-center gap-1.5 hover:text-slate-900 py-1 cursor-pointer"
                       >
                         <Share2 className="w-4 h-4 text-slate-400" />
@@ -582,6 +708,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-slate-900">{reply.authorName}</span>
+                              {reply.authorProfession ? (
+                                <span className="text-slate-500">{reply.authorProfession}</span>
+                              ) : null}
                               {reply.isVerifiedBuilderReply && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-200 px-2 py-0.5 rounded-full">
                                   <CheckCircle2 className="w-3 h-3 text-amber-700" /> Verified PMO Voice
@@ -623,6 +752,13 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               </div>
             );
           })
+        ) : searchTerm || searchError ? (
+          <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-2">
+            <h3 className="text-lg font-bold text-slate-900 font-display">No questions match this search</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              {searchError || `No questions match “${searchTerm}”.`}
+            </p>
+          </div>
         ) : (
           <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center mx-auto">

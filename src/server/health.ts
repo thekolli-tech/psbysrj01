@@ -2,7 +2,7 @@ import { describeDatabaseTarget } from './databaseTarget.ts';
 import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { getSqliteDb, isPostgresAuthoritative, isSqliteExplicit } from './db.ts';
 import { paymentsStatus } from './commerce.ts';
-import { configuredSmsProviders } from './notifications.ts';
+import { configuredWhatsAppProviders } from './notifications.ts';
 import { REQUIRED_TABLES } from './platformSchema.ts';
 
 function nonEmpty(name: string): boolean {
@@ -16,12 +16,22 @@ export function environmentPresence(): {
   RESEND_API_KEY: boolean;
   OTP_HASH_SECRET: boolean;
   EMAIL_FROM: boolean;
+  WHATSAPP_ACCESS_TOKEN: boolean;
+  WHATSAPP_PHONE_NUMBER_ID: boolean;
+  WHATSAPP_OTP_TEMPLATE_NAME: boolean;
+  WHATSAPP_GRAPH_API_VERSION: boolean;
+  WHATSAPP_OTP_TEMPLATE_LANGUAGE: boolean;
 } {
   return {
     DATABASE_URL: nonEmpty('DATABASE_URL'),
     RESEND_API_KEY: nonEmpty('RESEND_API_KEY'),
     OTP_HASH_SECRET: nonEmpty('OTP_HASH_SECRET'),
-    EMAIL_FROM: nonEmpty('EMAIL_FROM')
+    EMAIL_FROM: nonEmpty('EMAIL_FROM'),
+    WHATSAPP_ACCESS_TOKEN: nonEmpty('WHATSAPP_ACCESS_TOKEN'),
+    WHATSAPP_PHONE_NUMBER_ID: nonEmpty('WHATSAPP_PHONE_NUMBER_ID'),
+    WHATSAPP_OTP_TEMPLATE_NAME: nonEmpty('WHATSAPP_OTP_TEMPLATE_NAME'),
+    WHATSAPP_GRAPH_API_VERSION: nonEmpty('WHATSAPP_GRAPH_API_VERSION'),
+    WHATSAPP_OTP_TEMPLATE_LANGUAGE: nonEmpty('WHATSAPP_OTP_TEMPLATE_LANGUAGE')
   };
 }
 
@@ -38,7 +48,7 @@ function configurationFlags(): {
   emailProvider: boolean;
   emailSender: boolean;
   otpPepper: boolean;
-  sms: boolean;
+  whatsapp: boolean;
 } {
   const configuredSender = (process.env.EMAIL_FROM || process.env.RESEND_FROM || '').trim();
   return {
@@ -46,7 +56,7 @@ function configurationFlags(): {
     emailProvider: nonEmpty('RESEND_API_KEY'),
     emailSender: configuredSender.length > 0 && /@propertystudio\.org\b/i.test(configuredSender),
     otpPepper: nonEmpty('OTP_HASH_SECRET'),
-    sms: configuredSmsProviders().length > 0
+    whatsapp: configuredWhatsAppProviders().length > 0
   };
 }
 

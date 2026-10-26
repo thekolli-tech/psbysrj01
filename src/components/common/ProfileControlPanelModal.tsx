@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   User,
@@ -27,7 +27,16 @@ interface ProfileControlPanelModalProps {
 }
 
 export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, logout, setActiveView, walletBalance, showToast } = useApp();
+  const { currentUser, logout, setActiveView, walletBalance, showToast, isLoggedIn, refreshSession } = useApp();
+  const [townCity, setTownCity] = useState(currentUser.townCity || '');
+  const [profession, setProfession] = useState(currentUser.profession || '');
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setTownCity(currentUser.townCity || '');
+    setProfession(currentUser.profession || '');
+  }, [isOpen, currentUser.townCity, currentUser.profession]);
 
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'CHANGE_PASSWORD'>('PROFILE');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -40,6 +49,29 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleProfileSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setProfileSaving(true);
+    try {
+      const response = await fetch('/api/me/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ townCity, profession })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Profile was not saved.');
+      await refreshSession();
+      setSuccessMsg('Town/City and profession were saved.');
+      showToast('Profile saved');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Profile was not saved.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +216,47 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                   )}
                 </div>
               </div>
+
+              {isLoggedIn && (
+                <form onSubmit={handleProfileSave} className="space-y-3">
+                  <div>
+                    <label htmlFor="profile-town-city" className="block text-xs font-bold text-slate-700 mb-1">Town/City</label>
+                    <input
+                      id="profile-town-city"
+                      value={townCity}
+                      onChange={e => setTownCity(e.target.value)}
+                      maxLength={80}
+                      placeholder="Optional"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="profile-profession" className="block text-xs font-bold text-slate-700 mb-1">Profession</label>
+                    <input
+                      id="profile-profession"
+                      value={profession}
+                      onChange={e => setProfession(e.target.value)}
+                      maxLength={80}
+                      placeholder="Optional. Shown on Community Q&A."
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-500">Profession is a description. It does not change your account role.</p>
+                  </div>
+                  {errorMsg && activeTab === 'PROFILE' && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">{errorMsg}</div>
+                  )}
+                  {successMsg && activeTab === 'PROFILE' && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">{successMsg}</div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={profileSaving}
+                    className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold disabled:opacity-60"
+                  >
+                    {profileSaving ? 'Saving…' : 'Save profile'}
+                  </button>
+                </form>
+              )}
 
               {/* Account Meta Grid */}
               <div className="grid grid-cols-2 gap-3 text-xs">

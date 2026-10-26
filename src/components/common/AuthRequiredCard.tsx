@@ -43,7 +43,7 @@ export const AuthRequiredCard: React.FC<AuthRequiredCardProps> = ({
         };
       case 'CONFERENCE':
         return {
-          title: 'Live Corporate Summit & IFP Pitch Deck',
+          title: 'Live Corporate Summit',
           subtitle: 'Interactive Investor Stream',
           description:
             'Interactive participation in live project launches, executive slide decks, live Q&A, and live polling is restricted to registered accounts.',

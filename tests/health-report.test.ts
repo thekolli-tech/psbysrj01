@@ -12,6 +12,11 @@ process.env.EMAIL_FROM = 'Person <person@example.com>';
 const { buildHealthReport, environmentPresence } = await import('../src/server/health.ts');
 
 test('production health reports an unconfigured database without secrets', async () => {
+  delete process.env.WHATSAPP_ACCESS_TOKEN;
+  delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+  delete process.env.WHATSAPP_GRAPH_API_VERSION;
+  delete process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE;
   const report = await buildHealthReport();
   const database = report.body.database as { connected: boolean; schemaReady: boolean; code: string; failure: string | null };
   const configuration = report.body.configuration as {
@@ -19,13 +24,18 @@ test('production health reports an unconfigured database without secrets', async
     emailProvider: boolean;
     emailSender: boolean;
     otpPepper: boolean;
-    sms: boolean;
+    whatsapp: boolean;
   };
   const environment = report.body.environment as {
     DATABASE_URL: boolean;
     RESEND_API_KEY: boolean;
     OTP_HASH_SECRET: boolean;
     EMAIL_FROM: boolean;
+    WHATSAPP_ACCESS_TOKEN: boolean;
+    WHATSAPP_PHONE_NUMBER_ID: boolean;
+    WHATSAPP_OTP_TEMPLATE_NAME: boolean;
+    WHATSAPP_GRAPH_API_VERSION: boolean;
+    WHATSAPP_OTP_TEMPLATE_LANGUAGE: boolean;
   };
   const body = JSON.stringify(report.body);
   assert.equal(report.httpStatus, 503);
@@ -40,12 +50,17 @@ test('production health reports an unconfigured database without secrets', async
   assert.equal(configuration.emailProvider, false);
   assert.equal(configuration.emailSender, false);
   assert.equal(configuration.otpPepper, false);
-  assert.equal(configuration.sms, false);
+  assert.equal(configuration.whatsapp, false);
   assert.deepEqual(environment, {
     DATABASE_URL: false,
     RESEND_API_KEY: false,
     OTP_HASH_SECRET: false,
-    EMAIL_FROM: true
+    EMAIL_FROM: true,
+    WHATSAPP_ACCESS_TOKEN: false,
+    WHATSAPP_PHONE_NUMBER_ID: false,
+    WHATSAPP_OTP_TEMPLATE_NAME: false,
+    WHATSAPP_GRAPH_API_VERSION: false,
+    WHATSAPP_OTP_TEMPLATE_LANGUAGE: false
   });
   assert.equal(body.includes('postgresql://'), false);
   assert.equal(body.includes('person@example.com'), false);
@@ -90,12 +105,22 @@ test('environment presence reports only whether each required name is non-empty'
   process.env.VERCEL_GIT_COMMIT_REF = 'cursor/fix-vercel-registration-otp-c4c9';
   process.env.VERCEL_ENV = 'preview';
   try {
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+    delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+    delete process.env.WHATSAPP_GRAPH_API_VERSION;
+    delete process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE;
     const presence = environmentPresence();
     assert.deepEqual(presence, {
       DATABASE_URL: true,
       RESEND_API_KEY: true,
       OTP_HASH_SECRET: true,
-      EMAIL_FROM: true
+      EMAIL_FROM: true,
+      WHATSAPP_ACCESS_TOKEN: false,
+      WHATSAPP_PHONE_NUMBER_ID: false,
+      WHATSAPP_OTP_TEMPLATE_NAME: false,
+      WHATSAPP_GRAPH_API_VERSION: false,
+      WHATSAPP_OTP_TEMPLATE_LANGUAGE: false
     });
     process.env.DATABASE_URL = '   ';
     assert.equal(environmentPresence().DATABASE_URL, false);

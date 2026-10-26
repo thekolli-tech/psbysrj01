@@ -12,6 +12,7 @@ import {
   getAllUsers,
   createUser,
   updateUser,
+  updateUserProfileFields,
   updateUserRole,
   deleteUser,
   suspendUser,
@@ -26,6 +27,8 @@ import {
   getAuditLogs,
   getAllPosts,
   getPostById,
+  castCommunityVote,
+  toggleCommunityFollow,
   createPost,
   updatePost,
   deletePost,
@@ -65,12 +68,16 @@ import {
   updateLastLogin
 } from './src/server/db.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
-import { sendRealSmsOtp, getNotificationGatewayStatus, configuredSmsProviders } from './src/server/notifications.ts';
+import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders } from './src/server/notifications.ts';
+import { InvalidPhoneError } from './src/server/otpTarget.ts';
+import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
+import { readProfilePatch } from './src/shared/profileFields.ts';
+import { isCommunityPostId, readCommunitySearch, readCommunityVote } from './src/shared/communityEngagement.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
 import { canViewModeratedContent, communityReplayVisible, selfServeStorageRole } from './src/shared/policy.ts';
@@ -299,6 +306,45 @@ app.post('/api/auth/logout', async (req: AuthenticatedRequest, res: Response): P
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
+app.patch('/api/me/profile', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const patch = readProfilePatch(req.body);
+    if ('error' in patch.townCity) {
+      res.status(400).json({ error: patch.townCity.error });
+      return;
+    }
+    if ('error' in patch.profession) {
+      res.status(400).json({ error: patch.profession.error });
+      return;
+    }
+    if (patch.townCity.omit && patch.profession.omit) {
+      res.status(400).json({ error: 'No profile fields were provided.' });
+      return;
+    }
+    const updated = await updateUserProfileFields(req.user!.id, {
+      ...(patch.townCity.omit ? {} : { townCity: patch.townCity.value }),
+      ...(patch.profession.omit ? {} : { profession: patch.profession.value })
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'Account not found.' });
+      return;
+    }
+    const { password_hash, salt, ...safeUser } = updated;
+    res.json({
+      success: true,
+      user: {
+        ...safeUser,
+        townCity: updated.town_city || '',
+        profession: updated.profession || '',
+        isVerified: Boolean(updated.is_verified),
+        assignedPropertyIds: JSON.parse(updated.assigned_properties || '[]')
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Profile was not saved.' });
+  }
+});
+
 // Get currently authenticated user
 app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
   if (!req.user) {
@@ -446,41 +492,53 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response): Promis
   }
 });
 
-// Send Phone OTP. Property Seeker registration cannot finish without a real provider delivery.
+function whatsAppUnavailable(res: Response, code: 'WHATSAPP_NOT_CONFIGURED' | 'OTP_NOT_CONFIGURED'): void {
+  res.status(503).json({
+    error: 'WhatsApp verification is not configured. No code was sent and no account was created.',
+    code
+  });
+}
+
+// Send the phone OTP through WhatsApp. Property Seeker registration cannot finish without provider acceptance.
 app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
-  const phone = String(req.body?.phone || '').trim();
-  if (rejectIfRateLimited(req, res, 'phone-otp', phone)) return;
+  const phone = normalizeIndianMobile(req.body?.phone);
+  if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
   try {
-    if (phone.length < 8) {
-      res.status(400).json({ error: 'Valid mobile number is required' });
+    if (!phone) {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
       return;
     }
-    if (configuredSmsProviders().length === 0) {
-      res.status(503).json({
-        error: 'SMS verification is not configured. No code was sent and no account was created.',
-        code: 'SMS_NOT_CONFIGURED'
-      });
+    if (!String(process.env.OTP_HASH_SECRET || '').trim()) {
+      whatsAppUnavailable(res, 'OTP_NOT_CONFIGURED');
+      return;
+    }
+    if (configuredWhatsAppProviders().length === 0) {
+      whatsAppUnavailable(res, 'WHATSAPP_NOT_CONFIGURED');
       return;
     }
     const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
-    const dispatchResult = await sendRealSmsOtp(phone, otp);
-    if (!dispatchResult.success) {
+    const dispatchResult = await sendWhatsAppOtp(phone, otp);
+    if (!dispatchResult.success || dispatchResult.provider !== 'whatsapp') {
       await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
       res.status(502).json({
-        error: 'The SMS provider did not accept the verification code. No code remains active and no account was created.',
-        code: 'SMS_DELIVERY_FAILED'
+        error: 'WhatsApp did not accept the verification code. No code remains active and no account was created.',
+        code: 'WHATSAPP_DELIVERY_FAILED'
       });
       return;
     }
     res.json({
       success: true,
-      message: 'SMS verification code dispatched. Check the mobile number you entered.',
+      message: 'WhatsApp verification code dispatched. Check WhatsApp on the mobile number you entered.',
       expiresAt,
-      deliveredVia: dispatchResult.provider
+      deliveredVia: 'whatsapp'
     });
   } catch (err: any) {
     if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
       res.status(429).json({ error: err.message });
+      return;
+    }
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
       return;
     }
     if (phone) {
@@ -494,22 +552,28 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
   }
 });
 
-// Verify Phone OTP
+// Verify Phone OTP. The resulting grant is bound to this normalized number.
 app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Promise<void> => {
+  const phone = normalizeIndianMobile(req.body?.phone);
+  const otp = String(req.body?.otp || '').trim();
+  if (rejectIfRateLimited(req, res, 'phone-otp-verify', phone || 'invalid')) return;
   try {
-    const { phone, otp } = req.body;
     if (!phone || !otp) {
       res.status(400).json({ error: 'Phone number and verification code are required' });
       return;
     }
     const isValid = await verifyOtp(phone, 'PHONE_VERIFICATION', otp);
     if (!isValid) {
-      res.status(400).json({ error: 'Invalid or expired SMS OTP code' });
+      res.status(400).json({ error: 'Invalid or expired WhatsApp code' });
       return;
     }
     res.json({ success: true, verified: true, message: 'Phone number successfully verified' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    res.status(500).json({ error: 'Unable to verify the code.' });
   }
 });
 
@@ -517,7 +581,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
 app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
   if (rejectIfRateLimited(req, res, 'register', String(req.body?.email || ''))) return;
   try {
-    const { name, email, password, role, phone, organization, otp } = req.body;
+    const { name, email, password, role, phone, organization, otp, phoneOtp } = req.body;
     if (!name || !email || !password) {
       res.status(400).json({ error: 'Name, email, and password are required' });
       return;
@@ -535,16 +599,27 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
     }
 
     const safeRole = selfServeStorageRole(requestedRole);
+    const seeker = safeRole === 'PROPERTY_SEEKER';
+    const canonicalPhone = seeker ? normalizeIndianMobile(phone) : null;
+    if (seeker && !canonicalPhone) {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    if (seeker && !String(phoneOtp || '').trim()) {
+      res.status(400).json({ error: 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.' });
+      return;
+    }
 
     const newUser = await registerVerifiedUser({
       name,
       email,
       password,
       role: safeRole,
-      phone: phone?.trim() || '',
+      phone: seeker ? canonicalPhone || '' : (phone?.trim() || ''),
       organization: organization?.trim() || '',
       otp: String(otp),
-      requirePhone: false
+      phoneOtp: phoneOtp ? String(phoneOtp) : undefined,
+      requirePhone: seeker
     });
 
     const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);
@@ -575,6 +650,10 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
   } catch (err: any) {
     if (err instanceof RegistrationRejected || err?.name === 'RegistrationRejected') {
       res.status(err.statusCode || 400).json({ error: err.message });
+      return;
+    }
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
       return;
     }
     const message = typeof err?.message === 'string' && !/postgres|sqlite|constraint|select |insert /i.test(err.message)
@@ -872,10 +951,17 @@ app.get('/api/community/posts', async (req: AuthenticatedRequest, res: Response)
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
     const offset = req.query.offset ? Number(req.query.offset) : undefined;
 
+    const search = readCommunitySearch(req.query.q);
+    if ('error' in search) {
+      res.status(400).json({ error: search.error });
+      return;
+    }
+
     const posts = await getAllPosts({
       communityId,
       topic,
       mediaType,
+      q: search.q || undefined,
       limit,
       offset,
       currentUserId: req.user?.id
@@ -977,6 +1063,55 @@ app.patch('/api/community/posts/:id/pin', requireAdmin, async (req: Request, res
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/community/posts/:id/vote', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!isCommunityPostId(req.params.id)) {
+      res.status(400).json({ error: 'Post id is not valid.' });
+      return;
+    }
+    const vote = readCommunityVote(req.body?.vote);
+    if (typeof vote !== 'number') {
+      res.status(400).json({ error: vote.error });
+      return;
+    }
+    const post = await getPostById(req.params.id, req.user?.id);
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const result = await castCommunityVote(req.params.id, req.user.id, vote);
+    if (!result) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    res.json({ success: true, ...result });
+  } catch {
+    res.status(500).json({ error: 'Vote was not saved.' });
+  }
+});
+
+app.post('/api/community/posts/:id/follow', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!isCommunityPostId(req.params.id)) {
+      res.status(400).json({ error: 'Post id is not valid.' });
+      return;
+    }
+    const post = await getPostById(req.params.id, req.user?.id);
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const result = await toggleCommunityFollow(req.params.id, req.user.id);
+    if (!result) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    res.json({ success: true, ...result });
+  } catch {
+    res.status(500).json({ error: 'Follow was not saved.' });
   }
 });
 

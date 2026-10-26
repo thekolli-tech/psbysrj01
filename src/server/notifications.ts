@@ -1,3 +1,7 @@
+import { configuredWhatsAppProviders } from './whatsappOtp.ts';
+
+export { configuredWhatsAppProviders, sendWhatsAppOtp } from './whatsappOtp.ts';
+
 export interface EmailDispatchResult {
   success: boolean;
   provider: string;
@@ -5,12 +9,7 @@ export interface EmailDispatchResult {
   error?: string;
 }
 
-export interface SmsDispatchResult {
-  success: boolean;
-  provider: string;
-  messageId?: string;
-  error?: string;
-}
+export type { WhatsAppDispatchResult } from './whatsappOtp.ts';
 
 /**
  * Registration and password-reset email codes are sent only through Resend
@@ -71,148 +70,6 @@ export async function sendRealEmailOtp(toEmail: string, otp: string, _recipientN
   return sendResendOtp(toEmail, otp);
 }
 
-/** Providers with enough configuration to attempt a real SMS send. */
-export function configuredSmsProviders(): string[] {
-  const providers: string[] = [];
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) providers.push('Twilio');
-  if (process.env.FAST2SMS_API_KEY) providers.push('Fast2SMS');
-  if (process.env.MSG91_AUTH_KEY && process.env.MSG91_TEMPLATE_ID) providers.push('MSG91');
-  if (process.env.TWOFACTOR_API_KEY) providers.push('2Factor');
-  if (process.env.TEXTLOCAL_API_KEY) providers.push('Textlocal');
-  return providers;
-}
-
-/**
- * Sends a phone verification code through a configured SMS provider.
- * Returns failure when no provider is configured or every attempt is rejected.
- */
-export async function sendRealSmsOtp(toPhone: string, otp: string): Promise<SmsDispatchResult> {
-  const cleanPhone = toPhone.trim().replace(/[\s-]/g, '');
-  const messageText = `Property Studio: Your mobile verification OTP is ${otp}. Valid for 10 minutes only. Sent strictly from Property Studio. Do not share.`;
-
-  // 1. Check Twilio Credentials
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
-    try {
-      const auth = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
-      const params = new URLSearchParams();
-      params.append('To', cleanPhone.startsWith('+') ? cleanPhone : `+91${cleanPhone}`);
-      params.append('From', process.env.TWILIO_SENDER_ID || process.env.TWILIO_PHONE_NUMBER);
-      params.append('Body', messageText);
-
-      const res = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: params.toString()
-        }
-      );
-
-      const data = await res.json();
-      if (res.ok) {
-        console.log(`[Property Studio] Real SMS OTP sent to ${cleanPhone} from Property Studio via Twilio. SID: ${data.sid}`);
-        return { success: true, provider: 'twilio', messageId: data.sid };
-      } else {
-        console.warn(`[Property Studio] Twilio SMS was not accepted. Status ${res.status}.`);
-      }
-    } catch (err: any) {
-      console.warn('[Property Studio] Twilio dispatch failed:', err.message);
-    }
-  }
-
-  // 2. Check Fast2SMS API Key (Popular for Indian mobile numbers)
-  if (process.env.FAST2SMS_API_KEY) {
-    try {
-      // Extract 10-digit number for Indian mobile numbers
-      const digitsOnly = cleanPhone.replace(/[^0-9]/g, '');
-      const tenDigit = digitsOnly.slice(-10);
-
-      const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
-        method: 'POST',
-        headers: {
-          'authorization': process.env.FAST2SMS_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          route: 'otp',
-          variables_values: otp,
-          numbers: tenDigit,
-          sender_id: process.env.FAST2SMS_SENDER_ID || 'PROPST'
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.return) {
-        console.log(`[Property Studio] Real SMS OTP sent to ${cleanPhone} from Property Studio via Fast2SMS.`);
-        return { success: true, provider: 'fast2sms', messageId: data.request_id };
-      }
-    } catch (err: any) {
-      console.warn('[Property Studio] Fast2SMS dispatch failed:', err.message);
-    }
-  }
-
-  // 3. Check MSG91 Auth Key
-  if (process.env.MSG91_AUTH_KEY && process.env.MSG91_TEMPLATE_ID) {
-    try {
-      const digitsOnly = cleanPhone.replace(/[^0-9]/g, '');
-      const res = await fetch(
-        `https://api.msg91.com/api/v5/otp?template_id=${process.env.MSG91_TEMPLATE_ID}&mobile=${digitsOnly}&authkey=${process.env.MSG91_AUTH_KEY}&otp=${otp}`,
-        { method: 'GET' }
-      );
-      if (res.ok) {
-        console.log(`[Property Studio] Real SMS OTP sent to ${cleanPhone} from Property Studio via MSG91.`);
-        return { success: true, provider: 'msg91' };
-      }
-    } catch (err: any) {
-      console.warn('[Property Studio] MSG91 dispatch failed:', err.message);
-    }
-  }
-
-  // 4. Check 2Factor API Key (India)
-  if (process.env.TWOFACTOR_API_KEY) {
-    try {
-      const digitsOnly = cleanPhone.replace(/[^0-9]/g, '').slice(-10);
-      const res = await fetch(
-        `https://2factor.in/API/V1/${process.env.TWOFACTOR_API_KEY}/SMS/${digitsOnly}/${otp}/PropertyStudio`
-      );
-      const data = await res.json();
-      if (res.ok && data.Status === 'Success') {
-        console.log(`[Property Studio] Real SMS OTP sent from Property Studio via 2Factor to ${digitsOnly}. Session: ${data.Details}`);
-        return { success: true, provider: '2factor', messageId: data.Details };
-      }
-    } catch (err: any) {
-      console.warn('[Property Studio] 2Factor dispatch failed:', err.message);
-    }
-  }
-
-  // 5. Check Textlocal API Key
-  if (process.env.TEXTLOCAL_API_KEY) {
-    try {
-      const digitsOnly = cleanPhone.replace(/[^0-9]/g, '').slice(-10);
-      const params = new URLSearchParams();
-      params.append('apikey', process.env.TEXTLOCAL_API_KEY);
-      params.append('numbers', `91${digitsOnly}`);
-      params.append('message', messageText);
-      params.append('sender', process.env.TEXTLOCAL_SENDER || 'PROPST');
-      const res = await fetch('https://api.textlocal.in/send/?' + params.toString());
-      if (res.ok) {
-        console.log(`[Property Studio] Real SMS OTP sent from Property Studio via Textlocal to ${digitsOnly}`);
-        return { success: true, provider: 'textlocal' };
-      }
-    } catch (err: any) {
-      console.warn('[Property Studio] Textlocal dispatch failed:', err.message);
-    }
-  }
-
-  if (configuredSmsProviders().length === 0) {
-    return { success: false, provider: 'unconfigured', error: 'SMS provider is not configured.' };
-  }
-  return { success: false, provider: 'unconfigured', error: 'SMS provider did not accept the verification message.' };
-}
-
 /**
  * Returns summary of active notification providers configured in environment
  */
@@ -221,12 +78,12 @@ export function getNotificationGatewayStatus() {
   const resendReady = Boolean(process.env.RESEND_API_KEY) && /@propertystudio\.org\b/i.test(from);
   const emailProviders: string[] = resendReady ? ['Resend'] : [];
 
-  const smsProviders = configuredSmsProviders();
+  const whatsappProviders = configuredWhatsAppProviders();
 
   return {
     emailConfigured: emailProviders.length > 0,
     emailProviders,
-    smsConfigured: smsProviders.length > 0,
-    smsProviders
+    whatsappConfigured: whatsappProviders.length > 0,
+    whatsappProviders
   };
 }

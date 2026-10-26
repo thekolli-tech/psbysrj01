@@ -719,7 +719,7 @@ export async function suspendOrRestoreCommunity(input: {
   return true;
 }
 
-async function recordModeration(actorId: string, targetType: string, targetId: string, action: string, reason?: string): Promise<void> {
+export async function recordModeration(actorId: string, targetType: string, targetId: string, action: string, reason?: string): Promise<void> {
   const now = nowIso();
   const actionId = id('modact');
   if (isPostgresAuthoritative()) {

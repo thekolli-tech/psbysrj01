@@ -5,7 +5,10 @@ import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { applySqliteAdditiveSchema } from './platformSchema.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProofSync, type SyncOtpClaimRunner } from './otpClaim.ts';
+import { canonicalOtpTarget } from './otpTarget.ts';
 import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
+import { indianNationalDigits, storedPhoneMatches } from '../shared/indianMobile.ts';
+import { communitySearchLikePattern } from '../shared/communityEngagement.ts';
 import {
   pgFindUserByEmail,
   pgFindUserById,
@@ -33,6 +36,11 @@ import {
   pgGetAuditLogs,
   pgGetAllPosts,
   pgGetPostById,
+  pgCastCommunityVote,
+  pgToggleCommunityFollow,
+  pgCommunityEngagement,
+  pgProfessionsByUserId,
+  pgUpdateProfileFields,
   pgCreatePost,
   pgUpdatePost,
   pgDeletePost,
@@ -153,6 +161,8 @@ export interface DbUser {
   role: UserRole;
   avatar: string;
   organization: string;
+  town_city: string | null;
+  profession: string | null;
   wallet_balance: number;
   is_verified: number;
   email_verified: number;
@@ -524,6 +534,15 @@ export async function updateUser(id: string, updates: Partial<{
   return sqliteUpdateUser(id, updates);
 }
 
+/** Updates only town/city and profession. Omitted keys are left unchanged. Role is not accepted. */
+export async function updateUserProfileFields(
+  id: string,
+  fields: { townCity?: string | null; profession?: string | null }
+): Promise<DbUser | null> {
+  if (isPostgresAuthoritative()) return pgUpdateProfileFields(id, fields);
+  return sqliteUpdateProfileFields(id, fields);
+}
+
 export async function updateUserRole(
   actor: DbUser,
   targetUserId: string,
@@ -615,7 +634,7 @@ export async function discardUnconsumedOtp(
 }
 
 function sqliteDiscardUnconsumedOtp(target: string, type: string): void {
-  db.prepare('DELETE FROM otps WHERE target = ? AND type = ? AND consumed_at IS NULL').run(target.trim().toLowerCase(), type);
+  db.prepare('DELETE FROM otps WHERE target = ? AND type = ? AND consumed_at IS NULL').run(canonicalOtpTarget(type, target), type);
 }
 
 export async function generateOtp(
@@ -682,17 +701,39 @@ export async function getAllPosts(params?: {
   communityId?: string;
   topic?: string;
   mediaType?: string;
+  q?: string;
   limit?: number;
   offset?: number;
   currentUserId?: string;
 }): Promise<any[]> {
-  if (isPostgresAuthoritative()) return pgGetAllPosts(params);
-  return sqliteGetAllPosts(params);
+  const posts = isPostgresAuthoritative() ? await pgGetAllPosts(params) : sqliteGetAllPosts(params);
+  const withProfessions = await attachAuthorProfessions(posts);
+  return attachCommunityEngagement(withProfessions, params?.currentUserId);
 }
 
 export async function getPostById(postId: string, currentUserId?: string): Promise<any> {
-  if (isPostgresAuthoritative()) return pgGetPostById(postId, currentUserId);
-  return sqliteGetPostById(postId, currentUserId);
+  const post = isPostgresAuthoritative() ? await pgGetPostById(postId, currentUserId) : sqliteGetPostById(postId, currentUserId);
+  if (!post) return post;
+  const [withProfession] = await attachAuthorProfessions([post]);
+  const [enriched] = await attachCommunityEngagement([withProfession], currentUserId);
+  return enriched;
+}
+
+export async function castCommunityVote(
+  postId: string,
+  userId: string,
+  vote: 1 | -1 | 0
+): Promise<{ agreeCount: number; disagreeCount: number; userVote: 1 | -1 | 0 } | null> {
+  if (isPostgresAuthoritative()) return pgCastCommunityVote(postId, userId, vote);
+  return sqliteCastCommunityVote(postId, userId, vote);
+}
+
+export async function toggleCommunityFollow(
+  postId: string,
+  userId: string
+): Promise<{ following: boolean; followerCount: number } | null> {
+  if (isPostgresAuthoritative()) return pgToggleCommunityFollow(postId, userId);
+  return sqliteToggleCommunityFollow(postId, userId);
 }
 
 export async function createPost(post: {
@@ -1009,6 +1050,8 @@ function sqliteInitDatabase(): void {
       role TEXT NOT NULL DEFAULT 'PROPERTY_SEEKER',
       avatar TEXT,
       organization TEXT,
+      town_city TEXT,
+      profession TEXT,
       wallet_balance REAL DEFAULT 0,
       is_verified INTEGER DEFAULT 0,
       email_verified INTEGER DEFAULT 0,
@@ -1112,6 +1155,50 @@ function sqliteInitDatabase(): void {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at TEXT NOT NULL,
       UNIQUE(post_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS community_post_votes (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      vote INTEGER NOT NULL CHECK (vote IN (1, -1)),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(post_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS community_post_follows (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      UNIQUE(post_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS property_requirements (
+      id TEXT PRIMARY KEY,
+      seeker_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      property_type TEXT NOT NULL,
+      location TEXT,
+      budget TEXT,
+      details TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS entity_reviews (
+      id TEXT PRIMARY KEY,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      author_name TEXT NOT NULL,
+      rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      rejection_reason TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(entity_type, entity_id, author_id)
     );
 
     CREATE TABLE IF NOT EXISTS community_comments (
@@ -1243,6 +1330,170 @@ function sqliteFindUserById(id: string): DbUser | null {
   return (stmt.get(id, id) as unknown as DbUser) || null;
 }
 
+function sqliteProfessionsByUserId(ids: string[]): Map<string, string> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const marks = unique.map(() => '?').join(', ');
+  const rows = db.prepare(`SELECT id, profession FROM users WHERE id IN (${marks})`).all(...unique) as Array<{ id: string; profession: string | null }>;
+  return new Map(rows.map(row => [row.id, row.profession || '']));
+}
+
+function collectAuthorIds(value: any, ids: string[]): void {
+  if (!value || typeof value !== 'object') return;
+  if (typeof value.authorId === 'string') ids.push(value.authorId);
+  if (typeof value.author_id === 'string') ids.push(value.author_id);
+  for (const reply of value.replies || []) collectAuthorIds(reply, ids);
+  for (const comment of value.comments || []) collectAuthorIds(comment, ids);
+}
+
+function withAuthorProfession(value: any, professions: Map<string, string>): any {
+  if (!value || typeof value !== 'object') return value;
+  const authorId = value.authorId || value.author_id || '';
+  const next = {
+    ...value,
+    authorProfession: professions.get(authorId) || ''
+  };
+  if (Array.isArray(value.replies)) {
+    next.replies = value.replies.map((reply: any) => ({
+      ...withAuthorProfession(reply, professions),
+      authorName: reply.authorName || reply.author_name || ''
+    }));
+  }
+  if (Array.isArray(value.comments)) {
+    next.comments = value.comments.map((comment: any) => withAuthorProfession(comment, professions));
+  }
+  return next;
+}
+
+async function attachAuthorProfessions(posts: any[]): Promise<any[]> {
+  const ids: string[] = [];
+  for (const post of posts) collectAuthorIds(post, ids);
+  const professions = isPostgresAuthoritative()
+    ? await pgProfessionsByUserId(ids)
+    : sqliteProfessionsByUserId(ids);
+  return posts.map(post => withAuthorProfession(post, professions));
+}
+
+type CommunityEngagement = {
+  agreeCount: number;
+  disagreeCount: number;
+  userVote: 1 | -1 | 0;
+  followerCount: number;
+  following: boolean;
+};
+
+function emptyEngagement(): CommunityEngagement {
+  return { agreeCount: 0, disagreeCount: 0, userVote: 0, followerCount: 0, following: false };
+}
+
+function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, CommunityEngagement> {
+  const result = new Map<string, CommunityEngagement>();
+  if (ids.length === 0) return result;
+  const marks = ids.map(() => '?').join(', ');
+  const votes = db.prepare(`
+    SELECT post_id,
+      SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS agree_count,
+      SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS disagree_count
+    FROM community_post_votes
+    WHERE post_id IN (${marks})
+    GROUP BY post_id
+  `).all(...ids) as Array<{ post_id: string; agree_count: number | null; disagree_count: number | null }>;
+  const follows = db.prepare(`
+    SELECT post_id, COUNT(*) AS follower_count
+    FROM community_post_follows
+    WHERE post_id IN (${marks})
+    GROUP BY post_id
+  `).all(...ids) as Array<{ post_id: string; follower_count: number }>;
+  for (const row of votes) {
+    const current = result.get(row.post_id) || emptyEngagement();
+    current.agreeCount = Number(row.agree_count || 0);
+    current.disagreeCount = Number(row.disagree_count || 0);
+    result.set(row.post_id, current);
+  }
+  for (const row of follows) {
+    const current = result.get(row.post_id) || emptyEngagement();
+    current.followerCount = Number(row.follower_count || 0);
+    result.set(row.post_id, current);
+  }
+  if (userId) {
+    const mine = db.prepare(`
+      SELECT post_id, vote FROM community_post_votes WHERE user_id = ? AND post_id IN (${marks})
+    `).all(userId, ...ids) as Array<{ post_id: string; vote: number }>;
+    const followed = db.prepare(`
+      SELECT post_id FROM community_post_follows WHERE user_id = ? AND post_id IN (${marks})
+    `).all(userId, ...ids) as Array<{ post_id: string }>;
+    for (const row of mine) {
+      const current = result.get(row.post_id) || emptyEngagement();
+      current.userVote = Number(row.vote) === -1 ? -1 : 1;
+      result.set(row.post_id, current);
+    }
+    for (const row of followed) {
+      const current = result.get(row.post_id) || emptyEngagement();
+      current.following = true;
+      result.set(row.post_id, current);
+    }
+  }
+  return result;
+}
+
+async function attachCommunityEngagement(posts: any[], userId?: string): Promise<any[]> {
+  const ids = posts.map(post => String(post?.id || '')).filter(Boolean);
+  const engagement = isPostgresAuthoritative()
+    ? await pgCommunityEngagement(ids, userId)
+    : sqliteCommunityEngagement(ids, userId);
+  return posts.map(post => ({
+    ...post,
+    ...(engagement.get(post.id) || emptyEngagement())
+  }));
+}
+
+function sqliteVoteSnapshot(postId: string, userId: string): { agreeCount: number; disagreeCount: number; userVote: 1 | -1 | 0 } {
+  const row = sqliteCommunityEngagement([postId], userId).get(postId) || emptyEngagement();
+  return { agreeCount: row.agreeCount, disagreeCount: row.disagreeCount, userVote: row.userVote };
+}
+
+function sqliteCastCommunityVote(
+  postId: string,
+  userId: string,
+  vote: 1 | -1 | 0
+): { agreeCount: number; disagreeCount: number; userVote: 1 | -1 | 0 } | null {
+  const post = db.prepare('SELECT id FROM community_posts WHERE id = ?').get(postId);
+  if (!post) return null;
+  const existing = db.prepare('SELECT vote FROM community_post_votes WHERE post_id = ? AND user_id = ?').get(postId, userId) as { vote: number } | undefined;
+  const now = new Date().toISOString();
+  if (vote === 0 || (existing && Number(existing.vote) === vote)) {
+    db.prepare('DELETE FROM community_post_votes WHERE post_id = ? AND user_id = ?').run(postId, userId);
+  } else if (existing) {
+    db.prepare('UPDATE community_post_votes SET vote = ?, updated_at = ? WHERE post_id = ? AND user_id = ?').run(vote, now, postId, userId);
+  } else {
+    const id = `vote_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    db.prepare(`
+      INSERT INTO community_post_votes (id, post_id, user_id, vote, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, postId, userId, vote, now, now);
+  }
+  return sqliteVoteSnapshot(postId, userId);
+}
+
+function sqliteToggleCommunityFollow(postId: string, userId: string): { following: boolean; followerCount: number } | null {
+  const post = db.prepare('SELECT id FROM community_posts WHERE id = ?').get(postId);
+  if (!post) return null;
+  const existing = db.prepare('SELECT id FROM community_post_follows WHERE post_id = ? AND user_id = ?').get(postId, userId) as { id: string } | undefined;
+  if (existing) {
+    db.prepare('DELETE FROM community_post_follows WHERE post_id = ? AND user_id = ?').run(postId, userId);
+  } else {
+    const id = `follow_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    db.prepare('INSERT INTO community_post_follows (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)').run(
+      id,
+      postId,
+      userId,
+      new Date().toISOString()
+    );
+  }
+  const row = sqliteCommunityEngagement([postId], userId).get(postId) || emptyEngagement();
+  return { following: row.following, followerCount: row.followerCount };
+}
+
 function sqliteGetActiveDeveloperCount(): number {
   const stmt = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'DEVELOPER' AND account_status = 'ACTIVE'");
   const res = stmt.get() as { count: number };
@@ -1252,6 +1503,7 @@ function sqliteGetActiveDeveloperCount(): number {
 function sqliteGetAllUsers(): Array<Omit<DbUser, 'password_hash' | 'salt'> & { postCount: number }> {
   const stmt = db.prepare(`
     SELECT u.id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
+           u.town_city, u.profession,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
            u.must_change_password, u.assigned_properties, u.last_login_at, u.created_at, u.updated_at,
            COUNT(p.id) as postCount
@@ -1334,6 +1586,27 @@ function sqliteUpdateUser(id: string, updates: Partial<{
 
   const query = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
   db.prepare(query).run(...values);
+  return sqliteFindUserById(id);
+}
+
+function sqliteUpdateProfileFields(
+  id: string,
+  fields: { townCity?: string | null; profession?: string | null }
+): DbUser | null {
+  const sets: string[] = [];
+  const values: Array<string | null> = [];
+  if (fields.townCity !== undefined) {
+    sets.push('town_city = ?');
+    values.push(fields.townCity);
+  }
+  if (fields.profession !== undefined) {
+    sets.push('profession = ?');
+    values.push(fields.profession);
+  }
+  if (sets.length === 0) return sqliteFindUserById(id);
+  sets.push('updated_at = ?');
+  values.push(new Date().toISOString());
+  db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
   return sqliteFindUserById(id);
 }
 
@@ -1647,6 +1920,7 @@ function sqliteGetSession(rawToken: string): (DbSession & { user: DbUser }) | nu
 
   const stmt = db.prepare(`
     SELECT s.*, u.id as u_id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
+           u.town_city, u.profession,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
            u.must_change_password, u.assigned_properties, u.created_at as u_created_at, u.updated_at as u_updated_at
     FROM sessions s
@@ -1682,6 +1956,8 @@ function sqliteGetSession(rawToken: string): (DbSession & { user: DbUser }) | nu
       role: row.role,
       avatar: row.avatar,
       organization: row.organization,
+      town_city: row.town_city || null,
+      profession: row.profession || null,
       wallet_balance: row.wallet_balance,
       is_verified: row.is_verified,
       email_verified: row.email_verified,
@@ -1755,7 +2031,7 @@ function sqliteRunner(): SyncOtpClaimRunner {
 function sqliteGenerateOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'): { otp: string; expiresAt: number } {
   return sqliteTransaction(() => {
     const database = getSqliteDb();
-    const normalizedTarget = target.trim().toLowerCase();
+    const normalizedTarget = canonicalOtpTarget(type, target);
     const recentOtp = database.prepare(`
       SELECT created_at FROM otps
       WHERE target = ? AND type = ? AND consumed_at IS NULL
@@ -1785,7 +2061,14 @@ function sqliteGenerateOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_V
 }
 
 function sqliteVerifyOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET', code: string): boolean {
-  return sqliteTransaction(() => claimOtpProofSync(sqliteRunner(), target, type, code));
+  const normalizedTarget = canonicalOtpTarget(type, target);
+  return sqliteTransaction(() => claimOtpProofSync(sqliteRunner(), normalizedTarget, type, code));
+}
+
+function sqlitePhoneTaken(e164: string): boolean {
+  if (!indianNationalDigits(e164)) return false;
+  const rows = getSqliteDb().prepare(`SELECT phone FROM users`).all() as Array<{ phone: string | null }>;
+  return rows.some((row) => storedPhoneMatches(row.phone, e164));
 }
 
 function sqliteRegisterVerifiedUser(data: {
@@ -1800,7 +2083,9 @@ function sqliteRegisterVerifiedUser(data: {
   requirePhone: boolean;
 }): DbUser {
   const email = data.email.trim().toLowerCase();
-  const phone = data.phone?.trim().toLowerCase() || '';
+  const phone = data.requirePhone
+    ? canonicalOtpTarget('PHONE_VERIFICATION', data.phone || '')
+    : (data.phone?.trim().toLowerCase() || '');
   return sqliteTransaction(() => {
     const emailOk = claimOtpProofSync(sqliteRunner(), email, 'EMAIL_VERIFICATION', data.otp, { issueGrant: false, allowGrantFallback: true });
     if (!emailOk) throw new RegistrationRejected(400, 'Invalid or expired email verification code');
@@ -1808,6 +2093,9 @@ function sqliteRegisterVerifiedUser(data: {
       const phoneOk = Boolean(data.phoneOtp) && claimOtpProofSync(sqliteRunner(), phone, 'PHONE_VERIFICATION', String(data.phoneOtp), { issueGrant: false, allowGrantFallback: true });
       if (!phoneOk) {
         throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
+      }
+      if (sqlitePhoneTaken(phone)) {
+        throw new RegistrationRejected(400, 'An account with this mobile number already exists');
       }
     }
     try {
@@ -1901,6 +2189,7 @@ function sqliteGetAllPosts(params?: {
   communityId?: string;
   topic?: string;
   mediaType?: string;
+  q?: string;
   limit?: number;
   offset?: number;
   currentUserId?: string;
@@ -1921,6 +2210,12 @@ function sqliteGetAllPosts(params?: {
   if (params?.mediaType && params.mediaType !== 'ALL') {
     query += ' AND p.media_type = ?';
     args.push(params.mediaType);
+  }
+
+  if (params?.q) {
+    query += " AND (LOWER(p.title) LIKE ? ESCAPE '\\' OR LOWER(p.content) LIKE ? ESCAPE '\\')";
+    const pattern = communitySearchLikePattern(params.q);
+    args.push(pattern, pattern);
   }
 
   query += ' ORDER BY p.is_pinned DESC, p.created_at DESC';

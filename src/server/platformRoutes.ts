@@ -7,13 +7,25 @@ import {
   CONSENT_VERSION,
   isProfessionalRole,
   isPropertySeeker,
+  isPublicListing,
   isSelfServeRole
 } from '../shared/policy.ts';
 import { revealAllowedAfterPayment } from './commerce.ts';
+import { readRequirementInput, readReviewEdit, readReviewInput } from '../shared/requirementReview.ts';
+import {
+  createRequirement,
+  createReview,
+  listRequirementsForAdmin,
+  listRequirementsForSeeker,
+  listReviews,
+  moderateReview,
+  updateOwnReview
+} from './requirementReview.ts';
 import {
   CommerceError,
   createEnquiry,
   createListing,
+  getListing,
   creditWalletFromVerifiedPayment,
   adjustWallet,
   disputePayment,
@@ -24,6 +36,7 @@ import {
   listPublicListings,
   listUnlockHistory,
   moderateListing,
+  recordModeration,
   refundVerifiedPayment,
   setOwnedListingState,
   updateOwnedListing,
@@ -535,6 +548,148 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         },
         selfServeRoles: Array.from(isSelfServeRole('PROPERTY_SEEKER') ? ['configured'] : [])
       });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.get('/api/requirements', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+    try {
+      const requirements = await listRequirementsForSeeker(req.user.id);
+      res.json({ requirements });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.post('/api/requirements', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+    try {
+      const input = readRequirementInput(req.body);
+      if ('error' in input) {
+        res.status(400).json({ error: input.error });
+        return;
+      }
+      const requirement = await createRequirement(req.user.id, input);
+      res.status(201).json({ success: true, requirement });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.get('/api/admin/requirements', guards.requireAdmin, async (req: any, res: Response): Promise<void> => {
+    try {
+      if (req.user.role !== 'SUPER_ADMIN') {
+        res.status(403).json({ error: 'Only a Super Admin can read submitted requirements.' });
+        return;
+      }
+      res.json({ requirements: await listRequirementsForAdmin() });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.get('/api/reviews', async (req: any, res: Response): Promise<void> => {
+    try {
+      const entityId = String(req.query.entityId || '');
+      if (req.query.entityType !== 'LISTING' || !/^[A-Za-z0-9_-]{1,80}$/.test(entityId)) {
+        res.status(400).json({ error: req.query.entityType === 'LISTING' ? 'Project id is not valid.' : 'Only an approved project can be reviewed.' });
+        return;
+      }
+      const listing = await getListing(entityId);
+      const admin = req.user?.role === 'SUPER_ADMIN';
+      if (!listing || (!isPublicListing(listing.publicationStatus) && !admin)) {
+        res.status(404).json({ error: 'Project not found.' });
+        return;
+      }
+      const result = await listReviews({
+        entityId,
+        viewerId: req.user?.id,
+        includeModeration: admin
+      });
+      res.json(result);
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.post('/api/reviews', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+    try {
+      const input = readReviewInput(req.body);
+      if ('error' in input) {
+        res.status(400).json({ error: input.error });
+        return;
+      }
+      const created = await createReview({
+        entityId: input.entityId,
+        authorId: req.user.id,
+        authorName: String(req.user.name || 'Member').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Member',
+        rating: input.rating,
+        body: input.body
+      });
+      if ('error' in created) {
+        res.status(created.status).json({ error: created.error });
+        return;
+      }
+      res.status(201).json({ success: true, review: created });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.patch('/api/reviews/:id', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+    try {
+      const input = readReviewEdit(req.body);
+      if ('error' in input) {
+        res.status(400).json({ error: input.error });
+        return;
+      }
+      const updated = await updateOwnReview({
+        reviewId: req.params.id,
+        authorId: req.user.id,
+        rating: input.rating,
+        body: input.body
+      });
+      if ('error' in updated) {
+        res.status(updated.status).json({ error: updated.error });
+        return;
+      }
+      res.json({ success: true, review: updated });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.patch('/api/admin/reviews/:id/moderation', guards.requireAdmin, async (req: any, res: Response): Promise<void> => {
+    try {
+      if (req.user.role !== 'SUPER_ADMIN') {
+        res.status(403).json({ error: 'Only a Super Admin can moderate reviews.' });
+        return;
+      }
+      const status = req.body?.status;
+      if (!['APPROVED', 'REJECTED', 'REMOVED'].includes(status)) {
+        res.status(400).json({ error: 'Status must be APPROVED, REJECTED, or REMOVED.' });
+        return;
+      }
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason.slice(0, 200) : undefined;
+      const review = await moderateReview({
+        reviewId: req.params.id,
+        status,
+        reason
+      });
+      if (!review) {
+        res.status(404).json({ error: 'Review not found.' });
+        return;
+      }
+      await recordModeration(req.user.id, 'REVIEW', review.id, status, reason);
+      await createAuditLog({
+        actorId: req.user.id,
+        actorEmail: req.user.email,
+        actorRole: req.user.role,
+        action: 'REVIEW_MODERATION',
+        targetId: review.id,
+        details: { status, reason: reason || '' }
+      });
+      res.json({ success: true, review });
     } catch (err) {
       sendError(res, err);
     }

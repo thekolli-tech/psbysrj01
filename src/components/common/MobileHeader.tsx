@@ -2,7 +2,8 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
 import { BrandLogo } from './BrandLogo';
-import { Wallet, LogIn, ChevronLeft, ShieldAlert, Building, KeyRound } from 'lucide-react';
+import { roleUtilityDestinations } from '../../shared/endUserNavigation';
+import { Wallet, LogIn, ChevronLeft, ShieldAlert, Building, Users, Briefcase } from 'lucide-react';
 
 interface MobileHeaderProps {
   onOpenProfileModal: () => void;
@@ -28,15 +29,17 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
       case 'HOME': return 'Property Studio';
       case 'PROPERTIES': return 'Curated Projects';
       case 'LEADS_MARKET': return 'Buyer Leads';
-      case 'MEDIA': return 'Media & Podcasts';
-      case 'CONFERENCE': return 'Live Summit';
-      case 'MARKET_INSIGHTS': return 'Market Trends';
+      case 'MEDIA': return 'Media & Podcast';
+      case 'CONFERENCE': return 'Live & Latest';
+      case 'MARKET_INSIGHTS': return 'Market Trends & Insights';
       case 'COMMUNITY': return 'Community Q&A';
-      case 'CHAT': return 'Direct Messages';
+      case 'REVIEWS': return 'Review & Rating';
+      case 'REQUIREMENT': return 'Property Requirement';
+      case 'CHAT': return 'Contact & Connect Property Studio';
       case 'ADMIN': return 'Super Admin Console';
       case 'PROPERTY_ADMIN': return 'Scoped PMO Workspace';
-      case 'STUDIO': return '86" IFP Broadcast';
-      case 'CONTACT': return 'Official Secretariat & Support';
+      case 'STUDIO': return 'Studio Broadcast';
+      case 'CONTACT': return 'Property Admin Application';
       default: return 'Property Studio';
     }
   };
@@ -79,6 +82,28 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             title="Super Admin"
           >
             <ShieldAlert className="w-4 h-4" />
+          </button>
+        )}
+
+        {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('LEADS_MARKET') && activeView !== 'LEADS_MARKET' && (
+          <button
+            onClick={() => setActiveView('LEADS_MARKET')}
+            className="p-1.5 text-slate-700 bg-slate-50 rounded-lg active:scale-95 transition-transform"
+            title="Buyer Leads"
+            aria-label="Buyer Leads"
+          >
+            <Users className="w-4 h-4" />
+          </button>
+        )}
+
+        {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('PROFESSIONAL') && activeView !== 'PROFESSIONAL' && (
+          <button
+            onClick={() => setActiveView('PROFESSIONAL')}
+            className="p-1.5 text-slate-700 bg-slate-50 rounded-lg active:scale-95 transition-transform"
+            title="Workspace"
+            aria-label="Workspace"
+          >
+            <Briefcase className="w-4 h-4" />
           </button>
         )}
 
