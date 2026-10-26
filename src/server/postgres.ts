@@ -146,6 +146,8 @@ export async function runPostgresMigrations(): Promise<boolean> {
         role VARCHAR(32) NOT NULL DEFAULT 'PROPERTY_SEEKER',
         avatar TEXT,
         organization VARCHAR(255),
+        town_city TEXT,
+        profession TEXT,
         wallet_balance NUMERIC(14, 2) DEFAULT 0.00,
         is_verified SMALLINT DEFAULT 0,
         email_verified SMALLINT DEFAULT 0,
@@ -283,6 +285,58 @@ export async function runPostgresMigrations(): Promise<boolean> {
       );
       CREATE INDEX IF NOT EXISTS idx_post_likes_post_id ON post_likes(post_id);
       CREATE INDEX IF NOT EXISTS idx_post_likes_user_id ON post_likes(user_id);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS community_post_votes (
+        id VARCHAR(64) PRIMARY KEY,
+        post_id VARCHAR(64) NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+        user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        vote SMALLINT NOT NULL CHECK (vote IN (1, -1)),
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL,
+        UNIQUE (post_id, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_community_post_votes_post ON community_post_votes(post_id);
+
+      CREATE TABLE IF NOT EXISTS community_post_follows (
+        id VARCHAR(64) PRIMARY KEY,
+        post_id VARCHAR(64) NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+        user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL,
+        UNIQUE (post_id, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_community_post_follows_post ON community_post_follows(post_id);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS property_requirements (
+        id VARCHAR(64) PRIMARY KEY,
+        seeker_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        property_type VARCHAR(80) NOT NULL,
+        location TEXT,
+        budget TEXT,
+        details TEXT,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_property_requirements_seeker ON property_requirements(seeker_id, created_at);
+
+      CREATE TABLE IF NOT EXISTS entity_reviews (
+        id VARCHAR(64) PRIMARY KEY,
+        entity_type VARCHAR(32) NOT NULL,
+        entity_id VARCHAR(64) NOT NULL,
+        author_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        author_name VARCHAR(255) NOT NULL,
+        rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+        body TEXT NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+        rejection_reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL,
+        UNIQUE (entity_type, entity_id, author_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_entity_reviews_public ON entity_reviews(entity_type, entity_id, status);
     `);
 
     // 8. Community Comments & Nested Replies table

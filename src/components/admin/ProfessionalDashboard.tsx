@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { PropertyCategorySelect } from '../properties/PropertyCategorySelect';
+import { DEFAULT_NEW_PROPERTY_TYPE, displayPropertyType } from '../../shared/propertyCategories';
 
 export const ProfessionalDashboard: React.FC = () => {
   const { currentUser, showToast } = useApp();
@@ -10,6 +12,7 @@ export const ProfessionalDashboard: React.FC = () => {
   const [organization, setOrganization] = useState(currentUser.organization || '');
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
+  const [propertyType, setPropertyType] = useState(DEFAULT_NEW_PROPERTY_TYPE);
 
   const load = async () => {
     const [profileRes, listingRes, unlockRes] = await Promise.all([
@@ -52,7 +55,13 @@ export const ProfessionalDashboard: React.FC = () => {
     const res = await fetch('/api/properties', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, location, microMarket: location, developerName: organization })
+      body: JSON.stringify({
+        title,
+        location,
+        microMarket: location,
+        developerName: organization,
+        propertyType
+      })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -61,6 +70,7 @@ export const ProfessionalDashboard: React.FC = () => {
     }
     setTitle('');
     setLocation('');
+    setPropertyType(DEFAULT_NEW_PROPERTY_TYPE);
     showToast('Listing submitted for approval. It is not public yet.');
     load().catch(() => {});
   };
@@ -85,12 +95,23 @@ export const ProfessionalDashboard: React.FC = () => {
         <form onSubmit={submitListing} className="grid sm:grid-cols-2 gap-3 text-xs">
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Listing title" required className="border border-slate-300 rounded-xl px-3 py-2" />
           <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Location" className="border border-slate-300 rounded-xl px-3 py-2" />
+          <PropertyCategorySelect
+            ariaLabel="Property type"
+            value={propertyType}
+            onChange={setPropertyType}
+            className="sm:col-span-2 border border-slate-300 rounded-xl px-3 py-2 bg-white"
+          />
           <button className="sm:col-span-2 justify-self-start px-4 py-2 bg-slate-900 text-white rounded-xl font-bold">Submit listing</button>
         </form>
         <ul className="text-xs text-slate-700 space-y-1">
           {listings.length === 0 && <li>No listings yet.</li>}
           {listings.map(listing => (
-            <li key={listing.id}>{listing.title} — {listing.publicationStatus}</li>
+            <li key={listing.id}>
+              {listing.title}
+              {displayPropertyType(listing.propertyType) ? ` — ${displayPropertyType(listing.propertyType)}` : ''}
+              {' — '}
+              {listing.publicationStatus}
+            </li>
           ))}
         </ul>
       </section>

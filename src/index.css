@@ -71,8 +71,8 @@ body.apk-mode::-webkit-scrollbar,
   scrollbar-width: none !important;  /* Firefox */
 }
 
-/* 86-inch IFP studio broadcast display styles */
-.studio-ifp-mode {
+/* Studio broadcast display styles */
+.studio-broadcast-mode {
   background-color: #0b1120;
   color: #f8fafc;
 }

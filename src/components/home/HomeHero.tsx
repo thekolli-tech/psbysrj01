@@ -6,6 +6,9 @@ import { BrandLogo } from '../common/BrandLogo';
 import { AudioStoryPlayer } from '../common/AudioStoryPlayer';
 import { PropertyDetailModal } from '../properties/PropertyDetailModal';
 import { Property } from '../../types';
+import { PropertyCategorySelect } from '../properties/PropertyCategorySelect';
+import { OverviewFoundation } from './OverviewFoundation';
+import { ALL_PROPERTY_TYPES, displayPropertyType, matchesPropertyTypeFilter } from '../../shared/propertyCategories';
 import {
   ShieldCheck,
   Video,
@@ -62,12 +65,12 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
 
   // Visual Quick Search state
   const [searchCorridor, setSearchCorridor] = useState<string>('ALL');
-  const [searchAssetType, setSearchAssetType] = useState<string>('ALL');
+  const [searchAssetType, setSearchAssetType] = useState<string>(ALL_PROPERTY_TYPES);
 
   // Filter properties based on quick search
   const featuredProperties = properties.filter(p => {
     if (searchCorridor !== 'ALL' && !p.microMarket.toLowerCase().includes(searchCorridor.toLowerCase())) return false;
-    if (searchAssetType !== 'ALL' && p.propertyType !== searchAssetType) return false;
+    if (!matchesPropertyTypeFilter(p.propertyType, searchAssetType)) return false;
     return true;
   });
 
@@ -277,6 +280,8 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
         </div>
       </section>
 
+      <OverviewFoundation />
+
       {/* 
         ====================================================================
         SECTION 1.5: VISUAL SEARCH & CURATED DEVELOPMENTS SHOWCASE
@@ -325,24 +330,18 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
 
             {/* Asset Type Selector */}
             <div className="lg:col-span-5 space-y-1.5">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wide font-mono block">
-                Property Architecture
+              <label htmlFor="home-property-type" className="text-xs font-bold text-slate-400 uppercase tracking-wide font-mono block">
+                Property type
               </label>
-              <div className="flex flex-wrap gap-1.5">
-                {['ALL', 'Sky Villa', 'Luxury High-Rise', 'Grade-A Commercial', 'Gated Villa Community'].map(a => (
-                  <button
-                    key={a}
-                    onClick={() => setSearchAssetType(a)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                      searchAssetType === a
-                        ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                    }`}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
+              <PropertyCategorySelect
+                id="home-property-type"
+                ariaLabel="Property type"
+                includeAll
+                value={searchAssetType}
+                storedValues={properties.map(property => property.propertyType)}
+                onChange={setSearchAssetType}
+                className="w-full px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-100 border border-slate-700"
+              />
             </div>
 
             {/* Direct Browse Action */}
@@ -402,7 +401,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-black/20" />
                     
                     <div className="absolute top-2.5 left-2.5 bg-slate-950/90 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-amber-500/30 font-mono">
-                      {prop.propertyType}
+                      {displayPropertyType(prop.propertyType)}
                     </div>
 
                     <div className="absolute bottom-2.5 left-2.5 right-2.5 text-white">
@@ -508,11 +507,11 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                 2. The Broadcast Network
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Powered by high-definition YouTube studio analytics, professional TV Anchors, and live field Ground Reports using our 86-inch Interactive Flat Panel (IFP) to dissect vector layout blueprints.
+                Powered by high-definition YouTube studio analytics, professional TV Anchors, and live field Ground Reports.
               </p>
             </div>
             <div className="pt-2 text-[11px] font-bold text-red-600 flex items-center gap-1">
-              <span>86" IFP Broadcast Desk</span>
+              <span>Studio Broadcast Desk</span>
             </div>
           </div>
 

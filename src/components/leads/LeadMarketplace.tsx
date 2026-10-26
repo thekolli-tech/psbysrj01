@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { LeadTier } from '../../types';
+import { PropertyCategorySelect } from '../properties/PropertyCategorySelect';
+import {
+  ALL_PROPERTY_TYPES,
+  DEFAULT_NEW_PROPERTY_TYPE,
+  displayPropertyType,
+  matchesPropertyTypeFilter
+} from '../../shared/propertyCategories';
 import {
   Lock,
   Unlock,
@@ -38,6 +45,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
 
   const [selectedTier, setSelectedTier] = useState<'ALL' | LeadTier>('ALL');
   const [selectedMarket, setSelectedMarket] = useState<string>('ALL');
+  const [selectedPropertyType, setSelectedPropertyType] = useState<string>(ALL_PROPERTY_TYPES);
   const [isPostLeadModalOpen, setIsPostLeadModalOpen] = useState(false);
 
   // New Lead form state
@@ -45,7 +53,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [budget, setBudget] = useState('₹4.50 Cr - ₹6.50 Cr');
-  const [propertyType, setPropertyType] = useState('Luxury High-Rise');
+  const [propertyType, setPropertyType] = useState(DEFAULT_NEW_PROPERTY_TYPE);
   const [microMarket, setMicroMarket] = useState('Neopolis, Kokapet');
   const [tier, setTier] = useState<LeadTier>('PREMIUM');
   const [requirements, setRequirements] = useState('');
@@ -121,6 +129,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
   const filteredLeads = leads.filter(lead => {
     if (selectedTier !== 'ALL' && lead.tier !== selectedTier) return false;
     if (selectedMarket !== 'ALL' && !lead.microMarket.toLowerCase().includes(selectedMarket.toLowerCase())) return false;
+    if (!matchesPropertyTypeFilter(lead.propertyType, selectedPropertyType)) return false;
     return true;
   });
 
@@ -232,6 +241,18 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
           ))}
         </div>
 
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+          <span className="text-xs font-bold text-slate-500">Property type</span>
+          <PropertyCategorySelect
+            ariaLabel="Property type"
+            includeAll
+            value={selectedPropertyType}
+            storedValues={leads.map(lead => lead.propertyType)}
+            onChange={setSelectedPropertyType}
+            className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500 w-full sm:w-72"
+          />
+        </div>
+
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-500">Micro-Market:</span>
           <select
@@ -311,7 +332,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                     </div>
                     <div>
                       <span className="text-slate-400">Target Asset:</span>{' '}
-                      <strong className="text-slate-800">{lead.propertyType}</strong>
+                      <strong className="text-slate-800">{displayPropertyType(lead.propertyType)}</strong>
                     </div>
                     <div>
                       <span className="text-slate-400">Timeline:</span>{' '}
@@ -363,7 +384,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                     {isUnlocked ? (
                       <button
                         onClick={() => {
-                          sendMessage(`Hello, I am contacting you regarding your verified inquiry on Property Studio for ${lead.propertyType} in ${lead.microMarket}.`, 'user_seeker_ananya', lead.id);
+                          sendMessage(`Hello, I am contacting you regarding your verified inquiry on Property Studio for ${displayPropertyType(lead.propertyType)} in ${lead.microMarket}.`, 'user_seeker_ananya', lead.id);
                           setActiveView('CHAT');
                         }}
                         className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
@@ -595,17 +616,12 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Property Type</label>
-                  <select
+                  <PropertyCategorySelect
+                    ariaLabel="Property type"
                     value={propertyType}
-                    onChange={e => setPropertyType(e.target.value)}
+                    onChange={setPropertyType}
                     className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  >
-                    <option>Luxury High-Rise</option>
-                    <option>Sky Villa</option>
-                    <option>Penthouse</option>
-                    <option>Gated Villa Community</option>
-                    <option>Grade-A Commercial</option>
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Micro-Market</label>

@@ -6,6 +6,7 @@ import { claimOtpProof, type OtpClaimRunner } from './otpClaim.ts';
 import { canonicalOtpTarget } from './otpTarget.ts';
 import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
 import { indianNationalDigits } from '../shared/indianMobile.ts';
+import { communitySearchLikePattern } from '../shared/communityEngagement.ts';
 import type {
   UserRole,
   DbUser,
@@ -53,6 +54,8 @@ function mapUserRow(row: any): DbUser {
     role: row.role as UserRole,
     avatar: row.avatar || '',
     organization: row.organization || '',
+    town_city: row.town_city || null,
+    profession: row.profession || null,
     wallet_balance: Number(row.wallet_balance || 0),
     is_verified: Number(row.is_verified || 0),
     email_verified: Number(row.email_verified || 0),
@@ -102,6 +105,7 @@ export async function pgGetActiveDeveloperCount(): Promise<number> {
 export async function pgGetAllUsers(): Promise<Array<Omit<DbUser, 'password_hash' | 'salt'> & { postCount: number }>> {
   const res = await queryPostgres(`
     SELECT u.id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
+           u.town_city, u.profession,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
            u.must_change_password, u.assigned_properties, u.last_login_at, u.created_at, u.updated_at,
            COUNT(p.id) as post_count
@@ -120,6 +124,8 @@ export async function pgGetAllUsers(): Promise<Array<Omit<DbUser, 'password_hash
     role: row.role as UserRole,
     avatar: row.avatar || '',
     organization: row.organization || '',
+    town_city: row.town_city || null,
+    profession: row.profession || null,
     wallet_balance: Number(row.wallet_balance || 0),
     is_verified: Number(row.is_verified || 0),
     email_verified: Number(row.email_verified || 0),
@@ -211,6 +217,36 @@ export async function pgUpdateUser(id: string, updates: Partial<{
   const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramIdx}`;
   await queryPostgres(query, values);
   return pgFindUserById(id);
+}
+
+export async function pgUpdateProfileFields(
+  id: string,
+  fields: { townCity?: string | null; profession?: string | null }
+): Promise<DbUser | null> {
+  const sets: string[] = [];
+  const values: Array<string | null> = [];
+  let paramIdx = 1;
+  if (fields.townCity !== undefined) {
+    sets.push(`town_city = $${paramIdx++}`);
+    values.push(fields.townCity);
+  }
+  if (fields.profession !== undefined) {
+    sets.push(`profession = $${paramIdx++}`);
+    values.push(fields.profession);
+  }
+  if (sets.length === 0) return pgFindUserById(id);
+  sets.push(`updated_at = $${paramIdx++}`);
+  values.push(new Date().toISOString());
+  values.push(id);
+  await queryPostgres(`UPDATE users SET ${sets.join(', ')} WHERE id = $${paramIdx}`, values);
+  return pgFindUserById(id);
+}
+
+export async function pgProfessionsByUserId(ids: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const res = await queryPostgres('SELECT id, profession FROM users WHERE id = ANY($1::varchar[])', [unique]);
+  return new Map(res.rows.map((row: any) => [row.id, row.profession || '']));
 }
 
 export async function pgUpdateUserRole(
@@ -555,6 +591,7 @@ export async function pgGetSession(rawToken: string): Promise<(DbSession & { use
 
   const res = await queryPostgres(`
     SELECT s.*, u.id as u_id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
+           u.town_city, u.profession,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
            u.must_change_password, u.assigned_properties, u.created_at as u_created_at, u.updated_at as u_updated_at
     FROM sessions s
@@ -592,6 +629,8 @@ export async function pgGetSession(rawToken: string): Promise<(DbSession & { use
       role: row.role,
       avatar: row.avatar || '',
       organization: row.organization || '',
+      town_city: row.town_city || null,
+      profession: row.profession || null,
       wallet_balance: Number(row.wallet_balance || 0),
       is_verified: Number(row.is_verified || 0),
       email_verified: Number(row.email_verified || 0),
@@ -890,10 +929,139 @@ export async function pgGetAuditLogs(limit = 50, offset = 0, filterAction?: stri
 // COMMUNITY POSTS, LIKES & MEDIA (POSTGRESQL)
 // ==============================================================================
 
+export async function pgCommunityEngagement(ids: string[], userId?: string): Promise<Map<string, {
+  agreeCount: number;
+  disagreeCount: number;
+  userVote: 1 | -1 | 0;
+  followerCount: number;
+  following: boolean;
+}>> {
+  const result = new Map<string, {
+    agreeCount: number;
+    disagreeCount: number;
+    userVote: 1 | -1 | 0;
+    followerCount: number;
+    following: boolean;
+  }>();
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return result;
+  const blank = () => ({ agreeCount: 0, disagreeCount: 0, userVote: 0 as const, followerCount: 0, following: false });
+  const votes = await queryPostgres(
+    `SELECT post_id,
+        SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS agree_count,
+        SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS disagree_count
+     FROM community_post_votes
+     WHERE post_id = ANY($1::varchar[])
+     GROUP BY post_id`,
+    [unique]
+  );
+  const follows = await queryPostgres(
+    `SELECT post_id, COUNT(*) AS follower_count
+     FROM community_post_follows
+     WHERE post_id = ANY($1::varchar[])
+     GROUP BY post_id`,
+    [unique]
+  );
+  for (const row of votes.rows) {
+    const current = result.get(row.post_id) || blank();
+    current.agreeCount = Number(row.agree_count || 0);
+    current.disagreeCount = Number(row.disagree_count || 0);
+    result.set(row.post_id, current);
+  }
+  for (const row of follows.rows) {
+    const current = result.get(row.post_id) || blank();
+    current.followerCount = Number(row.follower_count || 0);
+    result.set(row.post_id, current);
+  }
+  if (userId) {
+    const mine = await queryPostgres(
+      'SELECT post_id, vote FROM community_post_votes WHERE user_id = $1 AND post_id = ANY($2::varchar[])',
+      [userId, unique]
+    );
+    const followed = await queryPostgres(
+      'SELECT post_id FROM community_post_follows WHERE user_id = $1 AND post_id = ANY($2::varchar[])',
+      [userId, unique]
+    );
+    for (const row of mine.rows) {
+      const current = result.get(row.post_id) || blank();
+      current.userVote = Number(row.vote) === -1 ? -1 : 1;
+      result.set(row.post_id, current);
+    }
+    for (const row of followed.rows) {
+      const current = result.get(row.post_id) || blank();
+      current.following = true;
+      result.set(row.post_id, current);
+    }
+  }
+  return result;
+}
+
+export async function pgCastCommunityVote(
+  postId: string,
+  userId: string,
+  vote: 1 | -1 | 0
+): Promise<{ agreeCount: number; disagreeCount: number; userVote: 1 | -1 | 0 } | null> {
+  const post = await queryPostgres('SELECT id FROM community_posts WHERE id = $1', [postId]);
+  if (post.rows.length === 0) return null;
+  const existing = await queryPostgres(
+    'SELECT vote FROM community_post_votes WHERE post_id = $1 AND user_id = $2',
+    [postId, userId]
+  );
+  const now = new Date().toISOString();
+  if (vote === 0 || (existing.rows[0] && Number(existing.rows[0].vote) === vote)) {
+    await queryPostgres('DELETE FROM community_post_votes WHERE post_id = $1 AND user_id = $2', [postId, userId]);
+  } else if (existing.rows[0]) {
+    await queryPostgres(
+      'UPDATE community_post_votes SET vote = $3, updated_at = $4 WHERE post_id = $1 AND user_id = $2',
+      [postId, userId, vote, now]
+    );
+  } else {
+    const id = `vote_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    await queryPostgres(
+      `INSERT INTO community_post_votes (id, post_id, user_id, vote, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (post_id, user_id) DO UPDATE SET vote = EXCLUDED.vote, updated_at = EXCLUDED.updated_at`,
+      [id, postId, userId, vote, now, now]
+    );
+  }
+  const row = (await pgCommunityEngagement([postId], userId)).get(postId);
+  return {
+    agreeCount: row?.agreeCount || 0,
+    disagreeCount: row?.disagreeCount || 0,
+    userVote: row?.userVote || 0
+  };
+}
+
+export async function pgToggleCommunityFollow(
+  postId: string,
+  userId: string
+): Promise<{ following: boolean; followerCount: number } | null> {
+  const post = await queryPostgres('SELECT id FROM community_posts WHERE id = $1', [postId]);
+  if (post.rows.length === 0) return null;
+  const existing = await queryPostgres(
+    'SELECT id FROM community_post_follows WHERE post_id = $1 AND user_id = $2',
+    [postId, userId]
+  );
+  if (existing.rows[0]) {
+    await queryPostgres('DELETE FROM community_post_follows WHERE post_id = $1 AND user_id = $2', [postId, userId]);
+  } else {
+    const id = `follow_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    await queryPostgres(
+      `INSERT INTO community_post_follows (id, post_id, user_id, created_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (post_id, user_id) DO NOTHING`,
+      [id, postId, userId, new Date().toISOString()]
+    );
+  }
+  const row = (await pgCommunityEngagement([postId], userId)).get(postId);
+  return { following: Boolean(row?.following), followerCount: row?.followerCount || 0 };
+}
+
 export async function pgGetAllPosts(params?: {
   communityId?: string;
   topic?: string;
   mediaType?: string;
+  q?: string;
   limit?: number;
   offset?: number;
   currentUserId?: string;
@@ -915,6 +1083,12 @@ export async function pgGetAllPosts(params?: {
   if (params?.mediaType && params.mediaType !== 'ALL') {
     query += ` AND p.media_type = $${paramIdx++}`;
     args.push(params.mediaType);
+  }
+
+  if (params?.q) {
+    const pattern = communitySearchLikePattern(params.q);
+    query += ` AND (LOWER(p.title) LIKE $${paramIdx++} ESCAPE '\\' OR LOWER(p.content) LIKE $${paramIdx++} ESCAPE '\\')`;
+    args.push(pattern, pattern);
   }
 
   query += ' ORDER BY p.is_pinned DESC, p.created_at DESC';

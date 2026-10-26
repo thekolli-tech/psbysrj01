@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Property } from '../../types';
+import { displayPropertyType } from '../../shared/propertyCategories';
 import {
   MapPin,
   Building2,
@@ -241,7 +242,7 @@ export const CorridorMapView: React.FC<CorridorMapViewProps> = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
                 <div className="absolute top-2.5 left-2.5 bg-slate-900/90 text-amber-400 text-[10px] font-bold px-2.5 py-1 rounded-md border border-amber-500/30 font-mono">
-                  {selectedProperty.propertyType}
+                  {displayPropertyType(selectedProperty.propertyType)}
                 </div>
                 <div className="absolute bottom-2.5 left-2.5 right-2.5 text-white">
                   <span className="text-[11px] text-amber-300 block font-medium">

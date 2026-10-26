@@ -28,6 +28,8 @@ ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS moderation_note TEXT;
 ALTER TABLE communities ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
 ALTER TABLE communities ADD COLUMN IF NOT EXISTS change_request TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities TEXT DEFAULT '[]';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS town_city TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profession TEXT;
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS seeker_id VARCHAR(64);
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS property_id VARCHAR(64);
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS consent_granted SMALLINT DEFAULT 0;
@@ -113,6 +115,54 @@ CREATE TABLE IF NOT EXISTS moderation_actions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_moderation_actions_target ON moderation_actions(target_type, target_id);
+
+CREATE TABLE IF NOT EXISTS community_post_votes (
+  id VARCHAR(64) PRIMARY KEY,
+  post_id VARCHAR(64) NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  vote SMALLINT NOT NULL CHECK (vote IN (1, -1)),
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (post_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_community_post_votes_post ON community_post_votes(post_id);
+
+CREATE TABLE IF NOT EXISTS community_post_follows (
+  id VARCHAR(64) PRIMARY KEY,
+  post_id VARCHAR(64) NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (post_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_community_post_follows_post ON community_post_follows(post_id);
+
+CREATE TABLE IF NOT EXISTS property_requirements (
+  id VARCHAR(64) PRIMARY KEY,
+  seeker_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  property_type VARCHAR(80) NOT NULL,
+  location TEXT,
+  budget TEXT,
+  details TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_property_requirements_seeker ON property_requirements(seeker_id, created_at);
+
+CREATE TABLE IF NOT EXISTS entity_reviews (
+  id VARCHAR(64) PRIMARY KEY,
+  entity_type VARCHAR(32) NOT NULL,
+  entity_id VARCHAR(64) NOT NULL,
+  author_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  author_name VARCHAR(255) NOT NULL,
+  rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  body TEXT NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+  rejection_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (entity_type, entity_id, author_id)
+);
+CREATE INDEX IF NOT EXISTS idx_entity_reviews_public ON entity_reviews(entity_type, entity_id, status);
 `;
 
 export const ESSENTIAL_CONFIG_SQL = `
@@ -132,6 +182,8 @@ const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE communities ADD COLUMN suspension_reason TEXT',
   'ALTER TABLE communities ADD COLUMN change_request TEXT',
   'ALTER TABLE users ADD COLUMN capabilities TEXT DEFAULT \'[]\'',
+  'ALTER TABLE users ADD COLUMN town_city TEXT',
+  'ALTER TABLE users ADD COLUMN profession TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN seeker_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN property_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN consent_granted INTEGER DEFAULT 0',
@@ -205,6 +257,46 @@ CREATE TABLE IF NOT EXISTS moderation_actions (
   actor_id TEXT NOT NULL,
   reason TEXT,
   created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS community_post_votes (
+  id TEXT PRIMARY KEY,
+  post_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  vote INTEGER NOT NULL CHECK (vote IN (1, -1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS community_post_follows (
+  id TEXT PRIMARY KEY,
+  post_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS property_requirements (
+  id TEXT PRIMARY KEY,
+  seeker_id TEXT NOT NULL,
+  property_type TEXT NOT NULL,
+  location TEXT,
+  budget TEXT,
+  details TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS entity_reviews (
+  id TEXT PRIMARY KEY,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  author_id TEXT NOT NULL,
+  author_name TEXT NOT NULL,
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  body TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  rejection_reason TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (entity_type, entity_id, author_id)
 );
 `;
 

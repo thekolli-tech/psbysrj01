@@ -24,6 +24,8 @@ export interface User {
   role: UserRole;
   avatar: string;
   organization?: string;
+  townCity?: string;
+  profession?: string;
   reraNumber?: string;
   walletBalance: number;
   assignedPropertyIds?: string[];
@@ -102,7 +104,7 @@ export interface Property {
   isClaimedByDeveloper: boolean;
   microMarket: string;
   location: string;
-  propertyType: 'Luxury High-Rise' | 'Sky Villa' | 'Grade-A Commercial' | 'Gated Villa Community' | 'Plotted Layout';
+  propertyType: string;
   priceRange: string;
   pricePerSqft: number;
   totalUnits: number;
@@ -218,6 +220,7 @@ export interface CommunityReply {
   id: string;
   authorName: string;
   authorRole: UserRole;
+  authorProfession?: string;
   isVerifiedBuilderReply: boolean;
   content: string;
   createdAt: string;
@@ -254,6 +257,7 @@ export interface CommunityPost {
   authorId?: string;
   authorName: string;
   authorRole: UserRole;
+  authorProfession?: string;
   propertyId?: string;
   propertyName?: string;
   communityId?: string;
@@ -269,6 +273,11 @@ export interface CommunityPost {
   duration?: string;
   status?: 'PUBLISHED' | 'FLAGGED' | 'ARCHIVED';
   upvotes: number;
+  agreeCount?: number;
+  disagreeCount?: number;
+  userVote?: 1 | -1 | 0;
+  followerCount?: number;
+  following?: boolean;
   userLiked?: boolean;
   commentsCount?: number;
   isPinned?: boolean;
@@ -388,6 +397,8 @@ export type ViewType =
   | 'CONFERENCE'
   | 'MARKET_INSIGHTS'
   | 'COMMUNITY'
+  | 'REVIEWS'
+  | 'REQUIREMENT'
   | 'CHAT'
   | 'ADMIN'
   | 'DEVELOPER'

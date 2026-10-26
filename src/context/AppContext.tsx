@@ -123,6 +123,7 @@ interface AppContextType {
   isLoggedIn: boolean;
   login: (user?: User) => void;
   logout: () => void;
+  refreshSession: () => Promise<void>;
 
   // Scroll Progress for Hero Morph Animation
   scrollProgress: number;
@@ -189,6 +190,8 @@ function mapApiUser(raw: any): User {
     role: raw.role,
     avatar: raw.avatar || '',
     organization: raw.organization || '',
+    townCity: raw.townCity || raw.town_city || '',
+    profession: raw.profession || '',
     walletBalance: Number(raw.wallet_balance ?? raw.walletBalance ?? 0),
     isVerified: Boolean(raw.is_verified ?? raw.isVerified),
     emailVerified: Boolean(raw.email_verified ?? raw.emailVerified),
@@ -380,6 +383,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     showToast('Signed in');
+  };
+
+  const refreshSession = async () => {
+    const res = await fetch('/api/auth/me');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data?.user) setSessionUser(mapApiUser(data.user));
   };
 
   const logout = () => {
@@ -1029,6 +1039,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLoggedIn,
         login,
         logout,
+        refreshSession,
         scrollProgress
       }}
     >

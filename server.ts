@@ -12,6 +12,7 @@ import {
   getAllUsers,
   createUser,
   updateUser,
+  updateUserProfileFields,
   updateUserRole,
   deleteUser,
   suspendUser,
@@ -26,6 +27,8 @@ import {
   getAuditLogs,
   getAllPosts,
   getPostById,
+  castCommunityVote,
+  toggleCommunityFollow,
   createPost,
   updatePost,
   deletePost,
@@ -73,6 +76,8 @@ import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
+import { readProfilePatch } from './src/shared/profileFields.ts';
+import { isCommunityPostId, readCommunitySearch, readCommunityVote } from './src/shared/communityEngagement.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
 import { canViewModeratedContent, selfServeStorageRole } from './src/shared/policy.ts';
@@ -299,6 +304,45 @@ app.post('/api/auth/logout', async (req: AuthenticatedRequest, res: Response): P
   }
   res.clearCookie('ps_session');
   res.json({ success: true, message: 'Logged out successfully' });
+});
+
+app.patch('/api/me/profile', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const patch = readProfilePatch(req.body);
+    if ('error' in patch.townCity) {
+      res.status(400).json({ error: patch.townCity.error });
+      return;
+    }
+    if ('error' in patch.profession) {
+      res.status(400).json({ error: patch.profession.error });
+      return;
+    }
+    if (patch.townCity.omit && patch.profession.omit) {
+      res.status(400).json({ error: 'No profile fields were provided.' });
+      return;
+    }
+    const updated = await updateUserProfileFields(req.user!.id, {
+      ...(patch.townCity.omit ? {} : { townCity: patch.townCity.value }),
+      ...(patch.profession.omit ? {} : { profession: patch.profession.value })
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'Account not found.' });
+      return;
+    }
+    const { password_hash, salt, ...safeUser } = updated;
+    res.json({
+      success: true,
+      user: {
+        ...safeUser,
+        townCity: updated.town_city || '',
+        profession: updated.profession || '',
+        isVerified: Boolean(updated.is_verified),
+        assignedPropertyIds: JSON.parse(updated.assigned_properties || '[]')
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Profile was not saved.' });
+  }
 });
 
 // Get currently authenticated user
@@ -907,10 +951,17 @@ app.get('/api/community/posts', async (req: AuthenticatedRequest, res: Response)
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
     const offset = req.query.offset ? Number(req.query.offset) : undefined;
 
+    const search = readCommunitySearch(req.query.q);
+    if ('error' in search) {
+      res.status(400).json({ error: search.error });
+      return;
+    }
+
     const posts = await getAllPosts({
       communityId,
       topic,
       mediaType,
+      q: search.q || undefined,
       limit,
       offset,
       currentUserId: req.user?.id
@@ -1012,6 +1063,55 @@ app.patch('/api/community/posts/:id/pin', requireAdmin, async (req: Request, res
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/community/posts/:id/vote', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!isCommunityPostId(req.params.id)) {
+      res.status(400).json({ error: 'Post id is not valid.' });
+      return;
+    }
+    const vote = readCommunityVote(req.body?.vote);
+    if (typeof vote !== 'number') {
+      res.status(400).json({ error: vote.error });
+      return;
+    }
+    const post = await getPostById(req.params.id, req.user?.id);
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const result = await castCommunityVote(req.params.id, req.user.id, vote);
+    if (!result) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    res.json({ success: true, ...result });
+  } catch {
+    res.status(500).json({ error: 'Vote was not saved.' });
+  }
+});
+
+app.post('/api/community/posts/:id/follow', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!isCommunityPostId(req.params.id)) {
+      res.status(400).json({ error: 'Post id is not valid.' });
+      return;
+    }
+    const post = await getPostById(req.params.id, req.user?.id);
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const result = await toggleCommunityFollow(req.params.id, req.user.id);
+    if (!result) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    res.json({ success: true, ...result });
+  } catch {
+    res.status(500).json({ error: 'Follow was not saved.' });
   }
 });
 

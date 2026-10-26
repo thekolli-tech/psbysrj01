@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Property, ConstructionLog, FloorPlan } from '../../types';
+import { displayPropertyType } from '../../shared/propertyCategories';
+import { ApprovedProjectReviews } from './ApprovedProjectReviews';
 import { AudioStoryPlayer } from '../common/AudioStoryPlayer';
 import {
   X,
@@ -90,7 +92,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           <div className="min-w-0 pr-4">
             <div className="flex items-center gap-2 text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">
               <Building2 className="w-3.5 h-3.5" />
-              <span>{property.propertyType}</span>
+              <span>{displayPropertyType(property.propertyType)}</span>
               <span className="text-slate-400" aria-hidden="true">·</span>
               <span className="text-slate-600 flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-amber-500" /> {property.microMarket}
@@ -347,7 +349,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 audioUrl={property.audioNarrationUrl}
                 transcript={
                   property.audioTranscript ||
-                  `This is the Property Studio architectural due-diligence review for ${property.title} located at ${property.location}. Featuring ${property.propertyType} architecture with civil construction verified at ${property.progressPercent}%, this development adheres strictly to TS-RERA approval registration ID ${property.reraRegId}.`
+                  `This is the Property Studio architectural due-diligence review for ${property.title} located at ${property.location}. Featuring ${displayPropertyType(property.propertyType)} architecture with civil construction verified at ${property.progressPercent}%, this development adheres strictly to TS-RERA approval registration ID ${property.reraRegId}.`
                 }
                 badge="Executive Voice Audit"
                 variant="card"
@@ -488,6 +490,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               )}
             </div>
           )}
+
+          <ApprovedProjectReviews projectId={property.id} />
 
           {/* Universal Amenities & Highlights Section */}
           <div className="pt-6 border-t border-slate-200 space-y-4">

@@ -1,15 +1,13 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { ViewType } from '../../types';
-import { isPlatformAdmin, isProfessionalRole, isPropertySeeker } from '../../shared/policy';
+import { isPlatformAdmin } from '../../shared/policy';
+import { linkedEndUserNavigation, roleUtilityDestinations } from '../../shared/endUserNavigation';
 import { BrandLogo } from './BrandLogo';
 import {
   Wallet,
   LogIn,
   KeyRound,
-  Tv,
   HelpCircle,
-  Phone,
   ShieldCheck
 } from 'lucide-react';
 
@@ -34,24 +32,8 @@ export const Header: React.FC<HeaderProps> = ({
     isLoggedIn
   } = useApp();
 
-  // Navigation links - member modules only visible after login
-  const navLinks: { view: ViewType; label: string }[] = isLoggedIn
-    ? [
-        { view: 'HOME', label: 'Overview' },
-        { view: 'PROPERTIES', label: 'Projects' },
-        ...(isPropertySeeker(currentUser.role) ? [] : [{ view: 'LEADS_MARKET' as ViewType, label: 'Buyer Leads' }]),
-        { view: 'MEDIA', label: 'Media & Podcasts' },
-        { view: 'CONFERENCE', label: 'Live Summit' },
-        { view: 'MARKET_INSIGHTS', label: 'Market Trends' },
-        { view: 'COMMUNITY', label: 'Community Q&A' },
-        ...(isProfessionalRole(currentUser.role) ? [{ view: 'PROFESSIONAL' as ViewType, label: 'Workspace' }] : [])
-      ]
-    : [
-        { view: 'HOME', label: 'Overview' },
-        { view: 'PROPERTIES', label: 'Projects' },
-        { view: 'MARKET_INSIGHTS', label: 'Market Trends' },
-        { view: 'COMMUNITY', label: 'Community Feed' }
-      ];
+  const navLinks = linkedEndUserNavigation();
+  const utilityLinks = roleUtilityDestinations(currentUser.role, isLoggedIn);
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 transition-all duration-300">
@@ -104,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Zone 2: Navigation links */}
-        <nav className="hidden lg:flex items-center gap-5 text-xs font-semibold text-slate-600">
+        <nav className="hidden lg:flex items-center gap-3 text-[11px] font-semibold text-slate-600 overflow-x-auto">
           {navLinks.map(link => {
             const isActive = activeView === link.view;
             return (
@@ -128,20 +110,37 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 3: Primary Actions */}
         <div className="flex items-center gap-2.5 shrink-0">
-          {/* 86-inch IFP studio broadcast quick launch */}
-          <button
-            onClick={() => {
-              setActiveView('STUDIO');
-            }}
-            className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-              activeView === 'STUDIO'
-                ? 'bg-slate-900 text-amber-400 border-slate-900 shadow-sm'
-                : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <Tv className="w-3.5 h-3.5 text-amber-500" />
-            <span className="whitespace-nowrap">86" Studio IFP</span>
-          </button>
+          {utilityLinks.includes('LEADS_MARKET') && (
+            <button
+              onClick={() => {
+                setActiveView('LEADS_MARKET');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`hidden xl:inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                activeView === 'LEADS_MARKET'
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-800 border-slate-300'
+              }`}
+            >
+              Buyer Leads
+            </button>
+          )}
+
+          {utilityLinks.includes('PROFESSIONAL') && (
+            <button
+              onClick={() => {
+                setActiveView('PROFESSIONAL');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`hidden xl:inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                activeView === 'PROFESSIONAL'
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-800 border-slate-300'
+              }`}
+            >
+              Workspace
+            </button>
+          )}
 
           {/* Admin / Developer Console direct button */}
           {isLoggedIn && currentUser.role === 'DEVELOPER' && (

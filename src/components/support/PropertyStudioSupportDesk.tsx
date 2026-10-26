@@ -17,6 +17,11 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { BrandLogo } from '../common/BrandLogo';
+import {
+  COMPANY_CONTACT_DISPLAY,
+  COMPANY_CONTACT_TEL,
+  COMPANY_SUPPORT_WHATSAPP
+} from '../../shared/companyContact';
 
 interface SupportDeskProps {
   isOpen: boolean;
@@ -77,10 +82,6 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
     {
       q: 'How can developers claim their project community space for town halls?',
       a: 'Verified developer PMOs submit their corporate credentials to the Secretariat. Once verified, developers broadcast unedited construction telemetry, respond directly to community Q&As, and publish certified inventory status updates.'
-    },
-    {
-      q: 'What is the 86-inch Interactive Flat Panel (IFP) Studio Broadcast?',
-      a: 'Our flagship broadcast studio utilizes an 86-inch 4K touchscreen panel to dissect masterplans, satellite topography, wind vortex deflectors, and true cost sheet calculations with industry managing directors.'
     }
   ];
 
@@ -173,14 +174,14 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
 
                 <div className="pt-2 flex flex-col sm:flex-row gap-2">
                   <a
-                    href="tel:+919849012890"
+                    href={COMPANY_CONTACT_TEL}
                     className="flex-1 py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-xs transition-colors"
                   >
                     <Phone className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Call +91 98490 12890</span>
+                    <span>Call {COMPANY_CONTACT_DISPLAY}</span>
                   </a>
                   <a
-                    href="https://wa.me/919849012890?text=Hello%20Property%20Studio%2C%20I%20would%20like%20to%20inquire%20about%20a%20project%20audit."
+                    href={COMPANY_SUPPORT_WHATSAPP}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-xs transition-colors"
@@ -280,7 +281,7 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                       <option>Anonymous Buyer Requirement Submission</option>
                       <option>Developer Community Space Claim</option>
                       <option>Elite Agent Verification & Badge</option>
-                      <option>86-inch IFP Studio Broadcast Inquiry</option>
+                      <option>Studio Broadcast Inquiry</option>
                       <option>Technical / Platform Assistance</option>
                     </select>
                   </div>

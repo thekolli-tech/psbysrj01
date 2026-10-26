@@ -1,5 +1,6 @@
 import React from 'react';
 import { Property } from '../../types';
+import { displayPropertyType } from '../../shared/propertyCategories';
 import {
   X,
   Building2,
@@ -85,7 +86,7 @@ export const PropertyCompareModal: React.FC<PropertyCompareModalProps> = ({
                       <X className="w-4 h-4" />
                     </button>
                     <div className="absolute bottom-2.5 left-2.5 bg-slate-950/90 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded font-mono">
-                      {p.propertyType}
+                      {displayPropertyType(p.propertyType)}
                     </div>
                   </div>
                   <div className="p-4 space-y-1">

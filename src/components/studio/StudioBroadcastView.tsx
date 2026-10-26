@@ -30,7 +30,7 @@ export const StudioBroadcastView: React.FC = () => {
       segment: 'SEGMENT 1: MACRO ROADWAYS',
       headline: 'Neopolis Trumpet Interchange & 100m Arterial Corridor',
       bullet: 'Point out: Land auctions at ₹100 Cr/acre creating ₹12,000/sq.ft structural floor price.',
-      camCue: 'CAMERA 1 (WIDE IFP SHOT)'
+      camCue: 'CAMERA 1 (WIDE SHOT)'
     },
     {
       segment: 'SEGMENT 2: STRUCTURAL INTEGRITY',
@@ -46,7 +46,7 @@ export const StudioBroadcastView: React.FC = () => {
     }
   ];
 
-  // Canvas drawing logic for 86-inch touch panel stylus
+  // Canvas drawing logic for the studio touch-panel stylus
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -124,13 +124,13 @@ export const StudioBroadcastView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none overflow-x-hidden">
-      {/* 86-inch IFP Studio Broadcast Header (+30% scale, glare-reduction dark matte, bold borders) */}
+      {/* Studio Broadcast header (+30% scale, glare-reduction dark matte, bold borders) */}
       <div className="bg-slate-900 border-b-2 border-slate-800 px-6 py-4 flex items-center justify-between shadow-2xl">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 bg-red-950/80 border-2 border-red-700/80 px-4 py-1.5 rounded-lg">
             <span className="w-3.5 h-3.5 bg-red-500 rounded-full animate-ping" />
             <span className="text-sm font-extrabold tracking-widest text-red-400 font-mono">
-              ON AIR · 86" STUDIO IFP CAPTURE
+              ON AIR · STUDIO CAPTURE
             </span>
           </div>
 
@@ -225,7 +225,7 @@ export const StudioBroadcastView: React.FC = () => {
             ))}
           </div>
 
-          {/* Interactive Digital Canvas Screen for 86-inch Touch Panel */}
+          {/* Interactive digital canvas for the studio touch panel */}
           <div className="relative flex-1 min-h-[560px] bg-slate-900 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center">
             {/* Background Content Based on Tab */}
             {selectedStudioTab === 'MASTERPLAN' && (
@@ -381,7 +381,7 @@ export const StudioBroadcastView: React.FC = () => {
                 </div>
 
                 <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300">
-                  💡 <span className="font-bold">Broadcast Tip:</span> Use the gold stylus tool to circle the Trumpet Interchange on the IFP panel before transitioning to the commercial chart.
+                  💡 <span className="font-bold">Broadcast Tip:</span> Use the gold stylus tool to circle the Trumpet Interchange on the studio panel before transitioning to the commercial chart.
                 </div>
               </div>
             </div>

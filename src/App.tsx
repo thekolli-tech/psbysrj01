@@ -16,11 +16,16 @@ import { MediaEngine } from './components/media/MediaEngine';
 import { CorporateConferenceView } from './components/conference/CorporateConference';
 import { MarketTrendsView } from './components/trends/MarketTrendsView';
 import { CommunityForumView } from './components/community/CommunityForum';
+import { PropertyRequirementView } from './components/requirements/PropertyRequirementView';
+import { ReviewRatingView } from './components/reviews/ReviewRatingView';
 import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { DeveloperDashboard } from './components/admin/DeveloperDashboard';
 import { ProfessionalDashboard } from './components/admin/ProfessionalDashboard';
 import { PropertyAdminDashboard } from './components/admin/PropertyAdminDashboard';
 import { canAccessProfessionalSurface, isPropertySeeker } from './shared/policy';
+import { COMPANY_CONTACT_DISPLAY, COMPANY_CONTACT_TEL } from './shared/companyContact';
+import { linkedEndUserNavigation, roleUtilityDestinations } from './shared/endUserNavigation';
+import { isCommunityPostId } from './shared/communityEngagement';
 import { StudioBroadcastView } from './components/studio/StudioBroadcastView';
 import { ContactPropertyAdmin } from './components/contact/ContactPropertyAdmin';
 import { PropertyStudioSupportDesk } from './components/support/PropertyStudioSupportDesk';
@@ -66,10 +71,18 @@ const AppContent: React.FC = () => {
     }
   }, [deviceMode]);
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const postId = params.get('post') || '';
+    if (params.get('view') === 'community' || isCommunityPostId(postId)) {
+      setActiveView('COMMUNITY');
+    }
+  }, [setActiveView]);
+
   // If STUDIO_IFP mode or activeView is STUDIO, render Studio Broadcast View
   if (deviceMode === 'STUDIO_IFP' || activeView === 'STUDIO') {
     return (
-      <div className="studio-ifp-mode min-h-screen">
+      <div className="studio-broadcast-mode min-h-screen">
         <StudioBroadcastView />
         <Toast />
       </div>
@@ -175,6 +188,14 @@ const AppContent: React.FC = () => {
           <CommunityForumView onOpenLoginModal={() => setLoginModalOpen(true)} />
         )}
 
+        {activeView === 'REVIEWS' && (
+          <ReviewRatingView onOpenLoginModal={() => setLoginModalOpen(true)} />
+        )}
+
+        {activeView === 'REQUIREMENT' && (
+          <PropertyRequirementView onOpenLoginModal={() => setLoginModalOpen(true)} />
+        )}
+
         {/* Official Secretariat & Support Desk View */}
         {activeView === 'CHAT' && (
           <div className="max-w-4xl mx-auto px-4 py-12 text-center space-y-6">
@@ -199,11 +220,11 @@ const AppContent: React.FC = () => {
                 <ArrowRight className="w-4 h-4 ml-1" />
               </button>
               <a
-                href="tel:+919849012890"
+                href={COMPANY_CONTACT_TEL}
                 className="px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-2xl text-xs font-bold inline-flex items-center gap-2 shadow-xs transition-colors"
               >
                 <Phone className="w-4 h-4 text-emerald-600" />
-                <span>Call +91 98490 12890</span>
+                <span>Call {COMPANY_CONTACT_DISPLAY}</span>
               </a>
               <a
                 href="mailto:info@propertystudio.org"
@@ -316,7 +337,7 @@ const AppContent: React.FC = () => {
 
       {/* Mobile Bottom Navigation Dock */}
       <div className="block md:hidden">
-        <MobileBottomNav onOpenSupport={() => setSupportOpen(true)} />
+        <MobileBottomNav />
       </div>
 
       {/* Production Footer (Overview View) */}
@@ -331,28 +352,26 @@ const AppContent: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-5 text-xs text-slate-600 font-medium">
-              <button onClick={() => { setActiveView('PROPERTIES'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
-                Projects
-              </button>
-              {isLoggedIn && (
-                <>
-                  <button onClick={() => { setActiveView('LEADS_MARKET'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
-                    Buyer Leads
-                  </button>
-                  <button onClick={() => { setActiveView('MEDIA'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
-                    Media & Podcasts
-                  </button>
-                  <button onClick={() => { setActiveView('CONFERENCE'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
-                    Live Summit
-                  </button>
-                </>
+              {linkedEndUserNavigation().map(link => (
+                <button
+                  key={link.key}
+                  onClick={() => {
+                    setActiveView(link.view);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-slate-900 cursor-pointer"
+                >
+                  {link.label}
+                </button>
+              ))}
+              {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('LEADS_MARKET') && (
+                <button onClick={() => { setActiveView('LEADS_MARKET'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
+                  Buyer Leads
+                </button>
               )}
-              <button onClick={() => { setActiveView('MARKET_INSIGHTS'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
-                Market Trends
-              </button>
-              {isLoggedIn && (
-                <button onClick={() => { setActiveView('COMMUNITY'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
-                  Community Q&A
+              {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('PROFESSIONAL') && (
+                <button onClick={() => { setActiveView('PROFESSIONAL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
+                  Workspace
                 </button>
               )}
               <button
@@ -361,14 +380,6 @@ const AppContent: React.FC = () => {
               >
                 <LifeBuoy className="w-3.5 h-3.5" />
                 <span>Support Desk</span>
-              </button>
-              <button
-                onClick={() => {
-                  setActiveView('STUDIO');
-                }}
-                className="text-slate-900 font-bold hover:underline cursor-pointer"
-              >
-                86" Studio IFP
               </button>
             </div>
           </div>
@@ -553,7 +564,7 @@ const AppContent: React.FC = () => {
 
               {/* Twitter / X */}
               <a
-                href="https://x.com/propertystudio"
+                href="https://x.com/propertystudio_"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-3 rounded-2xl border border-slate-200 hover:border-slate-900 hover:bg-slate-100 bg-white transition-all group flex items-center justify-between text-xs"
@@ -567,7 +578,7 @@ const AppContent: React.FC = () => {
                       Twitter / 𝕏
                     </span>
                     <span className="text-[10px] text-slate-400 block font-mono">
-                      @propertystudio
+                      @propertystudio_
                     </span>
                   </div>
                 </div>
