@@ -2385,7 +2385,12 @@ function sqliteUpdatePost(
     WHERE id = ?
   `).run(title, content, links, attachments, now, postId);
 
-  sqliteRecordCommunityEvent('POST_UPDATED', { id: postId, title });
+  sqliteRecordCommunityEvent('POST_UPDATED', {
+    id: postId,
+    title,
+    status: 'PENDING_APPROVAL',
+    authorId: post.author_id
+  }, post.author_id || null);
   return sqliteGetPostById(postId);
 }
 

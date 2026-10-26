@@ -80,7 +80,7 @@ import { readProfilePatch } from './src/shared/profileFields.ts';
 import { isCommunityPostId, readCommunitySearch, readCommunityVote } from './src/shared/communityEngagement.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
-import { canViewModeratedContent, selfServeStorageRole } from './src/shared/policy.ts';
+import { canViewModeratedContent, communityReplayVisible, selfServeStorageRole } from './src/shared/policy.ts';
 import { allowRequest, clientKey } from './src/server/rateLimit.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -226,7 +226,7 @@ app.get('/api/community/events', async (req: AuthenticatedRequest, res: Response
         } catch {
           payload = {};
         }
-        if (payload?.status && !canViewModeratedContent(payload.status, payload.authorId, req.user)) {
+        if (!communityReplayVisible(payload, req.user)) {
           continue;
         }
         res.write(`event: ${ev.event_type}\ndata: ${ev.payload}\n\n`);

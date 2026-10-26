@@ -313,6 +313,25 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   assert.equal(Number(smsRows.count), 0);
   assert.equal(await findUserByEmail('seeker-bypass@example.com'), null);
 
+  const privileged = await api('/api/auth/register', {
+    name: 'Not An Admin',
+    email: 'not-admin@example.com',
+    password: 'Longpassword1!',
+    role: 'SUPER_ADMIN',
+    otp: '123456'
+  });
+  assert.equal(privileged.status, 403);
+  assert.equal(await findUserByEmail('not-admin@example.com'), null);
+  const developerSignup = await api('/api/auth/register', {
+    name: 'Not A Developer',
+    email: 'not-developer@example.com',
+    password: 'Longpassword1!',
+    role: 'DEVELOPER',
+    otp: '123456'
+  });
+  assert.equal(developerSignup.status, 403);
+  assert.equal(await findUserByEmail('not-developer@example.com'), null);
+
   const seekerEmail = 'seeker-bypass@example.com';
   const seekerSent = await api('/api/auth/send-email-otp', { email: seekerEmail });
   assert.equal(seekerSent.status, 200, seekerSent.raw);
@@ -324,10 +343,42 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
     role: 'PROPERTY_SEEKER',
     phone: '+919800011199',
     otp: seekerCode,
-    phoneVerified: true
+    phoneVerified: true,
+    phoneOtp: '000000'
   });
   assert.equal(seekerBypass.status, 400);
   assert.equal(await findUserByEmail(seekerEmail), null);
+
+  const memberLogin = await originalFetch(`http://127.0.0.1:${port}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ email, password: 'Longpassword1!' })
+  });
+  const memberLoginJson = await memberLogin.json() as { user?: { role?: string }; token?: string };
+  assert.equal(memberLogin.status, 200);
+  assert.equal(memberLoginJson.user?.role, 'CHANNEL_PARTNER');
+  assert.equal(memberLoginJson.token, undefined);
+  const sessionCookie = String(memberLogin.headers.get('set-cookie') || '').split(';')[0];
+  assert.match(sessionCookie, /^ps_session=/);
+  const memberMe = await originalFetch(`http://127.0.0.1:${port}/api/auth/me`, { headers: { cookie: sessionCookie, accept: 'application/json' } });
+  const memberMeJson = await memberMe.json() as { user?: { email?: string } };
+  assert.equal(memberMeJson.user?.email, email);
+  const seekerLogout = await originalFetch(`http://127.0.0.1:${port}/api/auth/logout`, {
+    method: 'POST',
+    headers: { cookie: sessionCookie, accept: 'application/json' }
+  });
+  assert.equal(seekerLogout.status, 200);
+  const afterLogout = await originalFetch(`http://127.0.0.1:${port}/api/auth/me`, { headers: { cookie: sessionCookie, accept: 'application/json' } });
+  const afterLogoutJson = await afterLogout.json() as { user?: unknown };
+  assert.equal(afterLogoutJson.user, null);
+  const revokedNotifications = await originalFetch(`http://127.0.0.1:${port}/api/notifications`, {
+    headers: { cookie: sessionCookie, accept: 'application/json' }
+  });
+  assert.equal(revokedNotifications.status, 401);
+  const anonymousNotifications = await originalFetch(`http://127.0.0.1:${port}/api/notifications`, {
+    headers: { accept: 'application/json' }
+  });
+  assert.equal(anonymousNotifications.status, 401);
 
   const ownerEmail = 'landowner-register@example.com';
   const ownerSent = await api('/api/auth/send-email-otp', { email: ownerEmail });
