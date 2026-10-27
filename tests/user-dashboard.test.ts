@@ -83,6 +83,26 @@ test('UserDashboard component implements Phase 1 tabs, APIs, and privacy protect
   assert.match(dashSource, /PROPERTY_CATEGORY_GROUPS/);
 });
 
+test('UserDashboard component includes responsive property search with location, type, and keyword filters', () => {
+  const dashSource = read('src/components/dashboard/UserDashboard.tsx');
+
+  // Search input controls
+  assert.match(dashSource, /id="dashboard-search-query"/);
+  assert.match(dashSource, /id="dashboard-search-location"/);
+  assert.match(dashSource, /id="dashboard-search-type"/);
+
+  // PropertyCategorySelect reuse
+  assert.match(dashSource, /<PropertyCategorySelect/);
+
+  // Search execution and clear controls
+  assert.match(dashSource, /handleSearchSubmit/);
+  assert.match(dashSource, /handleResetSearch/);
+
+  // Results rendering with PropertyDetailModal integration
+  assert.match(dashSource, /data-testid="dashboard-search-results"/);
+  assert.match(dashSource, /<PropertyDetailModal/);
+});
+
 test('Header and Profile control panel provide navigation to Member Dashboard', () => {
   const headerSource = read('src/components/common/Header.tsx');
   assert.match(headerSource, /isPropertySeeker\(currentUser\.role\)/);

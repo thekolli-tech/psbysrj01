@@ -16,7 +16,20 @@ export type { WhatsAppDispatchResult } from './whatsappOtp.ts';
  * from an address on propertystudio.org. There is no testing-domain fallback.
  */
 export function emailFromAddress(): string {
-  return (process.env.EMAIL_FROM || process.env.RESEND_FROM || 'Property Studio <otp@propertystudio.org>').trim();
+  let from = (process.env.EMAIL_FROM || process.env.RESEND_FROM || 'Property Studio <otp@propertystudio.org>').trim();
+  while ((from.startsWith('"') && from.endsWith('"')) || (from.startsWith("'") && from.endsWith("'"))) {
+    from = from.slice(1, -1).trim();
+  }
+  const match = from.match(/^(.*?)\s*<([^>]+)>$/);
+  if (match) {
+    const name = match[1].replace(/["']/g, '').trim();
+    const email = match[2].trim().toLowerCase();
+    return name ? `${name} <${email}>` : email;
+  }
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) {
+    return `Property Studio <${from.toLowerCase()}>`;
+  }
+  return from;
 }
 
 export async function sendResendOtp(
@@ -24,7 +37,8 @@ export async function sendResendOtp(
   otp: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<EmailDispatchResult> {
-  if (!process.env.RESEND_API_KEY) {
+  const apiKey = (process.env.RESEND_API_KEY || '').trim().replace(/^["']\s*|\s*["']$/g, '');
+  if (!apiKey) {
     return { success: false, provider: 'resend', error: 'RESEND_API_KEY is not configured.' };
   }
   const from = emailFromAddress();
@@ -32,32 +46,50 @@ export async function sendResendOtp(
     return { success: false, provider: 'resend', error: 'EMAIL_FROM must use an address on propertystudio.org.' };
   }
 
+  const targetEmail = toEmail.trim().toLowerCase();
   const htmlContent = otpEmailHtml(otp);
   const textContent = `Property Studio\n\nYour 6-digit verification code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it.\n`;
   try {
     const response = await fetchImpl('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         from,
-        to: [toEmail],
+        to: [targetEmail],
         subject: 'Your Property Studio verification code',
         html: htmlContent,
         text: textContent
       })
     });
     if (!response.ok) {
-      console.warn(`[Property Studio] Resend rejected the verification email with status ${response.status}.`);
+      let detail = '';
+      try {
+        const errJson = await response.json();
+        detail = errJson?.message || errJson?.error?.message || (typeof errJson === 'string' ? errJson : JSON.stringify(errJson));
+      } catch {
+        detail = await response.text().catch(() => '');
+      }
+      const sanitizedDetail = detail
+        ? String(detail).replace(/[a-zA-Z0-9_\-]{20,}/g, '[REDACTED]').slice(0, 300)
+        : '';
+      console.warn(
+        `[Property Studio] Resend rejected the verification email with status ${response.status}${
+          sanitizedDetail ? `: ${sanitizedDetail}` : '.'
+        }`
+      );
       return { success: false, provider: 'resend', error: 'Resend did not accept the verification email.' };
     }
     const data = await response.json().catch(() => ({})) as { id?: string };
     console.log('[Property Studio] Verification email accepted by Resend.');
     return { success: true, provider: 'resend', messageId: data.id };
-  } catch {
-    console.warn('[Property Studio] Resend request failed before a response was received.');
+  } catch (err: any) {
+    const msg = err?.message
+      ? String(err.message).replace(/[a-zA-Z0-9_\-]{20,}/g, '[REDACTED]').slice(0, 200)
+      : '';
+    console.warn(`[Property Studio] Resend request failed before a response was received${msg ? `: ${msg}` : '.'}`);
     return { success: false, provider: 'resend', error: 'Resend request failed.' };
   }
 }

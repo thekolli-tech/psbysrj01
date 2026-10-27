@@ -164,6 +164,32 @@ queued('mocked Resend delivery, provider failure, and sender guard', async () =>
   }
 });
 
+queued('emailFromAddress cleans quoted strings, parses display names, and formats propertystudio.org senders', async () => {
+  const { emailFromAddress } = await import('../src/server/notifications.ts');
+  const saved = process.env.EMAIL_FROM;
+  try {
+    process.env.EMAIL_FROM = '"Property Studio <otp@propertystudio.org>"';
+    assert.equal(emailFromAddress(), 'Property Studio <otp@propertystudio.org>');
+
+    process.env.EMAIL_FROM = "'Property Studio <otp@propertystudio.org>'";
+    assert.equal(emailFromAddress(), 'Property Studio <otp@propertystudio.org>');
+
+    process.env.EMAIL_FROM = 'otp@propertystudio.org';
+    assert.equal(emailFromAddress(), 'Property Studio <otp@propertystudio.org>');
+
+    process.env.EMAIL_FROM = '"otp@propertystudio.org"';
+    assert.equal(emailFromAddress(), 'Property Studio <otp@propertystudio.org>');
+
+    process.env.EMAIL_FROM = '"Property Studio" <otp@propertystudio.org>';
+    assert.equal(emailFromAddress(), 'Property Studio <otp@propertystudio.org>');
+
+    delete process.env.EMAIL_FROM;
+    assert.equal(emailFromAddress(), 'Property Studio <otp@propertystudio.org>');
+  } finally {
+    process.env.EMAIL_FROM = saved;
+  }
+});
+
 queued('email OTP requests stop after 8 attempts in 15 minutes', async () => {
   const key = 'email-otp:203.0.113.10:rate-unit@example.com';
   for (let attempt = 0; attempt < 8; attempt += 1) {
