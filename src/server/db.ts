@@ -391,8 +391,16 @@ export function hashPassword(password: string, salt = crypto.randomBytes(16).toS
 }
 
 export function verifyPassword(password: string, hash: string, salt: string): boolean {
-  const verifyHash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
-  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(verifyHash, 'hex'));
+  if (!password || !hash || !salt) return false;
+  try {
+    const verifyHash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+    const a = Buffer.from(hash, 'hex');
+    const b = Buffer.from(verifyHash, 'hex');
+    if (a.length !== b.length || a.length === 0) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 export function hashToken(token: string): string {
@@ -1077,7 +1085,7 @@ function sqliteInitDatabase(): void {
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      expires_at INTEGER NOT NULL,
+      expires_at BIGINT NOT NULL,
       is_revoked INTEGER DEFAULT 0,
       user_agent TEXT,
       ip_address TEXT,

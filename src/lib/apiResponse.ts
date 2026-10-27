@@ -21,7 +21,7 @@ function errorText(data: Record<string, unknown> | null): string {
 }
 
 /** Reads a fetch response without throwing on HTML or plain-text host errors. */
-export async function readApiResponse(response: Response): Promise<ApiResponseBody> {
+export async function readApiResponse(response: Response, defaultFallback?: string): Promise<ApiResponseBody> {
   const text = await response.text();
   const trimmed = text.trim();
   let data: Record<string, unknown> | null = null;
@@ -41,6 +41,6 @@ export async function readApiResponse(response: Response): Promise<ApiResponseBo
     ok: response.ok,
     status: response.status,
     data,
-    error: response.ok ? '' : (usable || registrationFailureMessage(response.status))
+    error: response.ok ? '' : (usable || defaultFallback || registrationFailureMessage(response.status))
   };
 }

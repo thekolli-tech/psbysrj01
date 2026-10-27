@@ -566,19 +566,21 @@ export async function pgCreateSession(
   const tokenHash = hashToken(rawToken);
   const now = new Date().toISOString();
   const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  const safeAgent = typeof userAgent === 'string' ? userAgent.slice(0, 500) : null;
+  const safeIp = typeof ipAddress === 'string' ? ipAddress.slice(0, 128) : null;
 
   await queryPostgres(`
     INSERT INTO sessions (id, user_id, expires_at, is_revoked, user_agent, ip_address, created_at)
     VALUES ($1, $2, $3, 0, $4, $5, $6)
-  `, [tokenHash, userId, expiresAt, userAgent || null, ipAddress || null, now]);
+  `, [tokenHash, userId, expiresAt, safeAgent, safeIp, now]);
 
   const session: DbSession = {
     id: tokenHash,
     user_id: userId,
     expires_at: expiresAt,
     is_revoked: 0,
-    user_agent: userAgent,
-    ip_address: ipAddress,
+    user_agent: safeAgent || undefined,
+    ip_address: safeIp || undefined,
     created_at: now
   };
 

@@ -174,7 +174,7 @@ export async function runPostgresMigrations(): Promise<boolean> {
         expires_at BIGINT NOT NULL,
         is_revoked SMALLINT DEFAULT 0,
         user_agent TEXT,
-        ip_address VARCHAR(64),
+        ip_address TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);

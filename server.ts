@@ -120,10 +120,10 @@ const authenticateUser = async (req: AuthenticatedRequest, _res: Response, next:
         req.sessionToken = token;
       }
     }
-    next();
-  } catch (err) {
-    next(err);
+  } catch (err: any) {
+    console.warn('[Property Studio] Session lookup failed, continuing as guest:', redactDatabaseError(err?.message || 'session lookup failed'));
   }
+  next();
 };
 
 app.use(authenticateUser);
@@ -284,12 +284,24 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
     res.cookie('ps_session', token, sessionCookieOptions());
 
     const { password_hash, salt, ...safeUser } = user;
+    let assignedPropertyIds: string[] = [];
+    if (Array.isArray(safeUser.assigned_properties)) {
+      assignedPropertyIds = safeUser.assigned_properties;
+    } else if (typeof safeUser.assigned_properties === 'string' && safeUser.assigned_properties.trim()) {
+      try {
+        const parsed = JSON.parse(safeUser.assigned_properties.trim());
+        assignedPropertyIds = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        assignedPropertyIds = [];
+      }
+    }
+
     res.json({
       success: true,
       user: {
         ...safeUser,
         isVerified: Boolean(safeUser.is_verified),
-        assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
+        assignedPropertyIds
       }
     });
   } catch (err: any) {
@@ -1511,6 +1523,17 @@ app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
 });
 
 registerPlatformRoutes(app, { requireAuth, requireAdmin });
+
+// Central JSON error handler for all /api routes to prevent HTML error responses
+app.use('/api', (err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[Property Studio] API error:', redactDatabaseError(err?.message || 'Internal error'));
+  if (res.headersSent) return;
+  const status = typeof err?.status === 'number' && err.status >= 400 && err.status < 600 ? err.status : 500;
+  const message = err?.message && !/postgres|sqlite|constraint|syntax error|select |insert /i.test(err.message)
+    ? err.message
+    : 'The server could not complete that request.';
+  res.status(status).json({ error: message, code: err?.code || 'SERVER_ERROR' });
+});
 
 app.use('/api', (_req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found' });

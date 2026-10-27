@@ -93,7 +93,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         })
       });
 
-      const result = await readApiResponse(response);
+      const result = await readApiResponse(response, 'Invalid credentials. Please verify your email and password.');
       const user = result.data?.user as { name?: string; role?: string } | undefined;
       if (!result.ok || !user) {
         throw new Error(result.error || 'Authentication failed');
