@@ -115,7 +115,15 @@ export function getSqliteDb(): SqliteDatabase {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    const dbFile = process.env.SQLITE_PATH || path.join(DATA_DIR, 'propertystudio.db');
+    let dbFile = process.env.SQLITE_PATH || path.join(DATA_DIR, 'propertystudio.db');
+    if (process.platform === 'win32' && dbFile.startsWith('/tmp/')) {
+      const os = (process.getBuiltinModule ? process.getBuiltinModule('node:os') : null) as typeof import('node:os') | null;
+      dbFile = path.join(os?.tmpdir?.() || process.env.TEMP || 'C:\\temp', path.basename(dbFile));
+    }
+    const dbDir = path.dirname(dbFile);
+    if (!fs.existsSync(dbDir)) {
+      try { fs.mkdirSync(dbDir, { recursive: true }); } catch {}
+    }
     // A static import would evaluate node:sqlite while the Neon bundle loads.
     // import() is asynchronous, and SQLite callers are synchronous, so the
     // builtin is loaded here only after the checks above have passed.

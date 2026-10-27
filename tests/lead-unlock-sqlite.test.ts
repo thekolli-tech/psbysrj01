@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 test('SQLite wallet credit cannot unlock a lead while payments are unconfigured', async () => {
-  const dbPath = '/tmp/propertystudio-unlock-test.db';
+  const dbPath = process.platform === 'win32' ? path.join(os.tmpdir(), 'propertystudio-unlock-test.db') : '/tmp/propertystudio-unlock-test.db';
   fs.rmSync(dbPath, { force: true });
   delete process.env.DATABASE_URL;
   delete process.env.NODE_ENV;

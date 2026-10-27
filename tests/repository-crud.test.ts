@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 test('Repository CRUD and Authentication Flow', async (t) => {
-  const dbPath = '/tmp/propertystudio-repository-test.db';
+  const dbPath = process.platform === 'win32' ? path.join(os.tmpdir(), 'propertystudio-repository-test.db') : '/tmp/propertystudio-repository-test.db';
   fs.rmSync(dbPath, { force: true });
   delete process.env.DATABASE_URL;
   delete process.env.NODE_ENV;

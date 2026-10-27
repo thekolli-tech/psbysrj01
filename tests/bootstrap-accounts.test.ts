@@ -16,7 +16,7 @@ const occupiedEmail = 'occupied.bootstrap@example.com';
 const occupiedPassword = 'fixture-seeker-password';
 
 function runTsx(args: string[], env: NodeJS.ProcessEnv): { status: number | null; stdout: string; stderr: string } {
-  const result = spawnSync('npx', ['tsx', ...args], {
+  const result = spawnSync(process.platform === 'win32' ? process.execPath : 'npx', process.platform === 'win32' ? ['--import=tsx', ...args] : ['tsx', ...args], {
     cwd: process.cwd(),
     env,
     encoding: 'utf8'

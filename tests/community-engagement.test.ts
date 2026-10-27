@@ -176,31 +176,60 @@ test('persisted votes, follows, and question search keep roles and private field
   assert.equal(account?.profession, 'Architect');
   assert.equal(account?.town_city, 'Hyderabad');
 
-  const publicPosts = await api('GET', '/api/community/posts');
-  const visible = publicPosts.json.posts.find((item: any) => item.id === postId);
+  // Task 7: Unauthenticated guest requests must be rejected with 401
+  const guestPosts = await api('GET', '/api/community/posts');
+  assert.equal(guestPosts.status, 401, 'Guest posts listing must return 401');
+  const guestSingle = await api('GET', `/api/community/posts/${postId}`);
+  assert.equal(guestSingle.status, 401, 'Guest single post retrieval must return 401');
+  const guestComments = await api('GET', `/api/community/posts/${postId}/comments`);
+  assert.equal(guestComments.status, 401, 'Guest comments retrieval must return 401');
+
+  // Authenticated peer can view the discussions
+  const memberPosts = await api('GET', '/api/community/posts', undefined, peerCookie);
+  assert.equal(memberPosts.status, 200);
+  const visible = memberPosts.json.posts.find((item: any) => item.id === postId);
   assert.equal(visible.agreeCount, 1);
   assert.equal(visible.disagreeCount, 1);
-  assert.equal(visible.userVote, 0);
+  assert.equal(visible.userVote, 1);
   assert.equal(visible.followerCount, 1);
-  assert.equal(visible.following, false);
   assert.equal(visible.authorProfession, 'Architect');
   const serialized = JSON.stringify(visible);
   assert.equal(serialized.includes(seekerPhone), false);
   assert.equal(serialized.includes('Hyderabad'), false);
   assert.equal(serialized.includes('townCity'), false);
-  assert.equal(publicPosts.json.posts.some((item: any) => item.id === pending.json.post.id), false);
+  assert.equal(memberPosts.json.posts.some((item: any) => item.id === pending.json.post.id), false);
 
-  const found = await api('GET', '/api/community/posts?q=canal%20lining');
+  const found = await api('GET', '/api/community/posts?q=canal%20lining', undefined, peerCookie);
   assert.equal(found.status, 200);
   assert.equal(found.json.posts.some((item: any) => item.id === postId), true);
-  const missed = await api('GET', '/api/community/posts?q=' + encodeURIComponent("%' OR title LIKE '%"));
+  const missed = await api('GET', '/api/community/posts?q=' + encodeURIComponent("%' OR title LIKE '%"), undefined, peerCookie);
   assert.equal(missed.status, 200);
   assert.equal(missed.json.posts.some((item: any) => item.id === postId), false);
-  assert.equal((await api('GET', '/api/community/posts?q=' + 'x'.repeat(81))).status, 400);
-  assert.equal((await api('GET', '/api/community/posts?q=' + encodeURIComponent('<b>canal</b>'))).status, 400);
+  assert.equal((await api('GET', '/api/community/posts?q=' + 'x'.repeat(81), undefined, peerCookie)).status, 400);
+  assert.equal((await api('GET', '/api/community/posts?q=' + encodeURIComponent('<b>canal</b>'), undefined, peerCookie)).status, 400);
 
   const mine = await api('GET', '/api/community/posts', undefined, seekerCookie);
   const own = mine.json.posts.find((item: any) => item.id === postId);
   assert.equal(own.userVote, -1);
   assert.equal(own.following, true);
+
+  // Guest mutation rejection checks
+  const guestCreate = await api('POST', '/api/community/posts', { title: 'Guest Post', content: 'Disallowed', topic: 'Legal & RERA' });
+  assert.equal(guestCreate.status, 401, 'Guest cannot create post');
+  const guestEdit = await api('PUT', `/api/community/posts/${postId}`, { title: 'Hacked' });
+  assert.equal(guestEdit.status, 401, 'Guest cannot edit post');
+  const guestDelete = await api('DELETE', `/api/community/posts/${postId}`);
+  assert.equal(guestDelete.status, 401, 'Guest cannot delete post');
+  const guestComment = await api('POST', `/api/community/posts/${postId}/comments`, { content: 'Guest comment' });
+  assert.equal(guestComment.status, 401, 'Guest cannot add comment');
+  const guestReply = await api('POST', `/api/community/posts/${postId}/reply`, { content: 'Guest reply' });
+  assert.equal(guestReply.status, 401, 'Guest cannot reply');
+  const guestReport = await api('POST', '/api/community/reports', { targetType: 'POST', targetId: postId, reason: 'Spam' });
+  assert.equal(guestReport.status, 401, 'Guest cannot file report');
+
+  // Role and ownership authorization: peer cannot edit or delete another user's post
+  const peerEdit = await api('PUT', `/api/community/posts/${postId}`, { title: 'Unauthorized edit' }, peerCookie);
+  assert.equal(peerEdit.status, 403, 'Non-author cannot edit post');
+  const peerDelete = await api('DELETE', `/api/community/posts/${postId}`, undefined, peerCookie);
+  assert.equal(peerDelete.status, 403, 'Non-author cannot delete post');
 });

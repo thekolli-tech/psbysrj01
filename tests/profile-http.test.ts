@@ -124,9 +124,12 @@ test('town/city and profession save without changing role, registration, or priv
   const approved = await api('PATCH', `/api/admin/posts/${post.json.post.id}/moderation`, { status: 'APPROVED' }, adminCookie);
   assert.equal(approved.status, 200, JSON.stringify(approved.json));
 
-  const publicPosts = await api('GET', '/api/community/posts');
-  assert.equal(publicPosts.status, 200);
-  const visible = publicPosts.json.posts.find((item: any) => item.id === post.json.post.id);
+  // Task 7: Guest access must return 401; authenticated member can read posts
+  const guestPosts = await api('GET', '/api/community/posts');
+  assert.equal(guestPosts.status, 401);
+  const memberPosts = await api('GET', '/api/community/posts', undefined, seekerCookie);
+  assert.equal(memberPosts.status, 200);
+  const visible = memberPosts.json.posts.find((item: any) => item.id === post.json.post.id);
   assert.equal(visible.authorProfession, 'Planner');
   assert.equal(visible.authorRole, 'PROPERTY_SEEKER');
   const serialized = JSON.stringify(visible);

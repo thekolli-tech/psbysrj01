@@ -77,7 +77,7 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
     },
     {
       q: 'How are projects audited under TG-RERA and HMDA compliance?',
-      a: 'CEO Swamy Reddy Javidi (TG RERA: A02200004078) combines 24+ years of corporate distribution governance with engineering layout audits, verifying RERA Form 4, 28-day concrete cube compression tests, and municipal title approvals.'
+      a: 'CEO Swamy Reddy Javidi combines 24+ years of corporate distribution governance with engineering layout audits, verifying RERA Form 4, 28-day concrete cube compression tests, and municipal title approvals.'
     },
     {
       q: 'How can developers claim their project community space for town halls?',
@@ -99,9 +99,6 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                 <h2 className="text-base font-extrabold text-white font-display">
                   Official Support Desk
                 </h2>
-                <span className="text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded">
-                  TG RERA: A02200004078
-                </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 Property Studio by Swamy Reddy Javidi · Secretariat Assistance
@@ -221,12 +218,12 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                 </h4>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Government RERA</span>
-                    <strong className="text-slate-900 font-mono text-xs">TG RERA: A02200004078</strong>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Regulatory Framework</span>
+                    <strong className="text-slate-900 text-xs">RERA & HMDA Audited</strong>
                   </div>
                   <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">MSME Enterprise</span>
-                    <strong className="text-slate-900 font-mono text-xs">TS-02-283677</strong>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Privacy Framework</span>
+                    <strong className="text-slate-900 text-xs">Encrypted Data-Masking</strong>
                   </div>
                 </div>
               </div>

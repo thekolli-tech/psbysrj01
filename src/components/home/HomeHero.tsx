@@ -200,8 +200,8 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               {/* Key Trust Metrics */}
               <div className="grid grid-cols-3 gap-6 pt-6 border-t border-slate-200/80 text-slate-900">
                 <div>
-                  <div className="text-xl sm:text-2xl font-black font-mono-numbers text-slate-900">TG RERA</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5 font-mono">A02200004078</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono-numbers text-slate-900">5 Pillars</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">PropTech Integration</div>
                 </div>
                 <div>
                   <div className="text-xl sm:text-2xl font-black font-mono-numbers text-amber-700">24+ Years</div>

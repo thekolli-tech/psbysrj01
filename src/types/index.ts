@@ -405,6 +405,8 @@ export type ViewType =
   | 'PROFESSIONAL'
   | 'PROPERTY_ADMIN'
   | 'STUDIO'
-  | 'CONTACT';
+  | 'CONTACT'
+  | 'PRIVACY'
+  | 'TERMS';
 
 export type DeviceMode = 'AUTO' | 'MOBILE_APK' | 'DESKTOP' | 'STUDIO_IFP';

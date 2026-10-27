@@ -505,6 +505,34 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     />
                   </div>
 
+                  <p className="text-[11px] text-slate-500 text-center leading-normal">
+                    By proceeding, you agree to our{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        setActiveView('TERMS');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="text-amber-700 hover:underline font-bold cursor-pointer"
+                    >
+                      Terms & Conditions
+                    </button>{' '}
+                    and acknowledge our{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        setActiveView('PRIVACY');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="text-amber-700 hover:underline font-bold cursor-pointer"
+                    >
+                      Privacy Policy
+                    </button>
+                    .
+                  </p>
+
                   <button
                     type="submit"
                     disabled={loading}

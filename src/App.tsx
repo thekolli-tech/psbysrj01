@@ -23,17 +23,20 @@ import { DeveloperDashboard } from './components/admin/DeveloperDashboard';
 import { ProfessionalDashboard } from './components/admin/ProfessionalDashboard';
 import { PropertyAdminDashboard } from './components/admin/PropertyAdminDashboard';
 import { canAccessProfessionalSurface, isPropertySeeker } from './shared/policy';
-import { COMPANY_CONTACT_DISPLAY, COMPANY_CONTACT_TEL } from './shared/companyContact';
+import { COMPANY_CONTACT_DISPLAY, COMPANY_CONTACT_TEL, COMPANY_SUPPORT_WHATSAPP } from './shared/companyContact';
 import { linkedEndUserNavigation, roleUtilityDestinations } from './shared/endUserNavigation';
 import { isCommunityPostId } from './shared/communityEngagement';
 import { StudioBroadcastView } from './components/studio/StudioBroadcastView';
 import { ContactPropertyAdmin } from './components/contact/ContactPropertyAdmin';
 import { PropertyStudioSupportDesk } from './components/support/PropertyStudioSupportDesk';
 import { SupportDeskButton } from './components/support/SupportDeskButton';
+import { PrivacyPolicyView } from './components/legal/PrivacyPolicyView';
+import { TermsConditionsView } from './components/legal/TermsConditionsView';
+import { Youtube, Instagram, Linkedin, Facebook, Users } from 'lucide-react';
 import { AuthRequiredCard } from './components/common/AuthRequiredCard';
 import { BrandLogo } from './components/common/BrandLogo';
 import { Property } from './types';
-import { ShieldAlert, Building, LifeBuoy, ArrowRight, Lock, Phone, Mail, ShieldCheck, ExternalLink } from 'lucide-react';
+import { ShieldAlert, Building, LifeBuoy, ArrowRight, Lock, Phone, Mail, ShieldCheck, ExternalLink, MapPin } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const {
@@ -73,8 +76,13 @@ const AppContent: React.FC = () => {
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view')?.toLowerCase();
     const postId = params.get('post') || '';
-    if (params.get('view') === 'community' || isCommunityPostId(postId)) {
+    if (viewParam === 'privacy') {
+      setActiveView('PRIVACY');
+    } else if (viewParam === 'terms') {
+      setActiveView('TERMS');
+    } else if (viewParam === 'community' || isCommunityPostId(postId)) {
       setActiveView('COMMUNITY');
     }
   }, [setActiveView]);
@@ -94,7 +102,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans ${
+      className={`min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans overflow-x-hidden w-full ${
         isForcedMobile
           ? 'max-w-md mx-auto shadow-2xl border-x border-slate-300 min-h-dvh apk-mode no-scrollbar overflow-x-hidden'
           : ''
@@ -106,6 +114,7 @@ const AppContent: React.FC = () => {
           onOpenProfileModal={() => setProfileModalOpen(true)}
           onOpenWalletModal={() => setWalletModalOpen(true)}
           onOpenLoginModal={() => setLoginModalOpen(true)}
+          onOpenSupport={() => setSupportOpen(true)}
         />
       ) : isForcedDesktop ? (
         <Header
@@ -121,6 +130,7 @@ const AppContent: React.FC = () => {
               onOpenProfileModal={() => setProfileModalOpen(true)}
               onOpenWalletModal={() => setWalletModalOpen(true)}
               onOpenLoginModal={() => setLoginModalOpen(true)}
+              onOpenSupport={() => setSupportOpen(true)}
             />
           </div>
           <div className="hidden md:block">
@@ -185,7 +195,11 @@ const AppContent: React.FC = () => {
         )}
 
         {activeView === 'COMMUNITY' && (
-          <CommunityForumView onOpenLoginModal={() => setLoginModalOpen(true)} />
+          isLoggedIn ? (
+            <CommunityForumView onOpenLoginModal={() => setLoginModalOpen(true)} />
+          ) : (
+            <AuthRequiredCard view="COMMUNITY" onOpenLoginModal={() => setLoginModalOpen(true)} />
+          )
         )}
 
         {activeView === 'REVIEWS' && (
@@ -207,7 +221,7 @@ const AppContent: React.FC = () => {
                 Official Secretariat & Support Desk
               </h2>
               <p className="text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
-                Connect directly with the Property Studio secretariat under the leadership of CEO Swamy Reddy Javidi (TG RERA: A02200004078). Inquire regarding project regulatory compliance, anonymous buyer submissions, or developer community spaces.
+                Connect directly with the Property Studio secretariat under the leadership of CEO Swamy Reddy Javidi. Inquire regarding project regulatory compliance, anonymous buyer submissions, or developer community spaces.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-3">
@@ -239,6 +253,14 @@ const AppContent: React.FC = () => {
 
         {activeView === 'CONTACT' && (
           <ContactPropertyAdmin />
+        )}
+
+        {activeView === 'PRIVACY' && (
+          <PrivacyPolicyView />
+        )}
+
+        {activeView === 'TERMS' && (
+          <TermsConditionsView />
         )}
 
         {/* Super Admin & Developer Dashboard with Role Guard */}
@@ -337,56 +359,160 @@ const AppContent: React.FC = () => {
 
       {/* Mobile Bottom Navigation Dock */}
       <div className="block md:hidden">
-        <MobileBottomNav />
+        <MobileBottomNav onOpenLoginModal={() => setLoginModalOpen(true)} />
       </div>
 
-      {/* Production Footer (Overview View) */}
-      <footer className="bg-white border-t border-slate-200 py-10 px-4 sm:px-6 lg:px-8 mt-auto">
+      {/* Production Footer */}
+      <footer className="bg-white border-t border-slate-200 py-12 px-4 sm:px-6 lg:px-8 mt-auto">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="space-y-3">
-              <BrandLogo variant="compact" size="xl" />
-              <p className="text-[11px] text-slate-500 mt-1">
-                Official Secretariat: <a href="mailto:info@propertystudio.org" className="text-amber-700 font-mono font-bold hover:underline">info@propertystudio.org</a> · Western Corridor Financial District, Hyderabad
+          {/* Main 4-Column Responsive Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
+            {/* Column A: Logo, Mission Summary & Official Contact Details */}
+            <div className="lg:col-span-4 space-y-4">
+              <button
+                onClick={() => {
+                  setActiveView('HOME');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="text-left cursor-pointer focus:outline-none"
+                aria-label="Property Studio home"
+              >
+                <BrandLogo variant="compact" size="xl" />
+              </button>
+              <p className="text-xs text-slate-600 leading-relaxed max-w-sm">
+                Next-generation PropTech intelligence, high-fidelity media productions, regulatory telemetry, and verified community ecosystem across Hyderabad&apos;s Western Corridor and beyond.
               </p>
+              <div className="space-y-2 pt-1 text-xs text-slate-600">
+                <a
+                  href={COMPANY_CONTACT_TEL}
+                  className="flex items-center gap-2 hover:text-amber-700 font-semibold transition-colors"
+                >
+                  <Phone className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>{COMPANY_CONTACT_DISPLAY}</span>
+                </a>
+                <a
+                  href="mailto:info@propertystudio.org"
+                  className="flex items-center gap-2 hover:text-amber-700 font-mono transition-colors"
+                >
+                  <Mail className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>info@propertystudio.org</span>
+                </a>
+                <div className="flex items-start gap-2 text-slate-500">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                  <span>Secretariat · Western Corridor Financial District, Hyderabad</span>
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-5 text-xs text-slate-600 font-medium">
-              {linkedEndUserNavigation().map(link => (
+            {/* Column B: Main Platform Navigation */}
+            <div className="lg:col-span-2 space-y-3">
+              <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest block">
+                Platform
+              </span>
+              <nav className="flex flex-col space-y-2 text-xs text-slate-600 font-medium">
+                {linkedEndUserNavigation().map(link => (
+                  <button
+                    key={link.key}
+                    onClick={() => {
+                      if (link.view === 'COMMUNITY' && !isLoggedIn) {
+                        setLoginModalOpen(true);
+                        return;
+                      }
+                      setActiveView(link.view);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                  >
+                    {link.label}
+                  </button>
+                ))}
+                {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('LEADS_MARKET') && (
+                  <button
+                    onClick={() => {
+                      setActiveView('LEADS_MARKET');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                  >
+                    Buyer Leads
+                  </button>
+                )}
+                {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('PROFESSIONAL') && (
+                  <button
+                    onClick={() => {
+                      setActiveView('PROFESSIONAL');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                  >
+                    Workspace
+                  </button>
+                )}
+              </nav>
+            </div>
+
+            {/* Column C: Governance, Contact & Support */}
+            <div className="lg:col-span-2 space-y-3">
+              <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest block">
+                Governance & Support
+              </span>
+              <div className="flex flex-col space-y-2 text-xs text-slate-600 font-medium">
                 <button
-                  key={link.key}
+                  onClick={() => setSupportOpen(true)}
+                  className="text-left text-amber-700 font-bold hover:underline cursor-pointer flex items-center gap-1.5"
+                >
+                  <LifeBuoy className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Support Desk</span>
+                </button>
+                <a
+                  href={COMPANY_SUPPORT_WHATSAPP}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-emerald-700 transition-colors"
+                >
+                  Direct WhatsApp Support
+                </a>
+                <button
                   onClick={() => {
-                    setActiveView(link.view);
+                    setActiveView('CHAT');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="hover:text-slate-900 cursor-pointer"
+                  className="text-left hover:text-slate-900 transition-colors cursor-pointer"
                 >
-                  {link.label}
+                  Contact Secretariat
                 </button>
-              ))}
-              {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('LEADS_MARKET') && (
-                <button onClick={() => { setActiveView('LEADS_MARKET'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
-                  Buyer Leads
+                <button
+                  onClick={() => {
+                    setActiveView('CONTACT');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                >
+                  PMO Application
                 </button>
-              )}
-              {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('PROFESSIONAL') && (
-                <button onClick={() => { setActiveView('PROFESSIONAL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-slate-900 cursor-pointer">
-                  Workspace
+                <button
+                  onClick={() => {
+                    setActiveView('PRIVACY');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                >
+                  Privacy Policy
                 </button>
-              )}
-              <button
-                onClick={() => setSupportOpen(true)}
-                className="text-amber-700 font-bold hover:underline cursor-pointer flex items-center gap-1"
-              >
-                <LifeBuoy className="w-3.5 h-3.5" />
-                <span>Support Desk</span>
-              </button>
+                <button
+                  onClick={() => {
+                    setActiveView('TERMS');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                >
+                  Terms & Conditions
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* PROPERTY STUDIO SOCIAL MEDIA LINKS */}
-          <div className="mt-8 pt-6 border-t border-slate-200 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            {/* Column D: Verified Channels & Broadcast Platforms */}
+            <div className="lg:col-span-4 space-y-3">
               <div>
                 <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest block">
                   VERIFIED CHANNELS & BROADCAST PLATFORMS
@@ -394,207 +520,229 @@ const AppContent: React.FC = () => {
                 <h4 className="text-xs sm:text-sm font-black text-slate-900 font-display">
                   PROPERTY STUDIO SOCIAL MEDIA LINKS
                 </h4>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  Follow CEO Swamy Reddy Javidi for real-time market telemetry & video audits
+                </p>
               </div>
-              <span className="text-[11px] text-slate-500 font-medium">
-                Follow CEO Swamy Reddy Javidi for real-time market telemetry & video audits
-              </span>
-            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {/* WhatsApp Channel */}
-              <a
-                href="https://whatsapp.com/channel/0029VbDqFrPATRSnJ2S9x10t"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 bg-white transition-all group flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 font-bold flex items-center justify-center shrink-0">
-                    WA
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-900 block group-hover:text-emerald-700 leading-tight">
-                      WhatsApp Channel
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      Broadcast Alerts
-                    </span>
+              {/* 8 Verified Social Media Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {/* WhatsApp Channel */}
+                <a
+                  href="https://whatsapp.com/channel/0029VbDqFrPATRSnJ2S9x10t"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.634.085-1.808-.4-.984-.407-1.616-1.396-1.666-1.46-.048-.067-.406-.54-.406-1.032 0-.493.258-.733.35-.833.093-.101.203-.127.271-.127.068 0 .135.001.194.004.062.003.146-.024.227.172.085.203.288.704.313.755.025.05.042.11.008.177-.034.067-.051.109-.101.168-.051.06-.107.133-.153.179-.051.05-.104.105-.045.206.06.101.265.438.568.708.391.349.72.457.822.508.102.051.161.042.22-.025.06-.068.254-.296.322-.397.068-.102.136-.085.229-.051.093.034.593.28.695.331.102.051.17.076.195.119.025.042.025.245-.119.65zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.662 1.435 5.176L2 22l4.981-1.307A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
+                      </svg>
+                    </div>
+                    <div className="truncate">
+                      <span className="font-bold text-slate-900 block group-hover:text-emerald-700 leading-tight truncate">
+                        WhatsApp Channel
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono truncate">
+                        Broadcast Alerts
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 shrink-0" />
-              </a>
+                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-emerald-600 shrink-0 ml-1" />
+                </a>
 
-              {/* YouTube Link */}
-              <a
-                href="https://www.youtube.com/@PropertyStudio-SwamyReddyJavid"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-2xl border border-slate-200 hover:border-red-500 hover:bg-red-50/40 bg-white transition-all group flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-red-500/10 text-red-600 font-bold flex items-center justify-center shrink-0">
-                    YT
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-900 block group-hover:text-red-700 leading-tight">
-                      YouTube Studio
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      @PropertyStudio-SRJ
-                    </span>
+                {/* YouTube Link */}
+                <a
+                  href="https://www.youtube.com/@PropertyStudio-SwamyReddyJavid"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-red-500 hover:bg-red-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-red-50 text-red-600 border border-red-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Youtube className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="truncate">
+                      <span className="font-bold text-slate-900 block group-hover:text-red-700 leading-tight truncate">
+                        YouTube Studio
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono truncate">
+                        @PropertyStudio-SRJ
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-600 shrink-0" />
-              </a>
+                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-red-600 shrink-0 ml-1" />
+                </a>
 
-              {/* Instagram Link */}
-              <a
-                href="https://www.instagram.com/propertystudio_srj/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-2xl border border-slate-200 hover:border-pink-500 hover:bg-pink-50/40 bg-white transition-all group flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-pink-500/10 text-pink-600 font-bold flex items-center justify-center shrink-0">
-                    IG
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-900 block group-hover:text-pink-700 leading-tight">
-                      Instagram
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      @propertystudio_srj
-                    </span>
+                {/* Instagram Link */}
+                <a
+                  href="https://www.instagram.com/propertystudio_srj/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-pink-500 hover:bg-pink-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-pink-50 text-pink-600 border border-pink-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Instagram className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="truncate">
+                      <span className="font-bold text-slate-900 block group-hover:text-pink-700 leading-tight truncate">
+                        Instagram
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono truncate">
+                        @propertystudio_srj
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-pink-600 shrink-0" />
-              </a>
+                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-pink-600 shrink-0 ml-1" />
+                </a>
 
-              {/* LinkedIn Link */}
-              <a
-                href="https://www.linkedin.com/in/property-studio-73065743b/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-2xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50/40 bg-white transition-all group flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-700 font-bold flex items-center justify-center shrink-0">
-                    IN
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-900 block group-hover:text-blue-700 leading-tight">
-                      LinkedIn Network
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      Corporate Dossier
-                    </span>
+                {/* LinkedIn Link */}
+                <a
+                  href="https://www.linkedin.com/in/property-studio-73065743b/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Linkedin className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="truncate">
+                      <span className="font-bold text-slate-900 block group-hover:text-blue-700 leading-tight truncate">
+                        LinkedIn Network
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono truncate">
+                        Corporate Dossier
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 shrink-0" />
-              </a>
+                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-blue-600 shrink-0 ml-1" />
+                </a>
 
-              {/* Facebook Profile Page */}
-              <a
-                href="https://www.facebook.com/profile.php?id=61594972378425"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-2xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 bg-white transition-all group flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-indigo-600/10 text-indigo-700 font-bold flex items-center justify-center shrink-0">
-                    FB
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-900 block group-hover:text-indigo-700 leading-tight">
-                      Facebook Profile
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      Founder Profile
-                    </span>
+                {/* Facebook Profile Page */}
+                <a
+                  href="https://www.facebook.com/profile.php?id=61594972378425"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Facebook className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="truncate">
+                      <span className="font-bold text-slate-900 block group-hover:text-indigo-700 leading-tight truncate">
+                        Facebook Profile
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono truncate">
+                        Founder Profile
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 shrink-0" />
-              </a>
+                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
+                </a>
 
-              {/* Facebook Business Page */}
-              <a
-                href="https://www.facebook.com/profile.php?id=61595090693424"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-2xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 bg-white transition-all group flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-indigo-600/10 text-indigo-700 font-bold flex items-center justify-center shrink-0">
-                    FB
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-900 block group-hover:text-indigo-700 leading-tight">
-                      Facebook Business
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      Official Page
-                    </span>
+                {/* Facebook Business Page */}
+                <a
+                  href="https://www.facebook.com/profile.php?id=61595090693424"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Facebook className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="truncate">
+                      <span className="font-bold text-slate-900 block group-hover:text-indigo-700 leading-tight truncate">
+                        Facebook Business
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono truncate">
+                        Official Page
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 shrink-0" />
-              </a>
+                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
+                </a>
 
-              {/* Facebook Group Page */}
-              <a
-                href="https://www.facebook.com/groups/1531521175686327"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-2xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 bg-white transition-all group flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-indigo-600/10 text-indigo-700 font-bold flex items-center justify-center shrink-0">
-                    GP
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-900 block group-hover:text-indigo-700 leading-tight">
-                      Facebook Group
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      Community Group
-                    </span>
+                {/* Facebook Group Page */}
+                <a
+                  href="https://www.facebook.com/groups/1531521175686327"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Users className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="truncate">
+                      <span className="font-bold text-slate-900 block group-hover:text-indigo-700 leading-tight truncate">
+                        Facebook Group
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono truncate">
+                        Community Group
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 shrink-0" />
-              </a>
+                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
+                </a>
 
-              {/* Twitter / X */}
-              <a
-                href="https://x.com/propertystudio_"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 rounded-2xl border border-slate-200 hover:border-slate-900 hover:bg-slate-100 bg-white transition-all group flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-slate-900/10 text-slate-900 font-bold flex items-center justify-center shrink-0 font-mono">
-                    𝕏
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-900 block group-hover:text-slate-950 leading-tight">
-                      Twitter / 𝕏
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      @propertystudio_
-                    </span>
+                {/* Twitter / X */}
+                <a
+                  href="https://x.com/propertystudio_"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 rounded-xl border border-slate-200 hover:border-slate-900 hover:bg-slate-100 bg-white transition-all group flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-slate-100 text-slate-900 border border-slate-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                    </div>
+                    <div className="truncate">
+                      <span className="font-bold text-slate-900 block group-hover:text-slate-950 leading-tight truncate">
+                        Twitter / 𝕏
+                      </span>
+                      <span className="text-[10px] text-slate-400 block font-mono truncate">
+                        @propertystudio_
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 shrink-0" />
-              </a>
+                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-slate-900 shrink-0 ml-1" />
+                </a>
+              </div>
             </div>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-4">
+          {/* Sub-Footer Copyright & Inquiries */}
+          <div className="mt-10 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-4">
             <div>
               © 2026 Property Studio Media & Intelligence. All rights reserved.
             </div>
             <div className="flex items-center gap-3">
-              <span>TG RERA: <strong className="text-slate-700 font-mono">A02200004078</strong></span>
+              <button
+                onClick={() => {
+                  setActiveView('PRIVACY');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-slate-900 underline cursor-pointer"
+              >
+                Privacy Policy
+              </button>
               <span>·</span>
-              <span>Udyam: <strong className="text-slate-700 font-mono">TS-02-283677</strong></span>
+              <button
+                onClick={() => {
+                  setActiveView('TERMS');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-slate-900 underline cursor-pointer"
+              >
+                Terms & Conditions
+              </button>
               <span>·</span>
               <span>Inquiries: <span className="font-mono text-slate-700">info@propertystudio.org</span></span>
             </div>

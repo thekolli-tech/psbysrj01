@@ -943,7 +943,7 @@ app.get('/api/admin/audit-logs', requireDeveloper, async (req: Request, res: Res
 // ==============================================================================
 
 // Fetch all community posts
-app.get('/api/community/posts', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const communityId = req.query.communityId as string | undefined;
     const topic = req.query.topic as string | undefined;
@@ -974,7 +974,7 @@ app.get('/api/community/posts', async (req: AuthenticatedRequest, res: Response)
 });
 
 // Fetch single post with full comments
-app.get('/api/community/posts/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.get('/api/community/posts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
     if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
@@ -1191,7 +1191,7 @@ app.post('/api/community/posts/:id/like', requireAuth, async (req: Authenticated
 // ==============================================================================
 
 // Fetch comments for a post
-app.get('/api/community/posts/:id/comments', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.get('/api/community/posts/:id/comments', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
     if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {

@@ -99,10 +99,10 @@ test('HTTP role, moderation, listing, enquiry, and payment workflows', async (t)
 
   const emptyProperties = await api('GET', '/api/properties');
   const emptyCommunities = await api('GET', '/api/communities');
-  const emptyPosts = await api('GET', '/api/community/posts');
+  const emptyPostsGuest = await api('GET', '/api/community/posts');
   assert.deepEqual(emptyProperties.json.properties, []);
   assert.deepEqual(emptyCommunities.json.communities, []);
-  assert.deepEqual(emptyPosts.json.posts, []);
+  assert.equal(emptyPostsGuest.status, 401, 'Guest cannot list community posts');
 
   const seeker = await login('seeker.workflow@example.com');
   const developer = await login('dev.workflow@example.com');
@@ -164,11 +164,13 @@ test('HTTP role, moderation, listing, enquiry, and payment workflows', async (t)
     topic: 'LEGAL'
   }, partner);
   assert.equal(post.json.post.status, 'PENDING_APPROVAL');
-  assert.equal((await api('GET', '/api/community/posts')).json.posts.some((item: any) => item.id === post.json.post.id), false);
+  assert.equal((await api('GET', '/api/community/posts')).status, 401, 'Guest cannot view posts');
+  assert.equal((await api('GET', '/api/community/posts', undefined, seeker)).json.posts.some((item: any) => item.id === post.json.post.id), false);
   assert.equal((await api('GET', '/api/community/posts', undefined, partner)).json.posts.some((item: any) => item.id === post.json.post.id), true);
   assert.equal((await api('PATCH', `/api/admin/posts/${post.json.post.id}/moderation`, { status: 'REJECTED', reason: 'Needs a source document' }, developer)).status, 403);
   assert.equal((await api('PATCH', `/api/admin/posts/${post.json.post.id}/moderation`, { status: 'REJECTED', reason: 'Needs a source document' }, admin)).status, 200);
-  assert.equal((await api('GET', `/api/community/posts/${post.json.post.id}`)).status, 404);
+  assert.equal((await api('GET', `/api/community/posts/${post.json.post.id}`)).status, 401, 'Guest single post returns 401');
+  assert.equal((await api('GET', `/api/community/posts/${post.json.post.id}`, undefined, seeker)).status, 404);
 
   const visiblePost = await api('POST', '/api/community/posts', {
     title: 'Approved layout note',
@@ -177,7 +179,7 @@ test('HTTP role, moderation, listing, enquiry, and payment workflows', async (t)
   }, partner);
   assert.equal(visiblePost.json.post.status, 'PENDING_APPROVAL');
   assert.equal((await api('PATCH', `/api/admin/posts/${visiblePost.json.post.id}/moderation`, { status: 'APPROVED' }, admin)).status, 200);
-  assert.equal((await api('GET', '/api/community/posts')).json.posts.some((item: any) => item.id === visiblePost.json.post.id && item.status === 'APPROVED'), true);
+  assert.equal((await api('GET', '/api/community/posts', undefined, seeker)).json.posts.some((item: any) => item.id === visiblePost.json.post.id && item.status === 'APPROVED'), true);
   const revisedTitle = 'Revised layout note pending reapproval';
   const revised = await api('PUT', `/api/community/posts/${visiblePost.json.post.id}`, {
     title: revisedTitle,
@@ -185,10 +187,11 @@ test('HTTP role, moderation, listing, enquiry, and payment workflows', async (t)
   }, partner);
   assert.equal(revised.status, 200, JSON.stringify(revised.json));
   assert.equal(revised.json.post.status, 'PENDING_APPROVAL');
-  const publicAfterEdit = await api('GET', '/api/community/posts');
-  assert.equal(publicAfterEdit.json.posts.some((item: any) => item.id === visiblePost.json.post.id), false);
-  assert.equal(JSON.stringify(publicAfterEdit.json).includes(revisedTitle), false);
-  assert.equal((await api('GET', `/api/community/posts/${visiblePost.json.post.id}`)).status, 404);
+  const memberAfterEdit = await api('GET', '/api/community/posts', undefined, seeker);
+  assert.equal(memberAfterEdit.json.posts.some((item: any) => item.id === visiblePost.json.post.id), false);
+  assert.equal(JSON.stringify(memberAfterEdit.json).includes(revisedTitle), false);
+  assert.equal((await api('GET', `/api/community/posts/${visiblePost.json.post.id}`)).status, 401, 'Guest single post returns 401');
+  assert.equal((await api('GET', `/api/community/posts/${visiblePost.json.post.id}`, undefined, seeker)).status, 404);
   const authorView = await api('GET', `/api/community/posts/${visiblePost.json.post.id}`, undefined, partner);
   assert.equal(authorView.status, 200);
   assert.equal(authorView.json.post.status, 'PENDING_APPROVAL');

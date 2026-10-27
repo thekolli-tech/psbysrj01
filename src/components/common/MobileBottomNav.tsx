@@ -24,8 +24,12 @@ const ICONS: Record<string, React.ReactNode> = {
   CHAT: <Phone className="w-5 h-5" />
 };
 
-export const MobileBottomNav: React.FC = () => {
-  const { activeView, setActiveView } = useApp();
+interface MobileBottomNavProps {
+  onOpenLoginModal?: () => void;
+}
+
+export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenLoginModal }) => {
+  const { activeView, setActiveView, isLoggedIn } = useApp();
   const tabs = linkedEndUserNavigation();
 
   return (
@@ -38,6 +42,10 @@ export const MobileBottomNav: React.FC = () => {
             <button
               key={tab.key}
               onClick={() => {
+                if (tab.view === 'COMMUNITY' && !isLoggedIn) {
+                  onOpenLoginModal?.();
+                  return;
+                }
                 setActiveView(tab.view as ViewType);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
