@@ -18,6 +18,7 @@ import {
   listRequirementsForAdmin,
   listRequirementsForSeeker,
   listReviews,
+  listReviewsForAuthor,
   moderateReview,
   updateOwnReview
 } from './requirementReview.ts';
@@ -654,6 +655,15 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         return;
       }
       res.json({ success: true, review: updated });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.get('/api/me/reviews', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+    try {
+      const reviews = await listReviewsForAuthor(req.user.id);
+      res.json({ reviews });
     } catch (err) {
       sendError(res, err);
     }

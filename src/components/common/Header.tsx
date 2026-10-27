@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { isPlatformAdmin } from '../../shared/policy';
+import { isPlatformAdmin, isPropertySeeker } from '../../shared/policy';
 import { linkedEndUserNavigation, roleUtilityDestinations } from '../../shared/endUserNavigation';
 import { BrandLogo } from './BrandLogo';
 import {
   Wallet,
   LogIn,
+  LayoutDashboard,
   KeyRound,
   HelpCircle,
   ShieldCheck,
@@ -280,6 +281,24 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
+          {/* Member Dashboard direct button for property seekers */}
+          {isLoggedIn && isPropertySeeker(currentUser.role) && (
+            <button
+              onClick={() => {
+                setActiveView('DASHBOARD');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                activeView === 'DASHBOARD'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-amber-500" />
+              <span className="whitespace-nowrap font-bold hidden sm:inline">Dashboard</span>
+            </button>
+          )}
+
           {/* Wallet credit balance button (only if logged in) */}
           {isLoggedIn ? (
             <button
@@ -381,12 +400,24 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Role Workspaces & Consoles */}
-            {(utilityLinks.length > 0 || (isLoggedIn && currentUser.role === 'DEVELOPER') || (isLoggedIn && isPlatformAdmin(currentUser.role))) && (
+            {(utilityLinks.length > 0 || (isLoggedIn && isPropertySeeker(currentUser.role)) || (isLoggedIn && currentUser.role === 'DEVELOPER') || (isLoggedIn && isPlatformAdmin(currentUser.role))) && (
               <div className="pt-3 border-t border-slate-100">
                 <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest block mb-2">
                   Workspaces & Consoles
                 </span>
                 <div className="flex flex-wrap gap-x-2.5 gap-y-2">
+                  {isLoggedIn && isPropertySeeker(currentUser.role) && (
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setActiveView('DASHBOARD');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white transition-colors cursor-pointer"
+                    >
+                      Member Dashboard
+                    </button>
+                  )}
                   {utilityLinks.includes('LEADS_MARKET') && (
                     <button
                       onClick={() => {

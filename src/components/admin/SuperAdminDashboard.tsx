@@ -27,7 +27,15 @@ import {
   UserCheck,
   RefreshCw,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+  Layers,
+  Activity,
+  Database,
+  MapPin,
+  CreditCard,
+  History
 } from 'lucide-react';
 
 interface ManagedUser {
@@ -94,8 +102,33 @@ export const SuperAdminDashboard: React.FC = () => {
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<
-    'OVERVIEW' | 'COMMUNITIES' | 'USERS_DIRECTORY' | 'ALL_POSTS' | 'CREDENTIALS' | 'AGENTS_QUEUE' | 'DEV_CLAIMS' | 'LEAD_PRICING' | 'PROVISION_PMO'
+    'OVERVIEW' | 'MODERATION' | 'USERS_DIRECTORY' | 'REQUIREMENTS' | 'AUDIT_LOGS' | 'FINANCE' | 'COMMUNITIES' | 'ALL_POSTS' | 'CREDENTIALS' | 'AGENTS_QUEUE' | 'DEV_CLAIMS' | 'LEAD_PRICING' | 'PROVISION_PMO'
   >('OVERVIEW');
+
+  // Moderation Queue State
+  const [moderationListings, setModerationListings] = useState<any[]>([]);
+  const [moderationProfessionals, setModerationProfessionals] = useState<any[]>([]);
+  const [moderationPosts, setModerationPosts] = useState<any[]>([]);
+  const [moderationCommunities, setModerationCommunities] = useState<any[]>([]);
+  const [moderatingItemId, setModeratingItemId] = useState<string | null>(null);
+
+  // Requirements State
+  const [adminRequirements, setAdminRequirements] = useState<any[]>([]);
+  const [requirementSearch, setRequirementSearch] = useState('');
+
+  // Audit Logs State
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditActionFilter, setAuditActionFilter] = useState('ALL');
+
+  // Finance State
+  const [financeData, setFinanceData] = useState<{ payments: string; transactions: any[]; ledger: any[] } | null>(null);
+  const [adjustmentUserId, setAdjustmentUserId] = useState('');
+  const [adjustmentAmount, setAdjustmentAmount] = useState('');
+  const [adjustmentDirection, setAdjustmentDirection] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
+  const [adjustmentReason, setAdjustmentReason] = useState('');
+  const [submittingAdjustment, setSubmittingAdjustment] = useState(false);
+  const [adjustmentSuccessMsg, setAdjustmentSuccessMsg] = useState<string | null>(null);
+  const [adjustmentErrorMsg, setAdjustmentErrorMsg] = useState<string | null>(null);
 
   // Live Users Directory State
   const [liveUsers, setLiveUsers] = useState<ManagedUser[]>([]);
@@ -156,6 +189,34 @@ export const SuperAdminDashboard: React.FC = () => {
       const postRes = await fetch('/api/admin/moderation/queue');
       if (postRes.ok) {
         const pData = await postRes.json();
+        setModerationListings(Array.isArray(pData.listings) ? pData.listings : []);
+        setModerationProfessionals(Array.isArray(pData.professionals) ? pData.professionals : []);
+        setModerationCommunities(Array.isArray(pData.communities) ? pData.communities : []);
+      }
+
+      // Fetch Requirements
+      const reqRes = await fetch('/api/admin/requirements');
+      if (reqRes.ok) {
+        const rData = await reqRes.json();
+        setAdminRequirements(Array.isArray(rData.requirements) ? rData.requirements : []);
+      }
+
+      // Fetch Audit Logs
+      const auditRes = await fetch('/api/admin/audit-logs?limit=50');
+      if (auditRes.ok) {
+        const aData = await auditRes.json();
+        setAuditLogs(Array.isArray(aData.logs) ? aData.logs : []);
+      }
+
+      // Fetch Finance
+      const finRes = await fetch('/api/admin/finance');
+      if (finRes.ok) {
+        const fData = await finRes.json();
+        setFinanceData(fData);
+      }
+
+      if (postRes.ok) {
+        const pData = await postRes.json();
         const queued = Array.isArray(pData.posts) ? pData.posts : [];
         setLivePosts(queued.map((p: any) => ({
           id: p.id,
@@ -189,6 +250,79 @@ export const SuperAdminDashboard: React.FC = () => {
     updateLeadPrice('PREMIUM', customRates.PREMIUM);
     updateLeadPrice('HNI', customRates.HNI);
     showToast('Dynamic lead prices updated');
+  };
+
+  // Super Admin Moderation Handlers
+  const handleModerateListing = async (listingId: string, status: 'APPROVED' | 'REJECTED', reason?: string) => {
+    setModeratingItemId(listingId);
+    try {
+      const res = await fetch(`/api/admin/listings/${listingId}/publication`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to moderate listing');
+      showToast(`Listing marked as ${status}`);
+      refreshServerData();
+    } catch (err: any) {
+      showToast(err.message || 'Moderation failed');
+    } finally {
+      setModeratingItemId(null);
+    }
+  };
+
+  const handleModerateProfessional = async (userId: string, status: 'VERIFIED' | 'REJECTED', reason?: string) => {
+    setModeratingItemId(userId);
+    try {
+      const res = await fetch(`/api/admin/professionals/${userId}/verification`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update professional verification');
+      showToast(`Professional marked as ${status}`);
+      refreshServerData();
+    } catch (err: any) {
+      showToast(err.message || 'Verification update failed');
+    } finally {
+      setModeratingItemId(null);
+    }
+  };
+
+  const handleFinanceAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdjustmentSuccessMsg(null);
+    setAdjustmentErrorMsg(null);
+    if (!adjustmentUserId || !adjustmentAmount) {
+      setAdjustmentErrorMsg('User ID and amount are required.');
+      return;
+    }
+    setSubmittingAdjustment(true);
+    try {
+      const res = await fetch('/api/admin/finance/adjustment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: adjustmentUserId.trim(),
+          amount: Number(adjustmentAmount),
+          direction: adjustmentDirection,
+          reason: adjustmentReason.trim() || 'Super Admin manual adjustment',
+          idempotencyKey: crypto.randomUUID()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Adjustment failed');
+      setAdjustmentSuccessMsg(`Wallet successfully ${adjustmentDirection === 'CREDIT' ? 'credited' : 'debited'}.`);
+      setAdjustmentAmount('');
+      setAdjustmentReason('');
+      refreshServerData();
+    } catch (err: any) {
+      setAdjustmentErrorMsg(err.message || 'Adjustment request failed');
+    } finally {
+      setSubmittingAdjustment(false);
+    }
   };
 
   const handleProvisionSubmit = (e: React.FormEvent) => {
@@ -430,10 +564,14 @@ export const SuperAdminDashboard: React.FC = () => {
         <div className="flex items-center gap-2 mt-6 pt-6 border-t border-slate-800 overflow-x-auto no-scrollbar">
           {[
             { id: 'OVERVIEW', label: 'Platform Metrics' },
-            { id: 'COMMUNITIES', label: `Community Approvals (${communities.filter(c => c.status === 'PENDING_APPROVAL').length})`, highlight: true },
-            { id: 'USERS_DIRECTORY', label: `All Accounts (${liveUsers.length || users.length})`, highlight: true },
-            { id: 'ALL_POSTS', label: `Community Posts (${livePosts.length})`, highlight: true },
-            { id: 'CREDENTIALS', label: 'Super Admin Credentials', highlight: true },
+            { id: 'MODERATION', label: `Moderation Queue (${moderationListings.length + moderationProfessionals.length + moderationPosts.length})`, highlight: true },
+            { id: 'USERS_DIRECTORY', label: `User Accounts (${liveUsers.length || users.length})`, highlight: true },
+            { id: 'REQUIREMENTS', label: `Buyer Requirements (${adminRequirements.length})`, highlight: true },
+            { id: 'AUDIT_LOGS', label: `Audit Trail (${auditLogs.length})`, highlight: true },
+            { id: 'FINANCE', label: 'Finance & Ledger', highlight: true },
+            { id: 'COMMUNITIES', label: `Community Approvals (${communities.filter(c => c.status === 'PENDING_APPROVAL').length})` },
+            { id: 'ALL_POSTS', label: `Community Posts (${livePosts.length})` },
+            { id: 'CREDENTIALS', label: 'Super Admin Credentials' },
             { id: 'AGENTS_QUEUE', label: `Agent RERA Queue (${agentApplications.filter(a => a.status === 'PENDING').length})` },
             { id: 'DEV_CLAIMS', label: `Developer Claims (${developerClaims.filter(c => c.status === 'PENDING').length})` },
             { id: 'LEAD_PRICING', label: 'Dynamic Lead Pricing' },
@@ -488,14 +626,14 @@ export const SuperAdminDashboard: React.FC = () => {
 
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex items-center justify-between text-slate-500 text-xs">
-                <span>Leads Unlocked</span>
+                <span>Buyer Requirements</span>
                 <Tag className="w-4 h-4 text-amber-600" />
               </div>
               <div className="text-2xl font-black text-slate-900 font-mono-numbers mt-2">
-                1,842
+                {adminRequirements.length}
               </div>
               <span className="text-xs text-amber-700 font-semibold mt-1 inline-block">
-                Pay-per-lead marketplace
+                Active Seeker Briefs
               </span>
             </div>
 
@@ -532,6 +670,507 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
                 <span className="text-slate-400 font-mono">Active</span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: UNIFIED MODERATION QUEUE */}
+      {activeTab === 'MODERATION' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider mb-1 font-mono">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                  SUPER ADMIN MODERATION QUEUE
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 font-display">
+                  Platform Moderation Queue
+                </h2>
+                <p className="text-xs text-slate-600 max-w-2xl">
+                  Super Admin gatekeeping for developer listings, professional verifications, community posts, and user reviews.
+                </p>
+              </div>
+              <button
+                onClick={refreshServerData}
+                disabled={loadingData}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 self-start cursor-pointer transition-all"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? 'animate-spin' : ''}`} />
+                <span>Refresh Queue</span>
+              </button>
+            </div>
+
+            {/* Sub-Queue: Project Listings Pending Approval */}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Building className="w-4 h-4 text-amber-600" />
+                  <span>Developer Project Listings Pending Publication ({moderationListings.length})</span>
+                </h3>
+              </div>
+              {moderationListings.length === 0 ? (
+                <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                  No project listings currently awaiting publication review.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {moderationListings.map(item => (
+                    <div
+                      key={item.id}
+                      className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-sm">{item.title}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800">
+                            {item.publication_status || 'PENDING'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-slate-500">
+                          <span>Owner ID: {item.owner_id}</span>
+                          {item.created_at && (
+                            <span>Submitted: {new Date(item.created_at).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 self-start sm:self-center">
+                        <button
+                          onClick={() => handleModerateListing(item.id, 'APPROVED')}
+                          disabled={moderatingItemId === item.id}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Approve & Publish</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            const reason = window.prompt('Enter rejection reason (optional):') || undefined;
+                            handleModerateListing(item.id, 'REJECTED', reason);
+                          }}
+                          disabled={moderatingItemId === item.id}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sub-Queue: Professional Profiles Pending Verification */}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-amber-600" />
+                  <span>Professional Profiles Pending Verification ({moderationProfessionals.length})</span>
+                </h3>
+              </div>
+              {moderationProfessionals.length === 0 ? (
+                <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                  No professional profiles currently awaiting statutory verification.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {moderationProfessionals.map(item => (
+                    <div
+                      key={item.user_id}
+                      className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">{item.organization || 'Individual Professional'}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800">
+                            {item.verification_status || 'PENDING'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-slate-500">
+                          <span>User ID: {item.user_id}</span>
+                          <span>Role: {item.professional_role}</span>
+                          {item.rera_number && (
+                            <span className="font-mono text-amber-800 font-semibold">RERA: {item.rera_number}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 self-start sm:self-center">
+                        <button
+                          onClick={() => handleModerateProfessional(item.user_id, 'VERIFIED')}
+                          disabled={moderatingItemId === item.user_id}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Grant Verified Badge</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            const reason = window.prompt('Enter rejection reason (optional):') || undefined;
+                            handleModerateProfessional(item.user_id, 'REJECTED', reason);
+                          }}
+                          disabled={moderatingItemId === item.user_id}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: BUYER PROPERTY REQUIREMENTS */}
+      {activeTab === 'REQUIREMENTS' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider mb-1 font-mono">
+                <FileText className="w-3.5 h-3.5 text-amber-600" />
+                PLATFORM DEMAND INTELLIGENCE
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 font-display">
+                All Buyer Property Requirements ({adminRequirements.length})
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Real-time buyer requirements submitted by authenticated property seekers across Hyderabad micro-markets.
+              </p>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={requirementSearch}
+                onChange={e => setRequirementSearch(e.target.value)}
+                placeholder="Search by location, budget, or type..."
+                className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+          </div>
+
+          {adminRequirements.length === 0 ? (
+            <div className="p-10 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+              No buyer requirements recorded on platform yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500 text-[11px] font-mono uppercase bg-slate-50">
+                    <th className="py-3 px-3">Category</th>
+                    <th className="py-3 px-3">Location</th>
+                    <th className="py-3 px-3">Budget</th>
+                    <th className="py-3 px-3">Buyer Specifications</th>
+                    <th className="py-3 px-3">Seeker ID</th>
+                    <th className="py-3 px-3">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {adminRequirements
+                    .filter(r => {
+                      if (!requirementSearch.trim()) return true;
+                      const q = requirementSearch.toLowerCase();
+                      return (
+                        (r.propertyType && r.propertyType.toLowerCase().includes(q)) ||
+                        (r.location && r.location.toLowerCase().includes(q)) ||
+                        (r.budget && r.budget.toLowerCase().includes(q)) ||
+                        (r.details && r.details.toLowerCase().includes(q))
+                      );
+                    })
+                    .map(item => (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-3 font-bold text-slate-900">{item.propertyType}</td>
+                        <td className="py-3 px-3 text-slate-700">{item.location || '—'}</td>
+                        <td className="py-3 px-3 font-mono text-amber-800 font-bold">{item.budget || '—'}</td>
+                        <td className="py-3 px-3 text-slate-600 max-w-xs truncate">{item.details}</td>
+                        <td className="py-3 px-3 font-mono text-[10px] text-slate-400">{item.seekerId}</td>
+                        <td className="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: IMMUTABLE AUDIT LOGS */}
+      {activeTab === 'AUDIT_LOGS' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider mb-1 font-mono">
+                <History className="w-3.5 h-3.5 text-amber-600" />
+                IMMUTABLE AUDIT TRAIL
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 font-display">
+                Platform Security & Governance Audit Logs ({auditLogs.length})
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Append-only record of administrative modifications, role adjustments, wallet movements, and content approvals.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={auditActionFilter}
+                onChange={e => setAuditActionFilter(e.target.value)}
+                className="px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
+              >
+                <option value="ALL">All Actions</option>
+                <option value="USER_CREATE">USER_CREATE</option>
+                <option value="USER_DELETE">USER_DELETE</option>
+                <option value="ROLE_CHANGE">ROLE_CHANGE</option>
+                <option value="PASSWORD_RESET">PASSWORD_RESET</option>
+                <option value="LISTING_SUBMITTED">LISTING_SUBMITTED</option>
+                <option value="LEAD_UNLOCK">LEAD_UNLOCK</option>
+                <option value="WALLET_ADJUSTMENT">WALLET_ADJUSTMENT</option>
+                <option value="REVIEW_MODERATION">REVIEW_MODERATION</option>
+                <option value="PROFESSIONAL_VERIFICATION">PROFESSIONAL_VERIFICATION</option>
+              </select>
+            </div>
+          </div>
+
+          {auditLogs.length === 0 ? (
+            <div className="p-10 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+              No audit log entries recorded yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500 text-[11px] font-mono uppercase bg-slate-50">
+                    <th className="py-3 px-3">Timestamp</th>
+                    <th className="py-3 px-3">Action</th>
+                    <th className="py-3 px-3">Actor</th>
+                    <th className="py-3 px-3">Target</th>
+                    <th className="py-3 px-3">Status</th>
+                    <th className="py-3 px-3">Details / Context</th>
+                    <th className="py-3 px-3">IP</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {auditLogs
+                    .filter(log => auditActionFilter === 'ALL' || log.action === auditActionFilter)
+                    .map(item => (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-3 font-mono text-[10px] text-slate-500 whitespace-nowrap">
+                          {new Date(item.created_at).toLocaleString()}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-slate-100 text-slate-800">
+                            {item.action}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 font-medium text-slate-800">
+                          {item.actor_email} <span className="text-[10px] text-slate-400">({item.actor_role})</span>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[10px] text-slate-500">{item.target_id || item.target_email || '—'}</td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            item.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-600 max-w-xs truncate font-mono text-[11px]">
+                          {typeof item.details === 'string' ? item.details : JSON.stringify(item.details)}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[10px] text-slate-400">{item.ip_address || 'Internal'}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: FINANCE & WALLET LEDGERS */}
+      {activeTab === 'FINANCE' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider mb-1 font-mono">
+                  <CreditCard className="w-3.5 h-3.5 text-amber-600" />
+                  FINANCIAL LEDGER & BILLING AUDIT
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 font-display">
+                  Platform Finance & Wallet Ledger
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Track wallet transactions, payment provider readiness, and apply authorized manual balance adjustments.
+                </p>
+              </div>
+
+              {/* Provider Status Pill */}
+              <div className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-xl text-xs">
+                <span className="text-slate-500 font-medium">Payment Provider:</span>
+                <span className="font-mono font-bold text-amber-800 uppercase">
+                  {financeData?.payments || 'NOT_CONFIGURED'}
+                </span>
+              </div>
+            </div>
+
+            {/* Provider Policy Banner */}
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-700 mt-0.5" />
+              <span>
+                <strong>Launch Gate Notice:</strong> Payment gateway status is <strong>{financeData?.payments || 'NOT_CONFIGURED'}</strong>.
+                External payment checkouts and simulated test debits are fail-closed to protect banking security.
+                Only server-authorized adjustments and verified wallet top-ups update balances.
+              </span>
+            </div>
+
+            {/* Manual Wallet Adjustment Form */}
+            <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <h3 className="text-sm font-bold text-slate-900">Execute Administrative Wallet Adjustment</h3>
+
+              {adjustmentSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span>{adjustmentSuccessMsg}</span>
+                </div>
+              )}
+
+              {adjustmentErrorMsg && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                  <span>{adjustmentErrorMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleFinanceAdjustment} className="grid sm:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Target User ID</label>
+                  <input
+                    type="text"
+                    value={adjustmentUserId}
+                    onChange={e => setAdjustmentUserId(e.target.value)}
+                    placeholder="e.g. user_1720000000_abc123"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Adjustment Type</label>
+                  <select
+                    value={adjustmentDirection}
+                    onChange={e => setAdjustmentDirection(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold"
+                  >
+                    <option value="CREDIT">Credit (+) Wallet Balance</option>
+                    <option value="DEBIT">Debit (-) Wallet Balance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Amount (₹)</label>
+                  <input
+                    type="number"
+                    value={adjustmentAmount}
+                    onChange={e => setAdjustmentAmount(e.target.value)}
+                    placeholder="e.g. 1500"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Administrative Reason</label>
+                  <input
+                    type="text"
+                    value={adjustmentReason}
+                    onChange={e => setAdjustmentReason(e.target.value)}
+                    placeholder="e.g. Promotional credit grant"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="sm:col-span-4 flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    disabled={submittingAdjustment}
+                    className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
+                  >
+                    {submittingAdjustment ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Applying Adjustment...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Apply Wallet Adjustment</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Wallet Ledger Entries Table */}
+            <div className="space-y-2 pt-2">
+              <h3 className="text-sm font-bold text-slate-900">
+                Recent Wallet Ledger Operations ({financeData?.ledger?.length || 0})
+              </h3>
+              {!financeData?.ledger || financeData.ledger.length === 0 ? (
+                <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                  No wallet ledger transactions recorded yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto max-h-96">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500 text-[11px] font-mono uppercase bg-slate-50 sticky top-0">
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3">User ID</th>
+                        <th className="py-2.5 px-3">Type</th>
+                        <th className="py-2.5 px-3">Amount</th>
+                        <th className="py-2.5 px-3">Balance After</th>
+                        <th className="py-2.5 px-3">Reference</th>
+                        <th className="py-2.5 px-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {financeData.ledger.slice(0, 50).map((row: any) => (
+                        <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2 px-3 font-mono text-[10px] text-slate-500">
+                            {new Date(row.created_at).toLocaleString()}
+                          </td>
+                          <td className="py-2 px-3 font-mono text-[11px]">{row.user_id}</td>
+                          <td className="py-2 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              row.entry_type === 'CREDIT' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {row.entry_type}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 font-bold font-mono">₹{row.amount}</td>
+                          <td className="py-2 px-3 font-mono text-slate-600">₹{row.balance_after}</td>
+                          <td className="py-2 px-3 text-slate-500 text-[11px]">
+                            {row.reference_type} ({row.reference_id})
+                          </td>
+                          <td className="py-2 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                              {row.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>

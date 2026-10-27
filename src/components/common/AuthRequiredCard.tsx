@@ -49,6 +49,14 @@ export const AuthRequiredCard: React.FC<AuthRequiredCardProps> = ({
             'Interactive participation in live project launches, executive slide decks, live Q&A, and live polling is restricted to registered accounts.',
           perks: ['Live attendee chat & Q&A polling', 'Dynamic slide deck broadcast', 'Direct developer investor inquiries']
         };
+      case 'DASHBOARD':
+        return {
+          title: 'Member Dashboard',
+          subtitle: 'Authentication Required',
+          description:
+            'Access your submitted requirements, project reviews, notifications, and profile settings in your personalized member dashboard.',
+          perks: ['Track submitted property requirements', 'Manage your project reviews & ratings', 'Receive real-time lead & platform notifications']
+        };
       default:
         return {
           title: 'Member Access Required',

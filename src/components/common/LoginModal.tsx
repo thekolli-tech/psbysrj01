@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { postLoginDestination } from '../../shared/policy';
+import { isPropertySeeker, postLoginDestination } from '../../shared/policy';
 import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
 import {
@@ -102,7 +102,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       login(user as Parameters<typeof login>[0]);
       showToast(`Welcome back, ${user.name}!`);
 
-      setActiveView(postLoginDestination(user.role));
+      if (isPropertySeeker(user.role)) {
+        setActiveView('DASHBOARD');
+      } else {
+        setActiveView(postLoginDestination(user.role));
+      }
 
       onClose();
     } catch (err: any) {

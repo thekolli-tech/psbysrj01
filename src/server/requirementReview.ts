@@ -88,6 +88,7 @@ export type PublicReview = {
 
 export type OwnReview = PublicReview & {
   authorId: string;
+  entityId: string;
   status: string;
   rejectionReason: string;
 };
@@ -106,6 +107,7 @@ function presentOwn(row: any): OwnReview {
   return {
     ...presentPublic(row),
     authorId: row.author_id,
+    entityId: row.entity_id || '',
     status: row.status,
     rejectionReason: row.rejection_reason || ''
   };
@@ -257,4 +259,17 @@ export async function moderateReview(input: {
   }
   const updated = await reviewById(input.reviewId);
   return updated ? presentOwn(updated) : null;
+}
+
+
+export async function listReviewsForAuthor(authorId: string): Promise<OwnReview[]> {
+  const rows = isPostgresAuthoritative()
+    ? (await queryPostgres(
+      `SELECT * FROM entity_reviews WHERE author_id = $1 ORDER BY created_at DESC`,
+      [authorId]
+    )).rows
+    : getSqliteDb().prepare(
+      'SELECT * FROM entity_reviews WHERE author_id = ? ORDER BY created_at DESC'
+    ).all(authorId) as any[];
+  return rows.map(presentOwn);
 }

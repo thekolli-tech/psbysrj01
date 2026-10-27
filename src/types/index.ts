@@ -391,6 +391,7 @@ export interface ChatMessage {
 
 export type ViewType =
   | 'HOME'
+  | 'DASHBOARD'
   | 'PROPERTIES'
   | 'LEADS_MARKET'
   | 'MEDIA'

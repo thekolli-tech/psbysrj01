@@ -21,7 +21,7 @@ import {
 import {
   MICRO_MARKET_TRENDS
 } from '../data/mockData';
-import { postLoginDestination } from '../shared/policy';
+import { isPropertySeeker, postLoginDestination } from '../shared/policy';
 
 interface AppContextType {
   currentUser: User;
@@ -378,7 +378,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (user) {
       const mapped = mapApiUser(user);
       setSessionUser(mapped);
-      setActiveView(postLoginDestination(mapped.role));
+      if (isPropertySeeker(mapped.role)) {
+        setActiveView('DASHBOARD');
+      } else {
+        setActiveView(postLoginDestination(mapped.role));
+      }
       showToast(`Signed in as ${mapped.name}`);
       return;
     }

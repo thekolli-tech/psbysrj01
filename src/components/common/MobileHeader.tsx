@@ -3,10 +3,11 @@ import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
 import { BrandLogo } from './BrandLogo';
 import { linkedEndUserNavigation, roleUtilityDestinations } from '../../shared/endUserNavigation';
-import { isPlatformAdmin } from '../../shared/policy';
+import { isPlatformAdmin, isPropertySeeker } from '../../shared/policy';
 import {
   Wallet,
   LogIn,
+  LayoutDashboard,
   ChevronLeft,
   ShieldAlert,
   Building,
@@ -57,6 +58,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   const getTitle = (view: ViewType): string => {
     switch (view) {
       case 'HOME': return 'Property Studio';
+      case 'DASHBOARD': return 'Member Dashboard';
       case 'PROPERTIES': return 'Curated Projects';
       case 'LEADS_MARKET': return 'Buyer Leads';
       case 'MEDIA': return 'Media & Podcast';
@@ -119,6 +121,17 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               title="Super Admin"
             >
               <ShieldAlert className="w-4 h-4" />
+            </button>
+          )}
+
+          {isLoggedIn && isPropertySeeker(currentUser.role) && activeView !== 'DASHBOARD' && (
+            <button
+              onClick={() => setActiveView('DASHBOARD')}
+              className="p-1.5 text-amber-800 bg-amber-50 rounded-lg active:scale-95 transition-transform"
+              title="Member Dashboard"
+              aria-label="Member Dashboard"
+            >
+              <LayoutDashboard className="w-4 h-4 text-amber-600" />
             </button>
           )}
 
@@ -247,12 +260,24 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             </div>
 
             {/* Workspaces & Consoles */}
-            {(utilityLinks.length > 0 || (isLoggedIn && isPlatformAdmin(currentUser.role))) && (
+            {(utilityLinks.length > 0 || (isLoggedIn && isPropertySeeker(currentUser.role)) || (isLoggedIn && isPlatformAdmin(currentUser.role))) && (
               <div className="pt-3 border-t border-slate-100">
                 <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest block mb-2">
                   Workspaces & Consoles
                 </span>
                 <div className="flex flex-wrap gap-2">
+                  {isLoggedIn && isPropertySeeker(currentUser.role) && (
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setActiveView('DASHBOARD');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white transition-colors cursor-pointer"
+                    >
+                      Member Dashboard
+                    </button>
+                  )}
                   {utilityLinks.includes('LEADS_MARKET') && (
                     <button
                       onClick={() => {

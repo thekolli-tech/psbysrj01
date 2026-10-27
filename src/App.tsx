@@ -22,6 +22,7 @@ import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { DeveloperDashboard } from './components/admin/DeveloperDashboard';
 import { ProfessionalDashboard } from './components/admin/ProfessionalDashboard';
 import { PropertyAdminDashboard } from './components/admin/PropertyAdminDashboard';
+import { UserDashboard } from './components/dashboard/UserDashboard';
 import { canAccessProfessionalSurface, isPropertySeeker } from './shared/policy';
 import { COMPANY_CONTACT_DISPLAY, COMPANY_CONTACT_TEL, COMPANY_SUPPORT_WHATSAPP } from './shared/companyContact';
 import { linkedEndUserNavigation, roleUtilityDestinations } from './shared/endUserNavigation';
@@ -153,6 +154,14 @@ const AppContent: React.FC = () => {
             onOpenLoginModal={() => setLoginModalOpen(true)}
             onOpenSupport={() => setSupportOpen(true)}
           />
+        )}
+
+        {activeView === 'DASHBOARD' && (
+          isLoggedIn ? (
+            <UserDashboard />
+          ) : (
+            <AuthRequiredCard view="DASHBOARD" onOpenLoginModal={() => setLoginModalOpen(true)} />
+          )
         )}
 
         {activeView === 'PROPERTIES' && (

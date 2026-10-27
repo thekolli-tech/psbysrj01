@@ -926,7 +926,7 @@ app.delete('/api/admin/users/:id', requireAdmin, async (req: AuthenticatedReques
 });
 
 // Immutable Audit Logs
-app.get('/api/admin/audit-logs', requireDeveloper, async (req: Request, res: Response): Promise<void> => {
+app.get('/api/admin/audit-logs', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const limit = Number(req.query.limit) || 50;
     const offset = Number(req.query.offset) || 0;

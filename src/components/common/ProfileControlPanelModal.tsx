@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { isPropertySeeker } from '../../shared/policy';
 import {
   User,
   ShieldCheck,
@@ -7,6 +8,7 @@ import {
   HardHat,
   Briefcase,
   Search,
+  LayoutDashboard,
   MapPin,
   KeyRound,
   LogOut,
@@ -294,6 +296,21 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                     className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                   >
                     <span>Launch Super Admin Command Center →</span>
+                  </button>
+                </div>
+              )}
+
+              {isPropertySeeker(currentUser.role) && (
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      setActiveView('DASHBOARD');
+                      onClose();
+                    }}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Open Member Dashboard →</span>
                   </button>
                 </div>
               )}
