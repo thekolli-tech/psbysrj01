@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
+import { checkPostgresHealth, checkSchemaReadiness, ensurePostgresAdditiveSchema } from './postgres.ts';
 import { applySqliteAdditiveSchema } from './platformSchema.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProofSync, type SyncOtpClaimRunner } from './otpClaim.ts';
@@ -507,6 +507,7 @@ export async function initDatabase(): Promise<void> {
     if (!schema.ready) {
       throw new Error(`PostgreSQL schema is not ready. Missing: ${schema.missing.join(', ') || 'unknown'}. Run npm run db:init. Startup does not migrate, seed, import, or bootstrap accounts.`);
     }
+    await ensurePostgresAdditiveSchema();
     console.log('[Database] PostgreSQL connected and schema ready. No automatic seed, import, or account bootstrap.');
     return;
   }

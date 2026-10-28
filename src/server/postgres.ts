@@ -559,3 +559,37 @@ export async function queryPostgres<T extends pg.QueryResultRow = any>(
   }
 }
 
+
+let additiveSchemaEnsured = false;
+
+/**
+ * Reconciles non-destructive additive columns and tables on PostgreSQL.
+ * Statements use IF NOT EXISTS only. They never drop, delete, or alter existing data.
+ */
+export async function ensurePostgresAdditiveSchema(): Promise<void> {
+  if (additiveSchemaEnsured || !process.env.DATABASE_URL) return;
+  const pool = getPostgresPool();
+  if (!pool) return;
+
+  try {
+    const client = await pool.connect();
+    try {
+      // 1. Critical user columns first to guarantee immediate availability
+      await client.query(`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS town_city TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS profession TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities TEXT DEFAULT '[]';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT DEFAULT '[]';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT;
+      `);
+      // 2. Full additive schema statements
+      await client.query(POSTGRES_ADDITIVE_SQL);
+      additiveSchemaEnsured = true;
+      console.log('[PostgreSQL Schema] Additive schema reconciled successfully.');
+    } finally {
+      client.release();
+    }
+  } catch (err: any) {
+    console.error('[PostgreSQL Schema] Warning reconciling additive schema:', redactDatabaseError(err?.message || 'schema error'));
+  }
+}

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { PoolClient } from 'pg';
-import { getPostgresPool, queryPostgres } from './postgres.ts';
+import { getPostgresPool, queryPostgres, ensurePostgresAdditiveSchema } from './postgres.ts';
 import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, sealOtp } from './otpCrypto.ts';
 import { claimOtpProof, type OtpClaimRunner } from './otpClaim.ts';
 import { canonicalOtpTarget } from './otpTarget.ts';
@@ -78,6 +78,7 @@ function mapUserRow(row: any): DbUser {
 // ==============================================================================
 
 export async function pgFindUserByEmail(email: string): Promise<DbUser | null> {
+  await ensurePostgresAdditiveSchema();
   if (!email) return null;
   const res = await queryPostgres(
     'SELECT * FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
@@ -105,6 +106,7 @@ export async function pgGetActiveDeveloperCount(): Promise<number> {
 }
 
 export async function pgGetAllUsers(): Promise<Array<Omit<DbUser, 'password_hash' | 'salt'> & { postCount: number }>> {
+  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres(`
     SELECT u.id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
            u.town_city, u.profession,
@@ -155,6 +157,7 @@ export async function pgCreateUser(data: {
   password?: string;
   isVerified?: boolean;
 }): Promise<DbUser> {
+  await ensurePostgresAdditiveSchema();
   const id = `user_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const publicId = `usr_${crypto.randomBytes(4).toString('hex')}`;
   const normalizedEmail = data.email.trim().toLowerCase();
@@ -229,6 +232,7 @@ export async function pgUpdateProfileFields(
   id: string,
   fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null }
 ): Promise<DbUser | null> {
+  await ensurePostgresAdditiveSchema();
   const sets: string[] = [];
   const values: Array<any> = [];
   let paramIdx = 1;
@@ -785,6 +789,7 @@ export async function pgRegisterVerifiedUser(data: {
   phoneOtp?: string;
   requirePhone: boolean;
 }): Promise<DbUser> {
+  await ensurePostgresAdditiveSchema();
   const email = data.email.trim().toLowerCase();
   const phone = data.requirePhone
     ? canonicalOtpTarget('PHONE_VERIFICATION', data.phone || '')
