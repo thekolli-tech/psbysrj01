@@ -3,6 +3,8 @@
  * They are not roles and they do not grant access.
  */
 
+import { validateAvatarUpload } from './avatar.ts';
+
 export const PROFILE_TEXT_MAX = 80;
 
 export type ProfileFieldResult =
@@ -20,6 +22,14 @@ export function readProfileField(input: unknown, present: boolean, label: string
     return { error: `${label} must be ${PROFILE_TEXT_MAX} characters or fewer.` };
   }
   return { omit: false, value: normalized.length === 0 ? null : normalized };
+}
+
+export function readAvatarProfileField(input: unknown, present: boolean): ProfileFieldResult {
+  if (!present) return { omit: true };
+  if (input === null || input === '') return { omit: false, value: null };
+  const check = validateAvatarUpload(input);
+  if (!check.valid) return { error: check.error || 'Invalid avatar format or size' };
+  return { omit: false, value: check.avatar || null };
 }
 
 export function readInterestsField(input: unknown, present: boolean): { omit: true } | { omit: false; value: string[] } | { error: string } {
@@ -55,7 +65,7 @@ export function readProfilePatch(body: unknown): {
     townCity: readProfileField(record.townCity, Object.prototype.hasOwnProperty.call(record, 'townCity'), 'Town/City'),
     profession: readProfileField(record.profession, Object.prototype.hasOwnProperty.call(record, 'profession'), 'Profession'),
     company: readProfileField(record.company, Object.prototype.hasOwnProperty.call(record, 'company'), 'Company'),
-    avatar: readProfileField(record.avatar, Object.prototype.hasOwnProperty.call(record, 'avatar'), 'Avatar'),
+    avatar: readAvatarProfileField(record.avatar, Object.prototype.hasOwnProperty.call(record, 'avatar')),
     interests: readInterestsField(record.interests, Object.prototype.hasOwnProperty.call(record, 'interests'))
   };
 }

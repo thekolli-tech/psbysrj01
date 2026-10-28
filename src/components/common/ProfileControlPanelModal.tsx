@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { isPropertySeeker } from '../../shared/policy';
+import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import {
   User,
   ShieldCheck,
@@ -20,7 +21,10 @@ import {
   Wallet,
   Phone,
   Mail,
-  ShieldAlert
+  ShieldAlert,
+  Camera,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 
 interface ProfileControlPanelModalProps {
@@ -55,6 +59,74 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    e.target.value = '';
+    setAvatarError(null);
+
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError('Image file must be 2MB or smaller.');
+      return;
+    }
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      setAvatarError('Only JPEG, PNG, WebP, and GIF formats are allowed. SVG is disallowed for security.');
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read image file'));
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch('/api/me/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar: dataUrl })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to upload profile photo');
+
+      await refreshSession();
+      showToast('Profile photo updated');
+    } catch (err: any) {
+      setAvatarError(err.message || 'Failed to upload photo');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!confirm('Are you sure you want to remove your profile photo?')) return;
+    setAvatarUploading(true);
+    setAvatarError(null);
+    try {
+      const res = await fetch('/api/me/avatar', {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to remove profile photo');
+
+      await refreshSession();
+      showToast('Profile photo removed');
+    } catch (err: any) {
+      setAvatarError(err.message || 'Failed to remove photo');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -195,34 +267,83 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
         <div className="p-6">
           {activeTab === 'PROFILE' && (
             <div className="space-y-5">
-              {/* Profile Card */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center gap-4">
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-14 h-14 rounded-2xl object-cover border border-slate-300 shadow-sm"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
-                  }}
-                />
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900">{currentUser.name}</span>
-                    <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-100 text-amber-900 border border-amber-200">
-                      {currentUser.role.replace('_', ' ')}
-                    </span>
+              {/* Profile Card & Avatar Management */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex items-center gap-4">
+                  <div className="relative group flex-shrink-0">
+                    <img
+                      src={getSafeAvatar(currentUser.avatar)}
+                      alt={currentUser.name}
+                      className="w-16 h-16 rounded-2xl object-cover border border-slate-300 shadow-sm"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                      }}
+                    />
+                    {avatarUploading && (
+                      <div className="absolute inset-0 bg-slate-900/60 rounded-2xl flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-slate-600 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{currentUser.email}</span>
-                  </div>
-                  {currentUser.phone && (
-                    <div className="text-xs text-slate-600 flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{currentUser.phone}</span>
+
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900 truncate">{currentUser.name}</span>
+                      <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                        {currentUser.role.replace('_', ' ')}
+                      </span>
                     </div>
-                  )}
+                    <div className="text-xs text-slate-600 flex items-center gap-1.5 truncate">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="truncate">{currentUser.email}</span>
+                    </div>
+                    {currentUser.phone && (
+                      <div className="text-xs text-slate-600 flex items-center gap-1.5 truncate">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                        <span>{currentUser.phone}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* Photo Actions */}
+                <div className="pt-2 border-t border-slate-200/60 flex items-center gap-2 flex-wrap">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handleAvatarFileSelect}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={avatarUploading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{currentUser.avatar ? 'Change Photo' : 'Upload Photo'}</span>
+                  </button>
+                  {Boolean(currentUser.avatar) && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveAvatar}
+                      disabled={avatarUploading}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Remove</span>
+                    </button>
+                  )}
+                  <span className="text-[10px] text-slate-400 ml-auto">JPG, PNG, WebP or GIF (Max 2MB)</span>
+                </div>
+
+                {avatarError && (
+                  <div className="text-xs text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{avatarError}</span>
+                  </div>
+                )}
               </div>
 
               {isLoggedIn && (

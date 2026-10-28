@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Property } from '../../types';
 import { PropertyCategorySelect } from '../properties/PropertyCategorySelect';
 import { PropertyDetailModal } from '../properties/PropertyDetailModal';
+import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import {
   PROPERTY_CATEGORY_GROUPS,
   ALL_PROPERTY_TYPES,
@@ -505,12 +506,11 @@ export const UserDashboard: React.FC = () => {
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start sm:items-center gap-4 sm:gap-5">
             <img
-              src={currentUser.avatar}
+              src={getSafeAvatar(currentUser.avatar)}
               alt={currentUser.name}
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-amber-400/40 shadow-lg"
               onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80';
+                (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
               }}
             />
             <div className="space-y-1">

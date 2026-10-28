@@ -33,7 +33,8 @@ import {
   verifyPassword,
   hashToken,
   canActorModifyRole,
-  canActorDisableOrDeleteUser
+  canActorDisableOrDeleteUser,
+  canActorRestrictUser
 } from './db.ts';
 
 function toIso(val: any): string {
@@ -113,7 +114,7 @@ export async function pgGetAllUsers(): Promise<Array<Omit<DbUser, 'password_hash
   await ensurePostgresAdditiveSchema();
   const res = await queryPostgres(`
     SELECT u.id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
-           u.town_city, u.profession,
+           u.town_city, u.profession, u.company, u.interests, u.is_restricted, u.restricted_reason,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
            u.must_change_password, u.assigned_properties, u.last_login_at, u.created_at, u.updated_at,
            COUNT(p.id) as post_count
@@ -136,6 +137,8 @@ export async function pgGetAllUsers(): Promise<Array<Omit<DbUser, 'password_hash
     profession: row.profession || null,
     company: row.company || null,
     interests: typeof row.interests === 'string' ? row.interests : (Array.isArray(row.interests) ? JSON.stringify(row.interests) : null),
+    is_restricted: Number(row.is_restricted || 0),
+    restricted_reason: row.restricted_reason || null,
     wallet_balance: Number(row.wallet_balance || 0),
     is_verified: Number(row.is_verified || 0),
     email_verified: Number(row.email_verified || 0),
@@ -382,6 +385,54 @@ export async function pgSuspendUser(actor: DbUser, targetUserId: string, suspend
   return { success: true };
 }
 
+export async function pgRestrictUser(
+  actor: DbUser | { role: UserRole; id: string; email: string },
+  targetUserId: string,
+  restrict: boolean,
+  reason?: string
+): Promise<{ success: boolean; error?: string; user?: DbUser }> {
+  const targetUser = await pgFindUserById(targetUserId);
+  if (!targetUser) return { success: false, error: 'User not found' };
+
+  const check = canActorRestrictUser(actor.role, targetUser.role, actor.id === targetUser.id);
+  if (!check.allowed) {
+    await pgCreateAuditLog({
+      actorId: actor.id,
+      actorEmail: actor.email,
+      actorRole: actor.role,
+      action: 'USER_RESTRICTION_DENIED',
+      targetId: targetUser.id,
+      targetEmail: targetUser.email,
+      details: { reason: check.reason },
+      status: 'FAILED'
+    });
+    return { success: false, error: check.reason };
+  }
+
+  const isRestrictedVal = restrict ? 1 : 0;
+  const restrictedReasonVal = restrict ? (reason?.trim() || 'Account restricted by administrator') : null;
+  const newAccountStatus = restrict ? 'RESTRICTED' : 'ACTIVE';
+  const now = new Date().toISOString();
+
+  await queryPostgres(
+    'UPDATE users SET is_restricted = $1, restricted_reason = $2, account_status = $3, updated_at = $4 WHERE id = $5',
+    [isRestrictedVal, restrictedReasonVal, newAccountStatus, now, targetUserId]
+  );
+
+  await pgCreateAuditLog({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: restrict ? 'RESTRICT_USER' : 'UNRESTRICT_USER',
+    targetId: targetUser.id,
+    targetEmail: targetUser.email,
+    details: { reason: restrictedReasonVal, isRestricted: isRestrictedVal }
+  });
+
+  const updatedUser = await pgFindUserById(targetUserId);
+  return { success: true, user: updatedUser! };
+}
+
 export async function pgChangePassword(userId: string, currentPass: string, newPass: string): Promise<boolean> {
   const user = await pgFindUserById(userId);
   if (!user) return false;
@@ -619,7 +670,7 @@ export async function pgGetSession(rawToken: string): Promise<(DbSession & { use
 
   const res = await queryPostgres(`
     SELECT s.*, u.id as u_id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
-           u.town_city, u.profession,
+           u.town_city, u.profession, u.company, u.interests, u.is_restricted, u.restricted_reason,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
            u.must_change_password, u.assigned_properties, u.created_at as u_created_at, u.updated_at as u_updated_at
     FROM sessions s
@@ -659,6 +710,10 @@ export async function pgGetSession(rawToken: string): Promise<(DbSession & { use
       organization: row.organization || '',
       town_city: row.town_city || null,
       profession: row.profession || null,
+      company: row.company || null,
+      interests: typeof row.interests === 'string' ? row.interests : (Array.isArray(row.interests) ? JSON.stringify(row.interests) : null),
+      is_restricted: Number(row.is_restricted || 0),
+      restricted_reason: row.restricted_reason || null,
       wallet_balance: Number(row.wallet_balance || 0),
       is_verified: Number(row.is_verified || 0),
       email_verified: Number(row.email_verified || 0),

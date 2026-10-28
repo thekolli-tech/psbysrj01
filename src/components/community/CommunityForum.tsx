@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { CommunityPost, CommunityReply } from '../../types';
 import { communityPostShareUrl, isCommunityPostId, readCommunitySearch } from '../../shared/communityEngagement';
 import { AudioStoryPlayer } from '../common/AudioStoryPlayer';
+import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import {
   MessageSquare,
   ArrowBigUp,
@@ -2062,9 +2063,20 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               <div className="p-6 space-y-5 text-xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-full bg-slate-900 text-amber-400 font-bold text-lg flex items-center justify-center border-2 border-amber-400 shadow-md">
-                      {profileData.name.slice(0, 2).toUpperCase()}
-                    </div>
+                    {profileData.avatar ? (
+                      <img
+                        src={getSafeAvatar(profileData.avatar)}
+                        alt={profileData.name}
+                        className="w-14 h-14 rounded-full object-cover border-2 border-amber-400 shadow-md"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-slate-900 text-amber-400 font-bold text-lg flex items-center justify-center border-2 border-amber-400 shadow-md">
+                        {profileData.name.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-1.5">
                         <h4 className="text-base font-bold text-slate-900">{profileData.name}</h4>

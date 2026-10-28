@@ -64,7 +64,9 @@ function sendError(res: Response, err: any): void {
   res.status(500).json({ error: err?.message || 'Request failed' });
 }
 
-export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guard; requireAdmin: Guard }): void {
+export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guard; requireAdmin: Guard; requireUnrestricted?: Guard }): void {
+  const requireUnrestricted = guards.requireUnrestricted || ((_req: any, _res: any, next: any) => next());
+
   app.get('/api/properties', async (_req: Request, res: Response): Promise<void> => {
     try {
       const properties = await listPublicListings();
@@ -83,7 +85,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
     }
   });
 
-  app.post('/api/properties', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+  app.post('/api/properties', guards.requireAuth, requireUnrestricted, async (req: any, res: Response): Promise<void> => {
     try {
       if (isPropertySeeker(req.user.role) && !isProfessionalRole(req.user.role)) {
         res.status(403).json({ error: 'Property seekers cannot publish listings.' });
@@ -104,7 +106,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
     }
   });
 
-  app.patch('/api/properties/:id', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+  app.patch('/api/properties/:id', guards.requireAuth, requireUnrestricted, async (req: any, res: Response): Promise<void> => {
     try {
       const listing = await updateOwnedListing(req.user.id, req.params.id, req.body || {});
       if (!listing) {
@@ -117,7 +119,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
     }
   });
 
-  app.post('/api/properties/:id/state', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+  app.post('/api/properties/:id/state', guards.requireAuth, requireUnrestricted, async (req: any, res: Response): Promise<void> => {
     try {
       const status = req.body?.status;
       if (!['PAUSED', 'ARCHIVED', 'PENDING'].includes(status)) {
@@ -302,7 +304,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
     }
   });
 
-  app.post('/api/leads', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+  app.post('/api/leads', guards.requireAuth, requireUnrestricted, async (req: any, res: Response): Promise<void> => {
     try {
       const body = req.body || {};
       if (!body.name || !body.phone || !body.budget) {
@@ -336,7 +338,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
     }
   });
 
-  app.post('/api/leads/:id/unlock', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+  app.post('/api/leads/:id/unlock', guards.requireAuth, requireUnrestricted, async (req: any, res: Response): Promise<void> => {
     try {
       if (!canAccessProfessionalSurface(req.user.role)) {
         res.status(403).json({ error: 'Only eligible professionals can unlock lead contact details.' });
@@ -563,7 +565,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
     }
   });
 
-  app.post('/api/requirements', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+  app.post('/api/requirements', guards.requireAuth, requireUnrestricted, async (req: any, res: Response): Promise<void> => {
     try {
       const input = readRequirementInput(req.body);
       if ('error' in input) {
@@ -613,7 +615,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
     }
   });
 
-  app.post('/api/reviews', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+  app.post('/api/reviews', guards.requireAuth, requireUnrestricted, async (req: any, res: Response): Promise<void> => {
     try {
       const input = readReviewInput(req.body);
       if ('error' in input) {
@@ -637,7 +639,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
     }
   });
 
-  app.patch('/api/reviews/:id', guards.requireAuth, async (req: any, res: Response): Promise<void> => {
+  app.patch('/api/reviews/:id', guards.requireAuth, requireUnrestricted, async (req: any, res: Response): Promise<void> => {
     try {
       const input = readReviewEdit(req.body);
       if ('error' in input) {

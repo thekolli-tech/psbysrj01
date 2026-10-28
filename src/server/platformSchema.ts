@@ -34,6 +34,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS town_city TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profession TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT DEFAULT '[]';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted SMALLINT DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted_reason TEXT;
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS post_type VARCHAR(32) DEFAULT 'POST';
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS visibility VARCHAR(32) DEFAULT 'PUBLIC';
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS poll_options TEXT DEFAULT '[]';
@@ -272,6 +274,8 @@ export const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE users ADD COLUMN profession TEXT',
   'ALTER TABLE users ADD COLUMN interests TEXT DEFAULT \'[]\'',
   'ALTER TABLE users ADD COLUMN company TEXT',
+  'ALTER TABLE users ADD COLUMN is_restricted INTEGER DEFAULT 0',
+  'ALTER TABLE users ADD COLUMN restricted_reason TEXT',
   'ALTER TABLE community_posts ADD COLUMN post_type TEXT DEFAULT \'POST\'',
   'ALTER TABLE community_posts ADD COLUMN visibility TEXT DEFAULT \'PUBLIC\'',
   'ALTER TABLE community_posts ADD COLUMN poll_options TEXT DEFAULT \'[]\'',

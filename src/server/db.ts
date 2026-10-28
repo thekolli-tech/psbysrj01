@@ -195,7 +195,9 @@ export interface DbUser {
   is_verified: number;
   email_verified: number;
   phone_verified: number;
-  account_status: 'ACTIVE' | 'SUSPENDED' | 'DISABLED';
+  account_status: 'ACTIVE' | 'SUSPENDED' | 'DISABLED' | 'RESTRICTED';
+  is_restricted?: number;
+  restricted_reason?: string | null;
   must_change_password: number;
   assigned_properties: string; // JSON
   password_hash: string;
@@ -558,8 +560,36 @@ export function canActorDisableOrDeleteUser(
     return { allowed: false, reason: 'Access Denied: Super Admins cannot disable, suspend, or delete Developer accounts.' };
   }
 
+  if (actorRole === 'SUPER_ADMIN' && targetCurrentRole === 'SUPER_ADMIN') {
+    return { allowed: false, reason: 'Access Denied: Only platform Developers can disable, suspend, or delete Super Admin accounts.' };
+  }
+
   if (targetCurrentRole === 'DEVELOPER' && activeDeveloperCount <= 1) {
     return { allowed: false, reason: 'Lockout Prevention: Cannot disable or delete the last remaining platform Developer account.' };
+  }
+
+  return { allowed: true };
+}
+
+export function canActorRestrictUser(
+  actorRole: UserRole,
+  targetCurrentRole: UserRole,
+  isTargetSelf: boolean
+): { allowed: boolean; reason?: string } {
+  if (actorRole !== 'DEVELOPER' && actorRole !== 'SUPER_ADMIN') {
+    return { allowed: false, reason: 'Unauthorized: Administrator privileges required.' };
+  }
+
+  if (isTargetSelf) {
+    return { allowed: false, reason: 'Security policy: You cannot restrict your own account.' };
+  }
+
+  if (targetCurrentRole === 'DEVELOPER') {
+    return { allowed: false, reason: 'Access Denied: Super Admins and administrators cannot restrict Developer accounts.' };
+  }
+
+  if (actorRole === 'SUPER_ADMIN' && targetCurrentRole === 'SUPER_ADMIN') {
+    return { allowed: false, reason: 'Access Denied: Super Admins can only restrict regular user accounts.' };
   }
 
   return { allowed: true };
@@ -680,6 +710,19 @@ export async function suspendUser(
 ): Promise<{ success: boolean; error?: string }> {
   if (isPostgresAuthoritative()) return pgSuspendUser(actor, targetUserId, suspend);
   return sqliteSuspendUser(actor, targetUserId, suspend);
+}
+
+export async function restrictUser(
+  actor: DbUser | { role: UserRole; id: string; email: string },
+  targetUserId: string,
+  restrict: boolean,
+  reason?: string
+): Promise<{ success: boolean; error?: string; user?: DbUser }> {
+  if (isPostgresAuthoritative()) {
+    const { pgRestrictUser } = await import('./postgresRepo.ts');
+    return pgRestrictUser(actor, targetUserId, restrict, reason);
+  }
+  return sqliteRestrictUser(actor, targetUserId, restrict, reason);
 }
 
 export async function changePassword(userId: string, currentPass: string, newPass: string): Promise<boolean> {
@@ -1992,7 +2035,7 @@ function sqliteGetActiveDeveloperCount(): number {
 function sqliteGetAllUsers(): Array<Omit<DbUser, 'password_hash' | 'salt'> & { postCount: number }> {
   const stmt = db.prepare(`
     SELECT u.id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
-           u.town_city, u.profession,
+           u.town_city, u.profession, u.company, u.interests, u.is_restricted, u.restricted_reason,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
            u.must_change_password, u.assigned_properties, u.last_login_at, u.created_at, u.updated_at,
            COUNT(p.id) as postCount
@@ -2212,6 +2255,55 @@ function sqliteSuspendUser(actor: DbUser, targetUserId: string, suspend: boolean
   return { success: true };
 }
 
+function sqliteRestrictUser(
+  actor: DbUser | { role: UserRole; id: string; email: string },
+  targetUserId: string,
+  restrict: boolean,
+  reason?: string
+): { success: boolean; error?: string; user?: DbUser } {
+  const targetUser = sqliteFindUserById(targetUserId);
+  if (!targetUser) return { success: false, error: 'User not found' };
+
+  const check = canActorRestrictUser(actor.role, targetUser.role, actor.id === targetUser.id);
+  if (!check.allowed) {
+    sqliteCreateAuditLog({
+      actorId: actor.id,
+      actorEmail: actor.email,
+      actorRole: actor.role,
+      action: 'USER_RESTRICTION_DENIED',
+      targetId: targetUser.id,
+      targetEmail: targetUser.email,
+      details: { reason: check.reason },
+      status: 'FAILED'
+    });
+    return { success: false, error: check.reason };
+  }
+
+  const isRestrictedVal = restrict ? 1 : 0;
+  const restrictedReasonVal = restrict ? (reason?.trim() || 'Account restricted by administrator') : null;
+  const newAccountStatus = restrict ? 'RESTRICTED' : 'ACTIVE';
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE users
+    SET is_restricted = ?, restricted_reason = ?, account_status = ?, updated_at = ?
+    WHERE id = ?
+  `).run(isRestrictedVal, restrictedReasonVal, newAccountStatus, now, targetUserId);
+
+  sqliteCreateAuditLog({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    actorRole: actor.role,
+    action: restrict ? 'RESTRICT_USER' : 'UNRESTRICT_USER',
+    targetId: targetUser.id,
+    targetEmail: targetUser.email,
+    details: { reason: restrictedReasonVal, isRestricted: isRestrictedVal }
+  });
+
+  const updatedUser = sqliteFindUserById(targetUserId);
+  return { success: true, user: updatedUser! };
+}
+
 function sqliteChangePassword(userId: string, currentPass: string, newPass: string): boolean {
   const user = sqliteFindUserById(userId);
   if (!user) return false;
@@ -2423,7 +2515,7 @@ function sqliteGetSession(rawToken: string): (DbSession & { user: DbUser }) | nu
 
   const stmt = db.prepare(`
     SELECT s.*, u.id as u_id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
-           u.town_city, u.profession,
+           u.town_city, u.profession, u.company, u.interests, u.is_restricted, u.restricted_reason,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
            u.must_change_password, u.assigned_properties, u.created_at as u_created_at, u.updated_at as u_updated_at
     FROM sessions s
@@ -2461,6 +2553,10 @@ function sqliteGetSession(rawToken: string): (DbSession & { user: DbUser }) | nu
       organization: row.organization,
       town_city: row.town_city || null,
       profession: row.profession || null,
+      company: row.company || null,
+      interests: row.interests || '[]',
+      is_restricted: Number(row.is_restricted || 0),
+      restricted_reason: row.restricted_reason || null,
       wallet_balance: row.wallet_balance,
       is_verified: row.is_verified,
       email_verified: row.email_verified,

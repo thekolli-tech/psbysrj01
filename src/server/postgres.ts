@@ -581,6 +581,8 @@ export async function ensurePostgresAdditiveSchema(): Promise<void> {
         ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities TEXT DEFAULT '[]';
         ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT DEFAULT '[]';
         ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted SMALLINT DEFAULT 0;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted_reason TEXT;
       `);
       // 2. Full additive schema statements
       await client.query(POSTGRES_ADDITIVE_SQL);

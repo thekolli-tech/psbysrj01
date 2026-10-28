@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
 import { BrandLogo } from './BrandLogo';
+import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { linkedEndUserNavigation, roleUtilityDestinations } from '../../shared/endUserNavigation';
 import { isPlatformAdmin, isPropertySeeker } from '../../shared/policy';
 import {
@@ -194,11 +195,11 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               title="Open Profile Control Panel & Password Settings"
             >
               <img
-                src={currentUser.avatar}
+                src={getSafeAvatar(currentUser.avatar)}
                 alt={currentUser.name}
                 className="w-7 h-7 rounded-full object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
+                  (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                 }}
               />
               <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ConstructionLog } from '../../types';
+import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import {
   Building2,
   HardHat,
@@ -165,11 +166,11 @@ export const PropertyAdminDashboard: React.FC = () => {
             {/* Property Admin Session & Logout Button */}
             <div className="flex items-center gap-2.5 bg-indigo-900/90 pl-3 pr-2 py-1.5 rounded-xl border border-indigo-700 shadow-sm">
               <img
-                src={currentUser.avatar}
+                src={getSafeAvatar(currentUser.avatar)}
                 alt={currentUser.name}
                 className="w-8 h-8 rounded-full object-cover border border-indigo-400/50"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80';
+                  (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                 }}
               />
               <div className="text-left hidden sm:block pr-1">

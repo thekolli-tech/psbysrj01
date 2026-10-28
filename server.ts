@@ -83,8 +83,10 @@ import {
   createCommunity,
   updateCommunityStatus,
   deleteCommunity,
-  updateLastLogin
+  updateLastLogin,
+  restrictUser
 } from './src/server/db.ts';
+import { validateAvatarUpload } from './src/shared/avatar.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
 import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders } from './src/server/notifications.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
@@ -179,6 +181,20 @@ const requireSuperAdminOnly = (req: AuthenticatedRequest, res: Response, next: N
   }
   if (req.user.role !== 'SUPER_ADMIN') {
     res.status(403).json({ error: 'Access denied: Only Super Admin can upload, create, edit, delete, and publish videos or podcasts.' });
+    return;
+  }
+  next();
+};
+
+const requireUnrestricted = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required. Please sign in.' });
+    return;
+  }
+  if (req.user.is_restricted || req.user.account_status === 'RESTRICTED') {
+    res.status(403).json({
+      error: 'Account Restricted: Your account has been restricted by an administrator from performing this protected action. Please contact support at support@propertystudio.org for assistance.'
+    });
     return;
   }
   next();
@@ -403,6 +419,61 @@ app.patch('/api/me/profile', requireAuth, async (req: AuthenticatedRequest, res:
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Profile was not saved.' });
+  }
+});
+
+// Upload or change profile photo
+app.post('/api/me/avatar', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const avatarInput = req.body?.avatar;
+    if (!avatarInput) {
+      res.status(400).json({ error: 'Avatar image data or URL is required.' });
+      return;
+    }
+    const validation = validateAvatarUpload(avatarInput);
+    if (!validation.valid || !validation.avatar) {
+      res.status(400).json({ error: validation.error || 'Invalid avatar format or size.' });
+      return;
+    }
+    const updated = await updateUserProfileFields(req.user!.id, { avatar: validation.avatar });
+    if (!updated) {
+      res.status(404).json({ error: 'Account not found.' });
+      return;
+    }
+    const { password_hash, salt, ...safeUser } = updated;
+    res.json({
+      success: true,
+      avatar: validation.avatar,
+      user: {
+        ...safeUser,
+        avatar: updated.avatar || ''
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Avatar was not saved.' });
+  }
+});
+
+// Remove profile photo
+app.delete('/api/me/avatar', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const updated = await updateUserProfileFields(req.user!.id, { avatar: '' });
+    if (!updated) {
+      res.status(404).json({ error: 'Account not found.' });
+      return;
+    }
+    const { password_hash, salt, ...safeUser } = updated;
+    res.json({
+      success: true,
+      avatar: '',
+      user: {
+        ...safeUser,
+        avatar: ''
+      },
+      message: 'Profile photo removed'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Avatar was not removed.' });
   }
 });
 
@@ -1059,6 +1130,25 @@ app.post('/api/admin/users/:id/suspend', requireAdmin, async (req: Authenticated
   }
 });
 
+// Restrict or unrestrict user account
+app.post('/api/admin/users/:id/restrict', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { restrict, reason } = req.body;
+    const result = await restrictUser(req.user, req.params.id, Boolean(restrict), reason);
+    if (!result.success) {
+      res.status(403).json({ error: result.error });
+      return;
+    }
+    res.json({
+      success: true,
+      message: restrict ? 'User restricted successfully' : 'User unrestricted successfully',
+      user: result.user
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete user account
 app.delete('/api/admin/users/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -1116,7 +1206,7 @@ app.get('/api/users/:id/profile', async (req: AuthenticatedRequest, res: Respons
 });
 
 // Follow / Unfollow a user
-app.post('/api/users/:id/follow', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/users/:id/follow', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     if (req.user.id === req.params.id) {
       res.status(400).json({ error: 'Cannot follow yourself' });
@@ -1175,7 +1265,7 @@ app.get('/api/community/posts/:id', requireAuth, async (req: AuthenticatedReques
 });
 
 // Create community post
-app.post('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/posts', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const {
       title, content, topic, communityId, communityName,
@@ -1224,7 +1314,7 @@ app.post('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, 
 });
 
 // Update post
-app.put('/api/community/posts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.put('/api/community/posts/:id', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
     const updated = await updatePost(req.params.id, req.user.id, req.body, isElevated);
@@ -1240,7 +1330,7 @@ app.put('/api/community/posts/:id', requireAuth, async (req: AuthenticatedReques
 });
 
 // Delete post
-app.delete('/api/community/posts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.delete('/api/community/posts/:id', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
     const ok = await deletePost(req.params.id, req.user.id, isElevated);
@@ -1267,7 +1357,7 @@ app.patch('/api/community/posts/:id/pin', requireAdmin, async (req: Request, res
   }
 });
 
-app.post('/api/community/posts/:id/vote', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/posts/:id/vote', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     if (!isCommunityPostId(req.params.id)) {
       res.status(400).json({ error: 'Post id is not valid.' });
@@ -1294,7 +1384,7 @@ app.post('/api/community/posts/:id/vote', requireAuth, async (req: Authenticated
   }
 });
 
-app.post('/api/community/posts/:id/follow', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/posts/:id/follow', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     if (!isCommunityPostId(req.params.id)) {
       res.status(400).json({ error: 'Post id is not valid.' });
@@ -1317,7 +1407,7 @@ app.post('/api/community/posts/:id/follow', requireAuth, async (req: Authenticat
 });
 
 // Bookmark / Unbookmark post
-app.post('/api/community/posts/:id/bookmark', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/posts/:id/bookmark', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     if (!isCommunityPostId(req.params.id)) {
       res.status(400).json({ error: 'Post id is not valid.' });
@@ -1336,7 +1426,7 @@ app.post('/api/community/posts/:id/bookmark', requireAuth, async (req: Authentic
 });
 
 // Poll voting
-app.post('/api/community/posts/:id/poll-vote', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/posts/:id/poll-vote', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     if (!isCommunityPostId(req.params.id)) {
       res.status(400).json({ error: 'Post id is not valid.' });
@@ -1363,7 +1453,7 @@ app.post('/api/community/posts/:id/poll-vote', requireAuth, async (req: Authenti
   }
 });
 
-app.post('/api/community/posts/:id/upvote', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/posts/:id/upvote', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
     if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
@@ -1377,7 +1467,7 @@ app.post('/api/community/posts/:id/upvote', requireAuth, async (req: Authenticat
   }
 });
 
-app.post('/api/community/posts/:id/reply', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/posts/:id/reply', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const content = String(req.body?.content || '').trim();
     if (!content) {
@@ -1417,7 +1507,7 @@ app.delete('/api/admin/posts/:id', requireSuperAdmin, async (req: AuthenticatedR
 });
 
 // Toggle Post Like
-app.post('/api/community/posts/:id/like', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/posts/:id/like', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
     if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
@@ -1454,7 +1544,7 @@ app.get('/api/community/posts/:id/comments', requireAuth, async (req: Authentica
 });
 
 // Add comment or nested reply to a post
-app.post('/api/community/posts/:id/comments', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { content, parentId, isAmaAnswer } = req.body;
     if (!content || !content.trim()) {
@@ -1487,7 +1577,7 @@ app.post('/api/community/posts/:id/comments', requireAuth, async (req: Authentic
 });
 
 // Delete comment
-app.delete('/api/community/comments/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.delete('/api/community/comments/:id', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
     const ok = await deleteComment(req.params.id, req.user.id, isElevated);
@@ -1503,7 +1593,7 @@ app.delete('/api/community/comments/:id', requireAuth, async (req: Authenticated
 });
 
 // Toggle Comment Like
-app.post('/api/community/comments/:id/like', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/comments/:id/like', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const result = await toggleCommentLike(req.params.id, req.user.id);
     res.json({ success: true, ...result });
@@ -1516,7 +1606,7 @@ app.post('/api/community/comments/:id/like', requireAuth, async (req: Authentica
 // MODERATION REPORTS
 // ==============================================================================
 
-app.post('/api/community/reports', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/community/reports', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { targetType, targetId, reason } = req.body;
     if (!targetType || !targetId || !reason) {
@@ -1632,7 +1722,7 @@ app.get('/api/admin/communities/all', requireAdmin, async (_req: Request, res: R
   }
 });
 
-app.post('/api/communities', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/communities', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { name, description, category, location, rules } = req.body;
     if (!name || !description || !category) {
@@ -1757,7 +1847,7 @@ app.delete('/api/media/:id', requireSuperAdminOnly, async (req: AuthenticatedReq
 });
 
 // Media Engagement Endpoints
-app.post('/api/media/:id/like', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/media/:id/like', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const result = await toggleMediaLike(req.params.id, req.user.id);
     res.json({ success: true, ...result });
@@ -1766,7 +1856,7 @@ app.post('/api/media/:id/like', requireAuth, async (req: AuthenticatedRequest, r
   }
 });
 
-app.post('/api/media/:id/react', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/media/:id/react', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const reactionType = req.body?.reactionType || 'THUMBS_UP';
     const result = await setMediaReaction(req.params.id, req.user.id, reactionType);
@@ -1785,7 +1875,7 @@ app.get('/api/media/:id/comments', async (req: Request, res: Response): Promise<
   }
 });
 
-app.post('/api/media/:id/comment', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/media/:id/comment', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const text = String(req.body?.text || '').trim();
     if (!text) {
@@ -1821,7 +1911,7 @@ app.post('/api/media/:id/share', async (req: Request, res: Response): Promise<vo
   }
 });
 
-app.post('/api/media/:id/repost', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/media/:id/repost', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const note = req.body?.note ? String(req.body.note).trim() : undefined;
     const result = await toggleMediaRepost(req.params.id, req.user.id, req.user.name, note);
@@ -1892,7 +1982,7 @@ app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
   }
 });
 
-registerPlatformRoutes(app, { requireAuth, requireAdmin });
+registerPlatformRoutes(app, { requireAuth, requireAdmin, requireUnrestricted });
 
 // Central JSON error handler for all /api routes to prevent HTML error responses
 app.use('/api', (err: any, _req: Request, res: Response, _next: NextFunction) => {
