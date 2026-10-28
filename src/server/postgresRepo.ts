@@ -5,7 +5,7 @@ import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, 
 import { claimOtpProof, type OtpClaimRunner } from './otpClaim.ts';
 import { canonicalOtpTarget } from './otpTarget.ts';
 import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
-import { indianNationalDigits } from '../shared/indianMobile.ts';
+import { indianNationalDigits, normalizeIndianMobile } from '../shared/indianMobile.ts';
 import { communitySearchLikePattern } from '../shared/communityEngagement.ts';
 import type {
   UserRole,
@@ -788,7 +788,7 @@ export async function pgRegisterVerifiedUser(data: {
   const email = data.email.trim().toLowerCase();
   const phone = data.requirePhone
     ? canonicalOtpTarget('PHONE_VERIFICATION', data.phone || '')
-    : (data.phone?.trim().toLowerCase() || '');
+    : (data.phone?.trim() ? (normalizeIndianMobile(data.phone) || data.phone.trim()) : '');
   const locks = [`otp:EMAIL_VERIFICATION:${email}`, `otp:REGISTRATION_GRANT:${email}`];
   if (data.requirePhone) {
     locks.push(`otp:PHONE_VERIFICATION:${phone}`, `otp:PHONE_REGISTRATION_GRANT:${phone}`, `phone:${phone}`);

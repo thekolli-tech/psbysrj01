@@ -150,20 +150,20 @@ test('twenty independent registrations, single-use OTP claims, and no token expo
     assert.equal(rejected.json.success, undefined);
     assert.equal(await findUserByEmail('provider-rejected@example.com'), null);
 
-    const seekerEmail = 'seeker-bypass-concurrent@example.com';
+    const seekerEmail = 'seeker-email-only-concurrent@example.com';
     const seekerSent = await api('/api/auth/send-email-otp', { email: seekerEmail });
     assert.equal(seekerSent.status, 200, seekerSent.raw);
-    const bypass = await api('/api/auth/register', {
+    const seekerReg = await api('/api/auth/register', {
       name: 'Seeker',
       email: seekerEmail,
       password: 'Longpassword1!',
       role: 'PROPERTY_SEEKER',
       phone: '+919800011122',
-      otp: codes.get(seekerEmail),
-      phoneVerified: true
+      otp: codes.get(seekerEmail)
     });
-    assert.equal(bypass.status, 400);
-    assert.equal(await findUserByEmail(seekerEmail), null);
+    assert.equal(seekerReg.status, 200, seekerReg.raw);
+    assert.equal(seekerReg.json.success, true);
+    assert.equal((await findUserByEmail(seekerEmail))?.phone, '+919800011122');
 
     const privileged = await api('/api/auth/register', {
       name: 'Admin',

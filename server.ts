@@ -90,6 +90,7 @@ import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
 import { canViewModeratedContent, communityReplayVisible, selfServeStorageRole } from './src/shared/policy.ts';
 import { allowRequest, clientKey } from './src/server/rateLimit.ts';
+import { isPhoneOtpRequired } from './src/shared/authConfig.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -396,6 +397,13 @@ app.get('/api/me/bookmarks', requireAuth, async (req: AuthenticatedRequest, res:
   }
 });
 
+// Public auth configuration flags
+app.get('/api/auth/config', (_req: Request, res: Response): void => {
+  res.json({
+    phoneOtpRequired: isPhoneOtpRequired()
+  });
+});
+
 // Get currently authenticated user
 app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
   if (!req.user) {
@@ -655,14 +663,23 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
 
     const safeRole = selfServeStorageRole(requestedRole);
     const seeker = safeRole === 'PROPERTY_SEEKER';
-    const canonicalPhone = seeker ? normalizeIndianMobile(phone) : null;
-    if (seeker && !canonicalPhone) {
-      res.status(400).json({ error: 'A valid Indian mobile number is required' });
-      return;
+    const phoneRequired = isPhoneOtpRequired();
+
+    let resolvedPhone = '';
+    if (phone && typeof phone === 'string' && phone.trim()) {
+      const normalized = normalizeIndianMobile(phone.trim());
+      resolvedPhone = normalized || phone.trim();
     }
-    if (seeker && !String(phoneOtp || '').trim()) {
-      res.status(400).json({ error: 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.' });
-      return;
+
+    if (phoneRequired && seeker) {
+      if (!resolvedPhone || !normalizeIndianMobile(phone)) {
+        res.status(400).json({ error: 'A valid Indian mobile number is required' });
+        return;
+      }
+      if (!String(phoneOtp || '').trim()) {
+        res.status(400).json({ error: 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.' });
+        return;
+      }
     }
 
     // Default city: Hyderabad, state: Telangana, India
@@ -687,12 +704,12 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       email,
       password,
       role: safeRole,
-      phone: seeker ? canonicalPhone || '' : (phone?.trim() || ''),
+      phone: resolvedPhone,
       organization: organization?.trim() || '',
       townCity: resolvedTownCity,
       otp: String(otp),
       phoneOtp: phoneOtp ? String(phoneOtp) : undefined,
-      requirePhone: seeker
+      requirePhone: Boolean(phoneRequired && seeker)
     });
 
     let validatedProfession: string | null = null;

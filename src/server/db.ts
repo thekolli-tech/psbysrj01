@@ -7,7 +7,7 @@ import { OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS, OtpCooldownError, generateOtpCode, 
 import { claimOtpProofSync, type SyncOtpClaimRunner } from './otpClaim.ts';
 import { canonicalOtpTarget } from './otpTarget.ts';
 import { isUniqueEmailError, RegistrationRejected } from './registrationError.ts';
-import { indianNationalDigits, storedPhoneMatches } from '../shared/indianMobile.ts';
+import { indianNationalDigits, storedPhoneMatches, normalizeIndianMobile } from '../shared/indianMobile.ts';
 import { communitySearchLikePattern } from '../shared/communityEngagement.ts';
 import {
   pgFindUserByEmail,
@@ -2453,7 +2453,7 @@ function sqliteRegisterVerifiedUser(data: {
   const email = data.email.trim().toLowerCase();
   const phone = data.requirePhone
     ? canonicalOtpTarget('PHONE_VERIFICATION', data.phone || '')
-    : (data.phone?.trim().toLowerCase() || '');
+    : (data.phone?.trim() ? (normalizeIndianMobile(data.phone) || data.phone.trim()) : '');
   return sqliteTransaction(() => {
     const emailOk = claimOtpProofSync(sqliteRunner(), email, 'EMAIL_VERIFICATION', data.otp, { issueGrant: false, allowGrantFallback: true });
     if (!emailOk) throw new RegistrationRejected(400, 'Invalid or expired email verification code');

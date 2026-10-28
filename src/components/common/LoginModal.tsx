@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { isPropertySeeker, postLoginDestination } from '../../shared/policy';
+import { isPhoneOtpRequired } from '../../shared/authConfig';
 import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
 import {
@@ -64,10 +65,22 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [otpInput, setOtpInput] = useState('');
   const [countdown, setCountdown] = useState(0);
 
-  // Mobile Phone OTP verification state (Mandatory for Property Seeker)
+  // Mobile Phone OTP verification state (configurable via REQUIRE_PHONE_OTP)
+  const [phoneOtpRequired, setPhoneOtpRequired] = useState(isPhoneOtpRequired());
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [phoneOtpInput, setPhoneOtpInput] = useState('');
   const [phoneCountdown, setPhoneCountdown] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/auth/config')
+      .then(res => res.json())
+      .then(data => {
+        if (typeof data?.phoneOtpRequired === 'boolean') {
+          setPhoneOtpRequired(data.phoneOtpRequired);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -175,8 +188,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
 
     // Role-specific validation:
-    // Property Seeker requires phone number; other three do not.
-    if (roleInput === 'PROPERTY_SEEKER') {
+    // If phone OTP is required, Property Seeker requires phone number.
+    if (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') {
       if (!phoneInput.trim() || phoneInput.trim().length < 8) {
         setErrorMsg('Mobile phone number is required for Property Seeker registration.');
         return;
@@ -200,7 +213,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       setCountdown(60);
       showToast('Property Studio verification code sent. Check the inbox for that address.');
 
-      if (roleInput === 'PROPERTY_SEEKER' && phoneInput.trim()) {
+      if (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' && phoneInput.trim()) {
         const phoneRes = await fetch('/api/auth/send-phone-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', accept: 'application/json' },
@@ -233,8 +246,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    // Property Seeker requires Phone OTP verification
-    if (roleInput === 'PROPERTY_SEEKER') {
+    // Property Seeker requires Phone OTP verification only when configured
+    if (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') {
       if (!phoneOtpInput.trim() || phoneOtpInput.trim().length < 4) {
         setErrorMsg('Please enter the 6-digit WhatsApp code received on your phone.');
         return;
@@ -260,7 +273,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           townCity: locationInput.trim() || DEFAULT_SIGNUP_LOCATION,
           location: locationInput.trim() || DEFAULT_SIGNUP_LOCATION,
           otp: otpInput.trim(),
-          phoneOtp: roleInput === 'PROPERTY_SEEKER' ? phoneOtpInput.trim() : undefined
+          phoneOtp: (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') ? phoneOtpInput.trim() : undefined
         })
       });
 
@@ -485,7 +498,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
                       <label className="block font-bold text-slate-700 mb-1">
-                        Contact Mobile {roleInput === 'PROPERTY_SEEKER' ? (
+                        Contact Mobile {phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' ? (
                           <span className="text-red-500 font-bold text-[10px]">* Required</span>
                         ) : (
                           <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
@@ -496,7 +509,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         value={phoneInput}
                         onChange={e => setPhoneInput(e.target.value)}
                         placeholder="e.g. +91 98490 12345"
-                        required={roleInput === 'PROPERTY_SEEKER'}
+                        required={phoneOtpRequired && roleInput === 'PROPERTY_SEEKER'}
                         className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </div>
@@ -712,7 +725,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     />
                   </div>
 
-                  {roleInput === 'PROPERTY_SEEKER' && (
+                  {phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' && (
                     <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-2xl text-xs space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-amber-950 flex items-center gap-1.5">
@@ -771,11 +784,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
                   <button
                     type="submit"
-                    disabled={loading || otpInput.length < 4 || (roleInput === 'PROPERTY_SEEKER' && phoneOtpInput.length < 4)}
+                    disabled={loading || otpInput.length < 4 || (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' && phoneOtpInput.length < 4)}
                     className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>{loading ? 'Verifying...' : roleInput === 'PROPERTY_SEEKER' ? 'Verify Email & Mobile to Register' : 'Verify Email & Create Account'}</span>
+                    <span>{loading ? 'Verifying...' : (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') ? 'Verify Email & Mobile to Register' : 'Verify Email & Create Account'}</span>
                   </button>
                 </form>
               )}

@@ -362,18 +362,18 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
   const seekerSent = await api('/api/auth/send-email-otp', { email: seekerEmail });
   assert.equal(seekerSent.status, 200, seekerSent.raw);
   const seekerCode = deliveries[deliveries.length - 1].html.match(/>(\d{6})</)?.[1] || '';
-  const seekerBypass = await api('/api/auth/register', {
-    name: 'Seeker Bypass',
+  const seekerRegistration = await api('/api/auth/register', {
+    name: 'Seeker With Email OTP',
     email: seekerEmail,
     password: 'Longpassword1!',
     role: 'PROPERTY_SEEKER',
     phone: '+919800011199',
-    otp: seekerCode,
-    phoneVerified: true,
-    phoneOtp: '000000'
+    otp: seekerCode
   });
-  assert.equal(seekerBypass.status, 400);
-  assert.equal(await findUserByEmail(seekerEmail), null);
+  assert.equal(seekerRegistration.status, 200);
+  assert.equal(seekerRegistration.json.success, true);
+  const registeredSeeker = await findUserByEmail(seekerEmail);
+  assert.equal(registeredSeeker?.phone, '+919800011199');
 
   const memberLogin = await originalFetch(`http://127.0.0.1:${port}/api/auth/login`, {
     method: 'POST',
@@ -512,6 +512,7 @@ queued('HTTP registration uses mocked Resend and verifies email before creating 
 });
 
 queued('Property Seeker registration requires a real WhatsApp OTP and an email OTP', async () => {
+  process.env.REQUIRE_PHONE_OTP = 'true';
   process.env.RESEND_API_KEY = 're_test_mock_key';
   process.env.EMAIL_FROM = 'Property Studio <otp@propertystudio.org>';
   process.env.OTP_HASH_SECRET = 'test-pepper-not-used-in-production';
@@ -933,6 +934,7 @@ queued('Property Seeker registration requires a real WhatsApp OTP and an email O
     delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
     delete process.env.WHATSAPP_GRAPH_API_VERSION;
     delete process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE;
+    delete process.env.REQUIRE_PHONE_OTP;
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
