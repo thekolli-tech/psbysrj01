@@ -41,7 +41,6 @@ import {
   X,
   MapPin,
   Scale,
-  Volume2,
   Headphones,
   SlidersHorizontal,
   RotateCcw
@@ -137,17 +136,6 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
     if (!matchesPropertyTypeFilter(p.propertyType, searchPropertyType)) {
       return false;
     }
-    return true;
-  });
-
-  // Visual Quick Search state (Section 1.5)
-  const [searchCorridor, setSearchCorridor] = useState<string>('ALL');
-  const [searchAssetType, setSearchAssetType] = useState<string>(ALL_PROPERTY_TYPES);
-
-  // Filter properties based on quick search
-  const featuredProperties = allProperties.filter(p => {
-    if (searchCorridor !== 'ALL' && !p.microMarket.toLowerCase().includes(searchCorridor.toLowerCase())) return false;
-    if (!matchesPropertyTypeFilter(p.propertyType, searchAssetType)) return false;
     return true;
   });
 
@@ -615,177 +603,6 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
       </section>
 
       <OverviewFoundation />
-
-      {/* 
-        ====================================================================
-        SECTION 1.5: VISUAL SEARCH & CURATED DEVELOPMENTS SHOWCASE
-        ====================================================================
-      */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* Visual Search Box */}
-        <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider font-mono mb-1">
-                <Search className="w-4 h-4" />
-                <span>Visual Discovery & Spatial Search</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black font-display text-white">
-                Explore Verified Inventory by Corridor & Asset Type
-              </h2>
-            </div>
-            <div className="text-xs text-slate-400">
-              <strong className="text-amber-400 font-mono-numbers">{featuredProperties.length}</strong> audited developments ready for inspection
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-center">
-            {/* Corridor Selector */}
-            <div className="lg:col-span-5 space-y-1.5">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wide font-mono block">
-                Micro-Market Corridor
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {['ALL', 'Neopolis', 'Kokapet', 'Financial District', 'Tellapur'].map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setSearchCorridor(c)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                      searchCorridor === c
-                        ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Asset Type Selector */}
-            <div className="lg:col-span-5 space-y-1.5">
-              <label htmlFor="home-property-type" className="text-xs font-bold text-slate-400 uppercase tracking-wide font-mono block">
-                Property type
-              </label>
-              <PropertyCategorySelect
-                id="home-property-type"
-                ariaLabel="Property type"
-                includeAll
-                value={searchAssetType}
-                storedValues={properties.map(property => property.propertyType)}
-                onChange={setSearchAssetType}
-                className="w-full px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-100 border border-slate-700"
-              />
-            </div>
-
-            {/* Direct Browse Action */}
-            <div className="lg:col-span-2 pt-2 lg:pt-5">
-              <button
-                onClick={() => {
-                  setActiveView('PROPERTIES');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
-              >
-                <span>View All ({properties.length})</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Featured Visual Cards Showcase */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider font-mono">
-                FLAGSHIP PORTFOLIO
-              </span>
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 font-display">
-                Featured Developments with 4K Drone Walkthroughs
-              </h3>
-            </div>
-            <button
-              onClick={() => {
-                setActiveView('PROPERTIES');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer"
-            >
-              <span>Explore All Projects</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProperties.slice(0, 4).map(prop => (
-              <div
-                key={prop.id}
-                onClick={() => setActivePropertyModal(prop)}
-                className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between cursor-pointer group"
-              >
-                <div>
-                  {/* Photo with Overlay */}
-                  <div className="relative aspect-4/3 bg-slate-950 overflow-hidden">
-                    <img
-                      src={prop.heroImage}
-                      alt={prop.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-black/20" />
-                    
-                    <div className="absolute top-2.5 left-2.5 bg-slate-950/90 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-amber-500/30 font-mono">
-                      {displayPropertyType(prop.propertyType)}
-                    </div>
-
-                    <div className="absolute bottom-2.5 left-2.5 right-2.5 text-white">
-                      <span className="text-[11px] text-amber-300 block font-medium">
-                        {prop.microMarket}
-                      </span>
-                      <h4 className="text-base font-bold truncate leading-snug">
-                        {prop.title}
-                      </h4>
-                    </div>
-                  </div>
-
-                  {/* Card Content */}
-                  <div className="p-4 space-y-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">Starting</span>
-                      <strong className="text-amber-900 font-mono-numbers text-sm">
-                        {prop.priceRange.split('-')[0].trim()}
-                      </strong>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs text-slate-600">
-                      <span>Rate: ₹{prop.pricePerSqft.toLocaleString('en-IN')}/sqft</span>
-                      <span className="text-emerald-700 font-bold">{prop.progressPercent}% Audited</span>
-                    </div>
-
-                    {/* Media tags */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                      <span className="flex items-center gap-1">
-                        <Video className="w-3 h-3 text-amber-600" /> 4K Tour
-                      </span>
-                      <span className="text-slate-300" aria-hidden="true">·</span>
-                      <span className="flex items-center gap-1">
-                        <Volume2 className="w-3 h-3 text-amber-600" /> Audio Story
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 pt-0">
-                  <div className="w-full py-2 bg-slate-100 group-hover:bg-slate-900 group-hover:text-white rounded-xl text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 transition-colors">
-                    <Eye className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Inspect Blueprint</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* 
         ====================================================================

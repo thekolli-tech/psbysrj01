@@ -41,4 +41,16 @@ test('HomeHero component includes prominent top property search bar with locatio
   assert.match(heroSource, /BrandLogo/);
   assert.match(heroSource, /AudioStoryPlayer/);
   assert.match(heroSource, /OverviewFoundation/);
+
+  // Section 1.5 ("Explore Verified Inventory" and "Featured Developments with 4K Drone Walkthroughs") is removed from homepage
+  assert.doesNotMatch(heroSource, /Explore Verified Inventory by Corridor & Asset Type/);
+  assert.doesNotMatch(heroSource, /Featured Developments with 4K Drone Walkthroughs/);
+
+  // Shared property components remain available on dedicated property pages
+  const propertyList = read('src/components/properties/PropertyList.tsx');
+  assert.ok(propertyList.length > 0);
+  const propertyCategorySelect = read('src/components/properties/PropertyCategorySelect.tsx');
+  assert.ok(propertyCategorySelect.length > 0);
+  const propertyDetailModal = read('src/components/properties/PropertyDetailModal.tsx');
+  assert.ok(propertyDetailModal.length > 0);
 });
