@@ -18,8 +18,11 @@ import {
   Mail,
   CheckCircle2,
   RotateCcw,
-  Smartphone
+  Smartphone,
+  MapPin
 } from 'lucide-react';
+
+const DEFAULT_SIGNUP_LOCATION = 'Hyderabad, Telangana, India';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -43,6 +46,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [roleInput, setRoleInput] = useState<'PROPERTY_SEEKER' | 'LANDOWNER' | 'CHANNEL_PARTNER' | 'RESELLER' | 'RERA_AGENT' | 'REAL_ESTATE_MEDIA'>('PROPERTY_SEEKER');
   const [phoneInput, setPhoneInput] = useState('');
   const [organizationInput, setOrganizationInput] = useState('');
+  const [locationInput, setLocationInput] = useState(DEFAULT_SIGNUP_LOCATION);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const submitting = useRef(false);
@@ -243,6 +247,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           role: roleInput,
           phone: phoneInput.trim(),
           organization: organizationInput.trim(),
+          townCity: locationInput.trim() || DEFAULT_SIGNUP_LOCATION,
+          location: locationInput.trim() || DEFAULT_SIGNUP_LOCATION,
           otp: otpInput.trim(),
           phoneOtp: roleInput === 'PROPERTY_SEEKER' ? phoneOtpInput.trim() : undefined
         })
@@ -257,6 +263,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       login(user);
       showToast(`Account successfully registered and verified! Welcome, ${user.name}`);
       onClose();
+      setLocationInput(DEFAULT_SIGNUP_LOCATION);
     } catch (err: any) {
       setErrorMsg(err.message || 'Verification failed. Please check the OTP code.');
     } finally {
@@ -498,6 +505,31 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   </div>
 
                   <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="signup-location" className="block font-bold text-slate-700">
+                        Location (City & State)
+                      </label>
+                      <span className="text-[10px] text-amber-700 font-semibold">Preselected default</span>
+                    </div>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        id="signup-location"
+                        name="location"
+                        type="text"
+                        value={locationInput}
+                        onChange={e => setLocationInput(e.target.value)}
+                        placeholder="e.g. Hyderabad, Telangana, India"
+                        maxLength={80}
+                        className="w-full pl-10 pr-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Default: Hyderabad, Telangana, India. You may change this before registering.
+                    </span>
+                  </div>
+
+                  <div>
                     <label className="block font-bold text-slate-700 mb-1">Choose Password</label>
                     <input
                       type="password"
@@ -565,6 +597,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <p className="text-blue-800 text-[11px] leading-relaxed">
                       A real-time 6-digit verification code has been dispatched from <strong>Property Studio</strong> to <strong className="font-mono text-blue-950">{emailInput}</strong>. Please check your inbox for the email from Property Studio and enter the code below to complete registration.
                     </p>
+                    <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-[11px]">
+                      <span className="flex items-center gap-1 text-slate-600">
+                        <MapPin className="w-3.5 h-3.5 text-blue-600" /> Location:
+                      </span>
+                      <span className="font-semibold text-slate-800">{locationInput.trim() || DEFAULT_SIGNUP_LOCATION}</span>
+                    </div>
                   </div>
 
                   <div>

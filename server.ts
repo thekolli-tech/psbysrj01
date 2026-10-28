@@ -76,7 +76,7 @@ import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
-import { readProfilePatch } from './src/shared/profileFields.ts';
+import { readProfilePatch, readProfileField } from './src/shared/profileFields.ts';
 import { isCommunityPostId, readCommunitySearch, readCommunityVote } from './src/shared/communityEngagement.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
@@ -367,6 +367,7 @@ app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
   res.json({
     user: {
       ...safeUser,
+      townCity: safeUser.town_city || '',
       isVerified: Boolean(safeUser.is_verified),
       assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
     }
@@ -593,7 +594,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
 app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
   if (rejectIfRateLimited(req, res, 'register', String(req.body?.email || ''))) return;
   try {
-    const { name, email, password, role, phone, organization, otp, phoneOtp } = req.body;
+    const { name, email, password, role, phone, organization, otp, phoneOtp, townCity, location, city, state } = req.body;
     if (!name || !email || !password) {
       res.status(400).json({ error: 'Name, email, and password are required' });
       return;
@@ -622,6 +623,23 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       return;
     }
 
+    // Default city: Hyderabad, state: Telangana, India
+    const DEFAULT_SIGNUP_LOCATION = 'Hyderabad, Telangana, India';
+    const rawLocationInput = typeof townCity === 'string' && townCity.trim()
+      ? townCity.trim()
+      : typeof location === 'string' && location.trim()
+        ? location.trim()
+        : [city, state].filter(Boolean).map(s => String(s).trim()).join(', ').trim() || DEFAULT_SIGNUP_LOCATION;
+
+    const validatedLocationField = readProfileField(rawLocationInput, true, 'Location');
+    if ('error' in validatedLocationField) {
+      res.status(400).json({ error: validatedLocationField.error });
+      return;
+    }
+    const resolvedTownCity = (!validatedLocationField.omit && validatedLocationField.value)
+      ? validatedLocationField.value
+      : DEFAULT_SIGNUP_LOCATION;
+
     const newUser = await registerVerifiedUser({
       name,
       email,
@@ -629,6 +647,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       role: safeRole,
       phone: seeker ? canonicalPhone || '' : (phone?.trim() || ''),
       organization: organization?.trim() || '',
+      townCity: resolvedTownCity,
       otp: String(otp),
       phoneOtp: phoneOtp ? String(phoneOtp) : undefined,
       requirePhone: seeker
@@ -654,6 +673,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       success: true,
       user: {
         ...safeUser,
+        townCity: newUser.town_city || resolvedTownCity,
         isVerified: true,
         phone_verified: Number(newUser.phone_verified || 0),
         assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')

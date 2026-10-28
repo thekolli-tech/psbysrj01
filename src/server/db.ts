@@ -529,6 +529,7 @@ export async function createUser(data: {
   role?: UserRole;
   avatar?: string;
   organization?: string;
+  townCity?: string;
   password?: string;
   isVerified?: boolean;
 }): Promise<DbUser> {
@@ -685,12 +686,17 @@ export async function registerVerifiedUser(data: {
   role: UserRole;
   phone?: string;
   organization?: string;
+  townCity?: string;
   otp: string;
   phoneOtp?: string;
   requirePhone: boolean;
 }): Promise<DbUser> {
-  if (isPostgresAuthoritative()) return pgRegisterVerifiedUser(data);
-  return sqliteRegisterVerifiedUser(data);
+  const payload = {
+    ...data,
+    townCity: data.townCity?.trim() || 'Hyderabad, Telangana, India'
+  };
+  if (isPostgresAuthoritative()) return pgRegisterVerifiedUser(payload);
+  return sqliteRegisterVerifiedUser(payload);
 }
 
 export async function createAuditLog(entry: {
@@ -1538,6 +1544,7 @@ function sqliteCreateUser(data: {
   role?: UserRole;
   avatar?: string;
   organization?: string;
+  townCity?: string;
   password?: string;
   isVerified?: boolean;
 }): DbUser {
@@ -1549,8 +1556,8 @@ function sqliteCreateUser(data: {
   const now = new Date().toISOString();
 
   const insert = db.prepare(`
-    INSERT INTO users (id, public_id, name, email, phone, role, avatar, organization, wallet_balance, is_verified, email_verified, phone_verified, account_status, must_change_password, assigned_properties, password_hash, salt, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 'ACTIVE', 0, '[]', ?, ?, ?, ?)
+    INSERT INTO users (id, public_id, name, email, phone, role, avatar, organization, town_city, wallet_balance, is_verified, email_verified, phone_verified, account_status, must_change_password, assigned_properties, password_hash, salt, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 'ACTIVE', 0, '[]', ?, ?, ?, ?)
   `);
 
   insert.run(
@@ -1562,6 +1569,7 @@ function sqliteCreateUser(data: {
     data.role || 'PROPERTY_SEEKER',
     data.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
     data.organization?.trim() || '',
+    data.townCity ?? null,
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
     0,
@@ -2094,6 +2102,7 @@ function sqliteRegisterVerifiedUser(data: {
   role: UserRole;
   phone?: string;
   organization?: string;
+  townCity?: string;
   otp: string;
   phoneOtp?: string;
   requirePhone: boolean;
@@ -2122,6 +2131,7 @@ function sqliteRegisterVerifiedUser(data: {
         role: data.role,
         phone,
         organization: data.organization,
+        townCity: data.townCity?.trim() || 'Hyderabad, Telangana, India',
         isVerified: true
       });
       if (data.requirePhone) {

@@ -147,6 +147,7 @@ export async function pgCreateUser(data: {
   role?: UserRole;
   avatar?: string;
   organization?: string;
+  townCity?: string;
   password?: string;
   isVerified?: boolean;
 }): Promise<DbUser> {
@@ -159,11 +160,11 @@ export async function pgCreateUser(data: {
 
   await queryPostgres(`
     INSERT INTO users (
-      id, public_id, name, email, phone, role, avatar, organization,
+      id, public_id, name, email, phone, role, avatar, organization, town_city,
       wallet_balance, is_verified, email_verified, phone_verified,
       account_status, must_change_password, assigned_properties,
       password_hash, salt, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,$9,$10,$11,'ACTIVE',0,'[]',$12,$13,$14,$15)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,$10,$11,$12,'ACTIVE',0,'[]',$13,$14,$15,$16)
   `, [
     id,
     publicId,
@@ -173,6 +174,7 @@ export async function pgCreateUser(data: {
     data.role || 'PROPERTY_SEEKER',
     data.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
     data.organization?.trim() || '',
+    data.townCity ?? null,
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
     0,
@@ -762,6 +764,7 @@ export async function pgRegisterVerifiedUser(data: {
   role: UserRole;
   phone?: string;
   organization?: string;
+  townCity?: string;
   otp: string;
   phoneOtp?: string;
   requirePhone: boolean;
@@ -800,6 +803,7 @@ export async function pgRegisterVerifiedUser(data: {
         role: data.role,
         phone,
         organization: data.organization,
+        townCity: data.townCity?.trim() || 'Hyderabad, Telangana, India',
         phoneVerified: data.requirePhone
       });
     } catch (error) {
@@ -816,6 +820,7 @@ async function insertPgUser(client: PoolClient, data: {
   role: UserRole;
   phone: string;
   organization?: string;
+  townCity?: string;
   phoneVerified: boolean;
 }): Promise<DbUser> {
   const id = `user_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
@@ -824,11 +829,11 @@ async function insertPgUser(client: PoolClient, data: {
   const now = new Date().toISOString();
   const inserted = await client.query(`
     INSERT INTO users (
-      id, public_id, name, email, phone, role, avatar, organization,
+      id, public_id, name, email, phone, role, avatar, organization, town_city,
       wallet_balance, is_verified, email_verified, phone_verified,
       account_status, must_change_password, assigned_properties,
       password_hash, salt, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,1,1,$9,'ACTIVE',0,'[]',$10,$11,$12,$13)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,1,1,$10,'ACTIVE',0,'[]',$11,$12,$13,$14)
     RETURNING *
   `, [
     id,
@@ -839,6 +844,7 @@ async function insertPgUser(client: PoolClient, data: {
     data.role,
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
     data.organization?.trim() || '',
+    data.townCity?.trim() || 'Hyderabad, Telangana, India',
     data.phoneVerified ? 1 : 0,
     hash,
     salt,
