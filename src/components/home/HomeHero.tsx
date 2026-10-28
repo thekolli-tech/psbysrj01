@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ASSET_IMAGES } from '../../data/mockData';
+import { ASSET_IMAGES, INITIAL_PROPERTIES } from '../../data/mockData';
 import { OfficialBrandCard } from '../common/OfficialBrandCard';
 import { BrandLogo } from '../common/BrandLogo';
 import { AudioStoryPlayer } from '../common/AudioStoryPlayer';
@@ -43,8 +43,21 @@ import {
   Scale,
   Volume2,
   Headphones,
-  SlidersHorizontal
+  SlidersHorizontal,
+  RotateCcw
 } from 'lucide-react';
+
+const HOMEPAGE_LOCATIONS = [
+  'ALL',
+  'Neopolis',
+  'Kokapet',
+  'Financial District',
+  'Tellapur',
+  'Nanakramguda',
+  'Gachibowli',
+  'Madhapur',
+  'Mokila'
+];
 
 interface HomeHeroProps {
   onOpenRoleModal: () => void;
@@ -63,12 +76,76 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
 
   const [activePropertyModal, setActivePropertyModal] = useState<Property | null>(null);
 
-  // Visual Quick Search state
+  // Authoritative Property Listings state connected to public API with initial fallback
+  const [allProperties, setAllProperties] = useState<Property[]>(
+    properties && properties.length > 0 ? properties : INITIAL_PROPERTIES
+  );
+
+  useEffect(() => {
+    if (properties && properties.length > 0) {
+      setAllProperties(properties);
+    } else {
+      fetch('/api/properties')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data?.properties) && data.properties.length > 0) {
+            setAllProperties(data.properties);
+          } else {
+            setAllProperties(INITIAL_PROPERTIES);
+          }
+        })
+        .catch(() => {
+          setAllProperties(INITIAL_PROPERTIES);
+        });
+    }
+  }, [properties]);
+
+  // Top Prominent Search Bar state
+  const [searchKeyword, setSearchKeyword] = useState<string>('');
+  const [searchLocation, setSearchLocation] = useState<string>('ALL');
+  const [searchPropertyType, setSearchPropertyType] = useState<string>(ALL_PROPERTY_TYPES);
+  const [hasSearched, setHasSearched] = useState<boolean>(false);
+
+  const handleTopSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setHasSearched(true);
+  };
+
+  const handleResetTopSearch = () => {
+    setSearchKeyword('');
+    setSearchLocation('ALL');
+    setSearchPropertyType(ALL_PROPERTY_TYPES);
+    setHasSearched(false);
+  };
+
+  // Filter properties based on prominent top search bar
+  const searchResults = allProperties.filter(p => {
+    if (searchKeyword.trim()) {
+      const q = searchKeyword.toLowerCase().trim();
+      const matchTitle = p.title?.toLowerCase().includes(q);
+      const matchDev = p.developerName?.toLowerCase().includes(q);
+      const matchLoc = p.location?.toLowerCase().includes(q) || p.microMarket?.toLowerCase().includes(q);
+      const matchHighlights = (p.highlights || []).some(h => h.toLowerCase().includes(q));
+      const matchTags = (p.tags || []).some(t => t.toLowerCase().includes(q));
+      if (!matchTitle && !matchDev && !matchLoc && !matchHighlights && !matchTags) return false;
+    }
+    if (searchLocation !== 'ALL') {
+      const loc = searchLocation.toLowerCase();
+      const matchLoc = p.location?.toLowerCase().includes(loc) || p.microMarket?.toLowerCase().includes(loc);
+      if (!matchLoc) return false;
+    }
+    if (!matchesPropertyTypeFilter(p.propertyType, searchPropertyType)) {
+      return false;
+    }
+    return true;
+  });
+
+  // Visual Quick Search state (Section 1.5)
   const [searchCorridor, setSearchCorridor] = useState<string>('ALL');
   const [searchAssetType, setSearchAssetType] = useState<string>(ALL_PROPERTY_TYPES);
 
   // Filter properties based on quick search
-  const featuredProperties = properties.filter(p => {
+  const featuredProperties = allProperties.filter(p => {
     if (searchCorridor !== 'ALL' && !p.microMarket.toLowerCase().includes(searchCorridor.toLowerCase())) return false;
     if (!matchesPropertyTypeFilter(p.propertyType, searchAssetType)) return false;
     return true;
@@ -91,7 +168,274 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   const logoScale = Math.min(1, 0.85 + morph * 0.15);
 
   return (
-    <div className="space-y-16 pb-12">
+    <div className="space-y-12 sm:space-y-16 pb-12">
+      {/*
+        ====================================================================
+        PROMINENT TOP PROPERTY SEARCH BAR (IMMEDIATELY BELOW TOP NAVIGATION)
+        ====================================================================
+      */}
+      <section className="bg-white border-b border-slate-200/90 shadow-xs" data-testid="homepage-top-search">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4">
+          <form onSubmit={handleTopSearch} className="space-y-3">
+            <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 shadow-xs">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-2.5 items-center">
+                {/* 1. Keyword Input */}
+                <div className="md:col-span-5 lg:col-span-5 relative">
+                  <label htmlFor="home-search-keyword" className="sr-only">
+                    Search by project, developer, or keyword
+                  </label>
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    id="home-search-keyword"
+                    type="text"
+                    value={searchKeyword}
+                    onChange={e => {
+                      setSearchKeyword(e.target.value);
+                      setHasSearched(true);
+                    }}
+                    placeholder="Search by project, developer, or keyword..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                  />
+                  {searchKeyword && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchKeyword('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                      aria-label="Clear keyword"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* 2. Location Dropdown */}
+                <div className="md:col-span-3 lg:col-span-3 relative">
+                  <label htmlFor="home-search-location" className="sr-only">
+                    Location Corridor
+                  </label>
+                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <select
+                    id="home-search-location"
+                    aria-label="Select Corridor"
+                    value={searchLocation}
+                    onChange={e => {
+                      setSearchLocation(e.target.value);
+                      setHasSearched(true);
+                    }}
+                    className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all cursor-pointer truncate"
+                  >
+                    {HOMEPAGE_LOCATIONS.map(loc => (
+                      <option key={loc} value={loc}>
+                        {loc === 'ALL' ? 'All Locations / Corridors' : loc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 3. Property Type Dropdown */}
+                <div className="md:col-span-3 lg:col-span-3">
+                  <label htmlFor="home-search-property-type" className="sr-only">
+                    Property Type
+                  </label>
+                  <PropertyCategorySelect
+                    id="home-search-property-type"
+                    ariaLabel="Property Type"
+                    includeAll
+                    value={searchPropertyType}
+                    storedValues={allProperties.map(p => p.propertyType)}
+                    onChange={val => {
+                      setSearchPropertyType(val);
+                      setHasSearched(true);
+                    }}
+                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all cursor-pointer truncate"
+                  />
+                </div>
+
+                {/* 4. Search Button */}
+                <div className="md:col-span-1 lg:col-span-1 flex items-center gap-2">
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  >
+                    <Search className="w-4 h-4" />
+                    <span>Search</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick status bar / active filter chips */}
+            {(hasSearched || searchKeyword || searchLocation !== 'ALL' || searchPropertyType !== ALL_PROPERTY_TYPES) && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-600">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-bold text-slate-700">Active Filters:</span>
+                  {searchKeyword && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-full text-[11px] font-medium">
+                      Keyword: &quot;{searchKeyword}&quot;
+                      <button type="button" onClick={() => setSearchKeyword('')} className="hover:text-amber-700 cursor-pointer">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {searchLocation !== 'ALL' && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 text-blue-900 border border-blue-200 rounded-full text-[11px] font-medium">
+                      Location: {searchLocation}
+                      <button type="button" onClick={() => setSearchLocation('ALL')} className="hover:text-blue-700 cursor-pointer">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {searchPropertyType !== ALL_PROPERTY_TYPES && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-purple-50 text-purple-900 border border-purple-200 rounded-full text-[11px] font-medium">
+                      Type: {displayPropertyType(searchPropertyType)}
+                      <button type="button" onClick={() => setSearchPropertyType(ALL_PROPERTY_TYPES)} className="hover:text-purple-700 cursor-pointer">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleResetTopSearch}
+                  className="font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset filters</span>
+                </button>
+              </div>
+            )}
+          </form>
+
+          {/* Search Results Drawer */}
+          {hasSearched && (
+            <div className="mt-5 pt-4 border-t border-slate-200/80 space-y-4 animate-in fade-in duration-200" data-testid="homepage-search-results">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Search Results ({searchResults.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Showing matching RERA-approved developments across Hyderabad
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setActiveView('PROPERTIES');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>View in full catalog</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setHasSearched(false)}
+                    className="text-xs font-bold text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                    title="Close results"
+                    aria-label="Close search results"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {searchResults.length === 0 ? (
+                <div className="text-center py-10 px-4 bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-3">
+                  <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto">
+                    <Search className="w-6 h-6" />
+                  </div>
+                  <div className="max-w-md mx-auto space-y-1">
+                    <h4 className="text-sm font-bold text-slate-900">No developments found</h4>
+                    <p className="text-xs text-slate-500">
+                      No verified listings matched your search criteria. Try choosing &quot;All Locations&quot; or selecting &quot;All property types&quot;.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetTopSearch}
+                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    Reset Search
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {searchResults.slice(0, 8).map(prop => (
+                    <div
+                      key={prop.id}
+                      onClick={() => setActivePropertyModal(prop)}
+                      className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between cursor-pointer group"
+                    >
+                      <div>
+                        <div className="relative aspect-4/3 bg-slate-950 overflow-hidden">
+                          <img
+                            src={prop.heroImage || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'}
+                            alt={prop.title}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            onError={e => {
+                              (e.target as HTMLImageElement).src =
+                                'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20" />
+                          <div className="absolute top-2 left-2 bg-slate-950/90 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-md border border-amber-500/30 font-mono">
+                            {displayPropertyType(prop.propertyType)}
+                          </div>
+                          {prop.microMarket && (
+                            <div className="absolute bottom-2 left-2 right-2 text-white">
+                              <span className="text-[10px] text-amber-300 flex items-center gap-0.5 font-medium">
+                                <MapPin className="w-2.5 h-2.5" />
+                                {prop.microMarket}
+                              </span>
+                              <h4 className="text-xs sm:text-sm font-bold truncate leading-tight">
+                                {prop.title}
+                              </h4>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="p-3.5 space-y-2">
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {prop.developerName}
+                          </p>
+
+                          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                            <div>
+                              <span className="text-[10px] font-mono text-slate-400 block uppercase">Price</span>
+                              <span className="font-bold text-slate-900 font-mono-numbers">
+                                {prop.priceRange?.split('-')[0]?.trim() || (prop.pricePerSqft ? `₹${prop.pricePerSqft.toLocaleString('en-IN')}/sqft` : 'Price on request')}
+                              </span>
+                            </div>
+                            {prop.progressPercent ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                {prop.progressPercent}% Audited
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 pt-0">
+                        <button
+                          type="button"
+                          className="w-full py-1.5 bg-slate-100 group-hover:bg-slate-900 group-hover:text-white rounded-lg text-xs font-bold text-slate-800 flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3 h-3 text-amber-500" />
+                          <span>Inspect Blueprint</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* 
         ====================================================================
         SECTION 1: CINEMATIC VISUAL HERO & EXECUTIVE AUDIO BRIEFING
@@ -103,23 +447,29 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-            {/* Left 6 cols: Brand Manifesto & Audio Lead */}
-            <div className="lg:col-span-6 space-y-6 order-2 lg:order-1">
-              <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold tracking-wide">
-                <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
-                <span className="uppercase font-mono">REAL ESTATE MEDIA & DATA INTELLIGENCE</span>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            {/* Left 7 cols: Brand Manifesto, Audio Lead & Expanded Intelligence Space */}
+            <div className="lg:col-span-7 space-y-5 lg:space-y-6 order-2 lg:order-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold tracking-wide">
+                  <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
+                  <span className="uppercase font-mono">REAL ESTATE MEDIA & DATA INTELLIGENCE</span>
+                </div>
+                <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>TS-RERA Audited Projects</span>
+                </div>
               </div>
 
               <div className="space-y-3">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.12] font-display">
+                <h1 className="text-3xl sm:text-4xl lg:text-[42px] xl:text-5xl font-black text-slate-900 tracking-tight leading-[1.12] font-display">
                   Property Studio
-                  <span className="block text-amber-700 text-2xl sm:text-3xl lg:text-4xl font-bold mt-1">
+                  <span className="block text-amber-700 text-2xl sm:text-3xl lg:text-[32px] xl:text-4xl font-bold mt-1">
                     by Swamy Reddy Javidi
                   </span>
                 </h1>
                 <p className="text-base sm:text-lg text-slate-700 leading-relaxed font-normal">
-                  "The global PropTech ecosystem integrating the search power of property portals, the transparency of community forums, and the authority of broadcast media into one revolutionary platform."
+                  &quot;The global PropTech ecosystem integrating the search power of property portals, the transparency of community forums, and the authority of broadcast media into one revolutionary platform.&quot;
                 </p>
                 <p className="text-sm text-slate-600 leading-relaxed font-medium">
                   Property Studio is The Real Estate Media Network and Community PropTech Platform Delivering Absolute Market Intelligence.
@@ -149,7 +499,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-3 pt-1">
                 <button
                   onClick={() => {
                     setActiveView('PROPERTIES');
@@ -198,24 +548,24 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               </div>
 
               {/* Key Trust Metrics */}
-              <div className="grid grid-cols-3 gap-6 pt-6 border-t border-slate-200/80 text-slate-900">
-                <div>
+              <div className="grid grid-cols-3 gap-3 sm:gap-4 pt-4 border-t border-slate-200/80">
+                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs">
                   <div className="text-xl sm:text-2xl font-black font-mono-numbers text-slate-900">5 Pillars</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">PropTech Integration</div>
+                  <div className="text-[11px] font-medium text-slate-500 mt-0.5">PropTech Integration</div>
                 </div>
-                <div>
+                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs">
                   <div className="text-xl sm:text-2xl font-black font-mono-numbers text-amber-700">24+ Years</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Corporate Governance</div>
+                  <div className="text-[11px] font-medium text-slate-500 mt-0.5">Corporate Governance</div>
                 </div>
-                <div>
+                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs">
                   <div className="text-xl sm:text-2xl font-black font-mono-numbers text-emerald-700">100%</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Data Masking Privacy</div>
+                  <div className="text-[11px] font-medium text-slate-500 mt-0.5">Data Masking Privacy</div>
                 </div>
               </div>
             </div>
 
-            {/* Right 6 cols: Dynamic Host Card Morphing Container */}
-            <div className="lg:col-span-6 relative order-1 lg:order-2">
+            {/* Right 5 cols: Dynamic Host Card Morphing Container */}
+            <div className="lg:col-span-5 relative order-1 lg:order-2 flex flex-col items-center justify-center">
               <div className="relative mx-auto max-w-md lg:max-w-lg aspect-square rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden p-2.5 transition-all duration-300">
                 <div className="relative w-full h-full rounded-2xl overflow-hidden bg-white flex items-center justify-center">
                   {/* LAYER 1: Official Brand Card with Person */}
