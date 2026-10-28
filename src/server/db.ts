@@ -38,6 +38,14 @@ import {
   pgGetPostById,
   pgCastCommunityVote,
   pgToggleCommunityFollow,
+  pgToggleBookmarkPost,
+  pgGetUserBookmarkedPostIds,
+  pgToggleFollowUser,
+  pgGetUserFollowStats,
+  pgGetUserFollowedUserIds,
+  pgVoteCommunityPoll,
+  pgCheckDuplicateQuestion,
+  pgGetUserPublicProfile,
   pgCommunityEngagement,
   pgProfessionsByUserId,
   pgUpdateProfileFields,
@@ -169,8 +177,10 @@ export interface DbUser {
   role: UserRole;
   avatar: string;
   organization: string;
+  company?: string | null;
   town_city: string | null;
   profession: string | null;
+  interests?: string | null;
   wallet_balance: number;
   is_verified: number;
   email_verified: number;
@@ -259,6 +269,15 @@ export interface DbCommunityPost {
   media_url?: string;
   thumbnail_url?: string;
   duration?: string;
+  post_type?: string;
+  visibility?: string;
+  poll_options?: string;
+  poll_votes?: string;
+  ama_host_name?: string | null;
+  ama_host_role?: string | null;
+  ama_status?: string | null;
+  ama_start_time?: string | null;
+  ama_end_time?: string | null;
   status: 'PUBLISHED' | 'FLAGGED' | 'ARCHIVED';
   upvotes: number;
   comments_count: number;
@@ -284,6 +303,7 @@ export interface DbCommunityComment {
   author_role: string;
   content: string;
   likes_count: number;
+  is_ama_answer?: number;
   created_at: string;
   updated_at: string;
 }
@@ -314,7 +334,7 @@ export interface DbNotification {
   user_id: string;
   actor_id: string;
   actor_name: string;
-  type: 'COMMENT' | 'REPLY' | 'LIKE' | 'MODERATION' | 'SYSTEM';
+  type: 'COMMENT' | 'REPLY' | 'LIKE' | 'MODERATION' | 'SYSTEM' | 'FOLLOW';
   title: string;
   message: string;
   link_url?: string;
@@ -554,7 +574,7 @@ export async function updateUser(id: string, updates: Partial<{
 /** Updates only town/city and profession. Omitted keys are left unchanged. Role is not accepted. */
 export async function updateUserProfileFields(
   id: string,
-  fields: { townCity?: string | null; profession?: string | null }
+  fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null }
 ): Promise<DbUser | null> {
   if (isPostgresAuthoritative()) return pgUpdateProfileFields(id, fields);
   return sqliteUpdateProfileFields(id, fields);
@@ -758,6 +778,64 @@ export async function toggleCommunityFollow(
   return sqliteToggleCommunityFollow(postId, userId);
 }
 
+export async function toggleBookmarkPost(
+  userId: string,
+  postId: string
+): Promise<{ bookmarked: boolean; bookmarkCount: number }> {
+  if (isPostgresAuthoritative()) return pgToggleBookmarkPost(userId, postId);
+  return sqliteToggleBookmarkPost(userId, postId);
+}
+
+export async function getUserBookmarkedPostIds(userId: string): Promise<string[]> {
+  if (isPostgresAuthoritative()) return pgGetUserBookmarkedPostIds(userId);
+  return sqliteGetUserBookmarkedPostIds(userId);
+}
+
+export async function toggleFollowUser(
+  followerId: string,
+  followingId: string
+): Promise<{ following: boolean; followerCount: number; followingCount: number }> {
+  if (isPostgresAuthoritative()) return pgToggleFollowUser(followerId, followingId);
+  return sqliteToggleFollowUser(followerId, followingId);
+}
+
+export async function getUserFollowStats(
+  userId: string,
+  currentUserId?: string
+): Promise<{ followerCount: number; followingCount: number; isFollowing: boolean }> {
+  if (isPostgresAuthoritative()) return pgGetUserFollowStats(userId, currentUserId);
+  return sqliteGetUserFollowStats(userId, currentUserId);
+}
+
+export async function getUserFollowedUserIds(followerId: string): Promise<string[]> {
+  if (isPostgresAuthoritative()) return pgGetUserFollowedUserIds(followerId);
+  return sqliteGetUserFollowedUserIds(followerId);
+}
+
+export async function voteCommunityPoll(
+  postId: string,
+  userId: string,
+  optionId: string
+): Promise<{ pollOptions: Array<{ id: string; text: string; votes: number }>; userVotedOptionId: string } | null> {
+  if (isPostgresAuthoritative()) return pgVoteCommunityPoll(postId, userId, optionId);
+  return sqliteVoteCommunityPoll(postId, userId, optionId);
+}
+
+export async function checkDuplicateQuestion(
+  title: string
+): Promise<{ exists: boolean; matches: Array<{ id: string; title: string; upvotes: number }> }> {
+  if (isPostgresAuthoritative()) return pgCheckDuplicateQuestion(title);
+  return sqliteCheckDuplicateQuestion(title);
+}
+
+export async function getUserPublicProfile(
+  userId: string,
+  currentUserId?: string
+): Promise<any | null> {
+  if (isPostgresAuthoritative()) return pgGetUserPublicProfile(userId, currentUserId);
+  return sqliteGetUserPublicProfile(userId, currentUserId);
+}
+
 export async function createPost(post: {
   authorId?: string;
   authorName: string;
@@ -775,6 +853,14 @@ export async function createPost(post: {
   mediaUrl?: string;
   thumbnailUrl?: string;
   duration?: string;
+  postType?: 'QUESTION' | 'POST' | 'POLL' | 'AMA';
+  visibility?: 'PUBLIC' | 'COMMUNITY';
+  pollOptions?: Array<{ id: string; text: string; votes?: number }>;
+  amaHostName?: string;
+  amaHostRole?: string;
+  amaStatus?: 'UPCOMING' | 'LIVE' | 'ENDED';
+  amaStartTime?: string;
+  amaEndTime?: string;
 }): Promise<any> {
   if (isPostgresAuthoritative()) return pgCreatePost(post);
   return sqliteCreatePost(post);
@@ -832,6 +918,7 @@ export async function createComment(data: {
   authorName: string;
   authorRole: string;
   content: string;
+  isAmaAnswer?: boolean;
 }): Promise<any> {
   if (isPostgresAuthoritative()) return pgCreateComment(data);
   return sqliteCreateComment(data);
@@ -904,7 +991,7 @@ export async function createNotification(data: {
   userId: string;
   actorId: string;
   actorName: string;
-  type: 'COMMENT' | 'REPLY' | 'LIKE' | 'MODERATION' | 'SYSTEM';
+  type: 'COMMENT' | 'REPLY' | 'LIKE' | 'MODERATION' | 'SYSTEM' | 'FOLLOW';
   title: string;
   message: string;
   linkUrl?: string;
@@ -1060,7 +1147,7 @@ export async function updateConferenceDetails(details: {
 // ==============================================================================
 
 function sqliteInitDatabase(): void {
-  db.exec('PRAGMA foreign_keys = ON;');
+  db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -1072,8 +1159,10 @@ function sqliteInitDatabase(): void {
       role TEXT NOT NULL DEFAULT 'PROPERTY_SEEKER',
       avatar TEXT,
       organization TEXT,
+      company TEXT,
       town_city TEXT,
       profession TEXT,
+      interests TEXT DEFAULT '[]',
       wallet_balance REAL DEFAULT 0,
       is_verified INTEGER DEFAULT 0,
       email_verified INTEGER DEFAULT 0,
@@ -1162,6 +1251,15 @@ function sqliteInitDatabase(): void {
       media_url TEXT,
       thumbnail_url TEXT,
       duration TEXT,
+      post_type TEXT DEFAULT 'POST',
+      visibility TEXT DEFAULT 'PUBLIC',
+      poll_options TEXT DEFAULT '[]',
+      poll_votes TEXT DEFAULT '[]',
+      ama_host_name TEXT,
+      ama_host_role TEXT,
+      ama_status TEXT DEFAULT 'LIVE',
+      ama_start_time TEXT,
+      ama_end_time TEXT,
       status TEXT DEFAULT 'PUBLISHED',
       upvotes INTEGER DEFAULT 0,
       comments_count INTEGER DEFAULT 0,
@@ -1195,6 +1293,22 @@ function sqliteInitDatabase(): void {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at TEXT NOT NULL,
       UNIQUE(post_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS user_follows (
+      id TEXT PRIMARY KEY,
+      follower_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      following_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      UNIQUE(follower_id, following_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS community_bookmarks (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      UNIQUE(user_id, post_id)
     );
 
     CREATE TABLE IF NOT EXISTS property_requirements (
@@ -1232,6 +1346,7 @@ function sqliteInitDatabase(): void {
       author_role TEXT NOT NULL,
       content TEXT NOT NULL,
       likes_count INTEGER DEFAULT 0,
+      is_ama_answer INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -1402,10 +1517,12 @@ type CommunityEngagement = {
   userVote: 1 | -1 | 0;
   followerCount: number;
   following: boolean;
+  bookmarked: boolean;
+  bookmarkCount: number;
 };
 
 function emptyEngagement(): CommunityEngagement {
-  return { agreeCount: 0, disagreeCount: 0, userVote: 0, followerCount: 0, following: false };
+  return { agreeCount: 0, disagreeCount: 0, userVote: 0, followerCount: 0, following: false, bookmarked: false, bookmarkCount: 0 };
 }
 
 function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, CommunityEngagement> {
@@ -1426,6 +1543,12 @@ function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, 
     WHERE post_id IN (${marks})
     GROUP BY post_id
   `).all(...ids) as Array<{ post_id: string; follower_count: number }>;
+  const bookmarks = db.prepare(`
+    SELECT post_id, COUNT(*) AS bookmark_count
+    FROM community_bookmarks
+    WHERE post_id IN (${marks})
+    GROUP BY post_id
+  `).all(...ids) as Array<{ post_id: string; bookmark_count: number }>;
   for (const row of votes) {
     const current = result.get(row.post_id) || emptyEngagement();
     current.agreeCount = Number(row.agree_count || 0);
@@ -1437,12 +1560,20 @@ function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, 
     current.followerCount = Number(row.follower_count || 0);
     result.set(row.post_id, current);
   }
+  for (const row of bookmarks) {
+    const current = result.get(row.post_id) || emptyEngagement();
+    current.bookmarkCount = Number(row.bookmark_count || 0);
+    result.set(row.post_id, current);
+  }
   if (userId) {
     const mine = db.prepare(`
       SELECT post_id, vote FROM community_post_votes WHERE user_id = ? AND post_id IN (${marks})
     `).all(userId, ...ids) as Array<{ post_id: string; vote: number }>;
     const followed = db.prepare(`
       SELECT post_id FROM community_post_follows WHERE user_id = ? AND post_id IN (${marks})
+    `).all(userId, ...ids) as Array<{ post_id: string }>;
+    const bookmarked = db.prepare(`
+      SELECT post_id FROM community_bookmarks WHERE user_id = ? AND post_id IN (${marks})
     `).all(userId, ...ids) as Array<{ post_id: string }>;
     for (const row of mine) {
       const current = result.get(row.post_id) || emptyEngagement();
@@ -1452,6 +1583,11 @@ function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, 
     for (const row of followed) {
       const current = result.get(row.post_id) || emptyEngagement();
       current.following = true;
+      result.set(row.post_id, current);
+    }
+    for (const row of bookmarked) {
+      const current = result.get(row.post_id) || emptyEngagement();
+      current.bookmarked = true;
       result.set(row.post_id, current);
     }
   }
@@ -1514,6 +1650,201 @@ function sqliteToggleCommunityFollow(postId: string, userId: string): { followin
   }
   const row = sqliteCommunityEngagement([postId], userId).get(postId) || emptyEngagement();
   return { following: row.following, followerCount: row.followerCount };
+}
+
+function sqliteToggleBookmarkPost(userId: string, postId: string): { bookmarked: boolean; bookmarkCount: number } {
+  const existing = db.prepare('SELECT id FROM community_bookmarks WHERE user_id = ? AND post_id = ?').get(userId, postId) as { id: string } | undefined;
+  if (existing) {
+    db.prepare('DELETE FROM community_bookmarks WHERE user_id = ? AND post_id = ?').run(userId, postId);
+  } else {
+    const id = `bkmk_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    db.prepare('INSERT INTO community_bookmarks (id, user_id, post_id, created_at) VALUES (?, ?, ?, ?)').run(
+      id,
+      userId,
+      postId,
+      new Date().toISOString()
+    );
+  }
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM community_bookmarks WHERE post_id = ?').get(postId) as { count: number };
+  return {
+    bookmarked: !existing,
+    bookmarkCount: Number(countRow?.count || 0)
+  };
+}
+
+function sqliteGetUserBookmarkedPostIds(userId: string): string[] {
+  const rows = db.prepare('SELECT post_id FROM community_bookmarks WHERE user_id = ? ORDER BY created_at DESC').all(userId) as Array<{ post_id: string }>;
+  return rows.map(r => r.post_id);
+}
+
+function sqliteToggleFollowUser(followerId: string, followingId: string): { following: boolean; followerCount: number; followingCount: number } {
+  if (followerId === followingId) throw new Error('Cannot follow yourself');
+  const existing = db.prepare('SELECT id FROM user_follows WHERE follower_id = ? AND following_id = ?').get(followerId, followingId) as { id: string } | undefined;
+  if (existing) {
+    db.prepare('DELETE FROM user_follows WHERE follower_id = ? AND following_id = ?').run(followerId, followingId);
+  } else {
+    const id = `ufol_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    db.prepare('INSERT INTO user_follows (id, follower_id, following_id, created_at) VALUES (?, ?, ?, ?)').run(
+      id,
+      followerId,
+      followingId,
+      new Date().toISOString()
+    );
+    const followerUser = sqliteFindUserById(followerId);
+    if (followerUser) {
+      sqliteCreateNotification({
+        userId: followingId,
+        actorId: followerId,
+        actorName: followerUser.name,
+        type: 'FOLLOW',
+        title: 'New follower',
+        message: `${followerUser.name} started following you`,
+        linkUrl: `/community/user/${followerId}`
+      });
+    }
+  }
+  const followerCountRow = db.prepare('SELECT COUNT(*) as count FROM user_follows WHERE following_id = ?').get(followingId) as { count: number };
+  const followingCountRow = db.prepare('SELECT COUNT(*) as count FROM user_follows WHERE follower_id = ?').get(followerId) as { count: number };
+  return {
+    following: !existing,
+    followerCount: Number(followerCountRow?.count || 0),
+    followingCount: Number(followingCountRow?.count || 0)
+  };
+}
+
+function sqliteGetUserFollowStats(userId: string, currentUserId?: string): { followerCount: number; followingCount: number; isFollowing: boolean } {
+  const followerCountRow = db.prepare('SELECT COUNT(*) as count FROM user_follows WHERE following_id = ?').get(userId) as { count: number };
+  const followingCountRow = db.prepare('SELECT COUNT(*) as count FROM user_follows WHERE follower_id = ?').get(userId) as { count: number };
+  let isFollowing = false;
+  if (currentUserId) {
+    const check = db.prepare('SELECT id FROM user_follows WHERE follower_id = ? AND following_id = ?').get(currentUserId, userId);
+    isFollowing = Boolean(check);
+  }
+  return {
+    followerCount: Number(followerCountRow?.count || 0),
+    followingCount: Number(followingCountRow?.count || 0),
+    isFollowing
+  };
+}
+
+function sqliteGetUserFollowedUserIds(followerId: string): string[] {
+  const rows = db.prepare('SELECT following_id FROM user_follows WHERE follower_id = ?').all(followerId) as Array<{ following_id: string }>;
+  return rows.map(r => r.following_id);
+}
+
+function sqliteVoteCommunityPoll(
+  postId: string,
+  userId: string,
+  optionId: string
+): { pollOptions: Array<{ id: string; text: string; votes: number }>; userVotedOptionId: string } | null {
+  const post = db.prepare('SELECT id, post_type, poll_options, poll_votes FROM community_posts WHERE id = ?').get(postId) as {
+    id: string;
+    post_type: string;
+    poll_options: string | null;
+    poll_votes: string | null;
+  } | undefined;
+  if (!post) return null;
+  let options: Array<{ id: string; text: string; votes?: number }> = [];
+  try { options = JSON.parse(post.poll_options || '[]'); } catch {}
+  let votes: Record<string, string> = {};
+  try { votes = JSON.parse(post.poll_votes || '{}'); } catch {}
+  votes[userId] = optionId;
+
+  const counts: Record<string, number> = {};
+  for (const uid of Object.keys(votes)) {
+    const optId = votes[uid];
+    counts[optId] = (counts[optId] || 0) + 1;
+  }
+  const updatedOptions = options.map(opt => ({
+    ...opt,
+    votes: counts[opt.id] || 0
+  }));
+
+  db.prepare('UPDATE community_posts SET poll_options = ?, poll_votes = ?, updated_at = ? WHERE id = ?').run(
+    JSON.stringify(updatedOptions),
+    JSON.stringify(votes),
+    new Date().toISOString(),
+    postId
+  );
+
+  return {
+    pollOptions: updatedOptions as Array<{ id: string; text: string; votes: number }>,
+    userVotedOptionId: optionId
+  };
+}
+
+function sqliteCheckDuplicateQuestion(title: string): { exists: boolean; matches: Array<{ id: string; title: string; upvotes: number }> } {
+  const clean = title.trim().toLowerCase().replace(/[^\w\s]/g, '');
+  if (!clean || clean.length < 5) return { exists: false, matches: [] };
+  const queryWords = clean.split(/\s+/).filter(w => w.length > 2);
+  if (queryWords.length === 0) return { exists: false, matches: [] };
+
+  const candidates = db.prepare(`
+    SELECT id, title, upvotes FROM community_posts
+    WHERE status IN ('APPROVED', 'PUBLISHED', 'PENDING_APPROVAL')
+    ORDER BY id DESC LIMIT 100
+  `).all() as Array<{ id: string; title: string; upvotes: number }>;
+
+  const matchesWithScore: Array<{ id: string; title: string; upvotes: number; score: number }> = [];
+
+  for (const c of candidates) {
+    const cWords = new Set(c.title.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 2));
+    let matchCount = 0;
+    for (const qw of queryWords) {
+      if (cWords.has(qw) || Array.from(cWords).some(cw => cw.includes(qw) || qw.includes(cw))) {
+        matchCount++;
+      }
+    }
+    const threshold = queryWords.length <= 2 ? 1 : 2;
+    if (matchCount >= threshold) {
+      matchesWithScore.push({ ...c, score: matchCount });
+    }
+  }
+
+  matchesWithScore.sort((a, b) => b.score - a.score || b.upvotes - a.upvotes);
+  const matches = matchesWithScore.slice(0, 5).map(({ id, title, upvotes }) => ({ id, title, upvotes }));
+
+  return {
+    exists: matches.length > 0,
+    matches
+  };
+}
+
+function sqliteGetUserPublicProfile(userId: string, currentUserId?: string): any {
+  const user = sqliteFindUserById(userId);
+  if (!user) return null;
+  const followStats = sqliteGetUserFollowStats(user.id, currentUserId);
+  const posts = sqliteGetAllPosts({ currentUserId, limit: 10 }).filter(p => p.authorId === user.id);
+  const postCountRow = db.prepare("SELECT COUNT(*) as count FROM community_posts WHERE author_id = ? AND status IN ('APPROVED', 'PUBLISHED')").get(user.id) as { count: number };
+  const commentCountRow = db.prepare("SELECT COUNT(*) as count FROM community_comments WHERE author_id = ?").get(user.id) as { count: number };
+
+  let interests: string[] = [];
+  try {
+    if (typeof user.interests === 'string') interests = JSON.parse(user.interests);
+    else if (Array.isArray(user.interests)) interests = user.interests;
+  } catch {}
+
+  return {
+    id: user.id,
+    publicId: user.public_id,
+    name: user.name,
+    role: user.role,
+    profession: user.profession || null,
+    company: user.company || null,
+    avatar: user.avatar || null,
+    townCity: user.town_city || null,
+    interests,
+    isVerified: Boolean(user.is_verified),
+    createdAt: user.created_at,
+    followerCount: followStats.followerCount,
+    followingCount: followStats.followingCount,
+    isFollowing: followStats.isFollowing,
+    stats: {
+      totalPosts: Number(postCountRow?.count || 0),
+      totalAnswers: Number(commentCountRow?.count || 0)
+    },
+    recentPosts: posts
+  };
 }
 
 function sqliteGetActiveDeveloperCount(): number {
@@ -1615,7 +1946,7 @@ function sqliteUpdateUser(id: string, updates: Partial<{
 
 function sqliteUpdateProfileFields(
   id: string,
-  fields: { townCity?: string | null; profession?: string | null }
+  fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null }
 ): DbUser | null {
   const sets: string[] = [];
   const values: Array<string | null> = [];
@@ -1626,6 +1957,18 @@ function sqliteUpdateProfileFields(
   if (fields.profession !== undefined) {
     sets.push('profession = ?');
     values.push(fields.profession);
+  }
+  if (fields.company !== undefined) {
+    sets.push('company = ?');
+    values.push(fields.company);
+  }
+  if (fields.avatar !== undefined) {
+    sets.push('avatar = ?');
+    values.push(fields.avatar);
+  }
+  if (fields.interests !== undefined) {
+    sets.push('interests = ?');
+    values.push(fields.interests ? JSON.stringify(fields.interests) : null);
   }
   if (sets.length === 0) return sqliteFindUserById(id);
   sets.push('updated_at = ?');
@@ -2254,34 +2597,51 @@ function sqliteGetAllPosts(params?: {
   const posts = db.prepare(query).all(...args) as unknown as DbCommunityPost[];
   const userLikedPostIds = params?.currentUserId ? sqliteGetUserLikedPostIds(params.currentUserId) : new Set<string>();
 
-  return posts.map(p => ({
-    id: p.id,
-    authorId: p.author_id,
-    authorName: p.author_name,
-    authorRole: p.author_role,
-    communityId: p.community_id,
-    communityName: p.community_name,
-    propertyId: p.property_id,
-    propertyName: p.property_name,
-    topic: p.topic,
-    title: p.title,
-    content: p.content,
-    links: JSON.parse(p.links || '[]'),
-    attachments: JSON.parse(p.attachments || '[]'),
-    mediaType: p.media_type || 'POST',
-    mediaUrl: p.media_url,
-    thumbnailUrl: p.thumbnail_url,
-    duration: p.duration,
-    status: p.status,
-    upvotes: p.upvotes,
-    userLiked: userLikedPostIds.has(p.id),
-    commentsCount: p.comments_count || 0,
-    isPinned: Boolean(p.is_pinned),
-    isFlagged: Boolean(p.is_flagged),
-    replies: sqliteGetRepliesForPost(p.id),
-    createdAt: p.created_at,
-    updatedAt: p.updated_at
-  }));
+  return posts.map(p => {
+    let pollOptions = [];
+    try { pollOptions = JSON.parse(p.poll_options || '[]'); } catch {}
+    let pollVotes: Record<string, string> = {};
+    try { pollVotes = JSON.parse(p.poll_votes || '{}'); } catch {}
+    const userVotedOptionId = params?.currentUserId && pollVotes[params.currentUserId] ? pollVotes[params.currentUserId] : null;
+
+    return {
+      id: p.id,
+      authorId: p.author_id,
+      authorName: p.author_name,
+      authorRole: p.author_role,
+      communityId: p.community_id,
+      communityName: p.community_name,
+      propertyId: p.property_id,
+      propertyName: p.property_name,
+      topic: p.topic,
+      title: p.title,
+      content: p.content,
+      links: JSON.parse(p.links || '[]'),
+      attachments: JSON.parse(p.attachments || '[]'),
+      mediaType: p.media_type || 'POST',
+      mediaUrl: p.media_url,
+      thumbnailUrl: p.thumbnail_url,
+      duration: p.duration,
+      status: p.status,
+      upvotes: p.upvotes,
+      userLiked: userLikedPostIds.has(p.id),
+      commentsCount: p.comments_count || 0,
+      isPinned: Boolean(p.is_pinned),
+      isFlagged: Boolean(p.is_flagged),
+      postType: (p.post_type as any) || 'POST',
+      visibility: (p.visibility as any) || 'PUBLIC',
+      pollOptions,
+      userVotedOptionId,
+      amaHostName: p.ama_host_name || null,
+      amaHostRole: p.ama_host_role || null,
+      amaStatus: p.ama_status || null,
+      amaStartTime: p.ama_start_time || null,
+      amaEndTime: p.ama_end_time || null,
+      replies: sqliteGetRepliesForPost(p.id),
+      createdAt: p.created_at,
+      updatedAt: p.updated_at
+    };
+  });
 }
 
 function sqliteGetPostById(postId: string, currentUserId?: string): any {
@@ -2290,6 +2650,12 @@ function sqliteGetPostById(postId: string, currentUserId?: string): any {
   if (!p) return null;
 
   const userLiked = currentUserId ? sqliteIsPostLikedByUser(postId, currentUserId) : false;
+
+  let pollOptions = [];
+  try { pollOptions = JSON.parse(p.poll_options || '[]'); } catch {}
+  let pollVotes: Record<string, string> = {};
+  try { pollVotes = JSON.parse(p.poll_votes || '{}'); } catch {}
+  const userVotedOptionId = currentUserId && pollVotes[currentUserId] ? pollVotes[currentUserId] : null;
 
   return {
     id: p.id,
@@ -2315,6 +2681,15 @@ function sqliteGetPostById(postId: string, currentUserId?: string): any {
     commentsCount: p.comments_count || 0,
     isPinned: Boolean(p.is_pinned),
     isFlagged: Boolean(p.is_flagged),
+    postType: (p.post_type as any) || 'POST',
+    visibility: (p.visibility as any) || 'PUBLIC',
+    pollOptions,
+    userVotedOptionId,
+    amaHostName: p.ama_host_name || null,
+    amaHostRole: p.ama_host_role || null,
+    amaStatus: p.ama_status || null,
+    amaStartTime: p.ama_start_time || null,
+    amaEndTime: p.ama_end_time || null,
     replies: sqliteGetRepliesForPost(p.id),
     comments: sqliteGetCommentsForPost(p.id, currentUserId),
     createdAt: p.created_at,
@@ -2339,20 +2714,32 @@ function sqliteCreatePost(post: {
   mediaUrl?: string;
   thumbnailUrl?: string;
   duration?: string;
+  postType?: 'QUESTION' | 'POST' | 'POLL' | 'AMA';
+  visibility?: 'PUBLIC' | 'COMMUNITY';
+  pollOptions?: Array<{ id: string; text: string; votes?: number }>;
+  amaHostName?: string;
+  amaHostRole?: string;
+  amaStatus?: 'UPCOMING' | 'LIVE' | 'ENDED';
+  amaStartTime?: string;
+  amaEndTime?: string;
 }): any {
   const id = `post_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
   const linksStr = JSON.stringify(post.links || []);
   const attachmentsStr = JSON.stringify(post.attachments || []);
+  const pollOptionsStr = post.pollOptions ? JSON.stringify(post.pollOptions) : null;
+  const pollVotesStr = post.pollOptions ? JSON.stringify({}) : null;
 
   const stmt = db.prepare(`
     INSERT INTO community_posts (
       id, author_id, author_name, author_role, community_id, community_name,
       property_id, property_name, topic, title, content, links, attachments,
       media_type, media_url, thumbnail_url, duration, status, upvotes, comments_count,
-      is_pinned, is_flagged, created_at, updated_at
+      is_pinned, is_flagged, post_type, visibility, poll_options, poll_votes,
+      ama_host_name, ama_host_role, ama_status, ama_start_time, ama_end_time,
+      created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', 0, 0, 0, 0, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -2373,6 +2760,15 @@ function sqliteCreatePost(post: {
     post.mediaUrl || null,
     post.thumbnailUrl || null,
     post.duration || null,
+    post.postType || 'POST',
+    post.visibility || 'PUBLIC',
+    pollOptionsStr,
+    pollVotesStr,
+    post.amaHostName || null,
+    post.amaHostRole || null,
+    post.amaStatus || (post.postType === 'AMA' ? 'UPCOMING' : null),
+    post.amaStartTime || null,
+    post.amaEndTime || null,
     now,
     now
   );
@@ -2515,6 +2911,7 @@ function sqliteGetCommentsForPost(postId: string, currentUserId?: string): any[]
       content: c.content,
       likesCount: c.likes_count,
       userLiked: userLikedCommentIds.has(c.id),
+      isAmaAnswer: Boolean(c.is_ama_answer),
       replies: [],
       createdAt: c.created_at,
       updatedAt: c.updated_at
@@ -2541,13 +2938,14 @@ function sqliteCreateComment(data: {
   authorName: string;
   authorRole: string;
   content: string;
+  isAmaAnswer?: boolean;
 }): any {
   const id = `comm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
 
   db.prepare(`
-    INSERT INTO community_comments (id, post_id, parent_id, author_id, author_name, author_role, content, likes_count, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+    INSERT INTO community_comments (id, post_id, parent_id, author_id, author_name, author_role, content, likes_count, is_ama_answer, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
   `).run(
     id,
     data.postId,
@@ -2556,6 +2954,7 @@ function sqliteCreateComment(data: {
     data.authorName,
     data.authorRole,
     data.content.trim(),
+    data.isAmaAnswer ? 1 : 0,
     now,
     now
   );
@@ -2591,6 +2990,7 @@ function sqliteCreateComment(data: {
     authorRole: data.authorRole,
     content: data.content,
     likesCount: 0,
+    isAmaAnswer: Boolean(data.isAmaAnswer),
     replies: [],
     createdAt: now,
     updatedAt: now
@@ -2729,7 +3129,7 @@ function sqliteCreateNotification(data: {
   userId: string;
   actorId: string;
   actorName: string;
-  type: 'COMMENT' | 'REPLY' | 'LIKE' | 'MODERATION' | 'SYSTEM';
+  type: 'COMMENT' | 'REPLY' | 'LIKE' | 'MODERATION' | 'SYSTEM' | 'FOLLOW';
   title: string;
   message: string;
   linkUrl?: string;

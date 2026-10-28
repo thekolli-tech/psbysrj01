@@ -32,13 +32,19 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
   const { currentUser, logout, setActiveView, walletBalance, showToast, isLoggedIn, refreshSession } = useApp();
   const [townCity, setTownCity] = useState(currentUser.townCity || '');
   const [profession, setProfession] = useState(currentUser.profession || '');
+  const [company, setCompany] = useState((currentUser as any).company || '');
+  const [interests, setInterests] = useState<string[]>(
+    Array.isArray((currentUser as any).interests) ? (currentUser as any).interests : []
+  );
   const [profileSaving, setProfileSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     setTownCity(currentUser.townCity || '');
     setProfession(currentUser.profession || '');
-  }, [isOpen, currentUser.townCity, currentUser.profession]);
+    setCompany((currentUser as any).company || '');
+    setInterests(Array.isArray((currentUser as any).interests) ? (currentUser as any).interests : []);
+  }, [isOpen, currentUser.townCity, currentUser.profession, (currentUser as any).company, (currentUser as any).interests]);
 
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'CHANGE_PASSWORD'>('PROFILE');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -61,7 +67,7 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
       const response = await fetch('/api/me/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ townCity, profession })
+        body: JSON.stringify({ townCity, profession, company, interests })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Profile was not saved.');
@@ -239,10 +245,59 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                       value={profession}
                       onChange={e => setProfession(e.target.value)}
                       maxLength={80}
-                      placeholder="Optional. Shown on Community Q&A."
+                      placeholder="e.g. Buyer, Investor, Architect, Consultant"
                       className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                     <p className="mt-1 text-[11px] text-slate-500">Profession is a description. It does not change your account role.</p>
+                  </div>
+                  <div>
+                    <label htmlFor="profile-company" className="block text-xs font-bold text-slate-700 mb-1">Company / Organization</label>
+                    <input
+                      id="profile-company"
+                      value={company}
+                      onChange={e => setCompany(e.target.value)}
+                      maxLength={80}
+                      placeholder="e.g. Kolli Ventures / Independent"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">My Topics & Interests (Quora Style)</label>
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200/80 rounded-xl max-h-32 overflow-y-auto">
+                      {[
+                        'Kokapet & Neopolis',
+                        'High-Rise Construction',
+                        'Legal Due Diligence & RERA',
+                        'Rental Yield & ROI',
+                        'Luxury Villas & Communities',
+                        'Architecture & Vaastu',
+                        'Interior Design & Renovation',
+                        'Land & Plotting Guidelines',
+                        'Price Trends & Market Updates',
+                        'Home Loans & Taxation'
+                      ].map(topic => {
+                        const isSelected = interests.includes(topic);
+                        return (
+                          <button
+                            key={topic}
+                            type="button"
+                            onClick={() => {
+                              setInterests(prev =>
+                                isSelected ? prev.filter(t => t !== topic) : [...prev, topic]
+                              );
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all flex items-center gap-1 cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>{isSelected ? '✓' : '+'}</span>
+                            <span>{topic}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   {errorMsg && activeTab === 'PROFILE' && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">{errorMsg}</div>

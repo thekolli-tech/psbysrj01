@@ -32,6 +32,18 @@ ALTER TABLE communities ADD COLUMN IF NOT EXISTS change_request TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities TEXT DEFAULT '[]';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS town_city TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profession TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT DEFAULT '[]';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT;
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS post_type VARCHAR(32) DEFAULT 'POST';
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS visibility VARCHAR(32) DEFAULT 'PUBLIC';
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS poll_options TEXT DEFAULT '[]';
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS poll_votes TEXT DEFAULT '[]';
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS ama_host_name VARCHAR(255);
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS ama_host_role VARCHAR(128);
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS ama_status VARCHAR(32) DEFAULT 'LIVE';
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS ama_start_time TIMESTAMPTZ;
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS ama_end_time TIMESTAMPTZ;
+ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS is_ama_answer SMALLINT DEFAULT 0;
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS seeker_id VARCHAR(64);
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS property_id VARCHAR(64);
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS consent_granted SMALLINT DEFAULT 0;
@@ -138,6 +150,25 @@ CREATE TABLE IF NOT EXISTS community_post_follows (
 );
 CREATE INDEX IF NOT EXISTS idx_community_post_follows_post ON community_post_follows(post_id);
 
+CREATE TABLE IF NOT EXISTS user_follows (
+  id VARCHAR(64) PRIMARY KEY,
+  follower_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  following_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (follower_id, following_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_follows_follower ON user_follows(follower_id);
+CREATE INDEX IF NOT EXISTS idx_user_follows_following ON user_follows(following_id);
+
+CREATE TABLE IF NOT EXISTS community_bookmarks (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id VARCHAR(64) NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (user_id, post_id)
+);
+CREATE INDEX IF NOT EXISTS idx_community_bookmarks_user ON community_bookmarks(user_id);
+
 CREATE TABLE IF NOT EXISTS property_requirements (
   id VARCHAR(64) PRIMARY KEY,
   seeker_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -178,7 +209,7 @@ INSERT INTO system_metadata (key, value, updated_at) VALUES
 ON CONFLICT (key) DO NOTHING;
 `;
 
-const SQLITE_COLUMN_STATEMENTS = [
+export const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE community_posts ADD COLUMN rejection_reason TEXT',
   'ALTER TABLE community_posts ADD COLUMN moderation_note TEXT',
   'ALTER TABLE communities ADD COLUMN suspension_reason TEXT',
@@ -186,6 +217,18 @@ const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE users ADD COLUMN capabilities TEXT DEFAULT \'[]\'',
   'ALTER TABLE users ADD COLUMN town_city TEXT',
   'ALTER TABLE users ADD COLUMN profession TEXT',
+  'ALTER TABLE users ADD COLUMN interests TEXT DEFAULT \'[]\'',
+  'ALTER TABLE users ADD COLUMN company TEXT',
+  'ALTER TABLE community_posts ADD COLUMN post_type TEXT DEFAULT \'POST\'',
+  'ALTER TABLE community_posts ADD COLUMN visibility TEXT DEFAULT \'PUBLIC\'',
+  'ALTER TABLE community_posts ADD COLUMN poll_options TEXT DEFAULT \'[]\'',
+  'ALTER TABLE community_posts ADD COLUMN poll_votes TEXT DEFAULT \'[]\'',
+  'ALTER TABLE community_posts ADD COLUMN ama_host_name TEXT',
+  'ALTER TABLE community_posts ADD COLUMN ama_host_role TEXT',
+  'ALTER TABLE community_posts ADD COLUMN ama_status TEXT DEFAULT \'LIVE\'',
+  'ALTER TABLE community_posts ADD COLUMN ama_start_time TEXT',
+  'ALTER TABLE community_posts ADD COLUMN ama_end_time TEXT',
+  'ALTER TABLE community_comments ADD COLUMN is_ama_answer INTEGER DEFAULT 0',
   'ALTER TABLE buyer_leads ADD COLUMN seeker_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN property_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN consent_granted INTEGER DEFAULT 0',
@@ -194,7 +237,7 @@ const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE buyer_leads ADD COLUMN consented_at TEXT'
 ];
 
-const SQLITE_TABLE_SQL = `
+export const SQLITE_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS professional_profiles (
   user_id TEXT PRIMARY KEY,
   professional_role TEXT NOT NULL,
@@ -275,6 +318,20 @@ CREATE TABLE IF NOT EXISTS community_post_follows (
   user_id TEXT NOT NULL,
   created_at TEXT NOT NULL,
   UNIQUE (post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS user_follows (
+  id TEXT PRIMARY KEY,
+  follower_id TEXT NOT NULL,
+  following_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (follower_id, following_id)
+);
+CREATE TABLE IF NOT EXISTS community_bookmarks (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  post_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (user_id, post_id)
 );
 CREATE TABLE IF NOT EXISTS property_requirements (
   id TEXT PRIMARY KEY,

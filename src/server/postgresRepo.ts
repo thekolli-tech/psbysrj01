@@ -56,6 +56,8 @@ function mapUserRow(row: any): DbUser {
     organization: row.organization || '',
     town_city: row.town_city || null,
     profession: row.profession || null,
+    company: row.company || null,
+    interests: typeof row.interests === 'string' ? row.interests : (Array.isArray(row.interests) ? JSON.stringify(row.interests) : null),
     wallet_balance: Number(row.wallet_balance || 0),
     is_verified: Number(row.is_verified || 0),
     email_verified: Number(row.email_verified || 0),
@@ -126,6 +128,8 @@ export async function pgGetAllUsers(): Promise<Array<Omit<DbUser, 'password_hash
     organization: row.organization || '',
     town_city: row.town_city || null,
     profession: row.profession || null,
+    company: row.company || null,
+    interests: typeof row.interests === 'string' ? row.interests : (Array.isArray(row.interests) ? JSON.stringify(row.interests) : null),
     wallet_balance: Number(row.wallet_balance || 0),
     is_verified: Number(row.is_verified || 0),
     email_verified: Number(row.email_verified || 0),
@@ -223,10 +227,10 @@ export async function pgUpdateUser(id: string, updates: Partial<{
 
 export async function pgUpdateProfileFields(
   id: string,
-  fields: { townCity?: string | null; profession?: string | null }
+  fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null }
 ): Promise<DbUser | null> {
   const sets: string[] = [];
-  const values: Array<string | null> = [];
+  const values: Array<any> = [];
   let paramIdx = 1;
   if (fields.townCity !== undefined) {
     sets.push(`town_city = $${paramIdx++}`);
@@ -235,6 +239,18 @@ export async function pgUpdateProfileFields(
   if (fields.profession !== undefined) {
     sets.push(`profession = $${paramIdx++}`);
     values.push(fields.profession);
+  }
+  if (fields.company !== undefined) {
+    sets.push(`company = $${paramIdx++}`);
+    values.push(fields.company);
+  }
+  if (fields.avatar !== undefined) {
+    sets.push(`avatar = $${paramIdx++}`);
+    values.push(fields.avatar);
+  }
+  if (fields.interests !== undefined) {
+    sets.push(`interests = $${paramIdx++}`);
+    values.push(fields.interests ? JSON.stringify(fields.interests) : null);
   }
   if (sets.length === 0) return pgFindUserById(id);
   sets.push(`updated_at = $${paramIdx++}`);
@@ -943,6 +959,8 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
   userVote: 1 | -1 | 0;
   followerCount: number;
   following: boolean;
+  bookmarked: boolean;
+  bookmarkCount: number;
 }>> {
   const result = new Map<string, {
     agreeCount: number;
@@ -950,10 +968,12 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
     userVote: 1 | -1 | 0;
     followerCount: number;
     following: boolean;
+    bookmarked: boolean;
+    bookmarkCount: number;
   }>();
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return result;
-  const blank = () => ({ agreeCount: 0, disagreeCount: 0, userVote: 0 as const, followerCount: 0, following: false });
+  const blank = () => ({ agreeCount: 0, disagreeCount: 0, userVote: 0 as const, followerCount: 0, following: false, bookmarked: false, bookmarkCount: 0 });
   const votes = await queryPostgres(
     `SELECT post_id,
         SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS agree_count,
@@ -970,6 +990,13 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
      GROUP BY post_id`,
     [unique]
   );
+  const bookmarks = await queryPostgres(
+    `SELECT post_id, COUNT(*) AS bookmark_count
+     FROM community_bookmarks
+     WHERE post_id = ANY($1::varchar[])
+     GROUP BY post_id`,
+    [unique]
+  );
   for (const row of votes.rows) {
     const current = result.get(row.post_id) || blank();
     current.agreeCount = Number(row.agree_count || 0);
@@ -981,6 +1008,11 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
     current.followerCount = Number(row.follower_count || 0);
     result.set(row.post_id, current);
   }
+  for (const row of bookmarks.rows) {
+    const current = result.get(row.post_id) || blank();
+    current.bookmarkCount = Number(row.bookmark_count || 0);
+    result.set(row.post_id, current);
+  }
   if (userId) {
     const mine = await queryPostgres(
       'SELECT post_id, vote FROM community_post_votes WHERE user_id = $1 AND post_id = ANY($2::varchar[])',
@@ -988,6 +1020,10 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
     );
     const followed = await queryPostgres(
       'SELECT post_id FROM community_post_follows WHERE user_id = $1 AND post_id = ANY($2::varchar[])',
+      [userId, unique]
+    );
+    const bookmarked = await queryPostgres(
+      'SELECT post_id FROM community_bookmarks WHERE user_id = $1 AND post_id = ANY($2::varchar[])',
       [userId, unique]
     );
     for (const row of mine.rows) {
@@ -998,6 +1034,11 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
     for (const row of followed.rows) {
       const current = result.get(row.post_id) || blank();
       current.following = true;
+      result.set(row.post_id, current);
+    }
+    for (const row of bookmarked.rows) {
+      const current = result.get(row.post_id) || blank();
+      current.bookmarked = true;
       result.set(row.post_id, current);
     }
   }
@@ -1112,34 +1153,51 @@ export async function pgGetAllPosts(params?: {
     ? await pgGetUserLikedPostIds(params.currentUserId)
     : new Set<string>();
 
-  return Promise.all(posts.map(async (p: any) => ({
-    id: p.id,
-    authorId: p.author_id,
-    authorName: p.author_name,
-    authorRole: p.author_role,
-    communityId: p.community_id,
-    communityName: p.community_name,
-    propertyId: p.property_id,
-    propertyName: p.property_name,
-    topic: p.topic,
-    title: p.title,
-    content: p.content,
-    links: typeof p.links === 'string' ? JSON.parse(p.links || '[]') : (p.links || []),
-    attachments: typeof p.attachments === 'string' ? JSON.parse(p.attachments || '[]') : (p.attachments || []),
-    mediaType: p.media_type || 'POST',
-    mediaUrl: p.media_url,
-    thumbnailUrl: p.thumbnail_url,
-    duration: p.duration,
-    status: p.status,
-    upvotes: Number(p.upvotes || 0),
-    userLiked: userLikedPostIds.has(p.id),
-    commentsCount: Number(p.comments_count || 0),
-    isPinned: Boolean(p.is_pinned),
-    isFlagged: Boolean(p.is_flagged),
-    replies: await pgGetRepliesForPost(p.id),
-    createdAt: toIso(p.created_at),
-    updatedAt: toIso(p.updated_at)
-  })));
+  return Promise.all(posts.map(async (p: any) => {
+    let pollOptions = [];
+    try { pollOptions = typeof p.poll_options === 'string' ? JSON.parse(p.poll_options || '[]') : (p.poll_options || []); } catch {}
+    let pollVotes: Record<string, string> = {};
+    try { pollVotes = typeof p.poll_votes === 'string' ? JSON.parse(p.poll_votes || '{}') : (p.poll_votes || {}); } catch {}
+    const userVotedOptionId = params?.currentUserId && pollVotes[params.currentUserId] ? pollVotes[params.currentUserId] : null;
+
+    return {
+      id: p.id,
+      authorId: p.author_id,
+      authorName: p.author_name,
+      authorRole: p.author_role,
+      communityId: p.community_id,
+      communityName: p.community_name,
+      propertyId: p.property_id,
+      propertyName: p.property_name,
+      topic: p.topic,
+      title: p.title,
+      content: p.content,
+      links: typeof p.links === 'string' ? JSON.parse(p.links || '[]') : (p.links || []),
+      attachments: typeof p.attachments === 'string' ? JSON.parse(p.attachments || '[]') : (p.attachments || []),
+      mediaType: p.media_type || 'POST',
+      mediaUrl: p.media_url,
+      thumbnailUrl: p.thumbnail_url,
+      duration: p.duration,
+      status: p.status,
+      upvotes: Number(p.upvotes || 0),
+      userLiked: userLikedPostIds.has(p.id),
+      commentsCount: Number(p.comments_count || 0),
+      isPinned: Boolean(p.is_pinned),
+      isFlagged: Boolean(p.is_flagged),
+      postType: p.post_type || 'POST',
+      visibility: p.visibility || 'PUBLIC',
+      pollOptions,
+      userVotedOptionId,
+      amaHostName: p.ama_host_name || null,
+      amaHostRole: p.ama_host_role || null,
+      amaStatus: p.ama_status || null,
+      amaStartTime: p.ama_start_time || null,
+      amaEndTime: p.ama_end_time || null,
+      replies: await pgGetRepliesForPost(p.id),
+      createdAt: toIso(p.created_at),
+      updatedAt: toIso(p.updated_at)
+    };
+  }));
 }
 
 export async function pgGetPostById(postId: string, currentUserId?: string): Promise<any> {
@@ -1148,6 +1206,12 @@ export async function pgGetPostById(postId: string, currentUserId?: string): Pro
   const p = res.rows[0];
 
   const userLiked = currentUserId ? await pgIsPostLikedByUser(postId, currentUserId) : false;
+
+  let pollOptions = [];
+  try { pollOptions = typeof p.poll_options === 'string' ? JSON.parse(p.poll_options || '[]') : (p.poll_options || []); } catch {}
+  let pollVotes: Record<string, string> = {};
+  try { pollVotes = typeof p.poll_votes === 'string' ? JSON.parse(p.poll_votes || '{}') : (p.poll_votes || {}); } catch {}
+  const userVotedOptionId = currentUserId && pollVotes[currentUserId] ? pollVotes[currentUserId] : null;
 
   return {
     id: p.id,
@@ -1173,6 +1237,15 @@ export async function pgGetPostById(postId: string, currentUserId?: string): Pro
     commentsCount: Number(p.comments_count || 0),
     isPinned: Boolean(p.is_pinned),
     isFlagged: Boolean(p.is_flagged),
+    postType: p.post_type || 'POST',
+    visibility: p.visibility || 'PUBLIC',
+    pollOptions,
+    userVotedOptionId,
+    amaHostName: p.ama_host_name || null,
+    amaHostRole: p.ama_host_role || null,
+    amaStatus: p.ama_status || null,
+    amaStartTime: p.ama_start_time || null,
+    amaEndTime: p.ama_end_time || null,
     replies: await pgGetRepliesForPost(p.id),
     comments: await pgGetCommentsForPost(p.id, currentUserId),
     createdAt: toIso(p.created_at),
@@ -1197,20 +1270,36 @@ export async function pgCreatePost(post: {
   mediaUrl?: string;
   thumbnailUrl?: string;
   duration?: string;
+  postType?: 'QUESTION' | 'POST' | 'POLL' | 'AMA';
+  visibility?: 'PUBLIC' | 'COMMUNITY';
+  pollOptions?: Array<{ id: string; text: string; votes?: number }>;
+  amaHostName?: string;
+  amaHostRole?: string;
+  amaStatus?: 'UPCOMING' | 'LIVE' | 'ENDED';
+  amaStartTime?: string;
+  amaEndTime?: string;
 }): Promise<any> {
   const id = `post_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
   const linksStr = JSON.stringify(post.links || []);
   const attachmentsStr = JSON.stringify(post.attachments || []);
+  const pollOptionsStr = post.pollOptions ? JSON.stringify(post.pollOptions) : null;
+  const pollVotesStr = post.pollOptions ? JSON.stringify({}) : null;
 
   await queryPostgres(`
     INSERT INTO community_posts (
       id, author_id, author_name, author_role, community_id, community_name,
       property_id, property_name, topic, title, content, links, attachments,
       media_type, media_url, thumbnail_url, duration, status, upvotes, comments_count,
-      is_pinned, is_flagged, created_at, updated_at
+      is_pinned, is_flagged, post_type, visibility, poll_options, poll_votes,
+      ama_host_name, ama_host_role, ama_status, ama_start_time, ama_end_time,
+      created_at, updated_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'PENDING_APPROVAL', 0, 0, 0, 0, $18, $19)
+    VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+      $14, $15, $16, $17, 'PENDING_APPROVAL', 0, 0, 0, 0,
+      $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+    )
   `, [
     id,
     post.authorId || null,
@@ -1229,6 +1318,15 @@ export async function pgCreatePost(post: {
     post.mediaUrl || null,
     post.thumbnailUrl || null,
     post.duration || null,
+    post.postType || 'POST',
+    post.visibility || 'PUBLIC',
+    pollOptionsStr,
+    pollVotesStr,
+    post.amaHostName || null,
+    post.amaHostRole || null,
+    post.amaStatus || (post.postType === 'AMA' ? 'UPCOMING' : null),
+    post.amaStartTime || null,
+    post.amaEndTime || null,
     now,
     now
   ]);
@@ -1373,6 +1471,7 @@ export async function pgGetCommentsForPost(postId: string, currentUserId?: strin
     author_role: c.author_role,
     content: c.content,
     likes_count: Number(c.likes_count || 0),
+    is_ama_answer: Number(c.is_ama_answer || 0),
     created_at: toIso(c.created_at),
     updated_at: toIso(c.updated_at)
   }));
@@ -1393,6 +1492,7 @@ export async function pgGetCommentsForPost(postId: string, currentUserId?: strin
       content: c.content,
       likesCount: c.likes_count,
       userLiked: userLikedCommentIds.has(c.id),
+      isAmaAnswer: (c as any).is_ama_answer,
       replies: [],
       createdAt: c.created_at,
       updatedAt: c.updated_at
@@ -1419,13 +1519,14 @@ export async function pgCreateComment(data: {
   authorName: string;
   authorRole: string;
   content: string;
+  isAmaAnswer?: boolean;
 }): Promise<any> {
   const id = `comm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
 
   await queryPostgres(`
-    INSERT INTO community_comments (id, post_id, parent_id, author_id, author_name, author_role, content, likes_count, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9)
+    INSERT INTO community_comments (id, post_id, parent_id, author_id, author_name, author_role, content, likes_count, is_ama_answer, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10)
   `, [
     id,
     data.postId,
@@ -1434,6 +1535,7 @@ export async function pgCreateComment(data: {
     data.authorName,
     data.authorRole,
     data.content.trim(),
+    data.isAmaAnswer ? 1 : 0,
     now,
     now
   ]);
@@ -1469,6 +1571,7 @@ export async function pgCreateComment(data: {
     authorRole: data.authorRole,
     content: data.content,
     likesCount: 0,
+    isAmaAnswer: Boolean(data.isAmaAnswer),
     replies: [],
     createdAt: now,
     updatedAt: now
@@ -1646,7 +1749,7 @@ export async function pgCreateNotification(data: {
   userId: string;
   actorId: string;
   actorName: string;
-  type: 'COMMENT' | 'REPLY' | 'LIKE' | 'MODERATION' | 'SYSTEM';
+  type: 'COMMENT' | 'REPLY' | 'LIKE' | 'MODERATION' | 'SYSTEM' | 'FOLLOW';
   title: string;
   message: string;
   linkUrl?: string;
@@ -2080,5 +2183,200 @@ export async function pgUpdateConferenceDetails(details: {
     status: c.status,
     agenda: typeof c.agenda === 'string' ? c.agenda : JSON.stringify(c.agenda || []),
     updated_at: toIso(c.updated_at)
+  };
+}
+
+// ==============================================================================
+// COMMUNITY EXTENSIONS: BOOKMARKS, USER FOLLOWS, POLLS, DUPLICATE CHECK, PROFILES
+// ==============================================================================
+
+export async function pgToggleBookmarkPost(userId: string, postId: string): Promise<{ bookmarked: boolean; bookmarkCount: number }> {
+  const existing = await queryPostgres('SELECT id FROM community_bookmarks WHERE user_id = $1 AND post_id = $2', [userId, postId]);
+  if (existing.rows.length > 0) {
+    await queryPostgres('DELETE FROM community_bookmarks WHERE user_id = $1 AND post_id = $2', [userId, postId]);
+  } else {
+    const id = `bkmk_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    await queryPostgres('INSERT INTO community_bookmarks (id, user_id, post_id, created_at) VALUES ($1, $2, $3, $4)', [
+      id, userId, postId, new Date().toISOString()
+    ]);
+  }
+  const countRes = await queryPostgres('SELECT COUNT(*) as count FROM community_bookmarks WHERE post_id = $1', [postId]);
+  return {
+    bookmarked: existing.rows.length === 0,
+    bookmarkCount: parseInt(countRes.rows[0]?.count || '0', 10)
+  };
+}
+
+export async function pgGetUserBookmarkedPostIds(userId: string): Promise<string[]> {
+  const res = await queryPostgres('SELECT post_id FROM community_bookmarks WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+  return res.rows.map((r: any) => r.post_id);
+}
+
+export async function pgToggleFollowUser(followerId: string, followingId: string): Promise<{ following: boolean; followerCount: number; followingCount: number }> {
+  if (followerId === followingId) throw new Error('Cannot follow yourself');
+  const existing = await queryPostgres('SELECT id FROM user_follows WHERE follower_id = $1 AND following_id = $2', [followerId, followingId]);
+  if (existing.rows.length > 0) {
+    await queryPostgres('DELETE FROM user_follows WHERE follower_id = $1 AND following_id = $2', [followerId, followingId]);
+  } else {
+    const id = `ufol_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    await queryPostgres('INSERT INTO user_follows (id, follower_id, following_id, created_at) VALUES ($1, $2, $3, $4)', [
+      id, followerId, followingId, new Date().toISOString()
+    ]);
+    const followerUser = await pgFindUserById(followerId);
+    if (followerUser) {
+      await pgCreateNotification({
+        userId: followingId,
+        actorId: followerId,
+        actorName: followerUser.name,
+        type: 'FOLLOW',
+        title: 'New follower',
+        message: `${followerUser.name} started following you`,
+        linkUrl: `/community/user/${followerId}`
+      });
+    }
+  }
+  const followerRes = await queryPostgres('SELECT COUNT(*) as count FROM user_follows WHERE following_id = $1', [followingId]);
+  const followingRes = await queryPostgres('SELECT COUNT(*) as count FROM user_follows WHERE follower_id = $1', [followerId]);
+  return {
+    following: existing.rows.length === 0,
+    followerCount: parseInt(followerRes.rows[0]?.count || '0', 10),
+    followingCount: parseInt(followingRes.rows[0]?.count || '0', 10)
+  };
+}
+
+export async function pgGetUserFollowStats(userId: string, currentUserId?: string): Promise<{ followerCount: number; followingCount: number; isFollowing: boolean }> {
+  const followerRes = await queryPostgres('SELECT COUNT(*) as count FROM user_follows WHERE following_id = $1', [userId]);
+  const followingRes = await queryPostgres('SELECT COUNT(*) as count FROM user_follows WHERE follower_id = $1', [userId]);
+  let isFollowing = false;
+  if (currentUserId) {
+    const check = await queryPostgres('SELECT id FROM user_follows WHERE follower_id = $1 AND following_id = $2', [currentUserId, userId]);
+    isFollowing = check.rows.length > 0;
+  }
+  return {
+    followerCount: parseInt(followerRes.rows[0]?.count || '0', 10),
+    followingCount: parseInt(followingRes.rows[0]?.count || '0', 10),
+    isFollowing
+  };
+}
+
+export async function pgGetUserFollowedUserIds(followerId: string): Promise<string[]> {
+  const res = await queryPostgres('SELECT following_id FROM user_follows WHERE follower_id = $1', [followerId]);
+  return res.rows.map((r: any) => r.following_id);
+}
+
+export async function pgVoteCommunityPoll(
+  postId: string,
+  userId: string,
+  optionId: string
+): Promise<{ pollOptions: Array<{ id: string; text: string; votes: number }>; userVotedOptionId: string } | null> {
+  const res = await queryPostgres('SELECT id, post_type, poll_options, poll_votes FROM community_posts WHERE id = $1', [postId]);
+  if (res.rows.length === 0) return null;
+  const p = res.rows[0];
+  let options: Array<{ id: string; text: string; votes?: number }> = [];
+  try { options = typeof p.poll_options === 'string' ? JSON.parse(p.poll_options || '[]') : (p.poll_options || []); } catch {}
+  let votes: Record<string, string> = {};
+  try { votes = typeof p.poll_votes === 'string' ? JSON.parse(p.poll_votes || '{}') : (p.poll_votes || {}); } catch {}
+  votes[userId] = optionId;
+
+  const counts: Record<string, number> = {};
+  for (const uid of Object.keys(votes)) {
+    const optId = votes[uid];
+    counts[optId] = (counts[optId] || 0) + 1;
+  }
+  const updatedOptions = options.map(opt => ({
+    ...opt,
+    votes: counts[opt.id] || 0
+  }));
+
+  await queryPostgres('UPDATE community_posts SET poll_options = $1, poll_votes = $2, updated_at = $3 WHERE id = $4', [
+    JSON.stringify(updatedOptions),
+    JSON.stringify(votes),
+    new Date().toISOString(),
+    postId
+  ]);
+
+  return {
+    pollOptions: updatedOptions as Array<{ id: string; text: string; votes: number }>,
+    userVotedOptionId: optionId
+  };
+}
+
+export async function pgCheckDuplicateQuestion(title: string): Promise<{ exists: boolean; matches: Array<{ id: string; title: string; upvotes: number }> }> {
+  const clean = title.trim().toLowerCase().replace(/[^\w\s]/g, '');
+  if (!clean || clean.length < 5) return { exists: false, matches: [] };
+  const queryWords = clean.split(/\s+/).filter(w => w.length > 2);
+  if (queryWords.length === 0) return { exists: false, matches: [] };
+
+  const res = await queryPostgres(`
+    SELECT id, title, upvotes FROM community_posts
+    WHERE status IN ('APPROVED', 'PUBLISHED', 'PENDING_APPROVAL')
+    ORDER BY id DESC LIMIT 100
+  `);
+
+  const candidates = res.rows.map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    upvotes: Number(r.upvotes || 0)
+  }));
+
+  const matchesWithScore: Array<{ id: string; title: string; upvotes: number; score: number }> = [];
+
+  for (const c of candidates) {
+    const cWords = new Set(c.title.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter((w: string) => w.length > 2));
+    let matchCount = 0;
+    for (const qw of queryWords) {
+      if (cWords.has(qw) || Array.from(cWords).some(cw => (cw as string).includes(qw) || qw.includes(cw as string))) {
+        matchCount++;
+      }
+    }
+    const threshold = queryWords.length <= 2 ? 1 : 2;
+    if (matchCount >= threshold) {
+      matchesWithScore.push({ ...c, score: matchCount });
+    }
+  }
+
+  matchesWithScore.sort((a, b) => b.score - a.score || b.upvotes - a.upvotes);
+  const matches = matchesWithScore.slice(0, 5).map(({ id, title, upvotes }) => ({ id, title, upvotes }));
+
+  return {
+    exists: matches.length > 0,
+    matches
+  };
+}
+
+export async function pgGetUserPublicProfile(userId: string, currentUserId?: string): Promise<any | null> {
+  const user = await pgFindUserById(userId);
+  if (!user) return null;
+  const followStats = await pgGetUserFollowStats(user.id, currentUserId);
+  const posts = (await pgGetAllPosts({ currentUserId, limit: 10 })).filter(p => p.authorId === user.id);
+  const postRes = await queryPostgres("SELECT COUNT(*) as count FROM community_posts WHERE author_id = $1 AND status IN ('APPROVED', 'PUBLISHED')", [user.id]);
+  const commentRes = await queryPostgres("SELECT COUNT(*) as count FROM community_comments WHERE author_id = $1", [user.id]);
+
+  let interests: string[] = [];
+  try {
+    if (typeof user.interests === 'string') interests = JSON.parse(user.interests);
+    else if (Array.isArray(user.interests)) interests = user.interests;
+  } catch {}
+
+  return {
+    id: user.id,
+    publicId: user.public_id,
+    name: user.name,
+    role: user.role,
+    profession: user.profession || null,
+    company: user.company || null,
+    avatar: user.avatar || null,
+    townCity: user.town_city || null,
+    interests,
+    isVerified: Boolean(user.is_verified),
+    createdAt: user.created_at,
+    followerCount: followStats.followerCount,
+    followingCount: followStats.followingCount,
+    isFollowing: followStats.isFollowing,
+    stats: {
+      totalPosts: parseInt(postRes.rows[0]?.count || '0', 10),
+      totalAnswers: parseInt(commentRes.rows[0]?.count || '0', 10)
+    },
+    recentPosts: posts
   };
 }

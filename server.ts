@@ -35,6 +35,14 @@ import {
   pinPost,
   upvotePost,
   togglePostLike,
+  toggleBookmarkPost,
+  getUserBookmarkedPostIds,
+  toggleFollowUser,
+  getUserFollowStats,
+  getUserFollowedUserIds,
+  voteCommunityPoll,
+  checkDuplicateQuestion,
+  getUserPublicProfile,
   getCommentsForPost,
   createComment,
   deleteComment,
@@ -76,7 +84,7 @@ import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
 import { OtpCooldownError } from './src/server/otpCrypto.ts';
 import { registerPlatformRoutes } from './src/server/platformRoutes.ts';
-import { readProfilePatch, readProfileField } from './src/shared/profileFields.ts';
+import { readProfilePatch, readProfileField, readInterestsField } from './src/shared/profileFields.ts';
 import { isCommunityPostId, readCommunitySearch, readCommunityVote } from './src/shared/communityEngagement.ts';
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
@@ -329,13 +337,28 @@ app.patch('/api/me/profile', requireAuth, async (req: AuthenticatedRequest, res:
       res.status(400).json({ error: patch.profession.error });
       return;
     }
-    if (patch.townCity.omit && patch.profession.omit) {
+    if (patch.company && 'error' in patch.company) {
+      res.status(400).json({ error: patch.company.error });
+      return;
+    }
+    if (patch.avatar && 'error' in patch.avatar) {
+      res.status(400).json({ error: patch.avatar.error });
+      return;
+    }
+    if (patch.interests && 'error' in patch.interests) {
+      res.status(400).json({ error: patch.interests.error });
+      return;
+    }
+    if (patch.townCity.omit && patch.profession.omit && (!patch.company || patch.company.omit) && (!patch.avatar || patch.avatar.omit) && (!patch.interests || patch.interests.omit)) {
       res.status(400).json({ error: 'No profile fields were provided.' });
       return;
     }
     const updated = await updateUserProfileFields(req.user!.id, {
       ...(patch.townCity.omit ? {} : { townCity: patch.townCity.value }),
-      ...(patch.profession.omit ? {} : { profession: patch.profession.value })
+      ...(patch.profession.omit ? {} : { profession: patch.profession.value }),
+      ...(!patch.company || patch.company.omit ? {} : { company: patch.company.value }),
+      ...(!patch.avatar || patch.avatar.omit ? {} : { avatar: patch.avatar.value }),
+      ...(!patch.interests || patch.interests.omit ? {} : { interests: patch.interests.value })
     });
     if (!updated) {
       res.status(404).json({ error: 'Account not found.' });
@@ -348,12 +371,28 @@ app.patch('/api/me/profile', requireAuth, async (req: AuthenticatedRequest, res:
         ...safeUser,
         townCity: updated.town_city || '',
         profession: updated.profession || '',
+        company: updated.company || '',
+        avatar: updated.avatar || '',
+        interests: typeof updated.interests === 'string' ? JSON.parse(updated.interests) : (updated.interests || []),
         isVerified: Boolean(updated.is_verified),
         assignedPropertyIds: JSON.parse(updated.assigned_properties || '[]')
       }
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Profile was not saved.' });
+  }
+});
+
+// Bookmarks for current user
+app.get('/api/me/bookmarks', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const bookmarkedIds = await getUserBookmarkedPostIds(req.user.id);
+    const allPosts = await getAllPosts({ currentUserId: req.user.id });
+    const bookmarkedSet = new Set(bookmarkedIds);
+    const posts = allPosts.filter(p => bookmarkedSet.has(p.id));
+    res.json({ posts });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -368,6 +407,9 @@ app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
     user: {
       ...safeUser,
       townCity: safeUser.town_city || '',
+      profession: (safeUser as any).profession || '',
+      company: (safeUser as any).company || '',
+      interests: typeof (safeUser as any).interests === 'string' ? JSON.parse((safeUser as any).interests) : ((safeUser as any).interests || []),
       isVerified: Boolean(safeUser.is_verified),
       assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
     }
@@ -594,7 +636,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
 app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
   if (rejectIfRateLimited(req, res, 'register', String(req.body?.email || ''))) return;
   try {
-    const { name, email, password, role, phone, organization, otp, phoneOtp, townCity, location, city, state } = req.body;
+    const { name, email, password, role, phone, organization, otp, phoneOtp, townCity, location, city, state, profession, company, interests } = req.body;
     if (!name || !email || !password) {
       res.status(400).json({ error: 'Name, email, and password are required' });
       return;
@@ -653,6 +695,38 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       requirePhone: seeker
     });
 
+    let validatedProfession: string | null = null;
+    if (profession) {
+      const fieldRes = readProfileField(profession, true, 'Profession');
+      if (!('error' in fieldRes) && !fieldRes.omit && fieldRes.value) {
+        validatedProfession = fieldRes.value;
+      }
+    }
+    let validatedCompany: string | null = null;
+    if (company) {
+      const fieldRes = readProfileField(company, true, 'Company');
+      if (!('error' in fieldRes) && !fieldRes.omit && fieldRes.value) {
+        validatedCompany = fieldRes.value;
+      }
+    }
+    let validatedInterests: string[] | null = null;
+    if (interests && Array.isArray(interests)) {
+      const fieldRes = readInterestsField(interests, true);
+      if (!('error' in fieldRes) && !fieldRes.omit && fieldRes.value) {
+        validatedInterests = fieldRes.value;
+      }
+    }
+
+    let updatedNewUser = newUser;
+    if (validatedProfession || validatedCompany || validatedInterests) {
+      const resUpdated = await updateUserProfileFields(newUser.id, {
+        profession: validatedProfession,
+        company: validatedCompany,
+        interests: validatedInterests
+      });
+      if (resUpdated) updatedNewUser = resUpdated;
+    }
+
     const { token } = await createSession(newUser.id, req.headers['user-agent'], req.ip);
     res.cookie('ps_session', token, sessionCookieOptions());
 
@@ -668,12 +742,15 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       }
     }
 
-    const { password_hash, salt, ...safeUser } = newUser;
+    const { password_hash, salt, ...safeUser } = updatedNewUser;
     res.json({
       success: true,
       user: {
         ...safeUser,
-        townCity: newUser.town_city || resolvedTownCity,
+        townCity: updatedNewUser.town_city || resolvedTownCity,
+        profession: updatedNewUser.profession || '',
+        company: updatedNewUser.company || '',
+        interests: typeof updatedNewUser.interests === 'string' ? JSON.parse(updatedNewUser.interests) : (updatedNewUser.interests || []),
         isVerified: true,
         phone_verified: Number(newUser.phone_verified || 0),
         assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
@@ -974,6 +1051,45 @@ app.get('/api/admin/audit-logs', requireAdmin, async (req: Request, res: Respons
 // LIVE COMMUNITY — POSTS, LINKS, PODCASTS, VIDEOS & LIKES
 // ==============================================================================
 
+// Check duplicate question
+app.get('/api/community/check-duplicate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const title = String(req.query.title || '');
+    const result = await checkDuplicateQuestion(title);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// User public profile
+app.get('/api/users/:id/profile', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const profile = await getUserPublicProfile(req.params.id, req.user?.id);
+    if (!profile) {
+      res.status(404).json({ error: 'User profile not found' });
+      return;
+    }
+    res.json({ profile });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Follow / Unfollow a user
+app.post('/api/users/:id/follow', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (req.user.id === req.params.id) {
+      res.status(400).json({ error: 'Cannot follow yourself' });
+      return;
+    }
+    const result = await toggleFollowUser(req.user.id, req.params.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Fetch all community posts
 app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -1022,7 +1138,13 @@ app.get('/api/community/posts/:id', requireAuth, async (req: AuthenticatedReques
 // Create community post
 app.post('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { title, content, topic, communityId, communityName, propertyId, propertyName, links, attachments, mediaType, mediaUrl, thumbnailUrl, duration } = req.body;
+    const {
+      title, content, topic, communityId, communityName,
+      propertyId, propertyName, links, attachments,
+      mediaType, mediaUrl, thumbnailUrl, duration,
+      postType, visibility, pollOptions,
+      amaHostName, amaHostRole, amaStatus, amaStartTime, amaEndTime
+    } = req.body;
     if (!title || !content || !topic) {
       res.status(400).json({ error: 'Title, content, and topic are required' });
       return;
@@ -1044,7 +1166,15 @@ app.post('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, 
       mediaType: mediaType || 'POST',
       mediaUrl,
       thumbnailUrl,
-      duration
+      duration,
+      postType,
+      visibility,
+      pollOptions,
+      amaHostName,
+      amaHostRole,
+      amaStatus,
+      amaStartTime,
+      amaEndTime
     });
 
     broadcastSseEvent('POST_CREATED', { id: post.id, status: post.status }, req.user.id);
@@ -1147,6 +1277,53 @@ app.post('/api/community/posts/:id/follow', requireAuth, async (req: Authenticat
   }
 });
 
+// Bookmark / Unbookmark post
+app.post('/api/community/posts/:id/bookmark', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!isCommunityPostId(req.params.id)) {
+      res.status(400).json({ error: 'Post id is not valid.' });
+      return;
+    }
+    const post = await getPostById(req.params.id, req.user?.id);
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const result = await toggleBookmarkPost(req.user.id, req.params.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Poll voting
+app.post('/api/community/posts/:id/poll-vote', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!isCommunityPostId(req.params.id)) {
+      res.status(400).json({ error: 'Post id is not valid.' });
+      return;
+    }
+    const { optionId } = req.body;
+    if (!optionId || typeof optionId !== 'string') {
+      res.status(400).json({ error: 'optionId is required' });
+      return;
+    }
+    const post = await getPostById(req.params.id, req.user?.id);
+    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    const result = await voteCommunityPoll(req.params.id, req.user.id, optionId);
+    if (!result) {
+      res.status(400).json({ error: 'Could not record poll vote.' });
+      return;
+    }
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/community/posts/:id/upvote', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
@@ -1240,7 +1417,7 @@ app.get('/api/community/posts/:id/comments', requireAuth, async (req: Authentica
 // Add comment or nested reply to a post
 app.post('/api/community/posts/:id/comments', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { content, parentId } = req.body;
+    const { content, parentId, isAmaAnswer } = req.body;
     if (!content || !content.trim()) {
       res.status(400).json({ error: 'Comment content cannot be empty' });
       return;
@@ -1257,7 +1434,8 @@ app.post('/api/community/posts/:id/comments', requireAuth, async (req: Authentic
       authorId: req.user.id,
       authorName: req.user.name,
       authorRole: req.user.role,
-      content: content.trim()
+      content: content.trim(),
+      isAmaAnswer: Boolean(isAmaAnswer)
     });
 
     if (parentPost.status === 'APPROVED' || parentPost.status === 'PUBLISHED') {

@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   RotateCcw,
   Smartphone,
-  MapPin
+  MapPin,
+  Check
 } from 'lucide-react';
 
 const DEFAULT_SIGNUP_LOCATION = 'Hyderabad, Telangana, India';
@@ -47,6 +48,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [phoneInput, setPhoneInput] = useState('');
   const [organizationInput, setOrganizationInput] = useState('');
   const [locationInput, setLocationInput] = useState(DEFAULT_SIGNUP_LOCATION);
+  const [professionInput, setProfessionInput] = useState('Buyer');
+  const [companyInput, setCompanyInput] = useState('');
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([
+    'Kokapet & Neopolis',
+    'Legal Due Diligence & RERA'
+  ]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const submitting = useRef(false);
@@ -247,6 +254,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           role: roleInput,
           phone: phoneInput.trim(),
           organization: organizationInput.trim(),
+          profession: professionInput.trim() || undefined,
+          company: companyInput.trim() || undefined,
+          interests: selectedInterests,
           townCity: locationInput.trim() || DEFAULT_SIGNUP_LOCATION,
           location: locationInput.trim() || DEFAULT_SIGNUP_LOCATION,
           otp: otpInput.trim(),
@@ -501,6 +511,87 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         placeholder={roleInput === 'LANDOWNER' ? 'Land description' : roleInput === 'RERA_AGENT' ? 'RERA registration number' : 'Firm or organization'}
                         className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label htmlFor="signup-profession" className="block font-bold text-slate-700 mb-1">
+                        Profession
+                      </label>
+                      <select
+                        id="signup-profession"
+                        value={professionInput}
+                        onChange={e => setProfessionInput(e.target.value)}
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                      >
+                        <option value="Buyer">Buyer</option>
+                        <option value="Seller">Seller</option>
+                        <option value="Real Estate Agent">Real Estate Agent</option>
+                        <option value="Builder / Developer">Builder / Developer</option>
+                        <option value="Investor">Investor</option>
+                        <option value="Architect">Architect</option>
+                        <option value="Interior Designer">Interior Designer</option>
+                        <option value="Property Consultant">Property Consultant</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="signup-company" className="block font-bold text-slate-700 mb-1">
+                        Company / Practice <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
+                      </label>
+                      <input
+                        id="signup-company"
+                        type="text"
+                        value={companyInput}
+                        onChange={e => setCompanyInput(e.target.value)}
+                        placeholder="e.g. Studio Arc / Firm"
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block font-bold text-slate-700">
+                        Interests & Topics
+                      </label>
+                      <span className="text-[10px] text-slate-400">Personalizes your Community Q&A</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200/80 rounded-xl max-h-32 overflow-y-auto">
+                      {[
+                        'Kokapet & Neopolis',
+                        'High-Rise Construction',
+                        'Legal Due Diligence & RERA',
+                        'Rental Yield & ROI',
+                        'Luxury Villas & Communities',
+                        'Architecture & Vaastu',
+                        'Interior Design & Renovation',
+                        'Land & Plotting Guidelines',
+                        'Price Trends & Market Updates',
+                        'Home Loans & Taxation'
+                      ].map(topic => {
+                        const isSelected = selectedInterests.includes(topic);
+                        return (
+                          <button
+                            key={topic}
+                            type="button"
+                            onClick={() => {
+                              setSelectedInterests(prev =>
+                                isSelected ? prev.filter(t => t !== topic) : [...prev, topic]
+                              );
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all flex items-center gap-1 cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>{isSelected ? '✓' : '+'}</span>
+                            <span>{topic}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 

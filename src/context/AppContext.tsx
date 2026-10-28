@@ -588,12 +588,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       body: JSON.stringify({
         propertyId: postData.propertyId,
         propertyName: postData.propertyName,
+        communityId: postData.communityId,
+        communityName: postData.communityName,
         topic: postData.topic,
         title: postData.title,
         content: postData.content,
         mediaType: postData.mediaType,
         mediaUrl: postData.mediaUrl,
-        attachments: postData.attachments
+        attachments: postData.attachments,
+        postType: postData.postType,
+        visibility: postData.visibility,
+        pollOptions: postData.pollOptions,
+        amaHostName: postData.amaHostName,
+        amaHostRole: postData.amaHostRole,
+        amaStatus: postData.amaStatus,
+        amaStartTime: postData.amaStartTime,
+        amaEndTime: postData.amaEndTime
       })
     })
       .then(async res => {

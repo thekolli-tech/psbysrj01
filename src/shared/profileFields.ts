@@ -22,13 +22,40 @@ export function readProfileField(input: unknown, present: boolean, label: string
   return { omit: false, value: normalized.length === 0 ? null : normalized };
 }
 
+export function readInterestsField(input: unknown, present: boolean): { omit: true } | { omit: false; value: string[] } | { error: string } {
+  if (!present) return { omit: true };
+  let list: unknown[] = [];
+  if (typeof input === 'string') {
+    list = input.split(',').map(s => s.trim()).filter(Boolean);
+  } else if (Array.isArray(input)) {
+    list = input;
+  } else {
+    return { error: 'Interests must be a list of topics.' };
+  }
+  const cleaned: string[] = [];
+  for (const item of list) {
+    if (typeof item !== 'string') continue;
+    const norm = item.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (norm && !/[<>]/.test(norm) && norm.length <= 60) {
+      if (!cleaned.includes(norm)) cleaned.push(norm);
+    }
+  }
+  return { omit: false, value: cleaned.slice(0, 30) };
+}
+
 export function readProfilePatch(body: unknown): {
   townCity: ProfileFieldResult;
   profession: ProfileFieldResult;
+  company: ProfileFieldResult;
+  avatar: ProfileFieldResult;
+  interests: { omit: true } | { omit: false; value: string[] } | { error: string };
 } {
   const record = body && typeof body === 'object' ? body as Record<string, unknown> : {};
   return {
     townCity: readProfileField(record.townCity, Object.prototype.hasOwnProperty.call(record, 'townCity'), 'Town/City'),
-    profession: readProfileField(record.profession, Object.prototype.hasOwnProperty.call(record, 'profession'), 'Profession')
+    profession: readProfileField(record.profession, Object.prototype.hasOwnProperty.call(record, 'profession'), 'Profession'),
+    company: readProfileField(record.company, Object.prototype.hasOwnProperty.call(record, 'company'), 'Company'),
+    avatar: readProfileField(record.avatar, Object.prototype.hasOwnProperty.call(record, 'avatar'), 'Avatar'),
+    interests: readInterestsField(record.interests, Object.prototype.hasOwnProperty.call(record, 'interests'))
   };
 }

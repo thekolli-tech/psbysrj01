@@ -24,8 +24,10 @@ export interface User {
   role: UserRole;
   avatar: string;
   organization?: string;
+  company?: string;
   townCity?: string;
   profession?: string;
+  interests?: string[];
   reraNumber?: string;
   walletBalance: number;
   assignedPropertyIds?: string[];
@@ -222,6 +224,7 @@ export interface CommunityReply {
   authorRole: UserRole;
   authorProfession?: string;
   isVerifiedBuilderReply: boolean;
+  isAmaAnswer?: boolean;
   content: string;
   createdAt: string;
 }
@@ -262,7 +265,7 @@ export interface CommunityPost {
   propertyName?: string;
   communityId?: string;
   communityName?: string;
-  topic: 'Construction Updates' | 'Legal & RERA' | 'Livability & Amenities' | 'Resale & Rental Yield' | 'Builder Credibility';
+  topic: 'Construction Updates' | 'Legal & RERA' | 'Livability & Amenities' | 'Resale & Rental Yield' | 'Builder Credibility' | string;
   title: string;
   content: string;
   links?: PostLink[];
@@ -271,6 +274,18 @@ export interface CommunityPost {
   mediaUrl?: string;
   thumbnailUrl?: string;
   duration?: string;
+  postType?: 'QUESTION' | 'POST' | 'IMAGE_VIDEO' | 'LINK' | 'POLL' | 'AMA';
+  visibility?: 'PUBLIC' | 'COMMUNITY';
+  pollOptions?: Array<{ id: string; text: string; votes: number }>;
+  pollVotes?: Array<{ userId: string; optionId: string }>;
+  userVotedOptionId?: string;
+  amaHostName?: string;
+  amaHostRole?: string;
+  amaStatus?: 'UPCOMING' | 'LIVE' | 'CONCLUDED' | 'ENDED';
+  amaStartTime?: string;
+  amaEndTime?: string;
+  bookmarked?: boolean;
+  bookmarkCount?: number;
   status?: 'PUBLISHED' | 'FLAGGED' | 'ARCHIVED';
   upvotes: number;
   agreeCount?: number;
