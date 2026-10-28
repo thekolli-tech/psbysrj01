@@ -38,7 +38,7 @@ export const OverviewFoundation: React.FC = () => {
   // Default to About expanded and the other sections collapsed as requested
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     'about-property-studio': true,
-    'about-founder': false,
+    'about-founder': true,
     'vision': false,
     'mission': false,
     'core-dna': false
@@ -253,26 +253,75 @@ export const OverviewFoundation: React.FC = () => {
               id="section-content-about-founder"
               role="region"
               aria-labelledby="heading-about-founder"
-              className="px-5 pb-6 sm:px-6 sm:pb-8 pt-2 border-t border-slate-100 space-y-4 text-sm text-slate-700 leading-relaxed animate-in fade-in duration-200"
+              className="px-5 pb-6 sm:px-6 sm:pb-8 pt-2 border-t border-slate-100 animate-in fade-in duration-200"
             >
-              <p>
-                <strong>Swamy Reddy Javidi</strong> is the Chief Executive Officer (CEO) of Property Studio and the Founder of Sadguna Properties. Holding an <strong>MBA in Marketing (Post Graduate)</strong>, he brings over <strong>24 years of deep, multi-industry corporate governance experience</strong> spanning sales distribution, market expansion, scale operations, and real estate strategic consulting.
-              </p>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pt-3">
+                {/* Left Column: Official Founder Poster */}
+                <div className="lg:col-span-5 flex flex-col items-center">
+                  <div className="w-full max-w-sm sm:max-w-md bg-linear-to-b from-amber-50/80 via-white to-slate-50 rounded-2xl p-3 border border-amber-500/20 shadow-md">
+                    <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-white border border-slate-200/80 shadow-xs flex items-center justify-center">
+                      <img
+                        src="/brand/property-studio-founder-poster.png"
+                        alt="Property Studio Founder & CEO - Swamy Reddy Javidi"
+                        className="w-full h-full object-contain"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="mt-3 text-center space-y-1">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-100/80 rounded-full border border-amber-300/60">
+                        <span className="text-[10px] font-bold text-amber-900 tracking-wider font-mono uppercase">
+                          Founder & CEO
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-900">Swamy Reddy Javidi</h4>
+                      <p className="text-[11px] text-slate-500">
+                        Property Studio · Sadguna Properties
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                <h4 className="text-xs font-bold text-slate-900 font-display">Corporate Track Record & Leadership Background:</h4>
-                <ul className="text-xs text-slate-600 space-y-1.5 list-disc pl-5">
-                  <li><strong>Reliance Jio / Jio Fiber (2014–2023):</strong> Served nearly a decade as JCM / Area Home Lead, steering high-intensity market rollouts and distribution network scaling across key urban corporate clusters in Hyderabad and Warangal.</li>
-                  <li><strong>Tata Teleservices / Tata Docomo (2010–2014):</strong> Served as Zonal Manager, directing regional corporate sales, channel frameworks, and telecommunications network expansion.</li>
-                  <li><strong>Idea Cellular Ltd. (2008–2010):</strong> Operated as Territory Manager, directing micro-market distribution networks and subscriber acquisition.</li>
-                  <li><strong>Hindustan Unilever Ltd. (2004–2008):</strong> Served as Cluster Sales Officer for FMCG distribution, managing high-stakes consumer trade channels.</li>
-                  <li><strong>PepsiCo (2002–2004):</strong> Customer Executive, establishing disciplined corporate sales distribution operations in Hyderabad.</li>
-                </ul>
+                {/* Right Column: Executive Profile & Leadership Track Record */}
+                <div className="lg:col-span-7 space-y-4 text-sm text-slate-700 leading-relaxed">
+                  <p>
+                    <strong>Swamy Reddy Javidi</strong> is the Chief Executive Officer (CEO) of Property Studio and the Founder of Sadguna Properties. Holding an <strong>MBA in Marketing (Post Graduate)</strong>, he brings over <strong>24 years of deep, multi-industry corporate governance experience</strong> spanning sales distribution, market expansion, scale operations, and real estate strategic consulting.
+                  </p>
+
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                    <h4 className="text-xs font-bold text-slate-900 font-display">Corporate Track Record & Leadership Background:</h4>
+                    <ul className="text-xs text-slate-600 space-y-1.5 list-disc pl-5">
+                      <li><strong>Reliance Jio / Jio Fiber (2014–2023):</strong> Served nearly a decade as JCM / Area Home Lead, steering high-intensity market rollouts and distribution network scaling across key urban corporate clusters in Hyderabad and Warangal.</li>
+                      <li><strong>Tata Teleservices / Tata Docomo (2010–2014):</strong> Served as Zonal Manager, directing regional corporate sales, channel frameworks, and telecommunications network expansion.</li>
+                      <li><strong>Idea Cellular Ltd. (2008–2010):</strong> Operated as Territory Manager, directing micro-market distribution networks and subscriber acquisition.</li>
+                      <li><strong>Hindustan Unilever Ltd. (2004–2008):</strong> Served as Cluster Sales Officer for FMCG distribution, managing high-stakes consumer trade channels.</li>
+                      <li><strong>PepsiCo (2002–2004):</strong> Customer Executive, establishing disciplined corporate sales distribution operations in Hyderabad.</li>
+                    </ul>
+                  </div>
+
+                  <p>
+                    As founder of <strong>Sadguna Properties</strong>, he directed high-value advisory operations across Hyderabad's premium residential and commercial sectors. Establishing <strong>Property Studio</strong> represents his forward-looking PropTech vision: moving beyond traditional agency boundaries to create a transparent, multi-stakeholder ecosystem with encrypted data masking, broadcast visual intelligence, and rigorous project compliance audits.
+                  </p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 text-center shadow-xs">
+                      <div className="text-base font-black text-amber-700 font-mono-numbers">24+ Yrs</div>
+                      <div className="text-[10px] text-slate-500 font-medium">Corporate Leadership</div>
+                    </div>
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 text-center shadow-xs">
+                      <div className="text-base font-black text-slate-900 font-mono-numbers">MBA</div>
+                      <div className="text-[10px] text-slate-500 font-medium">Marketing Leadership</div>
+                    </div>
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 text-center shadow-xs">
+                      <div className="text-base font-black text-slate-900 font-mono-numbers">Decade</div>
+                      <div className="text-[10px] text-slate-500 font-medium">Telecom Scale (Jio)</div>
+                    </div>
+                    <div className="bg-white border border-slate-200/90 rounded-xl p-2.5 text-center shadow-xs">
+                      <div className="text-base font-black text-emerald-700 font-mono-numbers">PropTech</div>
+                      <div className="text-[10px] text-slate-500 font-medium">Western Corridor</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-
-              <p>
-                As founder of <strong>Sadguna Properties</strong>, he directed high-value advisory operations across Hyderabad's premium residential and commercial sectors. Establishing <strong>Property Studio</strong> represents his forward-looking PropTech vision: moving beyond traditional agency boundaries to create a transparent, multi-stakeholder ecosystem with encrypted data masking, broadcast visual intelligence, and rigorous project compliance audits.
-              </p>
             </div>
           )}
         </div>

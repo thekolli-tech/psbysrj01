@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ASSET_IMAGES } from '../../data/mockData';
 
 interface BrandLogoProps {
@@ -19,15 +19,28 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   variant = 'full',
   size = 'md'
 }) => {
+  const initialSrc = variant === 'full'
+    ? (ASSET_IMAGES.officialLogoSquare || ASSET_IMAGES.officialLogo)
+    : ASSET_IMAGES.officialLogo;
+
+  const [imgSrc, setImgSrc] = useState<string>(initialSrc);
+
   const frame = variant === 'full'
     ? 'w-full h-auto max-w-[420px]'
     : `${SIZE_CLASS[size]} w-auto`;
 
   return (
     <img
-      src={ASSET_IMAGES.officialLogo}
+      src={imgSrc}
       alt="Property Studio by Swamy Reddy Javidi"
       className={`${frame} object-contain ${className}`}
+      onError={() => {
+        if (imgSrc !== ASSET_IMAGES.officialLogo) {
+          setImgSrc(ASSET_IMAGES.officialLogo);
+        } else if (imgSrc !== '/brand/property-studio-logo-square.jpg') {
+          setImgSrc('/brand/property-studio-logo-square.jpg');
+        }
+      }}
     />
   );
 };

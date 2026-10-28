@@ -15,12 +15,15 @@ import {
 
 export const ASSET_IMAGES = {
   heroSkyline: '/src/assets/images/hero_luxury_skyline_1791288234434.jpg',
-  swamyPortrait: '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg',
+  swamyPortrait: '/brand/swamy-reddy-portrait.jpg',
   studioBroadcast: '/src/assets/images/media_studio_broadcast_1791288261453.jpg',
   commercialHub: '/src/assets/images/project_commercial_hub_1791288276077.jpg',
   officialLogo: '/brand/property-studio-logo.jpg',
+  officialLogoSquare: '/brand/property-studio-logo-square.jpg',
+  officialLogoSvg: '/brand/property-studio-logo.svg',
   officialHero: '/brand/property-studio-hero.jpg',
-  swamyFullPortrait: '/src/assets/images/swamy_reddy_standing_vertical_1791363659975.jpg'
+  founderPoster: '/brand/property-studio-founder-poster.png',
+  swamyFullPortrait: '/brand/swamy-reddy-portrait.jpg'
 };
 
 export const INITIAL_USERS: User[] = [
