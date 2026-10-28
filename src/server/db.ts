@@ -82,8 +82,18 @@ import {
   pgUpdateCommunityStatus,
   pgDeleteCommunity,
   pgGetAllMedia,
+  pgGetMediaById,
   pgCreateMedia,
+  pgUpdateMedia,
   pgDeleteMedia,
+  pgToggleMediaLike,
+  pgSetMediaReaction,
+  pgAddMediaComment,
+  pgGetMediaComments,
+  pgRecordMediaShare,
+  pgToggleMediaRepost,
+  pgGetMediaEngagement,
+  pgGetUserReposts,
   pgGetAllLeads,
   pgCreateLead,
   pgDeleteLead,
@@ -373,6 +383,71 @@ export interface DbMediaItem {
   author_name: string;
   created_at: string;
 }
+
+export interface DbMediaComment {
+  id: string;
+  media_id: string;
+  user_id: string;
+  author_name: string;
+  author_role?: string;
+  author_avatar?: string;
+  text: string;
+  created_at: string;
+}
+
+export interface DbMediaEngagement {
+  mediaId: string;
+  likesCount: number;
+  hasLiked: boolean;
+  reactionsCount: number;
+  userReaction: string | null;
+  commentsCount: number;
+  sharesCount: number;
+  repostsCount: number;
+  hasReposted: boolean;
+}
+
+export interface DbUserRepostItem {
+  repostId: string;
+  mediaId: string;
+  repostedAt: string;
+  note?: string;
+  title: string;
+  summary: string;
+  videoUrl: string;
+  thumbnail: string;
+  type: string;
+  duration: string;
+  views: number;
+  originalCreator: string;
+}
+
+export const DEFAULT_MEDIA_ITEMS: DbMediaItem[] = [
+  {
+    id: 'media_01',
+    title: 'Kokapet vs. Neopolis: The $15 Billion Micro-Market Masterclass',
+    summary: 'Swamy Reddy Javidi breaks down the urban planning blueprint, upcoming 100-meter Trumpet interchanges, FSI regulations, and realistic yield timelines for high-rise sky mansions in Kokapet & Neopolis.',
+    video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    thumbnail: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+    type: 'MASTERCLASS',
+    duration: '38:45',
+    views: 48200,
+    author_name: 'Swamy Reddy Javidi',
+    created_at: '2026-09-28T10:00:00.000Z'
+  },
+  {
+    id: 'media_02',
+    title: 'High-Rise Structural Audits: Wind Load Analysis & Soil Testing Norms',
+    summary: 'An uncompromised deep dive into how buyers and investors must evaluate soil load-bearing capacities, pile depths, and wind tunnel tests for buildings exceeding 50 storeys in Hyderabad Deccan plateau.',
+    video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    thumbnail: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80',
+    type: 'MASTERCLASS',
+    duration: '44:12',
+    views: 31400,
+    author_name: 'Swamy Reddy Javidi',
+    created_at: '2026-10-02T14:30:00.000Z'
+  }
+];
 
 export interface DbBuyerLead {
   id: string;
@@ -1082,6 +1157,11 @@ export async function getAllMedia(): Promise<DbMediaItem[]> {
   return sqliteGetAllMedia();
 }
 
+export async function getMediaById(id: string): Promise<DbMediaItem | null> {
+  if (isPostgresAuthoritative()) return pgGetMediaById(id);
+  return sqliteGetMediaById(id);
+}
+
 export async function createMedia(item: {
   title: string;
   summary: string;
@@ -1095,9 +1175,64 @@ export async function createMedia(item: {
   return sqliteCreateMedia(item);
 }
 
+export async function updateMedia(
+  id: string,
+  updates: Partial<{ title: string; summary: string; video_url: string; thumbnail: string; type: string; duration: string }>
+): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgUpdateMedia(id, updates);
+  return sqliteUpdateMedia(id, updates);
+}
+
 export async function deleteMedia(id: string): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgDeleteMedia(id);
   return sqliteDeleteMedia(id);
+}
+
+export async function toggleMediaLike(mediaId: string, userId: string): Promise<{ liked: boolean; count: number }> {
+  if (isPostgresAuthoritative()) return pgToggleMediaLike(mediaId, userId);
+  return sqliteToggleMediaLike(mediaId, userId);
+}
+
+export async function setMediaReaction(mediaId: string, userId: string, reactionType?: string): Promise<{ reaction: string | null; count: number }> {
+  if (isPostgresAuthoritative()) return pgSetMediaReaction(mediaId, userId, reactionType);
+  return sqliteSetMediaReaction(mediaId, userId, reactionType);
+}
+
+export async function addMediaComment(comment: {
+  mediaId: string;
+  userId: string;
+  authorName: string;
+  authorRole?: string;
+  authorAvatar?: string;
+  text: string;
+}): Promise<DbMediaComment> {
+  if (isPostgresAuthoritative()) return pgAddMediaComment(comment);
+  return sqliteAddMediaComment(comment);
+}
+
+export async function getMediaComments(mediaId: string): Promise<DbMediaComment[]> {
+  if (isPostgresAuthoritative()) return pgGetMediaComments(mediaId);
+  return sqliteGetMediaComments(mediaId);
+}
+
+export async function recordMediaShare(mediaId: string, userId?: string, platform?: string): Promise<{ count: number }> {
+  if (isPostgresAuthoritative()) return pgRecordMediaShare(mediaId, userId, platform);
+  return sqliteRecordMediaShare(mediaId, userId, platform);
+}
+
+export async function toggleMediaRepost(mediaId: string, userId: string, userName?: string, note?: string): Promise<{ reposted: boolean; count: number }> {
+  if (isPostgresAuthoritative()) return pgToggleMediaRepost(mediaId, userId, userName, note);
+  return sqliteToggleMediaRepost(mediaId, userId, userName, note);
+}
+
+export async function getMediaEngagement(mediaId: string, userId?: string): Promise<DbMediaEngagement> {
+  if (isPostgresAuthoritative()) return pgGetMediaEngagement(mediaId, userId);
+  return sqliteGetMediaEngagement(mediaId, userId);
+}
+
+export async function getUserReposts(userId: string): Promise<DbUserRepostItem[]> {
+  if (isPostgresAuthoritative()) return pgGetUserReposts(userId);
+  return sqliteGetUserReposts(userId);
 }
 
 export async function getAllLeads(): Promise<DbBuyerLead[]> {
@@ -3303,7 +3438,29 @@ function sqliteDeleteCommunity(id: string): boolean {
 
 function sqliteGetAllMedia(): DbMediaItem[] {
   const stmt = db.prepare('SELECT * FROM media_items ORDER BY created_at DESC');
-  return stmt.all() as unknown as DbMediaItem[];
+  const rows = stmt.all() as unknown as DbMediaItem[];
+  if (rows.length === 0) {
+    for (const item of DEFAULT_MEDIA_ITEMS) {
+      try {
+        db.prepare(`
+          INSERT OR IGNORE INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(item.id, item.title, item.summary, item.video_url, item.thumbnail, item.type, item.duration, item.views, item.author_name, item.created_at);
+      } catch {}
+    }
+    return db.prepare('SELECT * FROM media_items ORDER BY created_at DESC').all() as unknown as DbMediaItem[];
+  }
+  return rows;
+}
+
+function sqliteGetMediaById(id: string): DbMediaItem | null {
+  const stmt = db.prepare('SELECT * FROM media_items WHERE id = ?');
+  const item = stmt.get(id) as unknown as DbMediaItem | undefined;
+  if (!item) {
+    const fallback = DEFAULT_MEDIA_ITEMS.find(m => m.id === id);
+    return fallback || null;
+  }
+  return item;
 }
 
 function sqliteCreateMedia(item: {
@@ -3335,10 +3492,217 @@ function sqliteCreateMedia(item: {
   return id;
 }
 
+function sqliteUpdateMedia(
+  id: string,
+  updates: Partial<{ title: string; summary: string; video_url: string; thumbnail: string; type: string; duration: string }>
+): boolean {
+  const fields: string[] = [];
+  const args: any[] = [];
+  if (updates.title) { fields.push('title = ?'); args.push(updates.title); }
+  if (updates.summary) { fields.push('summary = ?'); args.push(updates.summary); }
+  if (updates.video_url) { fields.push('video_url = ?'); args.push(updates.video_url); }
+  if (updates.thumbnail) { fields.push('thumbnail = ?'); args.push(updates.thumbnail); }
+  if (updates.type) { fields.push('type = ?'); args.push(updates.type); }
+  if (updates.duration) { fields.push('duration = ?'); args.push(updates.duration); }
+  if (fields.length === 0) return true;
+  args.push(id);
+  const stmt = db.prepare(`UPDATE media_items SET ${fields.join(', ')} WHERE id = ?`);
+  stmt.run(...args);
+  return true;
+}
+
 function sqliteDeleteMedia(id: string): boolean {
   const stmt = db.prepare('DELETE FROM media_items WHERE id = ?');
   stmt.run(id);
   return true;
+}
+
+function sqliteToggleMediaLike(mediaId: string, userId: string): { liked: boolean; count: number } {
+  const existingItem = sqliteGetMediaById(mediaId);
+  if (existingItem) {
+    try {
+      db.prepare(`
+        INSERT OR IGNORE INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(existingItem.id, existingItem.title, existingItem.summary, existingItem.video_url, existingItem.thumbnail, existingItem.type, existingItem.duration, existingItem.views, existingItem.author_name, existingItem.created_at);
+    } catch {}
+  }
+
+  const existing = db.prepare('SELECT id FROM media_likes WHERE media_id = ? AND user_id = ?').get(mediaId, userId) as { id: string } | undefined;
+  let liked = false;
+  if (existing) {
+    db.prepare('DELETE FROM media_likes WHERE id = ?').run(existing.id);
+    liked = false;
+  } else {
+    const id = `mlike_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    const now = new Date().toISOString();
+    db.prepare('INSERT OR IGNORE INTO media_likes (id, media_id, user_id, created_at) VALUES (?, ?, ?, ?)').run(id, mediaId, userId, now);
+    liked = true;
+  }
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM media_likes WHERE media_id = ?').get(mediaId) as { count: number };
+  return { liked, count: Number(countRow?.count || 0) };
+}
+
+function sqliteSetMediaReaction(mediaId: string, userId: string, reactionType = 'THUMBS_UP'): { reaction: string | null; count: number } {
+  const existing = db.prepare('SELECT id, reaction_type FROM media_reactions WHERE media_id = ? AND user_id = ?').get(mediaId, userId) as { id: string; reaction_type: string } | undefined;
+  let reaction: string | null = null;
+  if (existing) {
+    if (existing.reaction_type === reactionType) {
+      db.prepare('DELETE FROM media_reactions WHERE id = ?').run(existing.id);
+      reaction = null;
+    } else {
+      db.prepare('UPDATE media_reactions SET reaction_type = ? WHERE id = ?').run(reactionType, existing.id);
+      reaction = reactionType;
+    }
+  } else {
+    const id = `mreact_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    const now = new Date().toISOString();
+    db.prepare('INSERT OR REPLACE INTO media_reactions (id, media_id, user_id, reaction_type, created_at) VALUES (?, ?, ?, ?, ?)').run(id, mediaId, userId, reactionType, now);
+    reaction = reactionType;
+  }
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM media_reactions WHERE media_id = ?').get(mediaId) as { count: number };
+  return { reaction, count: Number(countRow?.count || 0) };
+}
+
+function sqliteAddMediaComment(comment: {
+  mediaId: string;
+  userId: string;
+  authorName: string;
+  authorRole?: string;
+  authorAvatar?: string;
+  text: string;
+}): DbMediaComment {
+  const id = `mcomm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO media_comments (id, media_id, user_id, author_name, author_role, author_avatar, text, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    comment.mediaId,
+    comment.userId,
+    comment.authorName,
+    comment.authorRole || 'PROPERTY_SEEKER',
+    comment.authorAvatar || '',
+    comment.text,
+    now
+  );
+  return {
+    id,
+    media_id: comment.mediaId,
+    user_id: comment.userId,
+    author_name: comment.authorName,
+    author_role: comment.authorRole,
+    author_avatar: comment.authorAvatar,
+    text: comment.text,
+    created_at: now
+  };
+}
+
+function sqliteGetMediaComments(mediaId: string): DbMediaComment[] {
+  const stmt = db.prepare('SELECT * FROM media_comments WHERE media_id = ? ORDER BY created_at DESC');
+  return stmt.all(mediaId) as unknown as DbMediaComment[];
+}
+
+function sqliteRecordMediaShare(mediaId: string, userId?: string, platform = 'DIRECT_LINK'): { count: number } {
+  const id = `mshare_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  const now = new Date().toISOString();
+  db.prepare('INSERT INTO media_shares (id, media_id, user_id, platform, created_at) VALUES (?, ?, ?, ?, ?)').run(id, mediaId, userId || null, platform, now);
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM media_shares WHERE media_id = ?').get(mediaId) as { count: number };
+  return { count: Number(countRow?.count || 0) };
+}
+
+function sqliteToggleMediaRepost(mediaId: string, userId: string, userName?: string, note?: string): { reposted: boolean; count: number } {
+  const existingItem = sqliteGetMediaById(mediaId);
+  if (existingItem) {
+    try {
+      db.prepare(`
+        INSERT OR IGNORE INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(existingItem.id, existingItem.title, existingItem.summary, existingItem.video_url, existingItem.thumbnail, existingItem.type, existingItem.duration, existingItem.views, existingItem.author_name, existingItem.created_at);
+    } catch {}
+  }
+
+  const existing = db.prepare('SELECT id FROM media_reposts WHERE media_id = ? AND user_id = ?').get(mediaId, userId) as { id: string } | undefined;
+  let reposted = false;
+  if (existing) {
+    db.prepare('DELETE FROM media_reposts WHERE id = ?').run(existing.id);
+    reposted = false;
+  } else {
+    const id = `mrepost_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    const now = new Date().toISOString();
+    db.prepare('INSERT OR IGNORE INTO media_reposts (id, media_id, user_id, user_name, note, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+      id,
+      mediaId,
+      userId,
+      userName || '',
+      note || '',
+      now
+    );
+    reposted = true;
+  }
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM media_reposts WHERE media_id = ?').get(mediaId) as { count: number };
+  return { reposted, count: Number(countRow?.count || 0) };
+}
+
+function sqliteGetMediaEngagement(mediaId: string, userId?: string): DbMediaEngagement {
+  const likesCount = Number((db.prepare('SELECT COUNT(*) as count FROM media_likes WHERE media_id = ?').get(mediaId) as any)?.count || 0);
+  const reactionsCount = Number((db.prepare('SELECT COUNT(*) as count FROM media_reactions WHERE media_id = ?').get(mediaId) as any)?.count || 0);
+  const commentsCount = Number((db.prepare('SELECT COUNT(*) as count FROM media_comments WHERE media_id = ?').get(mediaId) as any)?.count || 0);
+  const sharesCount = Number((db.prepare('SELECT COUNT(*) as count FROM media_shares WHERE media_id = ?').get(mediaId) as any)?.count || 0);
+  const repostsCount = Number((db.prepare('SELECT COUNT(*) as count FROM media_reposts WHERE media_id = ?').get(mediaId) as any)?.count || 0);
+
+  let hasLiked = false;
+  let userReaction: string | null = null;
+  let hasReposted = false;
+
+  if (userId) {
+    hasLiked = Boolean(db.prepare('SELECT id FROM media_likes WHERE media_id = ? AND user_id = ?').get(mediaId, userId));
+    const reactRow = db.prepare('SELECT reaction_type FROM media_reactions WHERE media_id = ? AND user_id = ?').get(mediaId, userId) as { reaction_type: string } | undefined;
+    userReaction = reactRow?.reaction_type || null;
+    hasReposted = Boolean(db.prepare('SELECT id FROM media_reposts WHERE media_id = ? AND user_id = ?').get(mediaId, userId));
+  }
+
+  return {
+    mediaId,
+    likesCount,
+    hasLiked,
+    reactionsCount,
+    userReaction,
+    commentsCount,
+    sharesCount,
+    repostsCount,
+    hasReposted
+  };
+}
+
+function sqliteGetUserReposts(userId: string): DbUserRepostItem[] {
+  const rows = db.prepare(`
+    SELECT r.id as repost_id, r.media_id, r.note, r.created_at as reposted_at,
+           m.title, m.summary, m.video_url, m.thumbnail, m.type, m.duration, m.views, m.author_name as original_creator
+    FROM media_reposts r
+    LEFT JOIN media_items m ON r.media_id = m.id
+    WHERE r.user_id = ?
+    ORDER BY r.created_at DESC
+  `).all(userId) as any[];
+
+  return rows.map(r => {
+    const fallback = DEFAULT_MEDIA_ITEMS.find(m => m.id === r.media_id);
+    return {
+      repostId: r.repost_id,
+      mediaId: r.media_id,
+      repostedAt: r.reposted_at,
+      note: r.note || '',
+      title: r.title || fallback?.title || 'Video Broadcast',
+      summary: r.summary || fallback?.summary || '',
+      videoUrl: r.video_url || fallback?.video_url || '',
+      thumbnail: r.thumbnail || fallback?.thumbnail || '',
+      type: r.type || fallback?.type || 'MASTERCLASS',
+      duration: r.duration || fallback?.duration || '15:00',
+      views: Number(r.views || fallback?.views || 0),
+      originalCreator: r.original_creator || fallback?.author_name || 'Swamy Reddy Javidi'
+    };
+  });
 }
 
 function sqliteGetAllLeads(): DbBuyerLead[] {

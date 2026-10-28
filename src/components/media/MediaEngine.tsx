@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MediaItem } from '../../types';
 import {
@@ -15,7 +15,8 @@ import {
   LifeBuoy,
   X,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Repeat
 } from 'lucide-react';
 
 interface Comment {
@@ -44,9 +45,27 @@ export const MediaEngine: React.FC<{
     deleteMediaItem
   } = useApp();
 
+  const isSuperAdmin = Boolean(isLoggedIn && currentUser?.role === 'SUPER_ADMIN');
+
   const [activeTab, setActiveTab] = useState<'ALL' | 'MASTERCLASS' | 'PODCAST'>('ALL');
-  const [likesState, setLikesState] = useState<Record<string, { count: number; isLiked: boolean }>>({});
-  const [commentsState, setCommentsState] = useState<Record<string, Comment[]>>({});
+  const [engagement, setEngagement] = useState<{
+    likesCount: number;
+    hasLiked: boolean;
+    reactionsCount: number;
+    commentsCount: number;
+    sharesCount: number;
+    repostsCount: number;
+    hasReposted: boolean;
+  }>({
+    likesCount: 0,
+    hasLiked: false,
+    reactionsCount: 0,
+    commentsCount: 0,
+    sharesCount: 0,
+    repostsCount: 0,
+    hasReposted: false
+  });
+  const [comments, setComments] = useState<Comment[]>([]);
   const [commentInput, setCommentInput] = useState('');
 
   // Post new update modal state
@@ -59,10 +78,54 @@ export const MediaEngine: React.FC<{
   const [newHost, setNewHost] = useState(currentUser?.name || 'Swamy Reddy Javidi');
 
   const activeVideo = selectedMedia || (mediaItems.length > 0 ? mediaItems[0] : null);
-  const activeLikes = activeVideo ? (likesState[activeVideo.id] || { count: 0, isLiked: false }) : { count: 0, isLiked: false };
-  const activeComments = activeVideo ? (commentsState[activeVideo.id] || []) : [];
 
-  const handleLike = () => {
+  // Sync engagement & comments from server for active video
+  useEffect(() => {
+    if (!activeVideo?.id) return;
+    Promise.all([
+      fetch(`/api/media/${activeVideo.id}/engagement`)
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => {
+          if (data?.engagement) {
+            setEngagement({
+              likesCount: data.engagement.likesCount || 0,
+              hasLiked: Boolean(data.engagement.hasLiked),
+              reactionsCount: data.engagement.reactionsCount || 0,
+              commentsCount: data.engagement.commentsCount || 0,
+              sharesCount: data.engagement.sharesCount || 0,
+              repostsCount: data.engagement.repostsCount || 0,
+              hasReposted: Boolean(data.engagement.hasReposted)
+            });
+          }
+        })
+        .catch(() => {}),
+      fetch(`/api/media/${activeVideo.id}/comments`)
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => {
+          if (Array.isArray(data?.comments)) {
+            setComments(
+              data.comments.map((c: any) => ({
+                id: c.id,
+                authorName: c.author_name,
+                authorRole: (c.author_role || '').replace('_', ' '),
+                authorAvatar: c.author_avatar || '',
+                text: c.text,
+                timestamp: c.created_at
+                  ? new Date(c.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric'
+                    })
+                  : 'Recently',
+                likes: 0
+              }))
+            );
+          }
+        })
+        .catch(() => {})
+    ]);
+  }, [activeVideo?.id, isLoggedIn]);
+
+  const handleLike = async () => {
     if (!activeVideo) return;
     if (!isLoggedIn) {
       showToast('Please sign in to like this video audit.');
@@ -70,22 +133,64 @@ export const MediaEngine: React.FC<{
       return;
     }
 
-    setLikesState(prev => {
-      const current = prev[activeVideo.id] || { count: 0, isLiked: false };
-      const newIsLiked = !current.isLiked;
-      return {
-        ...prev,
-        [activeVideo.id]: {
-          count: newIsLiked ? current.count + 1 : Math.max(0, current.count - 1),
-          isLiked: newIsLiked
-        }
-      };
-    });
-
-    showToast(activeLikes.isLiked ? 'Removed from liked broadcasts' : 'Liked video broadcast!');
+    try {
+      const res = await fetch(`/api/media/${activeVideo.id}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEngagement(prev => ({
+          ...prev,
+          hasLiked: data.liked,
+          likesCount: data.count
+        }));
+        showToast(data.liked ? 'Liked video broadcast!' : 'Removed from liked broadcasts');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'Failed to update like status');
+      }
+    } catch {
+      showToast('Network error updating like');
+    }
   };
 
-  const handleCommentSubmit = (e: React.FormEvent) => {
+  const handleRepost = async () => {
+    if (!activeVideo) return;
+    if (!isLoggedIn) {
+      showToast('Please sign in to repost this video broadcast.');
+      onOpenLoginModal?.();
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/media/${activeVideo.id}/repost`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEngagement(prev => ({
+          ...prev,
+          hasReposted: data.reposted,
+          repostsCount: data.count
+        }));
+        showToast(
+          data.reposted
+            ? 'Broadcast reposted to your account feed!'
+            : 'Removed broadcast from your account feed'
+        );
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'Failed to repost broadcast');
+      }
+    } catch {
+      showToast('Network error updating repost');
+    }
+  };
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeVideo || !commentInput.trim()) return;
 
@@ -95,29 +200,53 @@ export const MediaEngine: React.FC<{
       return;
     }
 
-    const newComment: Comment = {
-      id: `comm_${Date.now()}`,
-      authorName: currentUser.name,
-      authorRole: currentUser.role.replace('_', ' '),
-      authorAvatar: currentUser.avatar,
-      text: commentInput.trim(),
-      timestamp: 'Just now',
-      likes: 1,
-      isLiked: true
-    };
-
-    setCommentsState(prev => ({
-      ...prev,
-      [activeVideo.id]: [newComment, ...(prev[activeVideo.id] || [])]
-    }));
-
-    setCommentInput('');
-    showToast('Your comment has been posted!');
+    try {
+      const res = await fetch(`/api/media/${activeVideo.id}/comment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: commentInput.trim() })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const c = data.comment;
+        const newComment: Comment = {
+          id: c.id,
+          authorName: c.author_name,
+          authorRole: (c.author_role || '').replace('_', ' '),
+          authorAvatar: c.author_avatar || '',
+          text: c.text,
+          timestamp: 'Just now',
+          likes: 0
+        };
+        setComments(prev => [newComment, ...prev]);
+        setEngagement(prev => ({ ...prev, commentsCount: prev.commentsCount + 1 }));
+        setCommentInput('');
+        showToast('Your comment has been posted!');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'Failed to post comment');
+      }
+    } catch {
+      showToast('Network error posting comment');
+    }
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    showToast('Broadcast link copied to clipboard!');
+  const handleShare = async () => {
+    if (!activeVideo) return;
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showToast('Broadcast link copied to clipboard!');
+      fetch(`/api/media/${activeVideo.id}/share`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          if (data?.count) {
+            setEngagement(prev => ({ ...prev, sharesCount: data.count }));
+          }
+        })
+        .catch(() => {});
+    } catch {
+      showToast('Broadcast link ready to share: ' + window.location.href);
+    }
   };
 
   const handleEnquire = () => {
@@ -132,6 +261,10 @@ export const MediaEngine: React.FC<{
 
   const handleCreateBroadcast = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isSuperAdmin) {
+      showToast('Only Super Admin can upload or publish video broadcasts.');
+      return;
+    }
     if (!newTitle.trim() || !newSummary.trim()) {
       showToast('Please provide broadcast title and summary.');
       return;
@@ -185,13 +318,15 @@ export const MediaEngine: React.FC<{
         </div>
 
         <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <button
-            onClick={() => setIsPostModalOpen(true)}
-            className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black tracking-wide flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Post Video / Podcast Update</span>
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setIsPostModalOpen(true)}
+              className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black tracking-wide flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Post Video / Podcast Update</span>
+            </button>
+          )}
 
           <button
             onClick={handleEnquire}
@@ -280,25 +415,46 @@ export const MediaEngine: React.FC<{
                   <button
                     onClick={handleLike}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      activeLikes.isLiked
-                        ? 'bg-amber-100 text-amber-900'
+                      engagement.hasLiked
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300'
                         : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                     }`}
+                    title={engagement.hasLiked ? 'Liked' : 'Like Broadcast'}
                   >
-                    <ThumbsUp className={`w-3.5 h-3.5 ${activeLikes.isLiked ? 'fill-current' : ''}`} />
-                    <span>{activeLikes.count}</span>
+                    <ThumbsUp className={`w-3.5 h-3.5 ${engagement.hasLiked ? 'fill-current text-amber-600' : ''}`} />
+                    <span>{engagement.likesCount}</span>
+                  </button>
+
+                  <button
+                    onClick={handleRepost}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      engagement.hasReposted
+                        ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                    title={engagement.hasReposted ? 'Reposted to your account feed' : 'Repost broadcast to your account feed'}
+                  >
+                    <Repeat className="w-3.5 h-3.5" />
+                    <span>{engagement.hasReposted ? 'Reposted' : 'Repost'}</span>
+                    {engagement.repostsCount > 0 && (
+                      <span className="text-[10px] font-mono ml-0.5">({engagement.repostsCount})</span>
+                    )}
                   </button>
 
                   <button
                     onClick={handleShare}
-                    className="p-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                    title="Share Broadcast"
+                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                    title="Share Broadcast Link"
                   >
                     <Share2 className="w-3.5 h-3.5" />
+                    <span>Share</span>
+                    {engagement.sharesCount > 0 && (
+                      <span className="text-[10px] font-mono text-slate-400">({engagement.sharesCount})</span>
+                    )}
                   </button>
                 </div>
 
-                {currentUser.role === 'SUPER_ADMIN' && (
+                {isSuperAdmin && (
                   <button
                     onClick={() => deleteMediaItem(activeVideo.id)}
                     className="text-xs text-red-600 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
@@ -315,7 +471,7 @@ export const MediaEngine: React.FC<{
           <div className="p-6 border-t border-slate-200 space-y-4">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-slate-500" />
-              <span>Discussion ({activeComments.length})</span>
+              <span>Discussion ({comments.length})</span>
             </h3>
 
             <form onSubmit={handleCommentSubmit} className="flex gap-2">
@@ -336,7 +492,7 @@ export const MediaEngine: React.FC<{
             </form>
 
             <div className="space-y-3 pt-2">
-              {activeComments.map(c => (
+              {comments.map(c => (
                 <div key={c.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-900">{c.authorName}</span>
@@ -355,19 +511,23 @@ export const MediaEngine: React.FC<{
           </div>
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-slate-900 font-display">
-              No Video Broadcasts Uploaded Yet
+              {isSuperAdmin ? 'Super Admin Broadcast Studio' : 'No Video Broadcasts Published Yet'}
             </h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto">
-              All masterclasses and builder podcasts are published dynamically. Click below to post the first official broadcast.
+            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              {isSuperAdmin
+                ? 'You have Super Admin broadcasting privileges. Click below to publish the first official broadcast.'
+                : 'Check back soon for upcoming masterclasses and builder podcasts hosted by Swamy Reddy Javidi.'}
             </p>
           </div>
-          <button
-            onClick={() => setIsPostModalOpen(true)}
-            className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors inline-flex items-center gap-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-amber-400" />
-            <span>Upload New Broadcast</span>
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setIsPostModalOpen(true)}
+              className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors inline-flex items-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-amber-400" />
+              <span>Upload New Broadcast</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -445,8 +605,8 @@ export const MediaEngine: React.FC<{
         </div>
       )}
 
-      {/* Modal: Post New Broadcast */}
-      {isPostModalOpen && (
+      {/* Modal: Post New Broadcast (Super Admin Only) */}
+      {isPostModalOpen && isSuperAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="p-5 bg-slate-900 text-white flex items-center justify-between">

@@ -196,6 +196,59 @@ CREATE TABLE IF NOT EXISTS entity_reviews (
   UNIQUE (entity_type, entity_id, author_id)
 );
 CREATE INDEX IF NOT EXISTS idx_entity_reviews_public ON entity_reviews(entity_type, entity_id, status);
+
+CREATE TABLE IF NOT EXISTS media_likes (
+  id VARCHAR(64) PRIMARY KEY,
+  media_id VARCHAR(64) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (media_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_media_likes_media ON media_likes(media_id);
+CREATE INDEX IF NOT EXISTS idx_media_likes_user ON media_likes(user_id);
+
+CREATE TABLE IF NOT EXISTS media_reactions (
+  id VARCHAR(64) PRIMARY KEY,
+  media_id VARCHAR(64) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  reaction_type VARCHAR(32) NOT NULL DEFAULT 'THUMBS_UP',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (media_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_media_reactions_media ON media_reactions(media_id);
+
+CREATE TABLE IF NOT EXISTS media_comments (
+  id VARCHAR(64) PRIMARY KEY,
+  media_id VARCHAR(64) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  author_name VARCHAR(255) NOT NULL,
+  author_role VARCHAR(128),
+  author_avatar TEXT,
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_media_comments_media ON media_comments(media_id);
+
+CREATE TABLE IF NOT EXISTS media_shares (
+  id VARCHAR(64) PRIMARY KEY,
+  media_id VARCHAR(64) NOT NULL,
+  user_id VARCHAR(64),
+  platform VARCHAR(64) DEFAULT 'DIRECT_LINK',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_media_shares_media ON media_shares(media_id);
+
+CREATE TABLE IF NOT EXISTS media_reposts (
+  id VARCHAR(64) PRIMARY KEY,
+  media_id VARCHAR(64) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  user_name VARCHAR(255),
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (media_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_media_reposts_user ON media_reposts(user_id);
+CREATE INDEX IF NOT EXISTS idx_media_reposts_media ON media_reposts(media_id);
 `;
 
 export const ESSENTIAL_CONFIG_SQL = `
@@ -356,6 +409,48 @@ CREATE TABLE IF NOT EXISTS entity_reviews (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (entity_type, entity_id, author_id)
+);
+
+CREATE TABLE IF NOT EXISTS media_likes (
+  id TEXT PRIMARY KEY,
+  media_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (media_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS media_reactions (
+  id TEXT PRIMARY KEY,
+  media_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  reaction_type TEXT NOT NULL DEFAULT 'THUMBS_UP',
+  created_at TEXT NOT NULL,
+  UNIQUE (media_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS media_comments (
+  id TEXT PRIMARY KEY,
+  media_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  author_name TEXT NOT NULL,
+  author_role TEXT,
+  author_avatar TEXT,
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS media_shares (
+  id TEXT PRIMARY KEY,
+  media_id TEXT NOT NULL,
+  user_id TEXT,
+  platform TEXT DEFAULT 'DIRECT_LINK',
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS media_reposts (
+  id TEXT PRIMARY KEY,
+  media_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT,
+  note TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (media_id, user_id)
 );
 `;
 

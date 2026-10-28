@@ -35,10 +35,28 @@ import {
   Building,
   UserCheck,
   Search,
-  RotateCcw
+  RotateCcw,
+  Video,
+  Play,
+  Repeat
 } from 'lucide-react';
 
 type TabType = 'OVERVIEW' | 'REQUIREMENTS' | 'REVIEWS' | 'NOTIFICATIONS' | 'COMMUNITY' | 'SETTINGS';
+
+interface RepostRecord {
+  repostId: string;
+  mediaId: string;
+  repostedAt: string;
+  note?: string;
+  title: string;
+  summary: string;
+  videoUrl: string;
+  thumbnail: string;
+  type: string;
+  duration: string;
+  views: number;
+  originalCreator: string;
+}
 
 interface RequirementRecord {
   id: string;
@@ -94,7 +112,7 @@ function maskPhoneNumber(phone?: string): string {
 }
 
 export const UserDashboard: React.FC = () => {
-  const { currentUser, setActiveView, walletBalance, showToast, refreshSession, properties, constructionLogs } = useApp();
+  const { currentUser, setActiveView, walletBalance, showToast, refreshSession, properties, constructionLogs, setSelectedMedia, mediaItems } = useApp();
 
   const [activeTab, setActiveTab] = useState<TabType>('OVERVIEW');
 
@@ -273,13 +291,35 @@ export const UserDashboard: React.FC = () => {
     }
   }, []);
 
+  // Reposted broadcasts state
+  const [userReposts, setUserReposts] = useState<RepostRecord[]>([]);
+  const [loadingReposts, setLoadingReposts] = useState(false);
+
+  const fetchUserReposts = useCallback(async () => {
+    setLoadingReposts(true);
+    try {
+      const res = await fetch('/api/me/reposts');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.reposts)) {
+          setUserReposts(data.reposts);
+        }
+      }
+    } catch {
+      // Reposts load is non-blocking
+    } finally {
+      setLoadingReposts(false);
+    }
+  }, []);
+
   // Initial load
   useEffect(() => {
     fetchRequirements();
     fetchReviews();
     fetchNotifications();
     fetchCommunityPosts();
-  }, [fetchRequirements, fetchReviews, fetchNotifications, fetchCommunityPosts]);
+    fetchUserReposts();
+  }, [fetchRequirements, fetchReviews, fetchNotifications, fetchCommunityPosts, fetchUserReposts]);
 
   // Sync profile fields if currentUser changes
   useEffect(() => {
@@ -1098,6 +1138,143 @@ export const UserDashboard: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Reposted Broadcasts Feed */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Repeat className="w-4 h-4 text-amber-600" />
+                  <span>My Reposted Broadcasts & Podcasts</span>
+                  {userReposts.length > 0 && (
+                    <span className="text-xs bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full">
+                      {userReposts.length}
+                    </span>
+                  )}
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Published broadcasts and structural audits you've reposted to your account feed with attribution to original hosts.
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveView('MEDIA')}
+                className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer"
+              >
+                <span>Browse All Broadcasts</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {loadingReposts ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
+                <div className="h-28 bg-slate-100 rounded-xl animate-pulse" />
+                <div className="h-28 bg-slate-100 rounded-xl animate-pulse" />
+              </div>
+            ) : userReposts.length === 0 ? (
+              <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl space-y-3">
+                <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                  <Video className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-700">No reposted broadcasts yet</p>
+                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                    Browse expert masterclasses and builder podcasts hosted by Swamy Reddy Javidi, and click Repost to share insights on your feed.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveView('MEDIA')}
+                  className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Explore Masterclasses</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {userReposts.map(rep => (
+                  <div
+                    key={rep.repostId}
+                    className="group border border-slate-200 hover:border-amber-400 rounded-xl overflow-hidden bg-slate-50/50 hover:bg-white transition-all shadow-2xs hover:shadow-sm flex flex-col justify-between"
+                  >
+                    <div>
+                      {/* Repost Header Badge */}
+                      <div className="px-3.5 py-2 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                          <Repeat className="w-3 h-3 text-amber-600" />
+                          <span>Reposted by you</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {rep.repostedAt ? new Date(rep.repostedAt).toLocaleDateString() : 'Recently'}
+                        </span>
+                      </div>
+
+                      {/* Video Thumbnail & Original Creator Attribution */}
+                      <div className="p-4 space-y-3">
+                        <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-950">
+                          <img
+                            src={rep.thumbnail}
+                            alt={rep.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+                          <span className="absolute bottom-2 left-2 text-[10px] font-bold text-amber-400 uppercase tracking-wider bg-slate-900/90 px-2 py-0.5 rounded font-mono">
+                            {rep.type} • {rep.duration}
+                          </span>
+                        </div>
+
+                        {/* Attribution Note */}
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200/80">
+                          <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span className="text-[11px] text-slate-600">Original broadcast by</span>
+                          <span className="text-[11px] font-bold text-slate-900">{rep.originalCreator}</span>
+                        </div>
+
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition-colors line-clamp-2">
+                            {rep.title}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                            {rep.summary}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action: Link to original video without media duplication */}
+                    <div className="px-4 py-3 bg-white border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {rep.views.toLocaleString()} views
+                      </span>
+                      <button
+                        onClick={() => {
+                          const target = (mediaItems && mediaItems.find(m => m.id === rep.mediaId)) || {
+                            id: rep.mediaId,
+                            title: rep.title,
+                            summary: rep.summary,
+                            videoUrl: rep.videoUrl,
+                            thumbnail: rep.thumbnail,
+                            type: rep.type as any,
+                            duration: rep.duration,
+                            host: rep.originalCreator,
+                            keyTakeaways: [],
+                            timestamps: [],
+                            views: rep.views,
+                            publishedDate: 'Original Broadcast'
+                          };
+                          setSelectedMedia(target);
+                          setActiveView('MEDIA');
+                        }}
+                        className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Watch Original Broadcast</span>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -57,8 +57,18 @@ import {
   markAllNotificationsRead,
   getCommunityEventsSince,
   getAllMedia,
+  getMediaById,
   createMedia,
+  updateMedia,
   deleteMedia,
+  toggleMediaLike,
+  setMediaReaction,
+  addMediaComment,
+  getMediaComments,
+  recordMediaShare,
+  toggleMediaRepost,
+  getMediaEngagement,
+  getUserReposts,
   getAllLeads,
   createLead,
   deleteLead,
@@ -157,6 +167,18 @@ const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFuncti
 const requireSuperAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!req.user || req.user.role !== 'SUPER_ADMIN') {
     res.status(403).json({ error: 'Only a Super Admin can approve or reject this content.' });
+    return;
+  }
+  next();
+};
+
+const requireSuperAdminOnly = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required. Please sign in.' });
+    return;
+  }
+  if (req.user.role !== 'SUPER_ADMIN') {
+    res.status(403).json({ error: 'Access denied: Only Super Admin can upload, create, edit, delete, and publish videos or podcasts.' });
     return;
   }
   next();
@@ -1677,19 +1699,152 @@ app.get('/api/media', async (_req: Request, res: Response): Promise<void> => {
   }
 });
 
-app.post('/api/media', requireAuth, async (req: Request, res: Response): Promise<void> => {
+app.get('/api/media/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const mediaId = await createMedia(req.body);
+    const item = await getMediaById(req.params.id);
+    if (!item) {
+      res.status(404).json({ error: 'Media broadcast not found.' });
+      return;
+    }
+    res.json({ item });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/media', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { title, summary, video_url, thumbnail, type, duration, author_name } = req.body;
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      res.status(400).json({ error: 'Title is required for video broadcast.' });
+      return;
+    }
+    if (!summary || typeof summary !== 'string' || !summary.trim()) {
+      res.status(400).json({ error: 'Summary is required for video broadcast.' });
+      return;
+    }
+    const mediaId = await createMedia({
+      title: title.trim(),
+      summary: summary.trim(),
+      video_url: video_url?.trim() || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      thumbnail: thumbnail?.trim() || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+      type: type || 'MASTERCLASS',
+      duration: duration || '20:00',
+      author_name: author_name?.trim() || req.user?.name || 'Swamy Reddy Javidi'
+    });
     res.json({ success: true, mediaId });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.delete('/api/media/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+app.put('/api/media/:id', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    await updateMedia(req.params.id, req.body);
+    res.json({ success: true, message: 'Media broadcast updated' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/media/:id', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     await deleteMedia(req.params.id);
     res.json({ success: true, message: 'Media item deleted' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Media Engagement Endpoints
+app.post('/api/media/:id/like', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const result = await toggleMediaLike(req.params.id, req.user.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/media/:id/react', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const reactionType = req.body?.reactionType || 'THUMBS_UP';
+    const result = await setMediaReaction(req.params.id, req.user.id, reactionType);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/media/:id/comments', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const comments = await getMediaComments(req.params.id);
+    res.json({ comments });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/media/:id/comment', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const text = String(req.body?.text || '').trim();
+    if (!text) {
+      res.status(400).json({ error: 'Comment text cannot be empty.' });
+      return;
+    }
+    if (text.length > 2000) {
+      res.status(400).json({ error: 'Comment exceeds maximum allowed length.' });
+      return;
+    }
+    const comment = await addMediaComment({
+      mediaId: req.params.id,
+      userId: req.user.id,
+      authorName: req.user.name || 'Member',
+      authorRole: req.user.role || 'PROPERTY_SEEKER',
+      authorAvatar: req.user.avatar,
+      text
+    });
+    res.json({ success: true, comment });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/media/:id/share', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as AuthenticatedRequest).user?.id || undefined;
+    const platform = req.body?.platform || 'DIRECT_LINK';
+    const result = await recordMediaShare(req.params.id, userId, platform);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/media/:id/repost', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const note = req.body?.note ? String(req.body.note).trim() : undefined;
+    const result = await toggleMediaRepost(req.params.id, req.user.id, req.user.name, note);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/media/:id/engagement', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as AuthenticatedRequest).user?.id || undefined;
+    const engagement = await getMediaEngagement(req.params.id, userId);
+    res.json({ engagement });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/me/reposts', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const reposts = await getUserReposts(req.user.id);
+    res.json({ reposts });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -20,11 +20,15 @@ import type {
   DbCommunityEvent,
   DbCommunityReply,
   DbMediaItem,
+  DbMediaComment,
+  DbMediaEngagement,
+  DbUserRepostItem,
   DbBuyerLead,
   DbConferenceDetails,
   DbModerationReport
 } from './db.ts';
 import {
+  DEFAULT_MEDIA_ITEMS,
   hashPassword,
   verifyPassword,
   hashToken,
@@ -2009,7 +2013,35 @@ export async function pgDeleteCommunity(id: string): Promise<boolean> {
 // ==============================================================================
 
 export async function pgGetAllMedia(): Promise<DbMediaItem[]> {
+  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres('SELECT * FROM media_items ORDER BY created_at DESC');
+  if (res.rows.length === 0) {
+    for (const item of DEFAULT_MEDIA_ITEMS) {
+      try {
+        await queryPostgres(`
+          INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ON CONFLICT (id) DO NOTHING
+        `, [item.id, item.title, item.summary, item.video_url, item.thumbnail, item.type, item.duration, item.views, item.author_name, item.created_at]);
+      } catch {}
+    }
+    const seeded = await queryPostgres('SELECT * FROM media_items ORDER BY created_at DESC');
+    if (seeded.rows.length > 0) {
+      return seeded.rows.map((m: any) => ({
+        id: m.id,
+        title: m.title,
+        summary: m.summary,
+        video_url: m.video_url,
+        thumbnail: m.thumbnail,
+        type: m.type,
+        duration: m.duration,
+        views: Number(m.views || 0),
+        author_name: m.author_name,
+        created_at: toIso(m.created_at)
+      }));
+    }
+    return DEFAULT_MEDIA_ITEMS;
+  }
   return res.rows.map((m: any) => ({
     id: m.id,
     title: m.title,
@@ -2024,6 +2056,28 @@ export async function pgGetAllMedia(): Promise<DbMediaItem[]> {
   }));
 }
 
+export async function pgGetMediaById(id: string): Promise<DbMediaItem | null> {
+  await ensurePostgresAdditiveSchema();
+  const res = await queryPostgres('SELECT * FROM media_items WHERE id = $1', [id]);
+  if (res.rows.length === 0) {
+    const fallback = DEFAULT_MEDIA_ITEMS.find(m => m.id === id);
+    return fallback || null;
+  }
+  const m = res.rows[0];
+  return {
+    id: m.id,
+    title: m.title,
+    summary: m.summary,
+    video_url: m.video_url,
+    thumbnail: m.thumbnail,
+    type: m.type,
+    duration: m.duration,
+    views: Number(m.views || 0),
+    author_name: m.author_name,
+    created_at: toIso(m.created_at)
+  };
+}
+
 export async function pgCreateMedia(item: {
   title: string;
   summary: string;
@@ -2033,6 +2087,7 @@ export async function pgCreateMedia(item: {
   duration?: string;
   author_name?: string;
 }): Promise<string> {
+  await ensurePostgresAdditiveSchema();
   const id = `media_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
   await queryPostgres(`
@@ -2052,9 +2107,248 @@ export async function pgCreateMedia(item: {
   return id;
 }
 
+export async function pgUpdateMedia(
+  id: string,
+  updates: Partial<{ title: string; summary: string; video_url: string; thumbnail: string; type: string; duration: string }>
+): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  const fields: string[] = [];
+  const args: any[] = [];
+  let idx = 1;
+  if (updates.title) { fields.push(`title = $${idx++}`); args.push(updates.title); }
+  if (updates.summary) { fields.push(`summary = $${idx++}`); args.push(updates.summary); }
+  if (updates.video_url) { fields.push(`video_url = $${idx++}`); args.push(updates.video_url); }
+  if (updates.thumbnail) { fields.push(`thumbnail = $${idx++}`); args.push(updates.thumbnail); }
+  if (updates.type) { fields.push(`type = $${idx++}`); args.push(updates.type); }
+  if (updates.duration) { fields.push(`duration = $${idx++}`); args.push(updates.duration); }
+  if (fields.length === 0) return true;
+  args.push(id);
+  await queryPostgres(`UPDATE media_items SET ${fields.join(', ')} WHERE id = $${idx}`, args);
+  return true;
+}
+
 export async function pgDeleteMedia(id: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
   await queryPostgres('DELETE FROM media_items WHERE id = $1', [id]);
   return true;
+}
+
+export async function pgToggleMediaLike(mediaId: string, userId: string): Promise<{ liked: boolean; count: number }> {
+  await ensurePostgresAdditiveSchema();
+  const existingItem = await pgGetMediaById(mediaId);
+  if (existingItem) {
+    try {
+      await queryPostgres(`
+        INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (id) DO NOTHING
+      `, [existingItem.id, existingItem.title, existingItem.summary, existingItem.video_url, existingItem.thumbnail, existingItem.type, existingItem.duration, existingItem.views, existingItem.author_name, existingItem.created_at]);
+    } catch {}
+  }
+
+  const existing = await queryPostgres('SELECT id FROM media_likes WHERE media_id = $1 AND user_id = $2', [mediaId, userId]);
+  let liked = false;
+  if (existing.rows.length > 0) {
+    await queryPostgres('DELETE FROM media_likes WHERE media_id = $1 AND user_id = $2', [mediaId, userId]);
+    liked = false;
+  } else {
+    const id = `mlike_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    await queryPostgres(`
+      INSERT INTO media_likes (id, media_id, user_id, created_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (media_id, user_id) DO NOTHING
+    `, [id, mediaId, userId]);
+    liked = true;
+  }
+  const countRes = await queryPostgres('SELECT COUNT(*) as count FROM media_likes WHERE media_id = $1', [mediaId]);
+  return { liked, count: Number(countRes.rows[0]?.count || 0) };
+}
+
+export async function pgSetMediaReaction(mediaId: string, userId: string, reactionType = 'THUMBS_UP'): Promise<{ reaction: string | null; count: number }> {
+  await ensurePostgresAdditiveSchema();
+  const existing = await queryPostgres('SELECT id, reaction_type FROM media_reactions WHERE media_id = $1 AND user_id = $2', [mediaId, userId]);
+  let reaction: string | null = null;
+  if (existing.rows.length > 0) {
+    if (existing.rows[0].reaction_type === reactionType) {
+      await queryPostgres('DELETE FROM media_reactions WHERE id = $1', [existing.rows[0].id]);
+      reaction = null;
+    } else {
+      await queryPostgres('UPDATE media_reactions SET reaction_type = $1 WHERE id = $2', [reactionType, existing.rows[0].id]);
+      reaction = reactionType;
+    }
+  } else {
+    const id = `mreact_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    await queryPostgres(`
+      INSERT INTO media_reactions (id, media_id, user_id, reaction_type, created_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (media_id, user_id) DO UPDATE SET reaction_type = EXCLUDED.reaction_type
+    `, [id, mediaId, userId, reactionType]);
+    reaction = reactionType;
+  }
+  const countRes = await queryPostgres('SELECT COUNT(*) as count FROM media_reactions WHERE media_id = $1', [mediaId]);
+  return { reaction, count: Number(countRes.rows[0]?.count || 0) };
+}
+
+export async function pgAddMediaComment(comment: {
+  mediaId: string;
+  userId: string;
+  authorName: string;
+  authorRole?: string;
+  authorAvatar?: string;
+  text: string;
+}): Promise<DbMediaComment> {
+  await ensurePostgresAdditiveSchema();
+  const id = `mcomm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  const now = new Date().toISOString();
+  await queryPostgres(`
+    INSERT INTO media_comments (id, media_id, user_id, author_name, author_role, author_avatar, text, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  `, [
+    id,
+    comment.mediaId,
+    comment.userId,
+    comment.authorName,
+    comment.authorRole || 'PROPERTY_SEEKER',
+    comment.authorAvatar || '',
+    comment.text,
+    now
+  ]);
+  return {
+    id,
+    media_id: comment.mediaId,
+    user_id: comment.userId,
+    author_name: comment.authorName,
+    author_role: comment.authorRole,
+    author_avatar: comment.authorAvatar,
+    text: comment.text,
+    created_at: now
+  };
+}
+
+export async function pgGetMediaComments(mediaId: string): Promise<DbMediaComment[]> {
+  await ensurePostgresAdditiveSchema();
+  const res = await queryPostgres('SELECT * FROM media_comments WHERE media_id = $1 ORDER BY created_at DESC', [mediaId]);
+  return res.rows.map((c: any) => ({
+    id: c.id,
+    media_id: c.media_id,
+    user_id: c.user_id,
+    author_name: c.author_name,
+    author_role: c.author_role,
+    author_avatar: c.author_avatar,
+    text: c.text,
+    created_at: toIso(c.created_at)
+  }));
+}
+
+export async function pgRecordMediaShare(mediaId: string, userId?: string, platform = 'DIRECT_LINK'): Promise<{ count: number }> {
+  await ensurePostgresAdditiveSchema();
+  const id = `mshare_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  await queryPostgres(`
+    INSERT INTO media_shares (id, media_id, user_id, platform, created_at)
+    VALUES ($1, $2, $3, $4, NOW())
+  `, [id, mediaId, userId || null, platform]);
+  const countRes = await queryPostgres('SELECT COUNT(*) as count FROM media_shares WHERE media_id = $1', [mediaId]);
+  return { count: Number(countRes.rows[0]?.count || 0) };
+}
+
+export async function pgToggleMediaRepost(
+  mediaId: string,
+  userId: string,
+  userName?: string,
+  note?: string
+): Promise<{ reposted: boolean; count: number }> {
+  await ensurePostgresAdditiveSchema();
+  const existingItem = await pgGetMediaById(mediaId);
+  if (existingItem) {
+    try {
+      await queryPostgres(`
+        INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (id) DO NOTHING
+      `, [existingItem.id, existingItem.title, existingItem.summary, existingItem.video_url, existingItem.thumbnail, existingItem.type, existingItem.duration, existingItem.views, existingItem.author_name, existingItem.created_at]);
+    } catch {}
+  }
+
+  const existing = await queryPostgres('SELECT id FROM media_reposts WHERE media_id = $1 AND user_id = $2', [mediaId, userId]);
+  let reposted = false;
+  if (existing.rows.length > 0) {
+    await queryPostgres('DELETE FROM media_reposts WHERE media_id = $1 AND user_id = $2', [mediaId, userId]);
+    reposted = false;
+  } else {
+    const id = `mrepost_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    await queryPostgres(`
+      INSERT INTO media_reposts (id, media_id, user_id, user_name, note, created_at)
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      ON CONFLICT (media_id, user_id) DO NOTHING
+    `, [id, mediaId, userId, userName || '', note || '']);
+    reposted = true;
+  }
+  const countRes = await queryPostgres('SELECT COUNT(*) as count FROM media_reposts WHERE media_id = $1', [mediaId]);
+  return { reposted, count: Number(countRes.rows[0]?.count || 0) };
+}
+
+export async function pgGetMediaEngagement(mediaId: string, userId?: string): Promise<DbMediaEngagement> {
+  await ensurePostgresAdditiveSchema();
+  const likesRes = await queryPostgres('SELECT COUNT(*) as count FROM media_likes WHERE media_id = $1', [mediaId]);
+  const reactsRes = await queryPostgres('SELECT COUNT(*) as count FROM media_reactions WHERE media_id = $1', [mediaId]);
+  const commsRes = await queryPostgres('SELECT COUNT(*) as count FROM media_comments WHERE media_id = $1', [mediaId]);
+  const sharesRes = await queryPostgres('SELECT COUNT(*) as count FROM media_shares WHERE media_id = $1', [mediaId]);
+  const repostsRes = await queryPostgres('SELECT COUNT(*) as count FROM media_reposts WHERE media_id = $1', [mediaId]);
+
+  let hasLiked = false;
+  let userReaction: string | null = null;
+  let hasReposted = false;
+
+  if (userId) {
+    const likeCheck = await queryPostgres('SELECT id FROM media_likes WHERE media_id = $1 AND user_id = $2', [mediaId, userId]);
+    hasLiked = likeCheck.rows.length > 0;
+    const reactCheck = await queryPostgres('SELECT reaction_type FROM media_reactions WHERE media_id = $1 AND user_id = $2', [mediaId, userId]);
+    userReaction = reactCheck.rows[0]?.reaction_type || null;
+    const repostCheck = await queryPostgres('SELECT id FROM media_reposts WHERE media_id = $1 AND user_id = $2', [mediaId, userId]);
+    hasReposted = repostCheck.rows.length > 0;
+  }
+
+  return {
+    mediaId,
+    likesCount: Number(likesRes.rows[0]?.count || 0),
+    hasLiked,
+    reactionsCount: Number(reactsRes.rows[0]?.count || 0),
+    userReaction,
+    commentsCount: Number(commsRes.rows[0]?.count || 0),
+    sharesCount: Number(sharesRes.rows[0]?.count || 0),
+    repostsCount: Number(repostsRes.rows[0]?.count || 0),
+    hasReposted
+  };
+}
+
+export async function pgGetUserReposts(userId: string): Promise<DbUserRepostItem[]> {
+  await ensurePostgresAdditiveSchema();
+  const res = await queryPostgres(`
+    SELECT r.id as repost_id, r.media_id, r.note, r.created_at as reposted_at,
+           m.title, m.summary, m.video_url, m.thumbnail, m.type, m.duration, m.views, m.author_name as original_creator
+    FROM media_reposts r
+    LEFT JOIN media_items m ON r.media_id = m.id
+    WHERE r.user_id = $1
+    ORDER BY r.created_at DESC
+  `, [userId]);
+
+  return res.rows.map((r: any) => {
+    const fallback = DEFAULT_MEDIA_ITEMS.find(m => m.id === r.media_id);
+    return {
+      repostId: r.repost_id,
+      mediaId: r.media_id,
+      repostedAt: toIso(r.reposted_at),
+      note: r.note || '',
+      title: r.title || fallback?.title || 'Video Broadcast',
+      summary: r.summary || fallback?.summary || '',
+      videoUrl: r.video_url || fallback?.video_url || '',
+      thumbnail: r.thumbnail || fallback?.thumbnail || '',
+      type: r.type || fallback?.type || 'MASTERCLASS',
+      duration: r.duration || fallback?.duration || '15:00',
+      views: Number(r.views || fallback?.views || 0),
+      originalCreator: r.original_creator || fallback?.author_name || 'Swamy Reddy Javidi'
+    };
+  });
 }
 
 export async function pgGetAllLeads(): Promise<DbBuyerLead[]> {
