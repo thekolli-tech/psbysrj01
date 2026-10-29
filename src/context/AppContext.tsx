@@ -90,8 +90,16 @@ interface AppContextType {
     description: string;
     category: string;
     location?: string;
+    coverImage?: string;
+    bannerImage?: string;
+    icon?: string;
+    visibility?: 'PUBLIC' | 'PRIVATE';
     rules?: string;
   }) => Promise<{ success: boolean; message: string }>;
+  updateCommunityDetails: (communityId: string, updates: Partial<CommunityHub>) => Promise<{ success: boolean; message?: string }>;
+  joinCommunity: (communityId: string) => Promise<{ success: boolean; status?: string; message?: string }>;
+  leaveCommunity: (communityId: string) => Promise<{ success: boolean; message?: string }>;
+  repostDiscussion: (postId: string, note?: string) => Promise<{ success: boolean; reposted?: boolean; count?: number }>;
   approveCommunity: (id: string) => Promise<void>;
   rejectCommunity: (id: string, reason?: string) => Promise<void>;
   deleteCommunityHub: (id: string) => Promise<void>;
@@ -256,6 +264,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           icon: c.icon || 'Users',
           bannerImage: c.banner_image,
           rules: c.rules,
+          visibility: c.visibility || 'PUBLIC',
+          membershipStatus: c.membership_status || 'NONE',
+          membershipRole: c.membership_role || undefined,
           createdAt: c.created_at,
           updatedAt: c.updated_at
         }));
@@ -625,6 +636,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     description: string;
     category: string;
     location?: string;
+    coverImage?: string;
+    bannerImage?: string;
+    icon?: string;
+    visibility?: 'PUBLIC' | 'PRIVATE';
     rules?: string;
   }) => {
     try {
@@ -647,6 +662,81 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err: any) {
       showToast(err.message || 'Error submitting community proposal');
       return { success: false, message: err.message };
+    }
+  };
+
+  const updateCommunityDetails = async (communityId: string, updates: Partial<CommunityHub>) => {
+    try {
+      const res = await fetch(`/api/communities/${communityId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to update community');
+        return { success: false, message: data.error };
+      }
+      showToast('Community details updated successfully!');
+      await refreshCommunities();
+      return { success: true, message: 'Updated' };
+    } catch (err: any) {
+      showToast(err.message || 'Error updating community');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const joinCommunity = async (communityId: string) => {
+    try {
+      const res = await fetch(`/api/communities/${communityId}/join`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to join community');
+        return { success: false, message: data.error };
+      }
+      showToast(data.message || (data.status === 'PENDING' ? 'Request submitted' : 'Joined community!'));
+      await refreshCommunities();
+      return { success: true, status: data.status, message: data.message };
+    } catch (err: any) {
+      showToast(err.message || 'Error joining community');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const leaveCommunity = async (communityId: string) => {
+    try {
+      const res = await fetch(`/api/communities/${communityId}/leave`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to leave community');
+        return { success: false, message: data.error };
+      }
+      showToast('Left community');
+      await refreshCommunities();
+      return { success: true };
+    } catch (err: any) {
+      showToast(err.message || 'Error leaving community');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const repostDiscussion = async (postId: string, note?: string) => {
+    try {
+      const res = await fetch(`/api/community/posts/${postId}/repost`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to repost discussion');
+        return { success: false };
+      }
+      showToast(data.reposted ? 'Discussion reposted to your profile!' : 'Discussion repost removed');
+      return { success: true, reposted: data.reposted, count: data.count };
+    } catch (err: any) {
+      showToast(err.message || 'Error reposting discussion');
+      return { success: false };
     }
   };
 
@@ -1032,6 +1122,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         communities,
         refreshCommunities,
         createCommunityProposal,
+        updateCommunityDetails,
+        joinCommunity,
+        leaveCommunity,
+        repostDiscussion,
         approveCommunity,
         rejectCommunity,
         deleteCommunityHub,

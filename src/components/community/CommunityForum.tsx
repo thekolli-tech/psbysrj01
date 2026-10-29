@@ -49,7 +49,12 @@ import {
   ChevronRight,
   AlertTriangle,
   Compass,
-  Lock
+  Lock,
+  Repeat,
+  Settings,
+  MapPin,
+  Filter,
+  Shield
 } from 'lucide-react';
 
 interface CommunityForumViewProps {
@@ -70,6 +75,18 @@ const COMMUNITY_TOPIC_LIST = [
   'Price Trends & Market Updates'
 ] as const;
 
+const COMMUNITY_CATEGORIES = [
+  'ALL',
+  'Micro-Market Hub',
+  'Residential',
+  'Commercial',
+  'Plots & Land',
+  'Luxury Villas & Gated Communities',
+  'Legal & RERA',
+  'Architecture & Vaastu',
+  'Investor Syndicate'
+] as const;
+
 export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLoginModal }) => {
   const {
     communityPosts,
@@ -79,7 +96,12 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     showToast,
     createCommunityPost,
     communities,
-    createCommunityProposal
+    createCommunityProposal,
+    updateCommunityDetails,
+    joinCommunity,
+    leaveCommunity,
+    repostDiscussion,
+    refreshCommunities
   } = useApp();
 
   // Navigation & Filtering
@@ -89,8 +111,29 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   const [sortMode, setSortMode] = useState<'HOT' | 'TOP' | 'NEW'>('HOT');
   const [questionQuery, setQuestionQuery] = useState('');
 
+  // Community Hubs Discovery Filtering
+  const [hubSearchQuery, setHubSearchQuery] = useState('');
+  const [hubCategoryFilter, setHubCategoryFilter] = useState<string>('ALL');
+  const [hubVisibilityFilter, setHubVisibilityFilter] = useState<'ALL' | 'PUBLIC' | 'PRIVATE'>('ALL');
+  const [communityActionLoading, setCommunityActionLoading] = useState<string | null>(null);
+
+  // Manage Community Hub Modal State
+  const [manageCommunityId, setManageCommunityId] = useState<string | null>(null);
+  const [communityMembersList, setCommunityMembersList] = useState<any[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [manageTab, setManageTab] = useState<'SETTINGS' | 'MEMBERS'>('SETTINGS');
+  const [editSettingsForm, setEditSettingsForm] = useState({
+    name: '',
+    category: 'Micro-Market Hub',
+    location: '',
+    description: '',
+    rules: '',
+    visibility: 'PUBLIC' as 'PUBLIC' | 'PRIVATE',
+    bannerImage: ''
+  });
+
   // Modals
-  const [showModal, setShowModal] = useState<'NONE' | 'UNIFIED' | 'PROPOSE_COMMUNITY' | 'USER_PROFILE' | 'REPORT'>('NONE');
+  const [showModal, setShowModal] = useState<'NONE' | 'UNIFIED' | 'PROPOSE_COMMUNITY' | 'USER_PROFILE' | 'REPORT' | 'MANAGE_COMMUNITY'>('NONE');
   const [unifiedTab, setUnifiedTab] = useState<'QUESTION' | 'POST'>('QUESTION');
   const [postSubTab, setPostSubTab] = useState<'TEXT' | 'MEDIA' | 'LINK' | 'POLL' | 'AMA'>('TEXT');
 
@@ -154,7 +197,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     category: 'Micro-Market Hub',
     location: 'Kokapet Neopolis, Hyderabad',
     description: '',
-    rules: '1. No spam. 2. Verify RERA numbers before quoting delay metrics. 3. Civil discourse only.'
+    rules: '1. No spam. 2. Verify RERA numbers before quoting delay metrics. 3. Civil discourse only.',
+    visibility: 'PUBLIC' as 'PUBLIC' | 'PRIVATE',
+    bannerImage: ''
   });
   const [commSubmitting, setCommSubmitting] = useState(false);
 
@@ -169,6 +214,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     bookmarkCount?: number;
     pollOptions?: any[];
     userVotedOptionId?: string | null;
+    repostsCount?: number;
+    hasReposted?: boolean;
   }>>({});
 
   // Load Bookmarks on Auth
@@ -231,7 +278,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       bookmarked: cached?.bookmarked ?? bookmarkedPostIds.has(post.id) ?? Boolean(post.bookmarked),
       bookmarkCount: cached?.bookmarkCount ?? post.bookmarkCount ?? 0,
       pollOptions: cached?.pollOptions ?? post.pollOptions ?? [],
-      userVotedOptionId: cached?.userVotedOptionId ?? post.userVotedOptionId ?? null
+      userVotedOptionId: cached?.userVotedOptionId ?? post.userVotedOptionId ?? null,
+      repostsCount: cached?.repostsCount ?? post.repostsCount ?? 0,
+      hasReposted: cached?.hasReposted ?? post.hasReposted ?? false
     };
   };
 
@@ -510,7 +559,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       content: questionForm.context.trim() || questionForm.title.trim(),
       mediaType: 'POST',
       postType: 'QUESTION',
-      visibility: questionForm.visibility
+      visibility: questionForm.visibility,
+      communityId: selectedCommunityId !== 'ALL' ? selectedCommunityId : undefined
     });
 
     setQuestionForm({
@@ -569,7 +619,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       content: postForm.content.trim() || postForm.title.trim(),
       propertyId: postForm.propertyId || undefined,
       propertyName: prop ? prop.title : undefined,
-      communityId: postForm.communityId || undefined,
+      communityId: selectedCommunityId !== 'ALL' ? selectedCommunityId : (postForm.communityId || undefined),
       mediaType: postForm.mediaType,
       mediaUrl: postForm.mediaUrl || postForm.linkUrl || undefined,
       thumbnailUrl: postForm.photoUrl || undefined,
@@ -650,6 +700,10 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       onOpenLoginModal?.();
       return;
     }
+    if (currentUser.role === 'PROPERTY_SEEKER') {
+      showToast('Property Seekers can discover, join, and participate in communities. Community creation is available for Developers, Agents, and Administrators.');
+      return;
+    }
     if (!commForm.name.trim() || !commForm.description.trim()) {
       showToast('Please fill out the community name and description.');
       return;
@@ -661,7 +715,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
         category: commForm.category,
         location: commForm.location.trim(),
         description: commForm.description.trim(),
-        rules: commForm.rules.trim()
+        rules: commForm.rules.trim(),
+        visibility: commForm.visibility,
+        bannerImage: commForm.bannerImage.trim() || undefined
       });
       setShowModal('NONE');
       setCommForm({
@@ -669,13 +725,239 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
         category: 'Micro-Market Hub',
         location: 'Kokapet Neopolis, Hyderabad',
         description: '',
-        rules: '1. No spam. 2. Verify RERA numbers. 3. Civil discourse only.'
+        rules: '1. No spam. 2. Verify RERA numbers before quoting delay metrics. 3. Civil discourse only.',
+        visibility: 'PUBLIC',
+        bannerImage: ''
       });
-      showToast('Community proposal submitted for Super Admin review!');
+      showToast('Community created successfully!');
+      await refreshCommunities();
     } finally {
       setCommSubmitting(false);
     }
   };
+
+  // Repost Handler
+  const handleToggleRepost = async (post: CommunityPost) => {
+    if (!isLoggedIn) {
+      showToast('Please sign in to repost discussions to your profile.');
+      onOpenLoginModal?.();
+      return;
+    }
+    const current = savedEngagement(post);
+    const nextHasReposted = !current.hasReposted;
+    const nextCount = Math.max(0, (current.repostsCount || 0) + (nextHasReposted ? 1 : -1));
+
+    // Optimistic update
+    setEngagement(prev => ({
+      ...prev,
+      [post.id]: {
+        ...current,
+        hasReposted: nextHasReposted,
+        repostsCount: nextCount
+      }
+    }));
+
+    try {
+      const res = await repostDiscussion(post.id);
+      if (res.success) {
+        showToast(res.reposted ? 'Discussion reposted to your profile!' : 'Repost removed.');
+        setEngagement(prev => ({
+          ...prev,
+          [post.id]: {
+            ...current,
+            hasReposted: Boolean(res.reposted),
+            repostsCount: typeof res.count === 'number' ? res.count : nextCount
+          }
+        }));
+      } else {
+        setEngagement(prev => ({ ...prev, [post.id]: current }));
+      }
+    } catch {
+      setEngagement(prev => ({ ...prev, [post.id]: current }));
+    }
+  };
+
+  // Join Community Handler
+  const handleJoinCommunity = async (commId: string) => {
+    if (!isLoggedIn) {
+      showToast('Please sign in to join communities.');
+      onOpenLoginModal?.();
+      return;
+    }
+    setCommunityActionLoading(commId);
+    try {
+      await joinCommunity(commId);
+    } finally {
+      setCommunityActionLoading(null);
+    }
+  };
+
+  // Leave Community Handler
+  const handleLeaveCommunity = async (commId: string) => {
+    if (!isLoggedIn) return;
+    setCommunityActionLoading(commId);
+    try {
+      await leaveCommunity(commId);
+    } finally {
+      setCommunityActionLoading(null);
+    }
+  };
+
+  // Open Community Management Modal
+  const handleOpenManageModal = async (comm: any) => {
+    setManageCommunityId(comm.id);
+    setEditSettingsForm({
+      name: comm.name || '',
+      category: comm.category || 'Micro-Market Hub',
+      location: comm.location || '',
+      description: comm.description || '',
+      rules: comm.rules || '',
+      visibility: (comm.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC') as 'PUBLIC' | 'PRIVATE',
+      bannerImage: comm.bannerImage || ''
+    });
+    setManageTab('SETTINGS');
+    setShowModal('MANAGE_COMMUNITY');
+    setMembersLoading(true);
+    try {
+      const res = await fetch(`/api/communities/${comm.id}/members`);
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityMembersList(Array.isArray(data.members) ? data.members : []);
+      }
+    } catch {
+      setCommunityMembersList([]);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  // Save Community Settings
+  const handleUpdateCommunitySettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manageCommunityId) return;
+    try {
+      const res = await updateCommunityDetails(manageCommunityId, editSettingsForm);
+      if (res.success) {
+        showToast('Community settings updated successfully.');
+        setShowModal('NONE');
+        await refreshCommunities();
+      }
+    } catch {
+      showToast('Failed to update community settings.');
+    }
+  };
+
+  // Member Status Change (Approve / Reject)
+  const handleMemberStatusChange = async (userId: string, newStatus: 'ACTIVE' | 'REJECTED') => {
+    if (!manageCommunityId) return;
+    try {
+      const res = await fetch(`/api/communities/${manageCommunityId}/members/${userId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to update member status');
+        return;
+      }
+      showToast(newStatus === 'ACTIVE' ? 'Member approved!' : 'Request rejected.');
+      const membersRes = await fetch(`/api/communities/${manageCommunityId}/members`);
+      if (membersRes.ok) {
+        const d = await membersRes.json();
+        setCommunityMembersList(d.members || []);
+      }
+      await refreshCommunities();
+    } catch {
+      showToast('Error updating member status');
+    }
+  };
+
+  // Member Role Change
+  const handleMemberRoleChange = async (userId: string, newRole: 'MODERATOR' | 'MEMBER') => {
+    if (!manageCommunityId) return;
+    try {
+      const res = await fetch(`/api/communities/${manageCommunityId}/members/${userId}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to update member role');
+        return;
+      }
+      showToast(`Member role updated to ${newRole}`);
+      const membersRes = await fetch(`/api/communities/${manageCommunityId}/members`);
+      if (membersRes.ok) {
+        const d = await membersRes.json();
+        setCommunityMembersList(d.members || []);
+      }
+      await refreshCommunities();
+    } catch {
+      showToast('Error updating member role');
+    }
+  };
+
+  // Remove Member
+  const handleRemoveMember = async (userId: string) => {
+    if (!manageCommunityId) return;
+    try {
+      const res = await fetch(`/api/communities/${manageCommunityId}/members/${userId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to remove member');
+        return;
+      }
+      showToast('Member removed from community');
+      setCommunityMembersList(prev => prev.filter(m => m.userId !== userId));
+      await refreshCommunities();
+    } catch {
+      showToast('Error removing member');
+    }
+  };
+
+  const canManageCommunity = (comm?: any) => {
+    if (!comm || !isLoggedIn) return false;
+    if (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEVELOPER') return true;
+    if (comm.createdById && comm.createdById === currentUser.id) return true;
+    if (comm.membershipRole === 'CREATOR') return true;
+    if (comm.membershipRole === 'MODERATOR' && comm.membershipStatus === 'ACTIVE') return true;
+    return false;
+  };
+
+  const activeCommunity = useMemo(() => {
+    if (selectedCommunityId === 'ALL') return null;
+    return communities.find(c => c.id === selectedCommunityId) || null;
+  }, [communities, selectedCommunityId]);
+
+  // Private Community Access Check for current viewer
+  const canAccessSelectedCommunity = useMemo(() => {
+    if (!activeCommunity) return true;
+    if (activeCommunity.visibility !== 'PRIVATE') return true;
+    if (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEVELOPER') return true;
+    if (activeCommunity.createdById && activeCommunity.createdById === currentUser.id) return true;
+    if (activeCommunity.membershipStatus === 'ACTIVE') return true;
+    return false;
+  }, [activeCommunity, currentUser]);
+
+  const filteredHubs = useMemo(() => {
+    return communities.filter(c => {
+      if (c.status !== 'APPROVED') return false;
+      if (hubCategoryFilter !== 'ALL' && c.category !== hubCategoryFilter) return false;
+      if (hubVisibilityFilter !== 'ALL' && (c.visibility || 'PUBLIC') !== hubVisibilityFilter) return false;
+      if (hubSearchQuery.trim()) {
+        const q = hubSearchQuery.toLowerCase();
+        const matchesName = c.name.toLowerCase().includes(q);
+        const matchesDesc = c.description.toLowerCase().includes(q);
+        const matchesLoc = (c.location || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesDesc && !matchesLoc) return false;
+      }
+      return true;
+    });
+  }, [communities, hubCategoryFilter, hubVisibilityFilter, hubSearchQuery]);
 
   // Filter & Personalization Engine
   const parsedSearch = readCommunitySearch(questionQuery);
@@ -779,6 +1061,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               if (!isLoggedIn) {
                 showToast('Please sign in to ask a question.');
                 onOpenLoginModal?.();
+              } else if (activeCommunity && !canAccessSelectedCommunity) {
+                showToast('You must be an approved member of this private community to ask questions.');
               } else {
                 setUnifiedTab('QUESTION');
                 setShowModal('UNIFIED');
@@ -795,6 +1079,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               if (!isLoggedIn) {
                 showToast('Please sign in to create a post.');
                 onOpenLoginModal?.();
+              } else if (activeCommunity && !canAccessSelectedCommunity) {
+                showToast('You must be an approved member of this private community to create posts.');
               } else {
                 setUnifiedTab('POST');
                 setShowModal('UNIFIED');
@@ -806,95 +1092,339 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             <span>+ Create Post</span>
           </button>
 
-          <button
-            onClick={() => {
-              if (!isLoggedIn) {
-                showToast('Please sign in to propose a community.');
-                onOpenLoginModal?.();
-              } else {
-                setShowModal('PROPOSE_COMMUNITY');
-              }
-            }}
-            className="px-3.5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
-          >
-            <Users className="w-4 h-4 text-slate-500" />
-            <span>Propose Hub</span>
-          </button>
+          {currentUser.role !== 'PROPERTY_SEEKER' && (
+            <button
+              onClick={() => {
+                if (!isLoggedIn) {
+                  showToast('Please sign in to create a community.');
+                  onOpenLoginModal?.();
+                } else {
+                  setShowModal('PROPOSE_COMMUNITY');
+                }
+              }}
+              className="px-3.5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+            >
+              <Users className="w-4 h-4 text-slate-500" />
+              <span>+ Create Community</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Verified Live Community Hubs Section */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900 font-display">
-                Verified Live Community Hubs
-              </h2>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-900">
-                Super Admin Approved
+      {/* Dedicated Community Page Banner OR Verified Live Community Hubs Section */}
+      {activeCommunity ? (
+        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+          {/* Banner image or rich gradient */}
+          <div className="relative h-44 w-full bg-gradient-to-r from-slate-900 via-slate-800 to-amber-950 overflow-hidden">
+            {activeCommunity.bannerImage ? (
+              <img
+                src={activeCommunity.bannerImage}
+                alt={activeCommunity.name}
+                className="w-full h-full object-cover opacity-80"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
+            )}
+            <div className="absolute top-4 left-4">
+              <button
+                type="button"
+                onClick={() => setSelectedCommunityId('ALL')}
+                className="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-md text-white rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <span>← All Communities</span>
+              </button>
+            </div>
+            <div className="absolute bottom-4 right-4 flex items-center gap-2">
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 backdrop-blur-md ${
+                activeCommunity.visibility === 'PRIVATE'
+                  ? 'bg-amber-900/80 text-amber-200 border border-amber-600/50'
+                  : 'bg-emerald-900/80 text-emerald-200 border border-emerald-600/50'
+              }`}>
+                {activeCommunity.visibility === 'PRIVATE' ? (
+                  <>
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Private Circle</span>
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Public Community</span>
+                  </>
+                )}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Select a community to filter discussions by micro-market corridor.
-            </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSelectedCommunityId('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                selectedCommunityId === 'ALL'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              All Hubs ({communities.filter(c => c.status === 'APPROVED').length})
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {communities.filter(c => c.status === 'APPROVED').map(comm => (
-            <div
-              key={comm.id}
-              onClick={() => setSelectedCommunityId(selectedCommunityId === comm.id ? 'ALL' : comm.id)}
-              className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
-                selectedCommunityId === comm.id
-                  ? 'border-amber-500 bg-amber-50/40 shadow-sm ring-2 ring-amber-500/20'
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs'
-              }`}
-            >
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-2">
+          <div className="p-6 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                    {comm.category}
+                    {activeCommunity.category}
                   </span>
-                  <span className="text-[11px] font-mono text-emerald-700 font-bold flex items-center gap-1">
+                  {activeCommunity.location && (
+                    <span className="text-[10px] font-mono text-slate-500 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      <span>{activeCommunity.location}</span>
+                    </span>
+                  )}
+                  <span className="text-[10px] font-mono text-emerald-700 font-bold flex items-center gap-1">
                     <Users className="w-3 h-3" />
-                    <span>{comm.memberCount} members</span>
+                    <span>{activeCommunity.memberCount} members</span>
                   </span>
+                  {activeCommunity.createdByName && (
+                    <span className="text-[10px] text-slate-400">
+                      Created by <span className="font-semibold text-slate-600">{activeCommunity.createdByName}</span>
+                    </span>
+                  )}
                 </div>
 
-                <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
-                  {comm.name}
-                </h3>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 font-display">
+                  {activeCommunity.name}
+                </h1>
 
-                <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
-                  {comm.description}
+                <p className="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed">
+                  {activeCommunity.description}
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 mt-2">
-                <span>{comm.location || 'Western Corridor'}</span>
-                <span className="font-bold text-amber-700 hover:underline">
-                  {selectedCommunityId === comm.id ? 'Active Filter ✓' : 'Filter Discussions →'}
-                </span>
+              {/* Action Buttons: Settings, Join / Leave / Pending */}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {canManageCommunity(activeCommunity) && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenManageModal(activeCommunity)}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Manage Hub</span>
+                  </button>
+                )}
+
+                {activeCommunity.membershipStatus === 'ACTIVE' ? (
+                  activeCommunity.createdById === currentUser.id ? (
+                    <span className="px-3.5 py-2 bg-amber-100 text-amber-900 rounded-xl text-xs font-bold inline-flex items-center gap-1 border border-amber-200">
+                      <Shield className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Creator</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={communityActionLoading === activeCommunity.id}
+                      onClick={() => handleLeaveCommunity(activeCommunity.id)}
+                      className="px-3.5 py-2 bg-emerald-50 hover:bg-red-50 text-emerald-800 hover:text-red-700 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all border border-emerald-200 hover:border-red-200 cursor-pointer"
+                      title="Click to leave this community"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>{communityActionLoading === activeCommunity.id ? 'Leaving...' : 'Joined (Leave)'}</span>
+                    </button>
+                  )
+                ) : activeCommunity.membershipStatus === 'PENDING' ? (
+                  <span className="px-3.5 py-2 bg-amber-50 text-amber-800 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 border border-amber-200">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Access Requested</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={communityActionLoading === activeCommunity.id}
+                    onClick={() => handleJoinCommunity(activeCommunity.id)}
+                    className={`px-4 py-2 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition-all cursor-pointer ${
+                      activeCommunity.visibility === 'PRIVATE'
+                        ? 'bg-amber-600 hover:bg-amber-700'
+                        : 'bg-slate-900 hover:bg-slate-800'
+                    }`}
+                  >
+                    {activeCommunity.visibility === 'PRIVATE' ? <Lock className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
+                    <span>
+                      {communityActionLoading === activeCommunity.id
+                        ? 'Submitting...'
+                        : activeCommunity.visibility === 'PRIVATE'
+                        ? 'Request Access'
+                        : 'Join Community'}
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
-          ))}
+
+            {activeCommunity.rules && (
+              <div className="pt-3 border-t border-slate-100 flex items-start gap-2 text-[11px] text-slate-500 bg-slate-50 p-3 rounded-xl">
+                <ShieldCheck className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-slate-700 mr-1.5">Community Guidelines:</span>
+                  <span>{activeCommunity.rules}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Verified Live Community Hubs Section */
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900 font-display">
+                  Verified Live Community Hubs
+                </h2>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-900">
+                  {communities.filter(c => c.status === 'APPROVED').length} Active
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Discover corridor hubs, gated community circles, and investment syndicates.
+              </p>
+            </div>
+
+            {/* Hub Search & Visibility Filter */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={hubSearchQuery}
+                  onChange={e => setHubSearchQuery(e.target.value)}
+                  placeholder="Search hubs..."
+                  className="pl-3 pr-8 py-1.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 w-40 sm:w-48"
+                />
+                {hubSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setHubSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Visibility filter pills */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+                {(['ALL', 'PUBLIC', 'PRIVATE'] as const).map(vis => (
+                  <button
+                    key={vis}
+                    type="button"
+                    onClick={() => setHubVisibilityFilter(vis)}
+                    className={`px-2.5 py-1 rounded-lg transition-all ${
+                      hubVisibilityFilter === vis
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    {vis === 'ALL' ? 'All' : vis === 'PUBLIC' ? 'Public' : 'Private'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Hub Category filter pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            {COMMUNITY_CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setHubCategoryFilter(cat)}
+                className={`px-3 py-1 rounded-xl font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                  hubCategoryFilter === cat
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                }`}
+              >
+                {cat === 'ALL' ? 'All Categories' : cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Hubs Grid */}
+          {filteredHubs.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-2xl">
+              No community hubs match your current filters.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredHubs.map(comm => (
+                <div
+                  key={comm.id}
+                  className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                          {comm.category}
+                        </span>
+                        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded flex items-center gap-1 ${
+                          comm.visibility === 'PRIVATE'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-blue-50 text-blue-700'
+                        }`}>
+                          {comm.visibility === 'PRIVATE' ? <Lock className="w-2.5 h-2.5" /> : <Globe className="w-2.5 h-2.5" />}
+                          <span>{comm.visibility === 'PRIVATE' ? 'Private' : 'Public'}</span>
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-mono text-emerald-700 font-bold flex items-center gap-1 shrink-0">
+                        <Users className="w-3 h-3" />
+                        <span>{comm.memberCount}</span>
+                      </span>
+                    </div>
+
+                    <h3
+                      onClick={() => setSelectedCommunityId(comm.id)}
+                      className="text-xs sm:text-sm font-bold text-slate-900 leading-snug cursor-pointer hover:text-amber-600 transition-colors"
+                    >
+                      {comm.name}
+                    </h3>
+
+                    <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
+                      {comm.description}
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 mt-3">
+                    <span className="truncate max-w-[130px] flex items-center gap-1">
+                      <MapPin className="w-3 h-3 shrink-0" />
+                      <span>{comm.location || 'Hyderabad'}</span>
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      {comm.membershipStatus === 'ACTIVE' ? (
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          Joined ✓
+                        </span>
+                      ) : comm.membershipStatus === 'PENDING' ? (
+                        <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                          Pending ⏳
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={communityActionLoading === comm.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleJoinCommunity(comm.id);
+                          }}
+                          className="text-[10px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-full cursor-pointer transition-colors"
+                        >
+                          {comm.visibility === 'PRIVATE' ? 'Request' : 'Join'}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCommunityId(comm.id)}
+                        className="font-bold text-amber-700 hover:underline cursor-pointer"
+                      >
+                        Enter Hub →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Grid: Feed + Right Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1009,8 +1539,40 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
           </div>
 
           {/* Posts Feed */}
-          <div className="space-y-4">
-            {visiblePosts.length > 0 ? (
+          {activeCommunity && !canAccessSelectedCommunity ? (
+            <div className="bg-white rounded-3xl p-10 border border-slate-200 text-center space-y-4 shadow-sm">
+              <div className="w-16 h-16 bg-amber-100 text-amber-800 rounded-full flex items-center justify-center mx-auto">
+                <Lock className="w-8 h-8 text-amber-600" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-slate-900">Private Community Hub</h3>
+                <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+                  Discussions, verified inquiries, and syndicate updates in this community are restricted to approved members. Submit an access request above to join the conversation.
+                </p>
+              </div>
+
+              {(!activeCommunity.membershipStatus || activeCommunity.membershipStatus === 'NONE') && (
+                <button
+                  type="button"
+                  disabled={communityActionLoading === activeCommunity.id}
+                  onClick={() => handleJoinCommunity(activeCommunity.id)}
+                  className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>{communityActionLoading === activeCommunity.id ? 'Submitting...' : 'Request Access to Join'}</span>
+                </button>
+              )}
+
+              {activeCommunity.membershipStatus === 'PENDING' && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-800 rounded-xl text-xs font-semibold border border-amber-200">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  <span>Your access request has been submitted and is awaiting approval by the community creator.</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {visiblePosts.length > 0 ? (
               visiblePosts.map(post => {
                 const row = savedEngagement(post);
                 const score = row.agreeCount - row.disagreeCount;
@@ -1282,6 +1844,23 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                             <span>{post.commentsCount || (post.replies ? post.replies.length : 0)}</span>
                           </button>
 
+                          {/* Repost Pill: [ 🔁 Repost ] */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleRepost(post)}
+                            aria-pressed={row.hasReposted}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold border transition-colors cursor-pointer ${
+                              row.hasReposted
+                                ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border-slate-200/80'
+                            }`}
+                            title={row.hasReposted ? 'Remove repost' : 'Repost discussion to your profile'}
+                          >
+                            <Repeat className={`w-3.5 h-3.5 ${row.hasReposted ? 'text-emerald-600' : 'text-slate-500'}`} />
+                            <span>{row.repostsCount ?? post.repostsCount ?? 0}</span>
+                            <span className="hidden sm:inline">{row.hasReposted ? 'Reposted' : 'Repost'}</span>
+                          </button>
+
                           {/* Bookmark Pill: [ 🔖 Bookmark ] */}
                           <button
                             type="button"
@@ -1457,9 +2036,10 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               </div>
             )}
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* Right Sidebar (1 Col): Quora Recommended Topics, Who to Follow & AMA Schedule */}
+      {/* Right Sidebar (1 Col): Quora Recommended Topics, Who to Follow & AMA Schedule */}
         <div className="space-y-6">
           {/* Recommended Topics for You (Quora Reference Image 1 & 5) */}
           <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
@@ -2211,17 +2791,17 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
         </div>
       )}
 
-      {/* PROPOSE COMMUNITY MODAL */}
+      {/* PROPOSE / CREATE COMMUNITY MODAL */}
       {showModal === 'PROPOSE_COMMUNITY' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 font-display">
-                  Propose a Micro-Market Community
+                  Create a Community Hub
                 </h3>
                 <p className="text-xs text-slate-500">
-                  New communities are reviewed and approved by Super Admin before going live.
+                  Build a corridor hub, investor circle, or niche real estate community.
                 </p>
               </div>
               <button
@@ -2247,13 +2827,17 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Category</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Property Category</label>
                   <select
                     value={commForm.category}
                     onChange={e => setCommForm({ ...commForm, category: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-xs"
                   >
                     <option value="Micro-Market Hub">Micro-Market Hub</option>
+                    <option value="Residential">Residential</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Plots & Land">Plots & Land</option>
+                    <option value="Luxury Villas & Gated Communities">Luxury Villas & Gated Communities</option>
                     <option value="Legal & RERA">Legal & RERA</option>
                     <option value="Architecture & Vaastu">Architecture & Vaastu</option>
                     <option value="Investor Syndicate">Investor Syndicate</option>
@@ -2261,7 +2845,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Corridor Location</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Corridor / Location</label>
                   <input
                     type="text"
                     value={commForm.location}
@@ -2270,6 +2854,57 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
                   />
                 </div>
+              </div>
+
+              {/* Visibility selection */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Access & Visibility *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label
+                    onClick={() => setCommForm({ ...commForm, visibility: 'PUBLIC' })}
+                    className={`p-3 rounded-2xl border cursor-pointer flex flex-col gap-1 transition-all ${
+                      commForm.visibility === 'PUBLIC'
+                        ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                      <Globe className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Public Hub</span>
+                    </div>
+                    <span className="text-[11px] text-slate-500">
+                      Anyone can discover, join immediately, and participate.
+                    </span>
+                  </label>
+
+                  <label
+                    onClick={() => setCommForm({ ...commForm, visibility: 'PRIVATE' })}
+                    className={`p-3 rounded-2xl border cursor-pointer flex flex-col gap-1 transition-all ${
+                      commForm.visibility === 'PRIVATE'
+                        ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                      <Lock className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Private Circle</span>
+                    </div>
+                    <span className="text-[11px] text-slate-500">
+                      Members must request access. Creator reviews and approves.
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Cover Image URL (Optional)</label>
+                <input
+                  type="url"
+                  value={commForm.bannerImage}
+                  onChange={e => setCommForm({ ...commForm, bannerImage: e.target.value })}
+                  placeholder="https://images.unsplash.com/..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
+                />
               </div>
 
               <div>
@@ -2284,7 +2919,18 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Community Guidelines / Rules</label>
+                <textarea
+                  rows={2}
+                  value={commForm.rules}
+                  onChange={e => setCommForm({ ...commForm, rules: e.target.value })}
+                  placeholder="e.g. 1. No spam. 2. Verify RERA numbers before quoting delay metrics."
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowModal('NONE')}
@@ -2297,10 +2943,293 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   disabled={commSubmitting}
                   className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all disabled:opacity-50"
                 >
-                  {commSubmitting ? 'Submitting...' : 'Submit Proposal'}
+                  {commSubmitting ? 'Creating...' : 'Create Community'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGE COMMUNITY HUB MODAL */}
+      {showModal === 'MANAGE_COMMUNITY' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-slate-700" />
+                  <span>Community Settings & Members</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Manage hub details, visibility, and review member access requests.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowModal('NONE')}
+                className="p-1 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sub-tabs: Settings vs Members */}
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+              <button
+                type="button"
+                onClick={() => setManageTab('SETTINGS')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                  manageTab === 'SETTINGS'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Hub Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => setManageTab('MEMBERS')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  manageTab === 'MEMBERS'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Members & Requests ({communityMembersList.length})</span>
+                {communityMembersList.some(m => m.status === 'PENDING') && (
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                )}
+              </button>
+            </div>
+
+            {manageTab === 'SETTINGS' ? (
+              <form onSubmit={handleUpdateCommunitySettings} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Community Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editSettingsForm.name}
+                    onChange={e => setEditSettingsForm({ ...editSettingsForm, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Category</label>
+                    <select
+                      value={editSettingsForm.category}
+                      onChange={e => setEditSettingsForm({ ...editSettingsForm, category: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-xs"
+                    >
+                      <option value="Micro-Market Hub">Micro-Market Hub</option>
+                      <option value="Residential">Residential</option>
+                      <option value="Commercial">Commercial</option>
+                      <option value="Plots & Land">Plots & Land</option>
+                      <option value="Luxury Villas & Gated Communities">Luxury Villas & Gated Communities</option>
+                      <option value="Legal & RERA">Legal & RERA</option>
+                      <option value="Architecture & Vaastu">Architecture & Vaastu</option>
+                      <option value="Investor Syndicate">Investor Syndicate</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Location</label>
+                    <input
+                      type="text"
+                      value={editSettingsForm.location}
+                      onChange={e => setEditSettingsForm({ ...editSettingsForm, location: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Visibility</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditSettingsForm({ ...editSettingsForm, visibility: 'PUBLIC' })}
+                      className={`p-3 rounded-2xl border text-left cursor-pointer flex flex-col gap-1 transition-all ${
+                        editSettingsForm.visibility === 'PUBLIC'
+                          ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Public Community</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500">Anyone can join and view</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditSettingsForm({ ...editSettingsForm, visibility: 'PRIVATE' })}
+                      className={`p-3 rounded-2xl border text-left cursor-pointer flex flex-col gap-1 transition-all ${
+                        editSettingsForm.visibility === 'PRIVATE'
+                          ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Private Circle</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500">Requires creator approval to view</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Cover Image URL</label>
+                  <input
+                    type="url"
+                    value={editSettingsForm.bannerImage}
+                    onChange={e => setEditSettingsForm({ ...editSettingsForm, bannerImage: e.target.value })}
+                    placeholder="https://images.unsplash.com/..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Description</label>
+                  <textarea
+                    rows={3}
+                    value={editSettingsForm.description}
+                    onChange={e => setEditSettingsForm({ ...editSettingsForm, description: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Community Guidelines / Rules</label>
+                  <textarea
+                    rows={2}
+                    value={editSettingsForm.rules}
+                    onChange={e => setEditSettingsForm({ ...editSettingsForm, rules: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-mono"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal('NONE')}
+                    className="px-4 py-2 text-slate-600 hover:text-slate-900 font-bold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4 text-xs">
+                {membersLoading ? (
+                  <div className="p-8 text-center text-slate-500 font-mono">Loading members...</div>
+                ) : (
+                  <>
+                    {/* Pending Requests Section */}
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Pending Join Requests ({communityMembersList.filter(m => m.status === 'PENDING').length})</span>
+                      </h4>
+
+                      {communityMembersList.filter(m => m.status === 'PENDING').length === 0 ? (
+                        <p className="text-slate-400 italic py-2">No pending join requests.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {communityMembersList.filter(m => m.status === 'PENDING').map(m => (
+                            <div
+                              key={m.id}
+                              className="p-3 bg-amber-50/50 border border-amber-200/80 rounded-2xl flex items-center justify-between gap-3"
+                            >
+                              <div>
+                                <p className="font-bold text-slate-900">{m.userName || 'Prospective Member'}</p>
+                                <p className="text-[11px] text-slate-500">{m.userEmail || m.userRole}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMemberStatusChange(m.userId, 'ACTIVE')}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMemberStatusChange(m.userId, 'REJECTED')}
+                                  className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Active Members Section */}
+                    <div className="space-y-2 pt-3 border-t border-slate-100">
+                      <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Active Members ({communityMembersList.filter(m => m.status === 'ACTIVE').length})</span>
+                      </h4>
+
+                      <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto">
+                        {communityMembersList.filter(m => m.status === 'ACTIVE').map(m => (
+                          <div key={m.id} className="py-2.5 flex items-center justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-slate-900">{m.userName}</span>
+                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                                  m.role === 'CREATOR'
+                                    ? 'bg-amber-100 text-amber-900'
+                                    : m.role === 'MODERATOR'
+                                    ? 'bg-blue-100 text-blue-900'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}>
+                                  {m.role}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400">{m.userEmail || m.userRole}</p>
+                            </div>
+
+                            {m.role !== 'CREATOR' && (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMemberRoleChange(m.userId, m.role === 'MODERATOR' ? 'MEMBER' : 'MODERATOR')}
+                                  className="text-[10px] text-slate-600 hover:text-slate-900 font-bold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 cursor-pointer"
+                                >
+                                  {m.role === 'MODERATOR' ? 'Demote' : 'Make Mod'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMember(m.userId)}
+                                  className="text-[10px] text-red-600 hover:text-red-700 font-bold px-2 py-1 rounded bg-red-50 hover:bg-red-100 cursor-pointer"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

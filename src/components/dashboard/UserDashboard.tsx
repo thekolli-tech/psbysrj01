@@ -39,7 +39,8 @@ import {
   RotateCcw,
   Video,
   Play,
-  Repeat
+  Repeat,
+  Users
 } from 'lucide-react';
 
 type TabType = 'OVERVIEW' | 'REQUIREMENTS' | 'REVIEWS' | 'NOTIFICATIONS' | 'COMMUNITY' | 'SETTINGS';
@@ -102,6 +103,39 @@ interface CommunitySummaryPost {
   communityName?: string;
   upvotes?: number;
   created_at?: string;
+}
+
+interface JoinedCommunityRecord {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  location?: string;
+  member_count?: number;
+  memberCount?: number;
+  banner_image?: string;
+  bannerImage?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  membership_role?: string;
+  membership_status?: string;
+}
+
+interface DiscussionRepostRecord {
+  repostId: string;
+  postId: string;
+  repostedAt: string;
+  note?: string;
+  title: string;
+  content: string;
+  topic: string;
+  authorId: string;
+  authorName: string;
+  authorRole: string;
+  communityId?: string;
+  communityName?: string;
+  upvotes: number;
+  commentsCount: number;
+  shareUrl: string;
 }
 
 function maskPhoneNumber(phone?: string): string {
@@ -296,6 +330,44 @@ export const UserDashboard: React.FC = () => {
   const [userReposts, setUserReposts] = useState<RepostRecord[]>([]);
   const [loadingReposts, setLoadingReposts] = useState(false);
 
+  // Joined Communities & Discussion Reposts State
+  const [joinedCommunities, setJoinedCommunities] = useState<JoinedCommunityRecord[]>([]);
+  const [loadingJoinedCommunities, setLoadingJoinedCommunities] = useState(false);
+  const [discussionReposts, setDiscussionReposts] = useState<DiscussionRepostRecord[]>([]);
+  const [loadingDiscussionReposts, setLoadingDiscussionReposts] = useState(false);
+
+  const fetchJoinedCommunities = useCallback(async () => {
+    setLoadingJoinedCommunities(true);
+    try {
+      const res = await fetch('/api/me/communities');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.communities)) {
+          setJoinedCommunities(data.communities);
+        }
+      }
+    } catch {
+    } finally {
+      setLoadingJoinedCommunities(false);
+    }
+  }, []);
+
+  const fetchDiscussionReposts = useCallback(async () => {
+    setLoadingDiscussionReposts(true);
+    try {
+      const res = await fetch('/api/me/discussion-reposts');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.reposts)) {
+          setDiscussionReposts(data.reposts);
+        }
+      }
+    } catch {
+    } finally {
+      setLoadingDiscussionReposts(false);
+    }
+  }, []);
+
   const fetchUserReposts = useCallback(async () => {
     setLoadingReposts(true);
     try {
@@ -320,7 +392,9 @@ export const UserDashboard: React.FC = () => {
     fetchNotifications();
     fetchCommunityPosts();
     fetchUserReposts();
-  }, [fetchRequirements, fetchReviews, fetchNotifications, fetchCommunityPosts, fetchUserReposts]);
+    fetchJoinedCommunities();
+    fetchDiscussionReposts();
+  }, [fetchRequirements, fetchReviews, fetchNotifications, fetchCommunityPosts, fetchUserReposts, fetchJoinedCommunities, fetchDiscussionReposts]);
 
   // Sync profile fields if currentUser changes
   useEffect(() => {
@@ -1817,12 +1891,12 @@ export const UserDashboard: React.FC = () => {
 
       {/* TAB 5: COMMUNITY FORUM */}
       {activeTab === 'COMMUNITY' && (
-        <div className="space-y-6 animate-in fade-in duration-150">
+        <div className="space-y-8 animate-in fade-in duration-150">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Community Discussions & Q&A</h2>
+              <h2 className="text-lg font-bold text-slate-900">Community Hubs & Discussions</h2>
               <p className="text-xs text-slate-600 mt-0.5">
-                Engage in authentic homeowner and buyer discussions without developer censorship.
+                Discover corridor hubs, engage with fellow buyers, and manage your community memberships.
               </p>
             </div>
             <button
@@ -1832,75 +1906,225 @@ export const UserDashboard: React.FC = () => {
               }}
               className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 self-start cursor-pointer shadow-sm transition-all"
             >
-              <span>Open Full Community Forum</span>
+              <span>Explore All Communities</span>
               <ArrowUpRight className="w-4 h-4 text-amber-400" />
             </button>
           </div>
 
-          {loadingCommunity ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-20 bg-white border border-slate-200 rounded-2xl animate-pulse" />
-              ))}
+          {/* Section 1: My Joined Communities */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-600" />
+                <span>My Joined Communities ({joinedCommunities.length})</span>
+              </h3>
             </div>
-          ) : communityPosts.length === 0 ? (
-            <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-10 text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-                <MessageSquare className="w-6 h-6" />
+
+            {loadingJoinedCommunities ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="h-28 bg-white border border-slate-200 rounded-2xl animate-pulse" />
+                ))}
               </div>
-              <h3 className="text-sm font-bold text-slate-900">Community Forum Access Ready</h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Your account is verified for posting and replying to topics across Hyderabad micro-markets.
-              </p>
-              <button
-                onClick={() => {
-                  setActiveView('COMMUNITY');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold shadow hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <span>Browse Active Discussions</span>
-                <ChevronRight className="w-4 h-4 text-amber-400" />
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {communityPosts.map(post => (
-                <div
-                  key={post.id}
-                  className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2 hover:border-slate-300 transition-colors"
+            ) : joinedCommunities.length === 0 ? (
+              <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center space-y-2">
+                <p className="text-xs text-slate-600">
+                  You haven't joined any communities yet. Join public micro-market hubs or request access to private investor circles.
+                </p>
+                <button
+                  onClick={() => {
+                    setActiveView('COMMUNITY');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-xs"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold font-mono uppercase tracking-wider text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
-                      {post.topic || 'General Discussion'}
-                    </span>
-                    {post.created_at && (
-                      <span className="text-[10px] text-slate-400">
-                        {new Date(post.created_at).toLocaleDateString()}
+                  <span>Discover Communities</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {joinedCommunities.map(comm => (
+                  <div
+                    key={comm.id}
+                    className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                          {comm.category}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800">
+                          {comm.visibility === 'PRIVATE' ? 'Private Hub' : 'Public Hub'}
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-slate-900 line-clamp-1">{comm.name}</h4>
+                      <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{comm.description}</p>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between mt-3 text-[11px]">
+                      <span className="text-slate-400 font-mono text-[10px] flex items-center gap-1">
+                        <Users className="w-3 h-3 text-emerald-600" />
+                        {comm.member_count || comm.memberCount || 1} members
                       </span>
+                      <button
+                        onClick={() => {
+                          setActiveView('COMMUNITY');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Enter Hub</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: Discussions from My Communities */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-amber-600" />
+              <span>Relevant Discussions & Questions</span>
+            </h3>
+
+            {loadingCommunity ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-20 bg-white border border-slate-200 rounded-2xl animate-pulse" />
+                ))}
+              </div>
+            ) : communityPosts.length === 0 ? (
+              <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center space-y-2">
+                <p className="text-xs text-slate-500">No recent discussions found. Start a topic in your corridor hub.</p>
+                <button
+                  onClick={() => {
+                    setActiveView('COMMUNITY');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold shadow hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <span>Browse Active Discussions</span>
+                  <ChevronRight className="w-4 h-4 text-amber-400" />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {communityPosts.map(post => (
+                  <div
+                    key={post.id}
+                    className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2 hover:border-slate-300 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
+                        {post.topic || 'General Discussion'}
+                      </span>
+                      {post.created_at && (
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(post.created_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-900">{post.title}</h4>
+                    {post.body && (
+                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{post.body}</p>
                     )}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                      <span>{post.communityName || 'Local Community'}</span>
+                      <button
+                        onClick={() => {
+                          setActiveView('COMMUNITY');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        Join Conversation
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
-                  <h4 className="text-xs font-bold text-slate-900">{post.title}</h4>
-                  {post.body && (
-                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{post.body}</p>
-                  )}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                    <span>{post.communityName || 'Local Community'}</span>
-                    <button
-                      onClick={() => {
-                        setActiveView('COMMUNITY');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className="text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 cursor-pointer"
-                    >
-                      Join Conversation
-                      <ChevronRight className="w-3 h-3" />
-                    </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: My Discussion Reposts */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Repeat className="w-4 h-4 text-amber-600" />
+              <span>My Discussion Reposts ({discussionReposts.length})</span>
+            </h3>
+
+            {loadingDiscussionReposts ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="h-20 bg-white border border-slate-200 rounded-2xl animate-pulse" />
+                ))}
+              </div>
+            ) : discussionReposts.length === 0 ? (
+              <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center space-y-1">
+                <p className="text-xs text-slate-500">You haven't reposted any discussions yet.</p>
+                <p className="text-[11px] text-slate-400">When you repost discussions with attribution, they will appear here on your feed.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {discussionReposts.map(repost => (
+                  <div
+                    key={repost.repostId}
+                    className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2 hover:border-slate-300 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 flex items-center gap-1">
+                          <Repeat className="w-3 h-3 text-amber-600" />
+                          <span>Reposted Discussion</span>
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          Original by <strong className="text-slate-800">{repost.authorName}</strong> ({repost.authorRole})
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {new Date(repost.repostedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    {repost.note && (
+                      <p className="text-xs text-slate-700 italic bg-slate-50 p-2 rounded-xl border border-slate-100">
+                        "{repost.note}"
+                      </p>
+                    )}
+
+                    <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-3 space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-amber-800 font-bold">
+                        {repost.topic}
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-900">{repost.title}</h4>
+                      <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">{repost.content}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                      <span className="text-slate-400 font-mono text-[10px]">
+                        {repost.upvotes} upvotes • {repost.commentsCount} comments
+                      </span>
+                      <button
+                        onClick={() => {
+                          setActiveView('COMMUNITY');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        View Original Discussion
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

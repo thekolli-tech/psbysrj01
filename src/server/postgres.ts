@@ -234,6 +234,7 @@ export async function runPostgresMigrations(): Promise<boolean> {
         icon TEXT,
         banner_image TEXT,
         rules TEXT,
+        visibility VARCHAR(32) DEFAULT 'PUBLIC',
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
@@ -583,6 +584,7 @@ export async function ensurePostgresAdditiveSchema(): Promise<void> {
         ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted SMALLINT DEFAULT 0;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted_reason TEXT;
+        ALTER TABLE communities ADD COLUMN IF NOT EXISTS visibility VARCHAR(32) DEFAULT 'PUBLIC';
       `);
       // 2. Full additive schema statements
       await client.query(POSTGRES_ADDITIVE_SQL);

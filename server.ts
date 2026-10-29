@@ -81,8 +81,21 @@ import {
   getAllCommunities,
   getCommunityById,
   createCommunity,
+  updateCommunity,
   updateCommunityStatus,
   deleteCommunity,
+  joinCommunity,
+  leaveCommunity,
+  getCommunityMembership,
+  listCommunityMembers,
+  updateCommunityMemberStatus,
+  updateCommunityMemberRole,
+  removeCommunityMember,
+  getUserJoinedCommunities,
+  canUserViewCommunityPosts,
+  canUserPostInCommunity,
+  toggleDiscussionRepost,
+  getUserDiscussionReposts,
   updateLastLogin,
   restrictUser
 } from './src/server/db.ts';
@@ -1234,6 +1247,14 @@ app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, r
       return;
     }
 
+    if (communityId) {
+      const allowed = await canUserViewCommunityPosts(communityId, req.user?.id, req.user?.role);
+      if (!allowed) {
+        res.status(403).json({ error: 'This is a private community. Membership is required to view discussions.' });
+        return;
+      }
+    }
+
     const posts = await getAllPosts({
       communityId,
       topic,
@@ -1243,6 +1264,21 @@ app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, r
       offset,
       currentUserId: req.user?.id
     });
+
+    if (!communityId) {
+      // Filter out posts from private communities that the current user cannot access
+      const filtered: any[] = [];
+      for (const p of posts) {
+        if (!p.communityId) {
+          filtered.push(p);
+        } else {
+          const ok = await canUserViewCommunityPosts(p.communityId, req.user?.id, req.user?.role);
+          if (ok) filtered.push(p);
+        }
+      }
+      res.json({ posts: filtered });
+      return;
+    }
 
     res.json({ posts });
   } catch (err: any) {
@@ -1254,7 +1290,18 @@ app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, r
 app.get('/api/community/posts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
-    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    if (post.communityId) {
+      const allowed = await canUserViewCommunityPosts(post.communityId, req.user?.id, req.user?.role);
+      if (!allowed) {
+        res.status(403).json({ error: 'This is a private community. Membership is required to view discussions.' });
+        return;
+      }
+    }
+    if (!canViewModeratedContent(post.status, post.authorId, req.user)) {
       res.status(404).json({ error: 'Post not found' });
       return;
     }
@@ -1277,6 +1324,14 @@ app.post('/api/community/posts', requireAuth, requireUnrestricted, async (req: A
     if (!title || !content || !topic) {
       res.status(400).json({ error: 'Title, content, and topic are required' });
       return;
+    }
+
+    if (communityId) {
+      const canPost = await canUserPostInCommunity(communityId, req.user.id, req.user.role);
+      if (!canPost) {
+        res.status(403).json({ error: 'You must be an approved member to post in this private community.' });
+        return;
+      }
     }
 
     const post = await createPost({
@@ -1316,7 +1371,19 @@ app.post('/api/community/posts', requireAuth, requireUnrestricted, async (req: A
 // Update post
 app.put('/api/community/posts/:id', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
+    const post = await getPostById(req.params.id, req.user.id);
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    let isCommunityMod = false;
+    if (post.communityId) {
+      const comm = await getCommunityById(post.communityId, req.user.id);
+      if (comm && (comm.created_by_id === req.user.id || (comm.membership_role === 'MODERATOR' && comm.membership_status === 'ACTIVE'))) {
+        isCommunityMod = true;
+      }
+    }
+    const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN' || isCommunityMod;
     const updated = await updatePost(req.params.id, req.user.id, req.body, isElevated);
     if (!updated) {
       res.status(403).json({ error: 'Unauthorized to edit this post' });
@@ -1332,7 +1399,19 @@ app.put('/api/community/posts/:id', requireAuth, requireUnrestricted, async (req
 // Delete post
 app.delete('/api/community/posts/:id', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
+    const post = await getPostById(req.params.id, req.user.id);
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    let isCommunityMod = false;
+    if (post.communityId) {
+      const comm = await getCommunityById(post.communityId, req.user.id);
+      if (comm && (comm.created_by_id === req.user.id || (comm.membership_role === 'MODERATOR' && comm.membership_status === 'ACTIVE'))) {
+        isCommunityMod = true;
+      }
+    }
+    const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN' || isCommunityMod;
     const ok = await deletePost(req.params.id, req.user.id, isElevated);
     if (!ok) {
       res.status(403).json({ error: 'Unauthorized to delete this post' });
@@ -1475,7 +1554,18 @@ app.post('/api/community/posts/:id/reply', requireAuth, requireUnrestricted, asy
       return;
     }
     const parentPost = await getPostById(req.params.id, req.user?.id);
-    if (!parentPost || !canViewModeratedContent(parentPost.status, parentPost.authorId, req.user)) {
+    if (!parentPost) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    if (parentPost.communityId) {
+      const canParticipate = await canUserPostInCommunity(parentPost.communityId, req.user.id, req.user.role);
+      if (!canParticipate) {
+        res.status(403).json({ error: 'You must be an approved member to participate in this private community.' });
+        return;
+      }
+    }
+    if (!canViewModeratedContent(parentPost.status, parentPost.authorId, req.user)) {
       res.status(404).json({ error: 'Post not found' });
       return;
     }
@@ -1532,7 +1622,18 @@ app.post('/api/community/posts/:id/like', requireAuth, requireUnrestricted, asyn
 app.get('/api/community/posts/:id/comments', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
-    if (!post || !canViewModeratedContent(post.status, post.authorId, req.user)) {
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    if (post.communityId) {
+      const allowed = await canUserViewCommunityPosts(post.communityId, req.user?.id, req.user?.role);
+      if (!allowed) {
+        res.status(403).json({ error: 'This is a private community. Membership is required to view discussions.' });
+        return;
+      }
+    }
+    if (!canViewModeratedContent(post.status, post.authorId, req.user)) {
       res.status(404).json({ error: 'Post not found' });
       return;
     }
@@ -1552,7 +1653,18 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
       return;
     }
     const parentPost = await getPostById(req.params.id, req.user?.id);
-    if (!parentPost || !canViewModeratedContent(parentPost.status, parentPost.authorId, req.user)) {
+    if (!parentPost) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    if (parentPost.communityId) {
+      const canParticipate = await canUserPostInCommunity(parentPost.communityId, req.user.id, req.user.role);
+      if (!canParticipate) {
+        res.status(403).json({ error: 'You must be an approved member to participate in this private community.' });
+        return;
+      }
+    }
+    if (!canViewModeratedContent(parentPost.status, parentPost.authorId, req.user)) {
       res.status(404).json({ error: 'Post not found' });
       return;
     }
@@ -1699,15 +1811,48 @@ app.post('/api/notifications/mark-all-read', requireAuth, async (req: Authentica
 
 app.get('/api/communities', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const approved = await getAllCommunities('APPROVED');
-    if (!req.user) {
-      res.json({ communities: approved });
+    const category = req.query.category as string | undefined;
+    const location = req.query.location as string | undefined;
+    const search = req.query.search as string | undefined;
+    const visibility = req.query.visibility as string | undefined;
+
+    const approved = await getAllCommunities('APPROVED', req.user?.id);
+    let list = approved;
+    if (req.user) {
+      const all = await getAllCommunities(undefined, req.user.id);
+      const own = all.filter(c => c.created_by_id === req.user!.id && c.status !== 'APPROVED');
+      const seen = new Set(approved.map(c => c.id));
+      list = [...own.filter(c => !seen.has(c.id)), ...approved];
+    }
+
+    if (category && category !== 'ALL') {
+      list = list.filter(c => c.category?.toLowerCase() === category.toLowerCase());
+    }
+    if (location && location !== 'ALL') {
+      list = list.filter(c => c.location?.toLowerCase().includes(location.toLowerCase()));
+    }
+    if (visibility && visibility !== 'ALL') {
+      list = list.filter(c => (c.visibility || 'PUBLIC') === visibility.toUpperCase());
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(c => c.name?.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q) || c.location?.toLowerCase().includes(q));
+    }
+
+    res.json({ communities: list });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/communities/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const community = await getCommunityById(req.params.id, req.user?.id);
+    if (!community) {
+      res.status(404).json({ error: 'Community not found' });
       return;
     }
-    const all = await getAllCommunities();
-    const own = all.filter(community => community.created_by_id === req.user!.id && community.status !== 'APPROVED');
-    const seen = new Set(approved.map(community => community.id));
-    res.json({ communities: [...own.filter(community => !seen.has(community.id)), ...approved] });
+    res.json({ community });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1724,7 +1869,12 @@ app.get('/api/admin/communities/all', requireAdmin, async (_req: Request, res: R
 
 app.post('/api/communities', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { name, description, category, location, rules } = req.body;
+    if (req.user.role === 'PROPERTY_SEEKER') {
+      res.status(403).json({ error: 'Property Seekers cannot create communities.' });
+      return;
+    }
+
+    const { name, description, category, location, coverImage, bannerImage, banner_image, icon, visibility, rules } = req.body;
     if (!name || !description || !category) {
       res.status(400).json({ error: 'Name, description, and category are required' });
       return;
@@ -1735,6 +1885,9 @@ app.post('/api/communities', requireAuth, requireUnrestricted, async (req: Authe
       description,
       category,
       location,
+      icon,
+      bannerImage: bannerImage || coverImage || banner_image || '',
+      visibility: visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC',
       rules,
       createdById: req.user.id,
       createdByName: req.user.name
@@ -1743,6 +1896,227 @@ app.post('/api/communities', requireAuth, requireUnrestricted, async (req: Authe
     res.json({ success: true, community: newCommunity });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/communities/:id', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (req.user.role === 'PROPERTY_SEEKER') {
+      res.status(403).json({ error: 'Property Seekers cannot change community settings.' });
+      return;
+    }
+
+    const community = await getCommunityById(req.params.id, req.user.id);
+    if (!community) {
+      res.status(404).json({ error: 'Community not found' });
+      return;
+    }
+
+    const isCreator = community.created_by_id === req.user.id;
+    const isElevated = req.user.role === 'SUPER_ADMIN';
+    const isModerator = community.membership_role === 'MODERATOR' && community.membership_status === 'ACTIVE';
+
+    if (!isCreator && !isElevated && !isModerator) {
+      res.status(403).json({ error: 'Only community creators, moderators, and administrators can manage community settings.' });
+      return;
+    }
+
+    const { name, description, category, location, coverImage, bannerImage, banner_image, icon, visibility, rules } = req.body;
+    const updated = await updateCommunity(req.params.id, {
+      name,
+      description,
+      category,
+      location,
+      icon,
+      bannerImage: bannerImage || coverImage || banner_image,
+      visibility,
+      rules
+    });
+
+    res.json({ success: true, community: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/communities/:id/join', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const result = await joinCommunity(req.params.id, req.user.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/communities/:id/leave', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    await leaveCommunity(req.params.id, req.user.id);
+    res.json({ success: true, message: 'Left community successfully' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/communities/:id/members', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const community = await getCommunityById(req.params.id, req.user.id);
+    if (!community) {
+      res.status(404).json({ error: 'Community not found' });
+      return;
+    }
+    const isCreator = community.created_by_id === req.user.id;
+    const isElevated = req.user.role === 'SUPER_ADMIN';
+    const isModerator = community.membership_role === 'MODERATOR' && community.membership_status === 'ACTIVE';
+    const isMember = community.membership_status === 'ACTIVE';
+
+    if (community.visibility === 'PRIVATE' && !isMember && !isCreator && !isElevated) {
+      res.status(403).json({ error: 'This is a private community. Membership is required to view members.' });
+      return;
+    }
+
+    const statusFilter = (isCreator || isModerator || isElevated) ? undefined : 'ACTIVE';
+    const members = await listCommunityMembers(req.params.id, statusFilter);
+    const formatted = members.map((m: any) => ({
+      id: m.id,
+      communityId: m.community_id || m.communityId,
+      userId: m.user_id || m.userId,
+      role: m.role,
+      status: m.status,
+      userName: m.user_name || m.userName,
+      userEmail: m.user_email || m.userEmail,
+      userAvatar: m.user_avatar || m.userAvatar,
+      userProfession: m.user_profession || m.userProfession,
+      userRole: m.user_role || m.userRole,
+      createdAt: m.created_at || m.createdAt,
+      updatedAt: m.updated_at || m.updatedAt
+    }));
+    res.json({ members: formatted });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/communities/:id/members/:userId/status', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const community = await getCommunityById(req.params.id, req.user.id);
+    if (!community) {
+      res.status(404).json({ error: 'Community not found' });
+      return;
+    }
+    const isCreator = community.created_by_id === req.user.id;
+    const isElevated = req.user.role === 'SUPER_ADMIN';
+    const isModerator = community.membership_role === 'MODERATOR' && community.membership_status === 'ACTIVE';
+
+    if (!isCreator && !isElevated && !isModerator) {
+      res.status(403).json({ error: 'Only community creators and moderators can manage member requests.' });
+      return;
+    }
+
+    const { status } = req.body;
+    if (status !== 'ACTIVE' && status !== 'REJECTED') {
+      res.status(400).json({ error: 'Status must be ACTIVE or REJECTED' });
+      return;
+    }
+
+    const updated = await updateCommunityMemberStatus(req.params.id, req.params.userId, status);
+    res.json({ success: true, member: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/communities/:id/members/:userId/role', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const community = await getCommunityById(req.params.id, req.user.id);
+    if (!community) {
+      res.status(404).json({ error: 'Community not found' });
+      return;
+    }
+    const isCreator = community.created_by_id === req.user.id;
+    const isElevated = req.user.role === 'SUPER_ADMIN';
+
+    if (!isCreator && !isElevated) {
+      res.status(403).json({ error: 'Only the community creator and administrators can assign roles.' });
+      return;
+    }
+
+    const { role } = req.body;
+    if (role !== 'MODERATOR' && role !== 'MEMBER') {
+      res.status(400).json({ error: 'Role must be MODERATOR or MEMBER' });
+      return;
+    }
+
+    const updated = await updateCommunityMemberRole(req.params.id, req.params.userId, role);
+    res.json({ success: true, member: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/communities/:id/members/:userId', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const community = await getCommunityById(req.params.id, req.user.id);
+    if (!community) {
+      res.status(404).json({ error: 'Community not found' });
+      return;
+    }
+    if (community.created_by_id === req.params.userId) {
+      res.status(400).json({ error: 'Cannot remove the community creator.' });
+      return;
+    }
+    const isCreator = community.created_by_id === req.user.id;
+    const isElevated = req.user.role === 'SUPER_ADMIN';
+
+    if (!isCreator && !isElevated) {
+      res.status(403).json({ error: 'Only community creators and administrators can remove members.' });
+      return;
+    }
+
+    await removeCommunityMember(req.params.id, req.params.userId);
+    res.json({ success: true, message: 'Member removed from community' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/me/communities', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const communities = await getUserJoinedCommunities(req.user.id);
+    res.json({ communities });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Discussion Reposts
+app.post('/api/community/posts/:id/repost', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const post = await getPostById(req.params.id, req.user.id);
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    if (post.communityId) {
+      const canView = await canUserViewCommunityPosts(post.communityId, req.user.id, req.user.role);
+      if (!canView) {
+        res.status(403).json({ error: 'Cannot repost from private community without membership' });
+        return;
+      }
+    }
+    const note = typeof req.body?.note === 'string' ? req.body.note.trim() : undefined;
+    const result = await toggleDiscussionRepost(req.params.id, req.user.id, req.user.name, note);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/me/discussion-reposts', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const reposts = await getUserDiscussionReposts(req.user.id);
+    res.json({ reposts });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

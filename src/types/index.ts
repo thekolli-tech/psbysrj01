@@ -295,6 +295,8 @@ export interface CommunityPost {
   following?: boolean;
   userLiked?: boolean;
   commentsCount?: number;
+  repostsCount?: number;
+  hasReposted?: boolean;
   isPinned?: boolean;
   isFlagged?: boolean;
   replies: CommunityReply[];
@@ -358,8 +360,46 @@ export interface CommunityHub {
   icon?: string;
   bannerImage?: string;
   rules?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  membershipStatus?: 'NONE' | 'PENDING' | 'ACTIVE' | 'REJECTED';
+  membershipRole?: 'CREATOR' | 'MODERATOR' | 'MEMBER';
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CommunityMember {
+  id: string;
+  communityId: string;
+  userId: string;
+  userName?: string;
+  userEmail?: string;
+  userAvatar?: string;
+  userProfession?: string;
+  userRole?: UserRole;
+  role: 'CREATOR' | 'MODERATOR' | 'MEMBER';
+  status: 'ACTIVE' | 'PENDING' | 'REJECTED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DiscussionRepost {
+  repostId: string;
+  postId: string;
+  repostedAt: string;
+  note?: string;
+  postTitle: string;
+  postContent: string;
+  postTopic: string;
+  postAuthorId: string;
+  postAuthorName: string;
+  postAuthorRole: UserRole;
+  postAuthorProfession?: string;
+  postCreatedAt: string;
+  communityId?: string;
+  communityName?: string;
+  upvotes: number;
+  commentsCount: number;
+  shareUrl: string;
 }
 
 export interface AgentApplication {

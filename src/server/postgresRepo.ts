@@ -23,6 +23,9 @@ import type {
   DbMediaComment,
   DbMediaEngagement,
   DbUserRepostItem,
+  DbCommunityMember,
+  DbCommunityPostRepost,
+  DbUserDiscussionRepostItem,
   DbBuyerLead,
   DbConferenceDetails,
   DbModerationReport
@@ -1025,6 +1028,8 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
   following: boolean;
   bookmarked: boolean;
   bookmarkCount: number;
+  repostsCount?: number;
+  hasReposted?: boolean;
 }>> {
   const result = new Map<string, {
     agreeCount: number;
@@ -1034,10 +1039,12 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
     following: boolean;
     bookmarked: boolean;
     bookmarkCount: number;
+    repostsCount?: number;
+    hasReposted?: boolean;
   }>();
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return result;
-  const blank = () => ({ agreeCount: 0, disagreeCount: 0, userVote: 0 as const, followerCount: 0, following: false, bookmarked: false, bookmarkCount: 0 });
+  const blank = () => ({ agreeCount: 0, disagreeCount: 0, userVote: 0 as const, followerCount: 0, following: false, bookmarked: false, bookmarkCount: 0, repostsCount: 0, hasReposted: false });
   const votes = await queryPostgres(
     `SELECT post_id,
         SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS agree_count,
@@ -1061,6 +1068,13 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
      GROUP BY post_id`,
     [unique]
   );
+  const reposts = await queryPostgres(
+    `SELECT post_id, COUNT(*) AS repost_count
+     FROM community_post_reposts
+     WHERE post_id = ANY($1::varchar[])
+     GROUP BY post_id`,
+    [unique]
+  );
   for (const row of votes.rows) {
     const current = result.get(row.post_id) || blank();
     current.agreeCount = Number(row.agree_count || 0);
@@ -1077,6 +1091,11 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
     current.bookmarkCount = Number(row.bookmark_count || 0);
     result.set(row.post_id, current);
   }
+  for (const row of reposts.rows) {
+    const current = result.get(row.post_id) || blank();
+    current.repostsCount = Number(row.repost_count || 0);
+    result.set(row.post_id, current);
+  }
   if (userId) {
     const mine = await queryPostgres(
       'SELECT post_id, vote FROM community_post_votes WHERE user_id = $1 AND post_id = ANY($2::varchar[])',
@@ -1088,6 +1107,10 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
     );
     const bookmarked = await queryPostgres(
       'SELECT post_id FROM community_bookmarks WHERE user_id = $1 AND post_id = ANY($2::varchar[])',
+      [userId, unique]
+    );
+    const reposted = await queryPostgres(
+      'SELECT post_id FROM community_post_reposts WHERE user_id = $1 AND post_id = ANY($2::varchar[])',
       [userId, unique]
     );
     for (const row of mine.rows) {
@@ -1103,6 +1126,11 @@ export async function pgCommunityEngagement(ids: string[], userId?: string): Pro
     for (const row of bookmarked.rows) {
       const current = result.get(row.post_id) || blank();
       current.bookmarked = true;
+      result.set(row.post_id, current);
+    }
+    for (const row of reposted.rows) {
+      const current = result.get(row.post_id) || blank();
+      current.hasReposted = true;
       result.set(row.post_id, current);
     }
   }
@@ -1955,7 +1983,8 @@ export async function pgEnsureInitialCommunities(): Promise<void> {
   // Intentionally empty. Schema initialization must not seed communities or statistics.
 }
 
-export async function pgGetAllCommunities(status?: string): Promise<DbCommunity[]> {
+export async function pgGetAllCommunities(status?: string, currentUserId?: string): Promise<DbCommunity[]> {
+  await ensurePostgresAdditiveSchema();
   let query = 'SELECT * FROM communities';
   const params: any[] = [];
   if (status) {
@@ -1966,30 +1995,85 @@ export async function pgGetAllCommunities(status?: string): Promise<DbCommunity[
   }
 
   const res = await queryPostgres(query, params);
-  return res.rows.map((c: any) => ({
-    id: c.id,
-    name: c.name,
-    slug: c.slug,
-    description: c.description,
-    category: c.category,
-    location: c.location,
-    created_by_id: c.created_by_id,
-    created_by_name: c.created_by_name,
-    status: c.status,
-    rejection_reason: c.rejection_reason,
-    member_count: Number(c.member_count || 1),
-    icon: c.icon,
-    banner_image: c.banner_image,
-    rules: c.rules,
-    created_at: toIso(c.created_at),
-    updated_at: toIso(c.updated_at)
-  }));
+  const rows = res.rows;
+  if (!currentUserId || rows.length === 0) {
+    return rows.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      description: c.description,
+      category: c.category,
+      location: c.location,
+      created_by_id: c.created_by_id,
+      created_by_name: c.created_by_name,
+      status: c.status,
+      rejection_reason: c.rejection_reason,
+      member_count: Number(c.member_count || 1),
+      icon: c.icon,
+      banner_image: c.banner_image,
+      rules: c.rules,
+      visibility: c.visibility || 'PUBLIC',
+      membership_status: c.created_by_id === currentUserId ? 'ACTIVE' : 'NONE',
+      membership_role: c.created_by_id === currentUserId ? 'CREATOR' : undefined,
+      created_at: toIso(c.created_at),
+      updated_at: toIso(c.updated_at)
+    }));
+  }
+
+  const ids = rows.map((r: any) => r.id);
+  const memRes = await queryPostgres(
+    'SELECT community_id, role, status FROM community_members WHERE user_id = $1 AND community_id = ANY($2::varchar[])',
+    [currentUserId, ids]
+  );
+  const memMap = new Map(memRes.rows.map((m: any) => [m.community_id, m]));
+
+  return rows.map((c: any) => {
+    const mem = memMap.get(c.id);
+    const isCreator = c.created_by_id === currentUserId;
+    return {
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      description: c.description,
+      category: c.category,
+      location: c.location,
+      created_by_id: c.created_by_id,
+      created_by_name: c.created_by_name,
+      status: c.status,
+      rejection_reason: c.rejection_reason,
+      member_count: Number(c.member_count || 1),
+      icon: c.icon,
+      banner_image: c.banner_image,
+      rules: c.rules,
+      visibility: c.visibility || 'PUBLIC',
+      membership_status: mem?.status || (isCreator ? 'ACTIVE' : 'NONE'),
+      membership_role: mem?.role || (isCreator ? 'CREATOR' : undefined),
+      created_at: toIso(c.created_at),
+      updated_at: toIso(c.updated_at)
+    };
+  });
 }
 
-export async function pgGetCommunityById(id: string): Promise<DbCommunity | null> {
+export async function pgGetCommunityById(id: string, currentUserId?: string): Promise<DbCommunity | null> {
+  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres('SELECT * FROM communities WHERE id = $1', [id]);
   if (res.rows.length === 0) return null;
   const c = res.rows[0];
+
+  let membership_status: 'NONE' | 'PENDING' | 'ACTIVE' | 'REJECTED' = 'NONE';
+  let membership_role: 'CREATOR' | 'MODERATOR' | 'MEMBER' | undefined = undefined;
+
+  if (currentUserId) {
+    const memRes = await queryPostgres('SELECT role, status FROM community_members WHERE community_id = $1 AND user_id = $2', [id, currentUserId]);
+    if (memRes.rows.length > 0) {
+      membership_status = memRes.rows[0].status;
+      membership_role = memRes.rows[0].role;
+    } else if (c.created_by_id === currentUserId) {
+      membership_status = 'ACTIVE';
+      membership_role = 'CREATOR';
+    }
+  }
+
   return {
     id: c.id,
     name: c.name,
@@ -2005,6 +2089,9 @@ export async function pgGetCommunityById(id: string): Promise<DbCommunity | null
     icon: c.icon,
     banner_image: c.banner_image,
     rules: c.rules,
+    visibility: c.visibility || 'PUBLIC',
+    membership_status,
+    membership_role,
     created_at: toIso(c.created_at),
     updated_at: toIso(c.updated_at)
   };
@@ -2017,15 +2104,22 @@ export async function pgCreateCommunity(community: {
   location?: string;
   createdById?: string;
   createdByName?: string;
+  icon?: string;
+  bannerImage?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
   rules?: string;
 }): Promise<DbCommunity> {
+  await ensurePostgresAdditiveSchema();
   const id = `comm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const slug = community.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + `-${Date.now().toString().slice(-4)}`;
   const now = new Date().toISOString();
+  const visibility = community.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC';
+  const icon = community.icon?.trim() || 'Users';
+  const bannerImage = community.bannerImage?.trim() || '';
 
   await queryPostgres(`
-    INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING_APPROVAL', '', 1, 'Users', '', $9, $10, $11)
+    INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, visibility, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING_APPROVAL', '', 1, $9, $10, $11, $12, $13, $14)
   `, [
     id,
     community.name.trim(),
@@ -2035,13 +2129,334 @@ export async function pgCreateCommunity(community: {
     community.location?.trim() || 'Western Corridor, Hyderabad',
     community.createdById || 'user_guest',
     community.createdByName || 'Property Seeker',
+    icon,
+    bannerImage,
     community.rules?.trim() || 'Constructive civil discourse and RERA compliance verification.',
+    visibility,
     now,
     now
   ]);
 
-  const created = await pgGetCommunityById(id);
+  if (community.createdById) {
+    const memberId = `cm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    try {
+      await queryPostgres(`
+        INSERT INTO community_members (id, community_id, user_id, role, status, created_at, updated_at)
+        VALUES ($1, $2, $3, 'CREATOR', 'ACTIVE', $4, $5)
+        ON CONFLICT (community_id, user_id) DO NOTHING
+      `, [memberId, id, community.createdById, now, now]);
+    } catch {}
+  }
+
+  const created = await pgGetCommunityById(id, community.createdById);
   return created!;
+}
+
+export async function pgUpdateCommunity(id: string, updates: {
+  name?: string;
+  description?: string;
+  category?: string;
+  location?: string;
+  icon?: string;
+  bannerImage?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  rules?: string;
+}): Promise<DbCommunity | null> {
+  await ensurePostgresAdditiveSchema();
+  const existing = await pgGetCommunityById(id);
+  if (!existing) return null;
+  const now = new Date().toISOString();
+
+  const sets: string[] = ['updated_at = $1'];
+  const values: any[] = [now];
+  let paramIdx = 2;
+
+  if (updates.name !== undefined) {
+    sets.push(`name = $${paramIdx++}`);
+    values.push(updates.name.trim());
+  }
+  if (updates.description !== undefined) {
+    sets.push(`description = $${paramIdx++}`);
+    values.push(updates.description.trim());
+  }
+  if (updates.category !== undefined) {
+    sets.push(`category = $${paramIdx++}`);
+    values.push(updates.category.trim());
+  }
+  if (updates.location !== undefined) {
+    sets.push(`location = $${paramIdx++}`);
+    values.push(updates.location.trim());
+  }
+  if (updates.icon !== undefined) {
+    sets.push(`icon = $${paramIdx++}`);
+    values.push(updates.icon.trim());
+  }
+  if (updates.bannerImage !== undefined) {
+    sets.push(`banner_image = $${paramIdx++}`);
+    values.push(updates.bannerImage.trim());
+  }
+  if (updates.visibility !== undefined) {
+    sets.push(`visibility = $${paramIdx++}`);
+    values.push(updates.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC');
+  }
+  if (updates.rules !== undefined) {
+    sets.push(`rules = $${paramIdx++}`);
+    values.push(updates.rules.trim());
+  }
+
+  values.push(id);
+  await queryPostgres(`UPDATE communities SET ${sets.join(', ')} WHERE id = $${paramIdx}`, values);
+  return pgGetCommunityById(id);
+}
+
+export async function pgRecountCommunityMembers(communityId: string): Promise<void> {
+  const countRes = await queryPostgres(
+    "SELECT COUNT(*) as count FROM community_members WHERE community_id = $1 AND status = 'ACTIVE'",
+    [communityId]
+  );
+  const count = Math.max(1, Number(countRes.rows[0]?.count || 1));
+  await queryPostgres('UPDATE communities SET member_count = $1, updated_at = $2 WHERE id = $3', [count, new Date().toISOString(), communityId]);
+}
+
+export async function pgJoinCommunity(communityId: string, userId: string): Promise<{ status: 'ACTIVE' | 'PENDING'; message: string }> {
+  await ensurePostgresAdditiveSchema();
+  const comm = await pgGetCommunityById(communityId);
+  if (!comm) throw new Error('Community not found');
+  const now = new Date().toISOString();
+
+  const existingRes = await queryPostgres('SELECT id, status, role FROM community_members WHERE community_id = $1 AND user_id = $2', [communityId, userId]);
+  const existing = existingRes.rows[0];
+  if (existing) {
+    if (existing.status === 'ACTIVE') {
+      return { status: 'ACTIVE', message: 'You are already a member of this community.' };
+    }
+    if (existing.status === 'PENDING') {
+      return { status: 'PENDING', message: 'Your membership request is pending approval.' };
+    }
+  }
+
+  const isPrivate = comm.visibility === 'PRIVATE';
+  const newStatus = isPrivate ? 'PENDING' : 'ACTIVE';
+  const role = comm.created_by_id === userId ? 'CREATOR' : 'MEMBER';
+  const memberId = existing?.id || `cm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+
+  if (existing) {
+    await queryPostgres('UPDATE community_members SET status = $1, role = $2, updated_at = $3 WHERE id = $4', [newStatus, role, now, memberId]);
+  } else {
+    await queryPostgres(`
+      INSERT INTO community_members (id, community_id, user_id, role, status, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (community_id, user_id) DO UPDATE SET status = EXCLUDED.status, role = EXCLUDED.role, updated_at = EXCLUDED.updated_at
+    `, [memberId, communityId, userId, role, newStatus, now, now]);
+  }
+
+  if (newStatus === 'ACTIVE' && (!existing || existing.status !== 'ACTIVE')) {
+    await pgRecountCommunityMembers(communityId);
+  }
+
+  return {
+    status: newStatus,
+    message: isPrivate
+      ? 'Membership request submitted! Community moderators will review your request.'
+      : 'Joined community successfully!'
+  };
+}
+
+export async function pgLeaveCommunity(communityId: string, userId: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  const comm = await pgGetCommunityById(communityId);
+  if (!comm) return false;
+  if (comm.created_by_id === userId) {
+    throw new Error('Community creator cannot leave their own community.');
+  }
+  await queryPostgres('DELETE FROM community_members WHERE community_id = $1 AND user_id = $2', [communityId, userId]);
+  await pgRecountCommunityMembers(communityId);
+  return true;
+}
+
+export async function pgGetCommunityMembership(communityId: string, userId: string): Promise<{ isMember: boolean; status?: 'ACTIVE' | 'PENDING' | 'REJECTED'; role?: 'CREATOR' | 'MODERATOR' | 'MEMBER' }> {
+  await ensurePostgresAdditiveSchema();
+  const comm = await pgGetCommunityById(communityId);
+  if (comm?.created_by_id === userId) {
+    return { isMember: true, status: 'ACTIVE', role: 'CREATOR' };
+  }
+  const res = await queryPostgres('SELECT role, status FROM community_members WHERE community_id = $1 AND user_id = $2', [communityId, userId]);
+  if (res.rows.length === 0) return { isMember: false };
+  const row = res.rows[0];
+  return {
+    isMember: row.status === 'ACTIVE',
+    status: row.status,
+    role: row.role
+  };
+}
+
+export async function pgListCommunityMembers(communityId: string, statusFilter?: string): Promise<DbCommunityMember[]> {
+  await ensurePostgresAdditiveSchema();
+  let query = `
+    SELECT cm.id, cm.community_id, cm.user_id, cm.role, cm.status, cm.created_at, cm.updated_at,
+           u.name as user_name, u.email as user_email, u.avatar as user_avatar, u.profession as user_profession, u.role as user_role
+    FROM community_members cm
+    JOIN users u ON cm.user_id = u.id
+    WHERE cm.community_id = $1
+  `;
+  const params: any[] = [communityId];
+  if (statusFilter) {
+    query += ' AND cm.status = $2';
+    params.push(statusFilter);
+  }
+  query += ' ORDER BY cm.created_at ASC';
+  const res = await queryPostgres(query, params);
+  return res.rows.map((r: any) => ({
+    id: r.id,
+    community_id: r.community_id,
+    user_id: r.user_id,
+    role: r.role,
+    status: r.status,
+    created_at: toIso(r.created_at),
+    updated_at: toIso(r.updated_at),
+    user_name: r.user_name,
+    user_email: r.user_email,
+    user_avatar: r.user_avatar,
+    user_profession: r.user_profession,
+    user_role: r.user_role
+  }));
+}
+
+export async function pgUpdateCommunityMemberStatus(communityId: string, userId: string, newStatus: 'ACTIVE' | 'REJECTED'): Promise<DbCommunityMember | null> {
+  await ensurePostgresAdditiveSchema();
+  const now = new Date().toISOString();
+  await queryPostgres('UPDATE community_members SET status = $1, updated_at = $2 WHERE community_id = $3 AND user_id = $4', [newStatus, now, communityId, userId]);
+  await pgRecountCommunityMembers(communityId);
+  const members = await pgListCommunityMembers(communityId);
+  return members.find(m => m.user_id === userId) || null;
+}
+
+export async function pgUpdateCommunityMemberRole(communityId: string, userId: string, newRole: 'MODERATOR' | 'MEMBER'): Promise<DbCommunityMember | null> {
+  await ensurePostgresAdditiveSchema();
+  const now = new Date().toISOString();
+  await queryPostgres('UPDATE community_members SET role = $1, updated_at = $2 WHERE community_id = $3 AND user_id = $4', [newRole, now, communityId, userId]);
+  const members = await pgListCommunityMembers(communityId);
+  return members.find(m => m.user_id === userId) || null;
+}
+
+export async function pgRemoveCommunityMember(communityId: string, userId: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  await queryPostgres('DELETE FROM community_members WHERE community_id = $1 AND user_id = $2', [communityId, userId]);
+  await pgRecountCommunityMembers(communityId);
+  return true;
+}
+
+export async function pgGetUserJoinedCommunities(userId: string): Promise<DbCommunity[]> {
+  await ensurePostgresAdditiveSchema();
+  const res = await queryPostgres(`
+    SELECT c.*, cm.role as membership_role, cm.status as membership_status
+    FROM communities c
+    JOIN community_members cm ON c.id = cm.community_id
+    WHERE cm.user_id = $1 AND cm.status = 'ACTIVE'
+    ORDER BY cm.created_at DESC
+  `, [userId]);
+  return res.rows.map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    description: c.description,
+    category: c.category,
+    location: c.location,
+    created_by_id: c.created_by_id,
+    created_by_name: c.created_by_name,
+    status: c.status,
+    rejection_reason: c.rejection_reason,
+    member_count: Number(c.member_count || 1),
+    icon: c.icon,
+    banner_image: c.banner_image,
+    rules: c.rules,
+    visibility: c.visibility || 'PUBLIC',
+    membership_status: c.membership_status,
+    membership_role: c.membership_role,
+    created_at: toIso(c.created_at),
+    updated_at: toIso(c.updated_at)
+  }));
+}
+
+export async function pgCanUserViewCommunityPosts(communityId: string, userId?: string, userRole?: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  const comm = await pgGetCommunityById(communityId);
+  if (!comm) return false;
+  if (comm.visibility !== 'PRIVATE') return true;
+  if (!userId) return false;
+  if (userRole === 'SUPER_ADMIN' || userRole === 'DEVELOPER') return true;
+  if (comm.created_by_id === userId) return true;
+  const res = await queryPostgres("SELECT status FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'ACTIVE'", [communityId, userId]);
+  return res.rows.length > 0;
+}
+
+export async function pgCanUserPostInCommunity(communityId: string, userId: string, userRole?: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  const comm = await pgGetCommunityById(communityId);
+  if (!comm) return false;
+  if (userRole === 'SUPER_ADMIN' || userRole === 'DEVELOPER') return true;
+  if (comm.created_by_id === userId) return true;
+  if (comm.visibility !== 'PRIVATE') return true;
+  const res = await queryPostgres("SELECT status FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'ACTIVE'", [communityId, userId]);
+  return res.rows.length > 0;
+}
+
+export async function pgToggleDiscussionRepost(postId: string, userId: string, userName?: string, note?: string): Promise<{ reposted: boolean; count: number }> {
+  await ensurePostgresAdditiveSchema();
+  const postRes = await queryPostgres('SELECT id FROM community_posts WHERE id = $1', [postId]);
+  if (postRes.rows.length === 0) throw new Error('Post not found');
+
+  const existingRes = await queryPostgres('SELECT id FROM community_post_reposts WHERE post_id = $1 AND user_id = $2', [postId, userId]);
+  let reposted = false;
+  if (existingRes.rows.length > 0) {
+    await queryPostgres('DELETE FROM community_post_reposts WHERE id = $1', [existingRes.rows[0].id]);
+    reposted = false;
+  } else {
+    const id = `cprepost_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    await queryPostgres(`
+      INSERT INTO community_post_reposts (id, post_id, user_id, user_name, note, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (post_id, user_id) DO NOTHING
+    `, [id, postId, userId, userName || 'Community Member', note?.trim() || '', new Date().toISOString()]);
+    reposted = true;
+  }
+
+  const countRes = await queryPostgres('SELECT COUNT(*) as count FROM community_post_reposts WHERE post_id = $1', [postId]);
+  return { reposted, count: Number(countRes.rows[0]?.count || 0) };
+}
+
+export async function pgGetUserDiscussionReposts(userId: string): Promise<DbUserDiscussionRepostItem[]> {
+  await ensurePostgresAdditiveSchema();
+  const res = await queryPostgres(`
+    SELECT r.id as repost_id, r.post_id, r.note, r.created_at as reposted_at,
+           p.title, p.content, p.topic, p.author_id, p.author_name, p.author_role,
+           p.community_id, p.community_name, p.upvotes, p.comments_count
+    FROM community_post_reposts r
+    JOIN community_posts p ON r.post_id = p.id
+    WHERE r.user_id = $1
+    ORDER BY r.created_at DESC
+  `, [userId]);
+
+  return res.rows.map((r: any) => ({
+    repostId: r.repost_id,
+    postId: r.post_id,
+    repostedAt: toIso(r.reposted_at),
+    note: r.note || '',
+    title: r.title,
+    content: r.content,
+    topic: r.topic,
+    authorId: r.author_id,
+    authorName: r.author_name,
+    originalAuthorName: r.author_name,
+    authorRole: r.author_role,
+    originalAuthorRole: r.author_role,
+    communityId: r.community_id,
+    communityName: r.community_name,
+    upvotes: Number(r.upvotes || 0),
+    commentsCount: Number(r.comments_count || 0),
+    shareUrl: `/?view=community&post=${encodeURIComponent(r.post_id)}`,
+    shareLink: `/?view=community&post=${encodeURIComponent(r.post_id)}`
+  }));
 }
 
 export async function pgUpdateCommunityStatus(
@@ -2049,6 +2464,7 @@ export async function pgUpdateCommunityStatus(
   status: 'APPROVED' | 'REJECTED',
   reason?: string
 ): Promise<DbCommunity | null> {
+  await ensurePostgresAdditiveSchema();
   const now = new Date().toISOString();
   await queryPostgres(`
     UPDATE communities 
@@ -2059,6 +2475,7 @@ export async function pgUpdateCommunityStatus(
 }
 
 export async function pgDeleteCommunity(id: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
   await queryPostgres('DELETE FROM communities WHERE id = $1', [id]);
   return true;
 }

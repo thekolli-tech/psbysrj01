@@ -79,8 +79,21 @@ import {
   pgGetAllCommunities,
   pgGetCommunityById,
   pgCreateCommunity,
+  pgUpdateCommunity,
   pgUpdateCommunityStatus,
   pgDeleteCommunity,
+  pgJoinCommunity,
+  pgLeaveCommunity,
+  pgGetCommunityMembership,
+  pgListCommunityMembers,
+  pgUpdateCommunityMemberStatus,
+  pgUpdateCommunityMemberRole,
+  pgRemoveCommunityMember,
+  pgGetUserJoinedCommunities,
+  pgCanUserViewCommunityPosts,
+  pgCanUserPostInCommunity,
+  pgToggleDiscussionRepost,
+  pgGetUserDiscussionReposts,
   pgGetAllMedia,
   pgGetMediaById,
   pgCreateMedia,
@@ -259,8 +272,54 @@ export interface DbCommunity {
   icon: string;
   banner_image: string;
   rules: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  membership_status?: 'NONE' | 'PENDING' | 'ACTIVE' | 'REJECTED';
+  membership_role?: 'CREATOR' | 'MODERATOR' | 'MEMBER';
   created_at: string;
   updated_at: string;
+}
+
+export interface DbCommunityMember {
+  id: string;
+  community_id: string;
+  user_id: string;
+  role: 'CREATOR' | 'MODERATOR' | 'MEMBER';
+  status: 'ACTIVE' | 'PENDING' | 'REJECTED';
+  created_at: string;
+  updated_at: string;
+  user_name?: string;
+  user_email?: string;
+  user_avatar?: string;
+  user_profession?: string;
+  user_role?: string;
+}
+
+export interface DbCommunityPostRepost {
+  id: string;
+  post_id: string;
+  user_id: string;
+  user_name?: string;
+  note?: string;
+  created_at: string;
+}
+
+export interface DbUserDiscussionRepostItem {
+  repostId: string;
+  postId: string;
+  repostedAt: string;
+  note?: string;
+  title: string;
+  content: string;
+  topic: string;
+  authorId: string;
+  authorName: string;
+  authorRole: string;
+  authorProfession?: string;
+  communityId?: string;
+  communityName?: string;
+  upvotes: number;
+  commentsCount: number;
+  shareUrl: string;
 }
 
 export interface DbCommunityPost {
@@ -1158,14 +1217,14 @@ export async function ensureInitialCommunities(): Promise<void> {
   sqliteEnsureInitialCommunities();
 }
 
-export async function getAllCommunities(status?: string): Promise<DbCommunity[]> {
-  if (isPostgresAuthoritative()) return pgGetAllCommunities(status);
-  return sqliteGetAllCommunities(status);
+export async function getAllCommunities(status?: string, currentUserId?: string): Promise<DbCommunity[]> {
+  if (isPostgresAuthoritative()) return pgGetAllCommunities(status, currentUserId);
+  return sqliteGetAllCommunities(status, currentUserId);
 }
 
-export async function getCommunityById(id: string): Promise<DbCommunity | null> {
-  if (isPostgresAuthoritative()) return pgGetCommunityById(id);
-  return sqliteGetCommunityById(id);
+export async function getCommunityById(id: string, currentUserId?: string): Promise<DbCommunity | null> {
+  if (isPostgresAuthoritative()) return pgGetCommunityById(id, currentUserId);
+  return sqliteGetCommunityById(id, currentUserId);
 }
 
 export async function createCommunity(community: {
@@ -1175,10 +1234,87 @@ export async function createCommunity(community: {
   location?: string;
   createdById?: string;
   createdByName?: string;
+  icon?: string;
+  bannerImage?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
   rules?: string;
 }): Promise<DbCommunity> {
   if (isPostgresAuthoritative()) return pgCreateCommunity(community);
   return sqliteCreateCommunity(community);
+}
+
+export async function updateCommunity(id: string, updates: {
+  name?: string;
+  description?: string;
+  category?: string;
+  location?: string;
+  icon?: string;
+  bannerImage?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  rules?: string;
+}): Promise<DbCommunity | null> {
+  if (isPostgresAuthoritative()) return pgUpdateCommunity(id, updates);
+  return sqliteUpdateCommunity(id, updates);
+}
+
+export async function joinCommunity(communityId: string, userId: string): Promise<{ status: 'ACTIVE' | 'PENDING'; message: string }> {
+  if (isPostgresAuthoritative()) return pgJoinCommunity(communityId, userId);
+  return sqliteJoinCommunity(communityId, userId);
+}
+
+export async function leaveCommunity(communityId: string, userId: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgLeaveCommunity(communityId, userId);
+  return sqliteLeaveCommunity(communityId, userId);
+}
+
+export async function getCommunityMembership(communityId: string, userId: string): Promise<{ isMember: boolean; status?: 'ACTIVE' | 'PENDING' | 'REJECTED'; role?: 'CREATOR' | 'MODERATOR' | 'MEMBER' }> {
+  if (isPostgresAuthoritative()) return pgGetCommunityMembership(communityId, userId);
+  return sqliteGetCommunityMembership(communityId, userId);
+}
+
+export async function listCommunityMembers(communityId: string, statusFilter?: string): Promise<DbCommunityMember[]> {
+  if (isPostgresAuthoritative()) return pgListCommunityMembers(communityId, statusFilter);
+  return sqliteListCommunityMembers(communityId, statusFilter);
+}
+
+export async function updateCommunityMemberStatus(communityId: string, userId: string, newStatus: 'ACTIVE' | 'REJECTED'): Promise<DbCommunityMember | null> {
+  if (isPostgresAuthoritative()) return pgUpdateCommunityMemberStatus(communityId, userId, newStatus);
+  return sqliteUpdateCommunityMemberStatus(communityId, userId, newStatus);
+}
+
+export async function updateCommunityMemberRole(communityId: string, userId: string, newRole: 'MODERATOR' | 'MEMBER'): Promise<DbCommunityMember | null> {
+  if (isPostgresAuthoritative()) return pgUpdateCommunityMemberRole(communityId, userId, newRole);
+  return sqliteUpdateCommunityMemberRole(communityId, userId, newRole);
+}
+
+export async function removeCommunityMember(communityId: string, userId: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgRemoveCommunityMember(communityId, userId);
+  return sqliteRemoveCommunityMember(communityId, userId);
+}
+
+export async function getUserJoinedCommunities(userId: string): Promise<DbCommunity[]> {
+  if (isPostgresAuthoritative()) return pgGetUserJoinedCommunities(userId);
+  return sqliteGetUserJoinedCommunities(userId);
+}
+
+export async function canUserViewCommunityPosts(communityId: string, userId?: string, userRole?: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgCanUserViewCommunityPosts(communityId, userId, userRole);
+  return sqliteCanUserViewCommunityPosts(communityId, userId, userRole);
+}
+
+export async function canUserPostInCommunity(communityId: string, userId: string, userRole?: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgCanUserPostInCommunity(communityId, userId, userRole);
+  return sqliteCanUserPostInCommunity(communityId, userId, userRole);
+}
+
+export async function toggleDiscussionRepost(postId: string, userId: string, userName?: string, note?: string): Promise<{ reposted: boolean; count: number }> {
+  if (isPostgresAuthoritative()) return pgToggleDiscussionRepost(postId, userId, userName, note);
+  return sqliteToggleDiscussionRepost(postId, userId, userName, note);
+}
+
+export async function getUserDiscussionReposts(userId: string): Promise<DbUserDiscussionRepostItem[]> {
+  if (isPostgresAuthoritative()) return pgGetUserDiscussionReposts(userId);
+  return sqliteGetUserDiscussionReposts(userId);
 }
 
 export async function updateCommunityStatus(
@@ -1408,6 +1544,7 @@ function sqliteInitDatabase(): void {
       icon TEXT,
       banner_image TEXT,
       rules TEXT,
+      visibility TEXT DEFAULT 'PUBLIC',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -1698,10 +1835,12 @@ type CommunityEngagement = {
   following: boolean;
   bookmarked: boolean;
   bookmarkCount: number;
+  repostsCount?: number;
+  hasReposted?: boolean;
 };
 
 function emptyEngagement(): CommunityEngagement {
-  return { agreeCount: 0, disagreeCount: 0, userVote: 0, followerCount: 0, following: false, bookmarked: false, bookmarkCount: 0 };
+  return { agreeCount: 0, disagreeCount: 0, userVote: 0, followerCount: 0, following: false, bookmarked: false, bookmarkCount: 0, repostsCount: 0, hasReposted: false };
 }
 
 function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, CommunityEngagement> {
@@ -1728,6 +1867,15 @@ function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, 
     WHERE post_id IN (${marks})
     GROUP BY post_id
   `).all(...ids) as Array<{ post_id: string; bookmark_count: number }>;
+  let reposts: Array<{ post_id: string; repost_count: number }> = [];
+  try {
+    reposts = db.prepare(`
+      SELECT post_id, COUNT(*) AS repost_count
+      FROM community_post_reposts
+      WHERE post_id IN (${marks})
+      GROUP BY post_id
+    `).all(...ids) as Array<{ post_id: string; repost_count: number }>;
+  } catch {}
   for (const row of votes) {
     const current = result.get(row.post_id) || emptyEngagement();
     current.agreeCount = Number(row.agree_count || 0);
@@ -1744,6 +1892,11 @@ function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, 
     current.bookmarkCount = Number(row.bookmark_count || 0);
     result.set(row.post_id, current);
   }
+  for (const row of reposts) {
+    const current = result.get(row.post_id) || emptyEngagement();
+    current.repostsCount = Number(row.repost_count || 0);
+    result.set(row.post_id, current);
+  }
   if (userId) {
     const mine = db.prepare(`
       SELECT post_id, vote FROM community_post_votes WHERE user_id = ? AND post_id IN (${marks})
@@ -1754,6 +1907,12 @@ function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, 
     const bookmarked = db.prepare(`
       SELECT post_id FROM community_bookmarks WHERE user_id = ? AND post_id IN (${marks})
     `).all(userId, ...ids) as Array<{ post_id: string }>;
+    let reposted: Array<{ post_id: string }> = [];
+    try {
+      reposted = db.prepare(`
+        SELECT post_id FROM community_post_reposts WHERE user_id = ? AND post_id IN (${marks})
+      `).all(userId, ...ids) as Array<{ post_id: string }>;
+    } catch {}
     for (const row of mine) {
       const current = result.get(row.post_id) || emptyEngagement();
       current.userVote = Number(row.vote) === -1 ? -1 : 1;
@@ -1767,6 +1926,11 @@ function sqliteCommunityEngagement(ids: string[], userId?: string): Map<string, 
     for (const row of bookmarked) {
       const current = result.get(row.post_id) || emptyEngagement();
       current.bookmarked = true;
+      result.set(row.post_id, current);
+    }
+    for (const row of reposted) {
+      const current = result.get(row.post_id) || emptyEngagement();
+      current.hasReposted = true;
       result.set(row.post_id, current);
     }
   }
@@ -3466,18 +3630,75 @@ function sqliteEnsureInitialCommunities(): void {
   // Intentionally empty. Local schema initialization must not seed communities.
 }
 
-function sqliteGetAllCommunities(status?: string): DbCommunity[] {
+function sqliteGetAllCommunities(status?: string, currentUserId?: string): DbCommunity[] {
+  let query = 'SELECT * FROM communities';
+  const params: any[] = [];
   if (status) {
-    const stmt = db.prepare('SELECT * FROM communities WHERE status = ? ORDER BY created_at DESC');
-    return stmt.all(status) as unknown as DbCommunity[];
+    query += ' WHERE status = ? ORDER BY created_at DESC';
+    params.push(status);
+  } else {
+    query += ' ORDER BY created_at DESC';
   }
-  const stmt = db.prepare('SELECT * FROM communities ORDER BY created_at DESC');
-  return stmt.all() as unknown as DbCommunity[];
+  const rows = db.prepare(query).all(...params) as unknown as DbCommunity[];
+
+  if (!currentUserId || rows.length === 0) {
+    return rows.map(r => ({
+      ...r,
+      visibility: r.visibility || 'PUBLIC',
+      membership_status: r.created_by_id === currentUserId ? 'ACTIVE' : 'NONE',
+      membership_role: r.created_by_id === currentUserId ? 'CREATOR' : undefined
+    }));
+  }
+
+  const ids = rows.map(r => r.id);
+  const marks = ids.map(() => '?').join(', ');
+  let memberships: Array<{ community_id: string; role: any; status: any }> = [];
+  try {
+    memberships = db.prepare(`
+      SELECT community_id, role, status FROM community_members WHERE user_id = ? AND community_id IN (${marks})
+    `).all(currentUserId, ...ids) as Array<{ community_id: string; role: any; status: any }>;
+  } catch {}
+
+  const memMap = new Map(memberships.map(m => [m.community_id, m]));
+
+  return rows.map(r => {
+    const mem = memMap.get(r.id);
+    const isCreator = r.created_by_id === currentUserId;
+    return {
+      ...r,
+      visibility: r.visibility || 'PUBLIC',
+      membership_status: mem?.status || (isCreator ? 'ACTIVE' : 'NONE'),
+      membership_role: mem?.role || (isCreator ? 'CREATOR' : undefined)
+    };
+  });
 }
 
-function sqliteGetCommunityById(id: string): DbCommunity | null {
+function sqliteGetCommunityById(id: string, currentUserId?: string): DbCommunity | null {
   const stmt = db.prepare('SELECT * FROM communities WHERE id = ?');
-  return (stmt.get(id) as unknown as DbCommunity) || null;
+  const r = (stmt.get(id) as unknown as DbCommunity) || null;
+  if (!r) return null;
+  let membership_status: 'NONE' | 'PENDING' | 'ACTIVE' | 'REJECTED' = 'NONE';
+  let membership_role: 'CREATOR' | 'MODERATOR' | 'MEMBER' | undefined = undefined;
+
+  if (currentUserId) {
+    try {
+      const mem = db.prepare('SELECT role, status FROM community_members WHERE community_id = ? AND user_id = ?').get(id, currentUserId) as { role: any; status: any } | undefined;
+      if (mem) {
+        membership_status = mem.status;
+        membership_role = mem.role;
+      } else if (r.created_by_id === currentUserId) {
+        membership_status = 'ACTIVE';
+        membership_role = 'CREATOR';
+      }
+    } catch {}
+  }
+
+  return {
+    ...r,
+    visibility: r.visibility || 'PUBLIC',
+    membership_status,
+    membership_role
+  };
 }
 
 function sqliteCreateCommunity(community: {
@@ -3487,15 +3708,21 @@ function sqliteCreateCommunity(community: {
   location?: string;
   createdById?: string;
   createdByName?: string;
+  icon?: string;
+  bannerImage?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
   rules?: string;
 }): DbCommunity {
   const id = `comm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const slug = community.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + `-${Date.now().toString().slice(-4)}`;
   const now = new Date().toISOString();
+  const visibility = community.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC';
+  const icon = community.icon?.trim() || 'Users';
+  const bannerImage = community.bannerImage?.trim() || '';
 
   const insert = db.prepare(`
-    INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', '', 1, 'Users', '', ?, ?, ?)
+    INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, visibility, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', '', 1, ?, ?, ?, ?, ?, ?)
   `);
 
   insert.run(
@@ -3507,12 +3734,318 @@ function sqliteCreateCommunity(community: {
     community.location?.trim() || 'Western Corridor, Hyderabad',
     community.createdById || 'user_guest',
     community.createdByName || 'Property Seeker',
+    icon,
+    bannerImage,
     community.rules?.trim() || 'Constructive civil discourse and RERA compliance verification.',
+    visibility,
     now,
     now
   );
 
-  return sqliteGetCommunityById(id)!;
+  if (community.createdById) {
+    const memberId = `cm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    try {
+      db.prepare(`
+        INSERT OR IGNORE INTO community_members (id, community_id, user_id, role, status, created_at, updated_at)
+        VALUES (?, ?, ?, 'CREATOR', 'ACTIVE', ?, ?)
+      `).run(memberId, id, community.createdById, now, now);
+    } catch {}
+  }
+
+  return sqliteGetCommunityById(id, community.createdById)!;
+}
+
+function sqliteUpdateCommunity(id: string, updates: {
+  name?: string;
+  description?: string;
+  category?: string;
+  location?: string;
+  icon?: string;
+  bannerImage?: string;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  rules?: string;
+}): DbCommunity | null {
+  const existing = sqliteGetCommunityById(id);
+  if (!existing) return null;
+  const now = new Date().toISOString();
+
+  const sets: string[] = ['updated_at = ?'];
+  const values: any[] = [now];
+
+  if (updates.name !== undefined) {
+    sets.push('name = ?');
+    values.push(updates.name.trim());
+  }
+  if (updates.description !== undefined) {
+    sets.push('description = ?');
+    values.push(updates.description.trim());
+  }
+  if (updates.category !== undefined) {
+    sets.push('category = ?');
+    values.push(updates.category.trim());
+  }
+  if (updates.location !== undefined) {
+    sets.push('location = ?');
+    values.push(updates.location.trim());
+  }
+  if (updates.icon !== undefined) {
+    sets.push('icon = ?');
+    values.push(updates.icon.trim());
+  }
+  if (updates.bannerImage !== undefined) {
+    sets.push('banner_image = ?');
+    values.push(updates.bannerImage.trim());
+  }
+  if (updates.visibility !== undefined) {
+    sets.push('visibility = ?');
+    values.push(updates.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC');
+  }
+  if (updates.rules !== undefined) {
+    sets.push('rules = ?');
+    values.push(updates.rules.trim());
+  }
+
+  values.push(id);
+  db.prepare(`UPDATE communities SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+  return sqliteGetCommunityById(id);
+}
+
+function sqliteRecountCommunityMembers(communityId: string): void {
+  try {
+    const row = db.prepare("SELECT COUNT(*) as count FROM community_members WHERE community_id = ? AND status = 'ACTIVE'").get(communityId) as { count: number };
+    const count = Math.max(1, Number(row?.count || 1));
+    db.prepare('UPDATE communities SET member_count = ?, updated_at = ? WHERE id = ?').run(count, new Date().toISOString(), communityId);
+  } catch {}
+}
+
+function sqliteJoinCommunity(communityId: string, userId: string): { status: 'ACTIVE' | 'PENDING'; message: string } {
+  const comm = sqliteGetCommunityById(communityId);
+  if (!comm) throw new Error('Community not found');
+  const now = new Date().toISOString();
+
+  const existing = db.prepare('SELECT id, status, role FROM community_members WHERE community_id = ? AND user_id = ?').get(communityId, userId) as { id: string; status: string; role: string } | undefined;
+  if (existing) {
+    if (existing.status === 'ACTIVE') {
+      return { status: 'ACTIVE', message: 'You are already a member of this community.' };
+    }
+    if (existing.status === 'PENDING') {
+      return { status: 'PENDING', message: 'Your membership request is pending approval.' };
+    }
+  }
+
+  const isPrivate = comm.visibility === 'PRIVATE';
+  const newStatus = isPrivate ? 'PENDING' : 'ACTIVE';
+  const role = comm.created_by_id === userId ? 'CREATOR' : 'MEMBER';
+  const memberId = existing?.id || `cm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+
+  if (existing) {
+    db.prepare('UPDATE community_members SET status = ?, role = ?, updated_at = ? WHERE id = ?').run(newStatus, role, now, memberId);
+  } else {
+    db.prepare(`
+      INSERT INTO community_members (id, community_id, user_id, role, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(memberId, communityId, userId, role, newStatus, now, now);
+  }
+
+  if (newStatus === 'ACTIVE' && (!existing || existing.status !== 'ACTIVE')) {
+    sqliteRecountCommunityMembers(communityId);
+  }
+
+  return {
+    status: newStatus,
+    message: isPrivate
+      ? 'Membership request submitted! Community moderators will review your request.'
+      : 'Joined community successfully!'
+  };
+}
+
+function sqliteLeaveCommunity(communityId: string, userId: string): boolean {
+  const comm = sqliteGetCommunityById(communityId);
+  if (!comm) return false;
+  if (comm.created_by_id === userId) {
+    throw new Error('Community creator cannot leave their own community.');
+  }
+  db.prepare('DELETE FROM community_members WHERE community_id = ? AND user_id = ?').run(communityId, userId);
+  sqliteRecountCommunityMembers(communityId);
+  return true;
+}
+
+function sqliteGetCommunityMembership(communityId: string, userId: string): { isMember: boolean; status?: 'ACTIVE' | 'PENDING' | 'REJECTED'; role?: 'CREATOR' | 'MODERATOR' | 'MEMBER' } {
+  const comm = sqliteGetCommunityById(communityId);
+  if (comm?.created_by_id === userId) {
+    return { isMember: true, status: 'ACTIVE', role: 'CREATOR' };
+  }
+  try {
+    const row = db.prepare('SELECT role, status FROM community_members WHERE community_id = ? AND user_id = ?').get(communityId, userId) as { role: any; status: any } | undefined;
+    if (!row) return { isMember: false };
+    return {
+      isMember: row.status === 'ACTIVE',
+      status: row.status,
+      role: row.role
+    };
+  } catch {
+    return { isMember: false };
+  }
+}
+
+function sqliteListCommunityMembers(communityId: string, statusFilter?: string): DbCommunityMember[] {
+  let query = `
+    SELECT cm.id, cm.community_id, cm.user_id, cm.role, cm.status, cm.created_at, cm.updated_at,
+           u.name as user_name, u.email as user_email, u.avatar as user_avatar, u.profession as user_profession, u.role as user_role
+    FROM community_members cm
+    JOIN users u ON cm.user_id = u.id
+    WHERE cm.community_id = ?
+  `;
+  const params: any[] = [communityId];
+  if (statusFilter) {
+    query += ' AND cm.status = ?';
+    params.push(statusFilter);
+  }
+  query += ' ORDER BY cm.created_at ASC';
+  try {
+    return db.prepare(query).all(...params) as unknown as DbCommunityMember[];
+  } catch {
+    return [];
+  }
+}
+
+function sqliteUpdateCommunityMemberStatus(communityId: string, userId: string, newStatus: 'ACTIVE' | 'REJECTED'): DbCommunityMember | null {
+  const now = new Date().toISOString();
+  db.prepare('UPDATE community_members SET status = ?, updated_at = ? WHERE community_id = ? AND user_id = ?').run(newStatus, now, communityId, userId);
+  sqliteRecountCommunityMembers(communityId);
+  const updated = db.prepare(`
+    SELECT cm.id, cm.community_id, cm.user_id, cm.role, cm.status, cm.created_at, cm.updated_at,
+           u.name as user_name, u.email as user_email, u.avatar as user_avatar, u.profession as user_profession, u.role as user_role
+    FROM community_members cm
+    JOIN users u ON cm.user_id = u.id
+    WHERE cm.community_id = ? AND cm.user_id = ?
+  `).get(communityId, userId) as unknown as DbCommunityMember | undefined;
+  return updated || null;
+}
+
+function sqliteUpdateCommunityMemberRole(communityId: string, userId: string, newRole: 'MODERATOR' | 'MEMBER'): DbCommunityMember | null {
+  const now = new Date().toISOString();
+  db.prepare('UPDATE community_members SET role = ?, updated_at = ? WHERE community_id = ? AND user_id = ?').run(newRole, now, communityId, userId);
+  const updated = db.prepare(`
+    SELECT cm.id, cm.community_id, cm.user_id, cm.role, cm.status, cm.created_at, cm.updated_at,
+           u.name as user_name, u.email as user_email, u.avatar as user_avatar, u.profession as user_profession, u.role as user_role
+    FROM community_members cm
+    JOIN users u ON cm.user_id = u.id
+    WHERE cm.community_id = ? AND cm.user_id = ?
+  `).get(communityId, userId) as unknown as DbCommunityMember | undefined;
+  return updated || null;
+}
+
+function sqliteRemoveCommunityMember(communityId: string, userId: string): boolean {
+  db.prepare('DELETE FROM community_members WHERE community_id = ? AND user_id = ?').run(communityId, userId);
+  sqliteRecountCommunityMembers(communityId);
+  return true;
+}
+
+function sqliteGetUserJoinedCommunities(userId: string): DbCommunity[] {
+  try {
+    const rows = db.prepare(`
+      SELECT c.*, cm.role as membership_role, cm.status as membership_status
+      FROM communities c
+      JOIN community_members cm ON c.id = cm.community_id
+      WHERE cm.user_id = ? AND cm.status = 'ACTIVE'
+      ORDER BY cm.created_at DESC
+    `).all(userId) as unknown as DbCommunity[];
+    return rows.map(r => ({
+      ...r,
+      visibility: r.visibility || 'PUBLIC'
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function sqliteCanUserViewCommunityPosts(communityId: string, userId?: string, userRole?: string): boolean {
+  const comm = sqliteGetCommunityById(communityId);
+  if (!comm) return false;
+  if (comm.visibility !== 'PRIVATE') return true;
+  if (!userId) return false;
+  if (userRole === 'SUPER_ADMIN' || userRole === 'DEVELOPER') return true;
+  if (comm.created_by_id === userId) return true;
+  try {
+    const mem = db.prepare("SELECT status FROM community_members WHERE community_id = ? AND user_id = ? AND status = 'ACTIVE'").get(communityId, userId);
+    return Boolean(mem);
+  } catch {
+    return false;
+  }
+}
+
+function sqliteCanUserPostInCommunity(communityId: string, userId: string, userRole?: string): boolean {
+  const comm = sqliteGetCommunityById(communityId);
+  if (!comm) return false;
+  if (userRole === 'SUPER_ADMIN' || userRole === 'DEVELOPER') return true;
+  if (comm.created_by_id === userId) return true;
+  if (comm.visibility !== 'PRIVATE') return true;
+  try {
+    const mem = db.prepare("SELECT status FROM community_members WHERE community_id = ? AND user_id = ? AND status = 'ACTIVE'").get(communityId, userId);
+    return Boolean(mem);
+  } catch {
+    return false;
+  }
+}
+
+function sqliteToggleDiscussionRepost(postId: string, userId: string, userName?: string, note?: string): { reposted: boolean; count: number } {
+  const post = db.prepare('SELECT id FROM community_posts WHERE id = ?').get(postId);
+  if (!post) throw new Error('Post not found');
+
+  const existing = db.prepare('SELECT id FROM community_post_reposts WHERE post_id = ? AND user_id = ?').get(postId, userId) as { id: string } | undefined;
+  let reposted = false;
+  if (existing) {
+    db.prepare('DELETE FROM community_post_reposts WHERE id = ?').run(existing.id);
+    reposted = false;
+  } else {
+    const id = `cprepost_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    db.prepare(`
+      INSERT OR IGNORE INTO community_post_reposts (id, post_id, user_id, user_name, note, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, postId, userId, userName || 'Community Member', note?.trim() || '', new Date().toISOString());
+    reposted = true;
+  }
+
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM community_post_reposts WHERE post_id = ?').get(postId) as { count: number };
+  return { reposted, count: Number(countRow?.count || 0) };
+}
+
+function sqliteGetUserDiscussionReposts(userId: string): DbUserDiscussionRepostItem[] {
+  try {
+    const rows = db.prepare(`
+      SELECT r.id as repost_id, r.post_id, r.note, r.created_at as reposted_at,
+             p.title, p.content, p.topic, p.author_id, p.author_name, p.author_role,
+             p.community_id, p.community_name, p.upvotes, p.comments_count
+      FROM community_post_reposts r
+      JOIN community_posts p ON r.post_id = p.id
+      WHERE r.user_id = ?
+      ORDER BY r.created_at DESC
+    `).all(userId) as any[];
+
+    return rows.map(r => ({
+      repostId: r.repost_id,
+      postId: r.post_id,
+      repostedAt: r.reposted_at,
+      note: r.note || '',
+      title: r.title,
+      content: r.content,
+      topic: r.topic,
+      authorId: r.author_id,
+      authorName: r.author_name,
+      originalAuthorName: r.author_name,
+      authorRole: r.author_role,
+      originalAuthorRole: r.author_role,
+      communityId: r.community_id,
+      communityName: r.community_name,
+      upvotes: Number(r.upvotes || 0),
+      commentsCount: Number(r.comments_count || 0),
+      shareUrl: `/?view=community&post=${encodeURIComponent(r.post_id)}`,
+      shareLink: `/?view=community&post=${encodeURIComponent(r.post_id)}`
+    }));
+  } catch {
+    return [];
+  }
 }
 
 function sqliteUpdateCommunityStatus(id: string, status: 'APPROVED' | 'REJECTED', reason?: string): DbCommunity | null {

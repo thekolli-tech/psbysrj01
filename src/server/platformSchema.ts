@@ -29,6 +29,7 @@ ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS moderation_note TEXT;
 ALTER TABLE communities ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
 ALTER TABLE communities ADD COLUMN IF NOT EXISTS change_request TEXT;
+ALTER TABLE communities ADD COLUMN IF NOT EXISTS visibility VARCHAR(32) DEFAULT 'PUBLIC';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities TEXT DEFAULT '[]';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS town_city TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS profession TEXT;
@@ -251,6 +252,32 @@ CREATE TABLE IF NOT EXISTS media_reposts (
 );
 CREATE INDEX IF NOT EXISTS idx_media_reposts_user ON media_reposts(user_id);
 CREATE INDEX IF NOT EXISTS idx_media_reposts_media ON media_reposts(media_id);
+
+CREATE TABLE IF NOT EXISTS community_members (
+  id VARCHAR(64) PRIMARY KEY,
+  community_id VARCHAR(64) NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role VARCHAR(32) NOT NULL DEFAULT 'MEMBER',
+  status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (community_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_community_members_comm ON community_members(community_id);
+CREATE INDEX IF NOT EXISTS idx_community_members_user ON community_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_community_members_status ON community_members(community_id, status);
+
+CREATE TABLE IF NOT EXISTS community_post_reposts (
+  id VARCHAR(64) PRIMARY KEY,
+  post_id VARCHAR(64) NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_name VARCHAR(255),
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (post_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_comm_reposts_post ON community_post_reposts(post_id);
+CREATE INDEX IF NOT EXISTS idx_comm_reposts_user ON community_post_reposts(user_id);
 `;
 
 export const ESSENTIAL_CONFIG_SQL = `
@@ -269,6 +296,7 @@ export const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE community_posts ADD COLUMN moderation_note TEXT',
   'ALTER TABLE communities ADD COLUMN suspension_reason TEXT',
   'ALTER TABLE communities ADD COLUMN change_request TEXT',
+  'ALTER TABLE communities ADD COLUMN visibility TEXT DEFAULT \'PUBLIC\'',
   'ALTER TABLE users ADD COLUMN capabilities TEXT DEFAULT \'[]\'',
   'ALTER TABLE users ADD COLUMN town_city TEXT',
   'ALTER TABLE users ADD COLUMN profession TEXT',
@@ -455,6 +483,25 @@ CREATE TABLE IF NOT EXISTS media_reposts (
   note TEXT,
   created_at TEXT NOT NULL,
   UNIQUE (media_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS community_members (
+  id TEXT PRIMARY KEY,
+  community_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'MEMBER',
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (community_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS community_post_reposts (
+  id TEXT PRIMARY KEY,
+  post_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT,
+  note TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (post_id, user_id)
 );
 `;
 
