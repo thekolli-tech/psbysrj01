@@ -71,7 +71,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   onOpenLoginModal,
   onOpenSupport
 }) => {
-  const { setActiveView, scrollProgress, properties, marketTrends, mediaItems, isLoggedIn, constructionLogs } = useApp();
+  const { setActiveView, scrollProgress, properties, marketTrends, isLoggedIn, constructionLogs } = useApp();
 
   const [activePropertyModal, setActivePropertyModal] = useState<Property | null>(null);
 
@@ -855,83 +855,6 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
             </div>
           ))}
         </div>
-
-        {/* Recent Video Audits preview (Media & Podcasts) */}
-        {isLoggedIn && (
-          <div className="pt-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900 font-display">
-                Latest Video Audits & Builder Podcasts
-              </h3>
-              <button
-                onClick={() => {
-                  setActiveView('MEDIA');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
-              >
-                Explore All Broadcasts →
-              </button>
-            </div>
-
-            {mediaItems.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {mediaItems.slice(0, 3).map(item => (
-                  <div
-                    key={item.id}
-                    onClick={() => {
-                      setActiveView('MEDIA');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="group cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="relative aspect-video bg-slate-950 overflow-hidden">
-                        <img
-                          src={item.thumbnail}
-                          alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <span className="absolute top-2 left-2 text-[10px] font-black uppercase bg-slate-900/90 text-amber-400 px-2 py-0.5 rounded font-mono">
-                          {item.type}
-                        </span>
-                        <span className="absolute bottom-2 right-2 text-[10px] font-mono bg-black/80 text-white px-1.5 py-0.5 rounded">
-                          {item.duration}
-                        </span>
-                      </div>
-
-                      <div className="p-4 space-y-1.5">
-                        <h4 className="text-sm font-bold text-slate-900 group-hover:text-amber-700 transition-colors line-clamp-2 leading-snug">
-                          {item.title}
-                        </h4>
-                        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                          {item.summary}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="p-4 pt-0 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 mt-2">
-                      <span>{item.views.toLocaleString()} views</span>
-                      <span className="text-amber-700 font-semibold group-hover:underline">Watch & Discuss →</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 bg-white rounded-2xl border border-slate-200 text-center space-y-2">
-                <p className="text-xs text-slate-500">
-                  No video broadcasts published yet. Use the Media engine to post new video audits.
-                </p>
-                <button
-                  onClick={() => setActiveView('MEDIA')}
-                  className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors"
-                >
-                  Go to Media Engine
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </section>
 
       {/* Property Detail Modal */}

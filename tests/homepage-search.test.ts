@@ -46,6 +46,10 @@ test('HomeHero component includes prominent top property search bar with locatio
   assert.doesNotMatch(heroSource, /Explore Verified Inventory by Corridor & Asset Type/);
   assert.doesNotMatch(heroSource, /Featured Developments with 4K Drone Walkthroughs/);
 
+  // "Latest Video Audits & Builder Podcasts" section is removed from homepage
+  assert.doesNotMatch(heroSource, /Latest Video Audits & Builder Podcasts/);
+  assert.doesNotMatch(heroSource, /Explore All Broadcasts/);
+
   // Shared property components remain available on dedicated property pages
   const propertyList = read('src/components/properties/PropertyList.tsx');
   assert.ok(propertyList.length > 0);
