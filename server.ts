@@ -124,7 +124,19 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.set('trust proxy', 1);
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  if (err?.type === 'entity.too.large' || err?.status === 413) {
+    res.status(413).json({ error: 'Image file must be 2MB or smaller.', code: 'ENTITY_TOO_LARGE' });
+    return;
+  }
+  if (err instanceof SyntaxError && 'body' in err) {
+    res.status(400).json({ error: 'Invalid JSON payload.', code: 'INVALID_JSON' });
+    return;
+  }
+  next(err);
+});
 app.use(cookieParser());
 
 function sessionCookieOptions() {
@@ -2362,6 +2374,14 @@ registerPlatformRoutes(app, { requireAuth, requireAdmin, requireUnrestricted });
 app.use('/api', (err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[Property Studio] API error:', redactDatabaseError(err?.message || 'Internal error'));
   if (res.headersSent) return;
+  if (err?.type === 'entity.too.large' || err?.status === 413) {
+    res.status(413).json({ error: 'Image file must be 2MB or smaller.', code: 'ENTITY_TOO_LARGE' });
+    return;
+  }
+  if (err instanceof SyntaxError && 'body' in err) {
+    res.status(400).json({ error: 'Invalid JSON payload.', code: 'INVALID_JSON' });
+    return;
+  }
   const status = typeof err?.status === 'number' && err.status >= 400 && err.status < 600 ? err.status : 500;
   const message = err?.message && !/postgres|sqlite|constraint|syntax error|select |insert /i.test(err.message)
     ? err.message

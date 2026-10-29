@@ -495,6 +495,71 @@ test('HTTP API: Role hierarchy, account protection, restriction, and avatar endp
     const seekerUserDb = await findUserById(seekerUser.id);
     assert.equal(seekerUserDb?.avatar, '');
   });
+
+  await t.test('7. Large profile photo upload up to 2MB succeeds without 413 request entity too large', async () => {
+    // Generate a valid 500KB PNG payload (far exceeding Express's default 100kb limit)
+    const validPngHeader = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
+    const filler = Buffer.alloc(500 * 1024, 0x20); // 500KB
+    const largePngBuffer = Buffer.concat([validPngHeader, filler]);
+    const largePngBase64 = `data:image/png;base64,${largePngBuffer.toString('base64')}`;
+
+    const uploadRes = await fetch(`${baseUrl}/api/me/avatar`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${seekerSession.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ avatar: largePngBase64 })
+    });
+
+    assert.equal(uploadRes.status, 200);
+    const data = await uploadRes.json();
+    assert.equal(data.success, true);
+    assert.equal(data.avatar, largePngBase64);
+
+    const seekerDb = await findUserById(seekerUser.id);
+    assert.equal(seekerDb?.avatar, largePngBase64);
+  });
+
+  await t.test('8. Oversized avatar payload (> 2MB) returns clean error with friendly message', async () => {
+    // 2.5MB payload
+    const validPngHeader = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
+    const filler = Buffer.alloc(2500 * 1024, 0x20);
+    const oversizedPngBuffer = Buffer.concat([validPngHeader, filler]);
+    const oversizedPngBase64 = `data:image/png;base64,${oversizedPngBuffer.toString('base64')}`;
+
+    const uploadRes = await fetch(`${baseUrl}/api/me/avatar`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${seekerSession.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ avatar: oversizedPngBase64 })
+    });
+
+    assert.equal(uploadRes.status, 400);
+    const data = await uploadRes.json();
+    assert.match(data.error || '', /2MB/i);
+  });
+
+  await t.test('9. HTTP 413 payload too large returns JSON with friendly error rather than raw text or HTML', async () => {
+    // Send a payload exceeding the 10MB body parser limit
+    const hugeBody = JSON.stringify({ avatar: 'x'.repeat(11 * 1024 * 1024) });
+
+    const uploadRes = await fetch(`${baseUrl}/api/me/avatar`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${seekerSession.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: hugeBody
+    });
+
+    assert.equal(uploadRes.status, 413);
+    const data = await uploadRes.json();
+    assert.equal(data.error, 'Image file must be 2MB or smaller.');
+    assert.equal(data.code, 'ENTITY_TOO_LARGE');
+  });
 });
 
 test('UI Components: Safe avatar fallbacks, RESTRICTED badge, and permission-gated buttons', () => {

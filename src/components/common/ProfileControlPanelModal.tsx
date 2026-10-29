@@ -64,6 +64,75 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
+  /**
+   * Downscales and compresses user-selected images client-side before upload.
+   * Keeps avatars sharp (up to 512x512) while reducing network payload and database storage.
+   * Leaves animated GIFs intact to preserve multi-frame animation.
+   */
+  const prepareAvatarUpload = (file: File): Promise<string> => {
+    if (file.type === 'image/gif') {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read image file'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Failed to read image file'));
+      reader.onload = () => {
+        const rawDataUrl = reader.result as string;
+        const img = new Image();
+        img.onerror = () => resolve(rawDataUrl);
+        img.onload = () => {
+          try {
+            const MAX_DIM = 512;
+            let width = img.naturalWidth || img.width;
+            let height = img.naturalHeight || img.height;
+
+            if (!width || !height) {
+              resolve(rawDataUrl);
+              return;
+            }
+
+            if (width > MAX_DIM || height > MAX_DIM) {
+              if (width > height) {
+                height = Math.round((height * MAX_DIM) / width);
+                width = MAX_DIM;
+              } else {
+                width = Math.round((width * MAX_DIM) / height);
+                height = MAX_DIM;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(rawDataUrl);
+              return;
+            }
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+            const compressed = canvas.toDataURL(outputType, 0.88);
+            resolve(compressed);
+          } catch {
+            resolve(rawDataUrl);
+          }
+        };
+        img.src = rawDataUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -84,20 +153,31 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
 
     setAvatarUploading(true);
     try {
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read image file'));
-        reader.readAsDataURL(file);
-      });
+      const dataUrl = await prepareAvatarUpload(file);
 
       const res = await fetch('/api/me/avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ avatar: dataUrl })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to upload profile photo');
+
+      let errorMsg = '';
+      try {
+        const data = await res.json();
+        if (!res.ok) {
+          errorMsg = data?.error || 'Failed to upload profile photo';
+        }
+      } catch {
+        const text = await res.text().catch(() => '');
+        errorMsg = text || 'Failed to upload profile photo';
+      }
+
+      if (!res.ok) {
+        if (res.status === 413 || /entity too large/i.test(errorMsg)) {
+          throw new Error('Image file must be 2MB or smaller.');
+        }
+        throw new Error(errorMsg || 'Failed to upload profile photo');
+      }
 
       await refreshSession();
       showToast('Profile photo updated');
@@ -116,8 +196,17 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
       const res = await fetch('/api/me/avatar', {
         method: 'DELETE'
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to remove profile photo');
+      let errorMsg = '';
+      try {
+        const data = await res.json();
+        if (!res.ok) {
+          errorMsg = data?.error || 'Failed to remove profile photo';
+        }
+      } catch {
+        const text = await res.text().catch(() => '');
+        errorMsg = text || 'Failed to remove profile photo';
+      }
+      if (!res.ok) throw new Error(errorMsg || 'Failed to remove profile photo');
 
       await refreshSession();
       showToast('Profile photo removed');
