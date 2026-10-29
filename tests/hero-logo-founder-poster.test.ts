@@ -50,6 +50,10 @@ test('Brand assets exist on disk in public/brand with valid sizes', () => {
   assert.ok(existsSync(posterPath), 'Founder poster must exist in public/brand/');
   assert.ok(statSync(posterPath).size > 100000, 'Founder poster must have valid size');
 
+  const buf = readFileSync(posterPath);
+  assert.equal(buf.readUInt32BE(16), 1254, 'Founder poster width must be 1254px');
+  assert.equal(buf.readUInt32BE(20), 1254, 'Founder poster height must be 1254px');
+
   const logoSquarePath = join(root, 'public/brand/property-studio-logo-square.jpg');
   assert.ok(existsSync(logoSquarePath), 'Square logo must exist in public/brand/');
   assert.ok(statSync(logoSquarePath).size > 50000, 'Square logo must have valid size');
