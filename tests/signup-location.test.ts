@@ -85,31 +85,33 @@ async function api(method: string, path: string, body?: unknown, cookie?: string
   return { status: response.status, json, cookie: sessionCookie || cookie || '' };
 }
 
-test('LoginModal component preselects Hyderabad as default signup location and allows user edit', () => {
+test('LoginModal component fixes signup location to Hyderabad, Telangana, India and supports viewport scrolling', () => {
   const loginModalSource = read('src/components/common/LoginModal.tsx');
 
   // Must declare Hyderabad, Telangana, India as default
   assert.match(loginModalSource, /DEFAULT_SIGNUP_LOCATION\s*=\s*'Hyderabad, Telangana, India'/);
 
-  // Must have location state initialized to default
-  assert.match(loginModalSource, /const\s*\[locationInput,\s*setLocationInput\]\s*=\s*useState\(DEFAULT_SIGNUP_LOCATION\);/);
-
-  // Must render editable input with signup-location id and preselected value
+  // Must render non-editable, locked input with signup-location id and fixed value
   assert.match(loginModalSource, /id="signup-location"/);
   assert.match(loginModalSource, /name="location"/);
-  assert.match(loginModalSource, /value=\{locationInput\}/);
-  assert.match(loginModalSource, /onChange=\{e => setLocationInput\(e\.target\.value\)\}/);
+  assert.match(loginModalSource, /value=\{DEFAULT_SIGNUP_LOCATION\}/);
+  assert.match(loginModalSource, /readOnly/);
 
-  // Must inform user of Hyderabad default and that they may change it
-  assert.match(loginModalSource, /Default: Hyderabad, Telangana, India\. You may change this before registering\./);
+  // Must inform user of fixed Hyderabad territory and not allow changing
+  assert.match(loginModalSource, /Platform location is fixed to Hyderabad, Telangana, India\./);
+  assert.doesNotMatch(loginModalSource, /You may change this before registering\./);
+
+  // Must have scrollable viewport-constrained container and compact layout
+  assert.match(loginModalSource, /max-h-\[92vh\]|max-h-\[90vh\]/);
+  assert.match(loginModalSource, /overflow-y-auto/);
 
   // Must send townCity / location in the register request payload
-  assert.match(loginModalSource, /townCity:\s*locationInput\.trim\(\)\s*\|\|\s*DEFAULT_SIGNUP_LOCATION/);
-  assert.match(loginModalSource, /location:\s*locationInput\.trim\(\)\s*\|\|\s*DEFAULT_SIGNUP_LOCATION/);
+  assert.match(loginModalSource, /townCity:\s*DEFAULT_SIGNUP_LOCATION/);
+  assert.match(loginModalSource, /location:\s*DEFAULT_SIGNUP_LOCATION/);
 
-  // Must show location on OTP confirmation screen
+  // Must show fixed location on OTP confirmation screen
   assert.match(loginModalSource, /Location:/);
-  assert.match(loginModalSource, /locationInput\.trim\(\)\s*\|\|\s*DEFAULT_SIGNUP_LOCATION/);
+  assert.match(loginModalSource, /DEFAULT_SIGNUP_LOCATION/);
 });
 
 test('Backend registerVerifiedUser defaults town_city to Hyderabad, Telangana, India when omitted', async () => {

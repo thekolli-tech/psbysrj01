@@ -21,7 +21,8 @@ import {
   RotateCcw,
   Smartphone,
   MapPin,
-  Check
+  Check,
+  Lock
 } from 'lucide-react';
 
 const DEFAULT_SIGNUP_LOCATION = 'Hyderabad, Telangana, India';
@@ -270,8 +271,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           profession: professionInput.trim() || undefined,
           company: companyInput.trim() || undefined,
           interests: selectedInterests,
-          townCity: locationInput.trim() || DEFAULT_SIGNUP_LOCATION,
-          location: locationInput.trim() || DEFAULT_SIGNUP_LOCATION,
+          townCity: DEFAULT_SIGNUP_LOCATION,
+          location: DEFAULT_SIGNUP_LOCATION,
           otp: otpInput.trim(),
           phoneOtp: (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') ? phoneOtpInput.trim() : undefined
         })
@@ -296,33 +297,33 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
-          <div className="flex items-center gap-3">
-            <div className="w-16 h-12 rounded-xl bg-white border border-white/20 flex items-center justify-center px-1 shrink-0">
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-12 h-9 sm:w-14 sm:h-10 rounded-lg sm:rounded-xl bg-white border border-white/20 flex items-center justify-center px-1 shrink-0">
               <BrandLogo variant="compact" size="sm" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white font-display">
+              <h3 className="text-sm sm:text-base font-bold text-white font-display">
                 {isLoggedIn ? 'Account Session' : mode === 'LOGIN' ? 'Portal Sign In' : 'Create Account'}
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-[11px] sm:text-xs text-slate-400">
                 {isLoggedIn ? `Active as ${currentUser.name}` : 'Live server database authentication'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1 sm:p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4 text-xs">
+        <div className="p-4 sm:p-5 space-y-3 sm:space-y-3.5 text-xs overflow-y-auto overscroll-contain flex-1">
           {isLoggedIn ? (
             /* Logged in state */
             <div className="space-y-4">
@@ -449,42 +450,42 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   </button>
                 </form>
               ) : !otpSent ? (
-                <form onSubmit={handleSendEmailOtp} className="space-y-3.5">
-                  <div className="bg-amber-50/80 p-2.5 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                <form onSubmit={handleSendEmailOtp} className="space-y-2.5">
+                  <div className="bg-amber-50/90 py-1.5 px-2.5 rounded-lg border border-amber-200/90 text-[11px] text-amber-900 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                     <span>Email OTP verification is mandatory for verified account registration.</span>
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Full Name</label>
+                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">Full Name</label>
                     <input
                       type="text"
                       value={nameInput}
                       onChange={e => setNameInput(e.target.value)}
                       placeholder="e.g. Suresh Chandra"
-                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Email Address</label>
+                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">Email Address</label>
                     <input
                       type="email"
                       value={emailInput}
                       onChange={e => setEmailInput(e.target.value)}
                       placeholder="e.g. suresh@example.com"
-                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Role / Account Type</label>
+                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">Role / Account Type</label>
                     <select
                       value={roleInput}
                       onChange={e => setRoleInput(e.target.value as any)}
-                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                     >
                       <option value="PROPERTY_SEEKER">Property Seeker (HNI / Investor / Buyer)</option>
                       <option value="LANDOWNER">Landowner</option>
@@ -495,9 +496,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
                         Contact Mobile {phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' ? (
                           <span className="text-red-500 font-bold text-[10px]">* Required</span>
                         ) : (
@@ -510,11 +511,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         onChange={e => setPhoneInput(e.target.value)}
                         placeholder="e.g. +91 98490 12345"
                         required={phoneOtpRequired && roleInput === 'PROPERTY_SEEKER'}
-                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </div>
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
                         {roleInput === 'LANDOWNER' ? 'Land Parcel' : roleInput === 'RERA_AGENT' || roleInput === 'CHANNEL_PARTNER' ? 'Agency / RERA' : 'Organization'} <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
                       </label>
                       <input
@@ -522,21 +523,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         value={organizationInput}
                         onChange={e => setOrganizationInput(e.target.value)}
                         placeholder={roleInput === 'LANDOWNER' ? 'Land description' : roleInput === 'RERA_AGENT' ? 'RERA registration number' : 'Firm or organization'}
-                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label htmlFor="signup-profession" className="block font-bold text-slate-700 mb-1">
+                      <label htmlFor="signup-profession" className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
                         Profession
                       </label>
                       <select
                         id="signup-profession"
                         value={professionInput}
                         onChange={e => setProfessionInput(e.target.value)}
-                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                       >
                         <option value="Buyer">Buyer</option>
                         <option value="Seller">Seller</option>
@@ -550,7 +551,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       </select>
                     </div>
                     <div>
-                      <label htmlFor="signup-company" className="block font-bold text-slate-700 mb-1">
+                      <label htmlFor="signup-company" className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
                         Company / Practice <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
                       </label>
                       <input
@@ -559,19 +560,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         value={companyInput}
                         onChange={e => setCompanyInput(e.target.value)}
                         placeholder="e.g. Studio Arc / Firm"
-                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block font-bold text-slate-700">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs">
                         Interests & Topics
                       </label>
                       <span className="text-[10px] text-slate-400">Personalizes your Community Q&A</span>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200/80 rounded-xl max-h-32 overflow-y-auto">
+                    <div className="flex flex-wrap gap-1 p-1.5 bg-slate-50 border border-slate-200/80 rounded-lg max-h-24 sm:max-h-28 overflow-y-auto">
                       {[
                         'Kokapet & Neopolis',
                         'High-Rise Construction',
@@ -594,7 +595,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                                 isSelected ? prev.filter(t => t !== topic) : [...prev, topic]
                               );
                             }}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all flex items-center gap-1 cursor-pointer ${
+                            className={`px-2 py-0.5 rounded-md text-[10.5px] font-medium border transition-all flex items-center gap-1 cursor-pointer ${
                               isSelected
                                 ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-xs'
                                 : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100'
@@ -610,42 +611,46 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label htmlFor="signup-location" className="block font-bold text-slate-700">
+                      <label htmlFor="signup-location" className="block font-bold text-slate-700 text-[11px] sm:text-xs">
                         Location (City & State)
                       </label>
-                      <span className="text-[10px] text-amber-700 font-semibold">Preselected default</span>
+                      <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200/60 inline-flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-amber-700" />
+                        Fixed Territory
+                      </span>
                     </div>
                     <div className="relative">
-                      <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <MapPin className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         id="signup-location"
                         name="location"
                         type="text"
-                        value={locationInput}
-                        onChange={e => setLocationInput(e.target.value)}
-                        placeholder="e.g. Hyderabad, Telangana, India"
-                        maxLength={80}
-                        className="w-full pl-10 pr-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                        value={DEFAULT_SIGNUP_LOCATION}
+                        readOnly
+                        aria-readonly="true"
+                        tabIndex={-1}
+                        className="w-full pl-9 pr-8 py-2 text-xs border border-slate-200 rounded-lg sm:rounded-xl bg-slate-100/90 text-slate-800 font-semibold cursor-not-allowed select-none focus:outline-none"
                       />
+                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
-                    <span className="text-[10px] text-slate-400 mt-1 block">
-                      Default: Hyderabad, Telangana, India. You may change this before registering.
+                    <span className="text-[10px] text-slate-500 mt-1 block font-medium">
+                      Platform location is fixed to Hyderabad, Telangana, India.
                     </span>
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Choose Password</label>
+                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">Choose Password</label>
                     <input
                       type="password"
                       value={passwordInput}
                       onChange={e => setPasswordInput(e.target.value)}
                       placeholder="Minimum 6 characters"
-                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       required
                     />
                   </div>
 
-                  <p className="text-[11px] text-slate-500 text-center leading-normal">
+                  <p className="text-[10px] text-slate-500 text-center leading-tight">
                     By proceeding, you agree to our{' '}
                     <button
                       type="button"
@@ -676,7 +681,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="w-full py-2.5 sm:py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg sm:rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <Mail className="w-4 h-4 text-amber-400" />
                     <span>{loading ? 'Sending Code...' : 'Send Email Verification Code'}</span>
@@ -705,7 +710,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       <span className="flex items-center gap-1 text-slate-600">
                         <MapPin className="w-3.5 h-3.5 text-blue-600" /> Location:
                       </span>
-                      <span className="font-semibold text-slate-800">{locationInput.trim() || DEFAULT_SIGNUP_LOCATION}</span>
+                      <span className="font-semibold text-slate-800">{DEFAULT_SIGNUP_LOCATION} (Fixed Territory)</span>
                     </div>
                   </div>
 
