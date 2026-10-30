@@ -114,6 +114,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [moderationProfessionals, setModerationProfessionals] = useState<any[]>([]);
   const [moderationPosts, setModerationPosts] = useState<any[]>([]);
   const [moderationCommunities, setModerationCommunities] = useState<any[]>([]);
+  const [moderationDeletionRequests, setModerationDeletionRequests] = useState<any[]>([]);
   const [moderatingItemId, setModeratingItemId] = useState<string | null>(null);
 
   // Requirements State
@@ -196,6 +197,7 @@ export const SuperAdminDashboard: React.FC = () => {
         setModerationListings(Array.isArray(pData.listings) ? pData.listings : []);
         setModerationProfessionals(Array.isArray(pData.professionals) ? pData.professionals : []);
         setModerationCommunities(Array.isArray(pData.communities) ? pData.communities : []);
+        setModerationDeletionRequests(Array.isArray(pData.deletionRequests) ? pData.deletionRequests : []);
         const queued = Array.isArray(pData.posts) ? pData.posts : [];
         setModerationPosts(queued);
         setLivePosts(queued.map((p: any) => ({
@@ -312,6 +314,48 @@ export const SuperAdminDashboard: React.FC = () => {
       refreshServerData();
     } catch (err: any) {
       showToast(err.message || 'Moderation failed');
+    } finally {
+      setModeratingItemId(null);
+    }
+  };
+
+  const handleApprovePostDeletion = async (postId: string) => {
+    setModeratingItemId(postId);
+    try {
+      const res = await fetch(`/api/admin/posts/${postId}/approve-deletion`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to approve post deletion');
+      showToast('Post deletion approved and removed from feeds.');
+      setModerationDeletionRequests(prev => prev.filter(p => p.id !== postId));
+      refreshServerData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to approve post deletion');
+    } finally {
+      setModeratingItemId(null);
+    }
+  };
+
+  const handleRejectPostDeletion = async (postId: string, reason: string) => {
+    if (!reason || reason.trim().length < 5) {
+      showToast('A mandatory rejection reason of at least 5 characters is required.');
+      return;
+    }
+    setModeratingItemId(postId);
+    try {
+      const res = await fetch(`/api/admin/posts/${postId}/reject-deletion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reject post deletion');
+      showToast('Post deletion request rejected. Post restored to original status.');
+      setModerationDeletionRequests(prev => prev.filter(p => p.id !== postId));
+      refreshServerData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to reject post deletion');
     } finally {
       setModeratingItemId(null);
     }
@@ -634,7 +678,7 @@ export const SuperAdminDashboard: React.FC = () => {
         <div className="flex items-center gap-2 mt-6 pt-6 border-t border-slate-800 overflow-x-auto no-scrollbar">
           {[
             { id: 'OVERVIEW', label: 'Platform Metrics' },
-            { id: 'MODERATION', label: `Moderation Queue (${moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length})`, highlight: true },
+            { id: 'MODERATION', label: `Moderation Queue (${moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length + moderationDeletionRequests.length})`, highlight: true },
             { id: 'USERS_DIRECTORY', label: `User Accounts (${liveUsers.length || users.length})`, highlight: true },
             { id: 'REQUIREMENTS', label: `Buyer Requirements (${adminRequirements.length})`, highlight: true },
             { id: 'AUDIT_LOGS', label: `Audit Trail (${auditLogs.length})`, highlight: true },
@@ -1017,6 +1061,84 @@ export const SuperAdminDashboard: React.FC = () => {
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sub-Queue: Community Post Deletion Requests Pending Super Admin Approval */}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <span>Post Deletion Requests Pending Super Admin Approval ({moderationDeletionRequests.length})</span>
+                </h3>
+              </div>
+              {moderationDeletionRequests.length === 0 ? (
+                <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                  No post deletion requests currently awaiting Super Admin review.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {moderationDeletionRequests.map(item => (
+                    <div
+                      key={item.id}
+                      className="p-4 bg-rose-50/40 rounded-xl border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                    >
+                      <div className="space-y-1.5 max-w-xl">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 text-sm">{item.title}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                            Deletion Requested
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-200 text-slate-700">
+                            r/{item.topic}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 line-clamp-2 text-xs">{item.content}</p>
+
+                        <div className="p-2.5 bg-white border border-rose-200 rounded-lg text-[11px] text-rose-950">
+                          <span className="font-bold text-rose-800">Owner Stated Reason: </span>
+                          <span>&quot;{item.deletion_reason || item.deletionReason}&quot;</span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 text-slate-500 text-[11px]">
+                          <span>Author: <strong>{item.author_name || item.authorName}</strong> ({item.author_role || item.authorRole})</span>
+                          {(item.deletion_requested_at || item.deletionRequestedAt) && (
+                            <span>Requested: {new Date(item.deletion_requested_at || item.deletionRequestedAt).toLocaleString()}</span>
+                          )}
+                          {item.created_at && (
+                            <span className="text-slate-400">Created: {new Date(item.created_at).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-center shrink-0">
+                        <button
+                          onClick={() => handleApprovePostDeletion(item.id)}
+                          disabled={moderatingItemId === item.id}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
+                          title="Approve deletion and remove post from public feeds"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Approve Deletion</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            const reason = window.prompt('Enter mandatory rejection reason for the author (min 5 characters):');
+                            if (reason !== null) {
+                              handleRejectPostDeletion(item.id, reason);
+                            }
+                          }}
+                          disabled={moderatingItemId === item.id}
+                          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
+                          title="Decline deletion request and restore post status"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Decline Request</span>
                         </button>
                       </div>
                     </div>

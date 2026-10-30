@@ -40,7 +40,8 @@ import {
   Video,
   Play,
   Repeat,
-  Users
+  Users,
+  Trash2
 } from 'lucide-react';
 
 type TabType = 'OVERVIEW' | 'REQUIREMENTS' | 'REVIEWS' | 'NOTIFICATIONS' | 'COMMUNITY' | 'SETTINGS';
@@ -223,6 +224,8 @@ export const UserDashboard: React.FC = () => {
   const [reqBudget, setReqBudget] = useState('');
   const [reqDetails, setReqDetails] = useState('');
   const [requirementFormError, setRequirementFormError] = useState<string | null>(null);
+  const [deletingRequirement, setDeletingRequirement] = useState<RequirementRecord | null>(null);
+  const [isDeletingRequirement, setIsDeletingRequirement] = useState(false);
 
   // Reviews state
   const [reviews, setReviews] = useState<OwnReview[]>([]);
@@ -433,6 +436,25 @@ export const UserDashboard: React.FC = () => {
       setRequirementFormError(err.message || 'Failed to post requirement. Please check the inputs.');
     } finally {
       setSubmittingRequirement(false);
+    }
+  };
+
+  // Handle requirement deletion
+  const handleDeleteRequirement = async (reqId: string) => {
+    setIsDeletingRequirement(true);
+    try {
+      const res = await fetch(`/api/requirements/${reqId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete requirement');
+      showToast('Property requirement deleted successfully.');
+      setDeletingRequirement(null);
+      fetchRequirements();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete requirement');
+    } finally {
+      setIsDeletingRequirement(false);
     }
   };
 
@@ -1558,12 +1580,101 @@ export const UserDashboard: React.FC = () => {
 
                   <p className="text-xs text-slate-700 leading-relaxed">{req.details}</p>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-400 pt-1 border-t border-slate-50">
                     <span>Reference ID: {req.id}</span>
-                    <span className="text-emerald-700 font-medium">Status: Active in Matchmaker</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-emerald-700 font-medium">Status: Active in Matchmaker</span>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingRequirement(req)}
+                        className="px-2.5 py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1 font-semibold border border-rose-200 cursor-pointer"
+                        title="Delete this requirement"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Delete Requirement Confirmation Modal */}
+          {deletingRequirement && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
+                      <Trash2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">Delete Requirement?</h3>
+                      <p className="text-xs text-slate-500">This action will remove it from active listings.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDeletingRequirement(null)}
+                    disabled={isDeletingRequirement}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Property Type:</span>
+                    <span className="font-bold text-slate-900">{deletingRequirement.propertyType}</span>
+                  </div>
+                  {deletingRequirement.location && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Location:</span>
+                      <span className="font-medium text-slate-800">{deletingRequirement.location}</span>
+                    </div>
+                  )}
+                  {deletingRequirement.budget && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Budget:</span>
+                      <span className="font-mono-numbers font-bold text-slate-900">{deletingRequirement.budget}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 leading-relaxed">
+                  <strong>Notice:</strong> Once deleted, this requirement will immediately stop appearing in active searches and matchmaker feeds. Your historical account audit logs are safely preserved.
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingRequirement(null)}
+                    disabled={isDeletingRequirement}
+                    className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteRequirement(deletingRequirement.id)}
+                    disabled={isDeletingRequirement}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all disabled:opacity-50"
+                  >
+                    {isDeletingRequirement ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Deleting…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Confirm Delete</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -349,8 +349,14 @@ export async function runPostgresMigrations(): Promise<boolean> {
         author_id VARCHAR(64) NOT NULL,
         author_name VARCHAR(255) NOT NULL,
         author_role VARCHAR(32) NOT NULL,
+        author_avatar TEXT,
         content TEXT NOT NULL,
         likes_count INTEGER DEFAULT 0,
+        is_ama_answer SMALLINT DEFAULT 0,
+        is_deleted SMALLINT DEFAULT 0,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(64),
+        original_content TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );

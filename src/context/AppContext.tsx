@@ -81,7 +81,7 @@ interface AppContextType {
   refreshPosts: () => Promise<void>;
   upvoteCommunityPost: (postId: string) => void;
   addCommunityReply: (postId: string, content: string) => void;
-  createCommunityPost: (post: Omit<CommunityPost, 'id' | 'createdAt' | 'upvotes' | 'replies'>) => void;
+  createCommunityPost: (post: Omit<CommunityPost, 'id' | 'createdAt' | 'upvotes' | 'replies'>) => Promise<{ success: boolean; post?: any; error?: string }>;
 
   // Community Hubs (Super Admin approval gated)
   communities: CommunityHub[];
@@ -317,9 +317,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'POST_MODERATED',
           'POST_UPDATED',
           'POST_DELETED',
+          'POST_DELETION_REQUESTED',
+          'POST_DELETION_APPROVED',
+          'POST_DELETION_REJECTED',
+          'REQUIREMENT_DELETED',
           'POST_VOTE_UPDATED',
           'COMMENT_CREATED',
+          'COMMENT_UPDATED',
           'COMMENT_DELETED',
+          'COMMENT_LIKED',
           'LIKE_CHANGED',
           'POST_REPOSTED',
           'POST_FOLLOW_UPDATED',
@@ -338,7 +344,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ];
 
         postEvents.forEach(type => {
-          eventSource?.addEventListener(type, handlePostEvent);
+          eventSource?.addEventListener(type, (e: MessageEvent) => {
+            handlePostEvent();
+            try {
+              const parsedData = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+              window.dispatchEvent(new CustomEvent('community-sse-event', { detail: { type, data: parsedData } }));
+            } catch {}
+          });
         });
 
         commEvents.forEach(type => {
@@ -727,45 +739,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .catch(() => showToast('The reply was not saved.'));
   };
 
-  const createCommunityPost = (postData: Omit<CommunityPost, 'id' | 'createdAt' | 'upvotes' | 'replies'>) => {
-    fetch('/api/community/posts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        propertyId: postData.propertyId,
-        propertyName: postData.propertyName,
-        communityId: postData.communityId,
-        communityName: postData.communityName,
-        topic: postData.topic,
-        title: postData.title,
-        content: postData.content,
-        mediaType: postData.mediaType,
-        mediaUrl: postData.mediaUrl,
-        attachments: postData.attachments,
-        postType: postData.postType,
-        visibility: postData.visibility,
-        pollOptions: postData.pollOptions,
-        amaHostName: postData.amaHostName,
-        amaHostRole: postData.amaHostRole,
-        amaStatus: postData.amaStatus,
-        amaStartTime: postData.amaStartTime,
-        amaEndTime: postData.amaEndTime
-      })
-    })
-      .then(async res => {
-        const data = await res.json();
-        if (!res.ok) {
-          showToast(data.error || 'The post was not submitted.');
-          return;
-        }
-        if (data.post?.status === 'APPROVED') {
-          showToast('Official post published live to the community!');
-        } else {
-          showToast('Question submitted! It is pending Super Admin approval before appearing publicly.');
-        }
-        await refreshPosts();
-      })
-      .catch(() => showToast('The post was not submitted.'));
+  const createCommunityPost = async (postData: Omit<CommunityPost, 'id' | 'createdAt' | 'upvotes' | 'replies'>): Promise<{ success: boolean; post?: any; error?: string }> => {
+    try {
+      const res = await fetch('/api/community/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          propertyId: postData.propertyId,
+          propertyName: postData.propertyName,
+          communityId: postData.communityId,
+          communityName: postData.communityName,
+          topic: postData.topic,
+          title: postData.title,
+          content: postData.content,
+          mediaType: postData.mediaType,
+          mediaUrl: postData.mediaUrl,
+          attachments: postData.attachments,
+          postType: postData.postType,
+          visibility: postData.visibility,
+          pollOptions: postData.pollOptions,
+          amaHostName: postData.amaHostName,
+          amaHostRole: postData.amaHostRole,
+          amaStatus: postData.amaStatus,
+          amaStartTime: postData.amaStartTime,
+          amaEndTime: postData.amaEndTime
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'The post was not submitted.');
+        return { success: false, error: data.error || 'The post was not submitted.' };
+      }
+      if (data.post?.status === 'APPROVED') {
+        showToast('Official post published live to the community!');
+      } else {
+        showToast('Question submitted! It is pending Super Admin approval before appearing publicly.');
+      }
+      await refreshPosts();
+      return { success: true, post: data.post };
+    } catch (err: any) {
+      showToast(err.message || 'The post was not submitted.');
+      return { success: false, error: err.message || 'The post was not submitted.' };
+    }
   };
 
   const createCommunityProposal = async (proposal: {

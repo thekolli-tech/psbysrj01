@@ -47,12 +47,28 @@ ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS ama_status VARCHAR(32) DEFA
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS ama_start_time TIMESTAMPTZ;
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS ama_end_time TIMESTAMPTZ;
 ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS is_ama_answer SMALLINT DEFAULT 0;
+ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS author_avatar TEXT;
+ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS is_deleted SMALLINT DEFAULT 0;
+ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(64);
+ALTER TABLE community_comments ADD COLUMN IF NOT EXISTS original_content TEXT;
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS seeker_id VARCHAR(64);
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS property_id VARCHAR(64);
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS consent_granted SMALLINT DEFAULT 0;
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS consent_version VARCHAR(64);
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS consent_purpose TEXT;
 ALTER TABLE buyer_leads ADD COLUMN IF NOT EXISTS consented_at TIMESTAMPTZ;
+ALTER TABLE property_requirements ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'ACTIVE';
+ALTER TABLE property_requirements ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE property_requirements ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(64);
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_status VARCHAR(32) DEFAULT 'NONE';
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_reason TEXT;
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_requested_at TIMESTAMPTZ;
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_requested_by VARCHAR(64);
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_reviewed_at TIMESTAMPTZ;
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_reviewed_by VARCHAR(64);
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_rejection_reason TEXT;
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS previous_status VARCHAR(32);
 
 CREATE TABLE IF NOT EXISTS professional_profiles (
   user_id VARCHAR(64) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -179,6 +195,9 @@ CREATE TABLE IF NOT EXISTS property_requirements (
   location TEXT,
   budget TEXT,
   details TEXT,
+  status VARCHAR(32) DEFAULT 'ACTIVE',
+  deleted_at TIMESTAMPTZ,
+  deleted_by VARCHAR(64),
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -314,12 +333,28 @@ export const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE community_posts ADD COLUMN ama_start_time TEXT',
   'ALTER TABLE community_posts ADD COLUMN ama_end_time TEXT',
   'ALTER TABLE community_comments ADD COLUMN is_ama_answer INTEGER DEFAULT 0',
+  'ALTER TABLE community_comments ADD COLUMN author_avatar TEXT',
+  'ALTER TABLE community_comments ADD COLUMN is_deleted INTEGER DEFAULT 0',
+  'ALTER TABLE community_comments ADD COLUMN deleted_at TEXT',
+  'ALTER TABLE community_comments ADD COLUMN deleted_by TEXT',
+  'ALTER TABLE community_comments ADD COLUMN original_content TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN seeker_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN property_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN consent_granted INTEGER DEFAULT 0',
   'ALTER TABLE buyer_leads ADD COLUMN consent_version TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN consent_purpose TEXT',
-  'ALTER TABLE buyer_leads ADD COLUMN consented_at TEXT'
+  'ALTER TABLE buyer_leads ADD COLUMN consented_at TEXT',
+  'ALTER TABLE property_requirements ADD COLUMN status TEXT DEFAULT \'ACTIVE\'',
+  'ALTER TABLE property_requirements ADD COLUMN deleted_at TEXT',
+  'ALTER TABLE property_requirements ADD COLUMN deleted_by TEXT',
+  'ALTER TABLE community_posts ADD COLUMN deletion_status TEXT DEFAULT \'NONE\'',
+  'ALTER TABLE community_posts ADD COLUMN deletion_reason TEXT',
+  'ALTER TABLE community_posts ADD COLUMN deletion_requested_at TEXT',
+  'ALTER TABLE community_posts ADD COLUMN deletion_requested_by TEXT',
+  'ALTER TABLE community_posts ADD COLUMN deletion_reviewed_at TEXT',
+  'ALTER TABLE community_posts ADD COLUMN deletion_reviewed_by TEXT',
+  'ALTER TABLE community_posts ADD COLUMN deletion_rejection_reason TEXT',
+  'ALTER TABLE community_posts ADD COLUMN previous_status TEXT'
 ];
 
 export const SQLITE_TABLE_SQL = `
@@ -425,6 +460,9 @@ CREATE TABLE IF NOT EXISTS property_requirements (
   location TEXT,
   budget TEXT,
   details TEXT,
+  status TEXT DEFAULT 'ACTIVE',
+  deleted_at TEXT,
+  deleted_by TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

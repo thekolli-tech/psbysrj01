@@ -52,14 +52,22 @@ import {
   pgCreatePost,
   pgUpdatePost,
   pgDeletePost,
+  pgRequestPostDeletion,
+  pgApprovePostDeletion,
+  pgRejectPostDeletion,
+  pgGetPostDeletionRequests,
   pgPinPost,
   pgUpvotePost,
   pgTogglePostLike,
   pgIsPostLikedByUser,
   pgGetUserLikedPostIds,
+  pgGetCommentById,
   pgGetCommentsForPost,
   pgCreateComment,
+  pgUpdateComment,
   pgDeleteComment,
+  pgRestoreComment,
+  pgGetActiveCommunityMemberIds,
   pgToggleCommentLike,
   pgGetUserLikedCommentIds,
   pgGetRepliesForPost,
@@ -354,11 +362,20 @@ export interface DbCommunityPost {
   ama_status?: string | null;
   ama_start_time?: string | null;
   ama_end_time?: string | null;
-  status: 'PUBLISHED' | 'FLAGGED' | 'ARCHIVED';
+  status: string;
   upvotes: number;
   comments_count: number;
   is_pinned: number;
   is_flagged: number;
+  rejection_reason?: string | null;
+  deletion_status?: string | null;
+  deletion_reason?: string | null;
+  deletion_requested_at?: string | null;
+  deletion_requested_by?: string | null;
+  deletion_reviewed_at?: string | null;
+  deletion_reviewed_by?: string | null;
+  deletion_rejection_reason?: string | null;
+  previous_status?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -377,9 +394,14 @@ export interface DbCommunityComment {
   author_id: string;
   author_name: string;
   author_role: string;
+  author_avatar?: string | null;
   content: string;
   likes_count: number;
   is_ama_answer?: number;
+  is_deleted?: number;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  original_content?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1066,6 +1088,26 @@ export async function deletePost(postId: string, actorId?: string, isElevated = 
   return sqliteDeletePost(postId, actorId, isElevated);
 }
 
+export async function requestPostDeletion(postId: string, actorId: string, reason: string): Promise<{ success: boolean; error?: string; post?: any }> {
+  if (isPostgresAuthoritative()) return pgRequestPostDeletion(postId, actorId, reason);
+  return sqliteRequestPostDeletion(postId, actorId, reason);
+}
+
+export async function approvePostDeletion(postId: string, reviewerId: string): Promise<{ success: boolean; error?: string; post?: any }> {
+  if (isPostgresAuthoritative()) return pgApprovePostDeletion(postId, reviewerId);
+  return sqliteApprovePostDeletion(postId, reviewerId);
+}
+
+export async function rejectPostDeletion(postId: string, reviewerId: string, rejectionReason: string): Promise<{ success: boolean; error?: string; post?: any }> {
+  if (isPostgresAuthoritative()) return pgRejectPostDeletion(postId, reviewerId, rejectionReason);
+  return sqliteRejectPostDeletion(postId, reviewerId, rejectionReason);
+}
+
+export async function getPostDeletionRequests(): Promise<any[]> {
+  if (isPostgresAuthoritative()) return pgGetPostDeletionRequests();
+  return sqliteGetPostDeletionRequests();
+}
+
 export async function pinPost(postId: string, isPinned: boolean): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgPinPost(postId, isPinned);
   return sqlitePinPost(postId, isPinned);
@@ -1091,9 +1133,20 @@ export async function getUserLikedPostIds(userId: string): Promise<Set<string>> 
   return sqliteGetUserLikedPostIds(userId);
 }
 
-export async function getCommentsForPost(postId: string, currentUserId?: string): Promise<any[]> {
-  if (isPostgresAuthoritative()) return pgGetCommentsForPost(postId, currentUserId);
-  return sqliteGetCommentsForPost(postId, currentUserId);
+export async function getCommentById(commentId: string): Promise<DbCommunityComment | null> {
+  if (isPostgresAuthoritative()) return pgGetCommentById(commentId);
+  return sqliteGetCommentById(commentId);
+}
+
+export async function getCommentsForPost(
+  postId: string,
+  currentUserId?: string,
+  sortMode: 'best' | 'newest' | 'oldest' = 'best',
+  page = 1,
+  limit = 50
+): Promise<any> {
+  if (isPostgresAuthoritative()) return pgGetCommentsForPost(postId, currentUserId, sortMode, page, limit);
+  return sqliteGetCommentsForPost(postId, currentUserId, sortMode, page, limit);
 }
 
 export async function createComment(data: {
@@ -1102,6 +1155,7 @@ export async function createComment(data: {
   authorId: string;
   authorName: string;
   authorRole: string;
+  authorAvatar?: string | null;
   content: string;
   isAmaAnswer?: boolean;
 }): Promise<any> {
@@ -1109,9 +1163,19 @@ export async function createComment(data: {
   return sqliteCreateComment(data);
 }
 
+export async function updateComment(commentId: string, actorId: string, content: string): Promise<any> {
+  if (isPostgresAuthoritative()) return pgUpdateComment(commentId, actorId, content);
+  return sqliteUpdateComment(commentId, actorId, content);
+}
+
 export async function deleteComment(commentId: string, actorId: string, isElevated = false): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgDeleteComment(commentId, actorId, isElevated);
   return sqliteDeleteComment(commentId, actorId, isElevated);
+}
+
+export async function restoreComment(commentId: string, actorId: string, isElevated = false): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgRestoreComment(commentId, actorId, isElevated);
+  return sqliteRestoreComment(commentId, actorId, isElevated);
 }
 
 export async function toggleCommentLike(commentId: string, userId: string): Promise<{ likesCount: number; liked: boolean }> {
@@ -1673,9 +1737,14 @@ function sqliteInitDatabase(): void {
       author_id TEXT NOT NULL,
       author_name TEXT NOT NULL,
       author_role TEXT NOT NULL,
+      author_avatar TEXT,
       content TEXT NOT NULL,
       likes_count INTEGER DEFAULT 0,
       is_ama_answer INTEGER DEFAULT 0,
+      is_deleted INTEGER DEFAULT 0,
+      deleted_at TEXT,
+      deleted_by TEXT,
+      original_content TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -2981,12 +3050,13 @@ function sqliteGetAllPosts(params?: {
     query += ' AND p.status = ?';
     args.push(params.status);
   } else if (params?.currentUserRole === 'SUPER_ADMIN' || params?.currentUserRole === 'DEVELOPER') {
-    // Platform administrators see all posts in feeds & moderation views
+    // Platform administrators see active & pending posts in general feed, excluding DELETED unless requested
+    query += " AND p.status != 'DELETED'";
   } else if (params?.currentUserId) {
-    query += " AND (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
+    query += " AND ((p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')) OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED', 'DELETED', 'PENDING_DELETION')))";
     args.push(params.currentUserId);
   } else {
-    query += " AND p.status IN ('APPROVED', 'PUBLISHED')";
+    query += " AND p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')";
   }
 
   if (params?.communityId) {
@@ -3061,6 +3131,15 @@ function sqliteGetAllPosts(params?: {
       amaStartTime: p.ama_start_time || null,
       amaEndTime: p.ama_end_time || null,
       replies: sqliteGetRepliesForPost(p.id),
+      rejectionReason: p.rejection_reason || null,
+      deletionStatus: p.deletion_status || 'NONE',
+      deletionReason: p.deletion_reason || null,
+      deletionRequestedAt: p.deletion_requested_at || null,
+      deletionRequestedBy: p.deletion_requested_by || null,
+      deletionReviewedAt: p.deletion_reviewed_at || null,
+      deletionReviewedBy: p.deletion_reviewed_by || null,
+      deletionRejectionReason: p.deletion_rejection_reason || null,
+      previousStatus: p.previous_status || null,
       createdAt: p.created_at,
       updatedAt: p.updated_at
     };
@@ -3115,6 +3194,15 @@ function sqliteGetPostById(postId: string, currentUserId?: string): any {
     amaEndTime: p.ama_end_time || null,
     replies: sqliteGetRepliesForPost(p.id),
     comments: sqliteGetCommentsForPost(p.id, currentUserId),
+    rejectionReason: p.rejection_reason || null,
+    deletionStatus: p.deletion_status || 'NONE',
+    deletionReason: p.deletion_reason || null,
+    deletionRequestedAt: p.deletion_requested_at || null,
+    deletionRequestedBy: p.deletion_requested_by || null,
+    deletionReviewedAt: p.deletion_reviewed_at || null,
+    deletionReviewedBy: p.deletion_reviewed_by || null,
+    deletionRejectionReason: p.deletion_rejection_reason || null,
+    previousStatus: p.previous_status || null,
     createdAt: p.created_at,
     updatedAt: p.updated_at
   };
@@ -3249,9 +3337,157 @@ function sqliteDeletePost(postId: string, actorId?: string, isElevated = false):
   if (!post) return false;
   if (actorId && !isElevated && post.author_id !== actorId) return false;
 
-  db.prepare('DELETE FROM community_posts WHERE id = ?').run(postId);
-  sqliteRecordCommunityEvent('POST_DELETED', { id: postId });
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE community_posts 
+     SET status = 'DELETED', 
+         deletion_status = 'APPROVED', 
+         deletion_reviewed_at = ?, 
+         deletion_reviewed_by = ?, 
+         updated_at = ? 
+     WHERE id = ?`
+  ).run(now, actorId || null, now, postId);
+  sqliteRecordCommunityEvent('POST_DELETED', { id: postId, actorId });
   return true;
+}
+
+function sqliteRequestPostDeletion(
+  postId: string,
+  actorId: string,
+  reason: string
+): { success: boolean; error?: string; post?: any } {
+  const post = db.prepare('SELECT * FROM community_posts WHERE id = ?').get(postId) as DbCommunityPost | undefined;
+  if (!post) {
+    return { success: false, error: 'Post not found' };
+  }
+  if (post.author_id !== actorId) {
+    return { success: false, error: 'Forbidden: Only the post author can request deletion.' };
+  }
+  if (post.status === 'DELETED') {
+    return { success: false, error: 'Post is already deleted.' };
+  }
+  if (post.status === 'PENDING_DELETION' || (post as any).deletion_status === 'PENDING') {
+    return { success: false, error: 'A deletion request is already pending review for this post.' };
+  }
+
+  const now = new Date().toISOString();
+  const prevStatus = post.status;
+  db.prepare(
+    `UPDATE community_posts 
+     SET status = 'PENDING_DELETION',
+         deletion_status = 'PENDING',
+         deletion_reason = ?,
+         deletion_requested_at = ?,
+         deletion_requested_by = ?,
+         previous_status = ?,
+         updated_at = ?
+     WHERE id = ?`
+  ).run(reason.trim(), now, actorId, prevStatus, now, postId);
+
+  sqliteRecordCommunityEvent('POST_DELETION_REQUESTED', {
+    id: postId,
+    authorId: post.author_id,
+    reason: reason.trim()
+  });
+
+  const updated = sqliteGetPostById(postId, actorId);
+  return { success: true, post: updated };
+}
+
+function sqliteApprovePostDeletion(
+  postId: string,
+  reviewerId: string
+): { success: boolean; error?: string; post?: any } {
+  const post = db.prepare('SELECT * FROM community_posts WHERE id = ?').get(postId) as DbCommunityPost | undefined;
+  if (!post) {
+    return { success: false, error: 'Post not found' };
+  }
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `UPDATE community_posts 
+     SET status = 'DELETED',
+         deletion_status = 'APPROVED',
+         deletion_reviewed_at = ?,
+         deletion_reviewed_by = ?,
+         updated_at = ?
+     WHERE id = ?`
+  ).run(now, reviewerId, now, postId);
+
+  sqliteRecordCommunityEvent('POST_DELETION_APPROVED', {
+    id: postId,
+    authorId: post.author_id,
+    reviewerId
+  });
+  sqliteRecordCommunityEvent('POST_DELETED', { id: postId, reviewerId });
+
+  const updated = sqliteGetPostById(postId, reviewerId);
+  return { success: true, post: updated };
+}
+
+function sqliteRejectPostDeletion(
+  postId: string,
+  reviewerId: string,
+  rejectionReason: string
+): { success: boolean; error?: string; post?: any } {
+  const post = db.prepare('SELECT * FROM community_posts WHERE id = ?').get(postId) as DbCommunityPost | undefined;
+  if (!post) {
+    return { success: false, error: 'Post not found' };
+  }
+  const restoredStatus = (post as any).previous_status || 'APPROVED';
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `UPDATE community_posts 
+     SET status = ?,
+         deletion_status = 'REJECTED',
+         deletion_rejection_reason = ?,
+         deletion_reviewed_at = ?,
+         deletion_reviewed_by = ?,
+         updated_at = ?
+     WHERE id = ?`
+  ).run(restoredStatus, rejectionReason.trim(), now, reviewerId, now, postId);
+
+  sqliteRecordCommunityEvent('POST_DELETION_REJECTED', {
+    id: postId,
+    authorId: post.author_id,
+    reviewerId,
+    rejectionReason: rejectionReason.trim()
+  });
+
+  const updated = sqliteGetPostById(postId, reviewerId);
+  return { success: true, post: updated };
+}
+
+function sqliteGetPostDeletionRequests(): any[] {
+  const rows = db.prepare(
+    `SELECT * FROM community_posts 
+     WHERE deletion_status = 'PENDING' OR status = 'PENDING_DELETION'
+     ORDER BY deletion_requested_at DESC, created_at DESC`
+  ).all() as unknown as DbCommunityPost[];
+
+  return rows.map(p => ({
+    id: p.id,
+    authorId: p.author_id,
+    authorName: p.author_name,
+    authorRole: p.author_role,
+    communityId: p.community_id,
+    communityName: p.community_name,
+    topic: p.topic,
+    title: p.title,
+    content: p.content,
+    status: p.status,
+    deletionStatus: (p as any).deletion_status || 'NONE',
+    deletionReason: (p as any).deletion_reason || null,
+    deletionRequestedAt: (p as any).deletion_requested_at || null,
+    deletionRequestedBy: (p as any).deletion_requested_by || null,
+    deletionReviewedAt: (p as any).deletion_reviewed_at || null,
+    deletionReviewedBy: (p as any).deletion_reviewed_by || null,
+    deletionRejectionReason: (p as any).deletion_rejection_reason || null,
+    previousStatus: (p as any).previous_status || null,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at
+  }));
 }
 
 function sqlitePinPost(postId: string, isPinned: boolean): boolean {
@@ -3316,7 +3552,18 @@ function sqliteGetUserLikedPostIds(userId: string): Set<string> {
   return new Set(rows.map(r => r.post_id));
 }
 
-function sqliteGetCommentsForPost(postId: string, currentUserId?: string): any[] {
+function sqliteGetCommentById(commentId: string): DbCommunityComment | null {
+  const row = db.prepare('SELECT * FROM community_comments WHERE id = ?').get(commentId);
+  return (row as unknown as DbCommunityComment) || null;
+}
+
+function sqliteGetCommentsForPost(
+  postId: string,
+  currentUserId?: string,
+  sortMode: 'best' | 'newest' | 'oldest' = 'best',
+  page = 1,
+  limit = 50
+): any {
   const comments = db.prepare(`
     SELECT * FROM community_comments 
     WHERE post_id = ? 
@@ -3329,17 +3576,21 @@ function sqliteGetCommentsForPost(postId: string, currentUserId?: string): any[]
   const rootComments: any[] = [];
 
   for (const c of comments) {
+    const isDeleted = Boolean(c.is_deleted);
     const item = {
       id: c.id,
       postId: c.post_id,
-      parentId: c.parent_id,
+      parentId: c.parent_id || null,
       authorId: c.author_id,
-      authorName: c.author_name,
+      authorName: isDeleted ? '[deleted]' : c.author_name,
       authorRole: c.author_role,
-      content: c.content,
-      likesCount: c.likes_count,
-      userLiked: userLikedCommentIds.has(c.id),
+      authorAvatar: isDeleted ? null : (c.author_avatar || null),
+      content: isDeleted ? '[This comment was deleted by the author]' : c.content,
+      likesCount: isDeleted ? 0 : Number(c.likes_count || 0),
+      userLiked: isDeleted ? false : userLikedCommentIds.has(c.id),
       isAmaAnswer: Boolean(c.is_ama_answer),
+      isDeleted,
+      deletedAt: c.deleted_at || null,
       replies: [],
       createdAt: c.created_at,
       updatedAt: c.updated_at
@@ -3356,7 +3607,34 @@ function sqliteGetCommentsForPost(postId: string, currentUserId?: string): any[]
     }
   }
 
-  return rootComments;
+  // Sort child replies in each node chronologically
+  for (const item of commentMap.values()) {
+    item.replies.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  // Sort root comments
+  if (sortMode === 'best') {
+    rootComments.sort((a, b) => (b.likesCount - a.likesCount) || (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+  } else if (sortMode === 'newest') {
+    rootComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } else if (sortMode === 'oldest') {
+    rootComments.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  const totalRoots = rootComments.length;
+  const totalComments = comments.length;
+  const startIndex = Math.max(0, (page - 1) * limit);
+  const paginatedRoots = limit > 0 ? rootComments.slice(startIndex, startIndex + limit) : rootComments;
+  const hasMore = limit > 0 ? (startIndex + limit < totalRoots) : false;
+
+  const result: any = paginatedRoots;
+  result.comments = paginatedRoots;
+  result.totalRoots = totalRoots;
+  result.totalComments = totalComments;
+  result.page = page;
+  result.limit = limit;
+  result.hasMore = hasMore;
+  return result;
 }
 
 function sqliteCreateComment(data: {
@@ -3365,15 +3643,26 @@ function sqliteCreateComment(data: {
   authorId: string;
   authorName: string;
   authorRole: string;
+  authorAvatar?: string | null;
   content: string;
   isAmaAnswer?: boolean;
 }): any {
+  if (data.parentId) {
+    const parent = sqliteGetCommentById(data.parentId);
+    if (!parent) {
+      throw new Error('Parent comment not found');
+    }
+    if (parent.post_id !== data.postId) {
+      throw new Error('Parent comment does not belong to this discussion');
+    }
+  }
+
   const id = `comm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
 
   db.prepare(`
-    INSERT INTO community_comments (id, post_id, parent_id, author_id, author_name, author_role, content, likes_count, is_ama_answer, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+    INSERT INTO community_comments (id, post_id, parent_id, author_id, author_name, author_role, author_avatar, content, likes_count, is_ama_answer, is_deleted, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?)
   `).run(
     id,
     data.postId,
@@ -3381,6 +3670,7 @@ function sqliteCreateComment(data: {
     data.authorId,
     data.authorName,
     data.authorRole,
+    data.authorAvatar || null,
     data.content.trim(),
     data.isAmaAnswer ? 1 : 0,
     now,
@@ -3405,7 +3695,7 @@ function sqliteCreateComment(data: {
   sqliteRecordCommunityEvent('COMMENT_CREATED', {
     id,
     postId: data.postId,
-    parentId: data.parentId,
+    parentId: data.parentId || null,
     authorName: data.authorName
   });
 
@@ -3416,24 +3706,110 @@ function sqliteCreateComment(data: {
     authorId: data.authorId,
     authorName: data.authorName,
     authorRole: data.authorRole,
-    content: data.content,
+    authorAvatar: data.authorAvatar || null,
+    content: data.content.trim(),
     likesCount: 0,
     isAmaAnswer: Boolean(data.isAmaAnswer),
+    isDeleted: false,
     replies: [],
     createdAt: now,
     updatedAt: now
   };
 }
 
+function sqliteUpdateComment(commentId: string, actorId: string, content: string): any {
+  const c = sqliteGetCommentById(commentId);
+  if (!c) throw new Error('Comment not found');
+  if (c.author_id !== actorId) throw new Error('Unauthorized to edit this comment');
+  if (c.is_deleted) throw new Error('Cannot edit a deleted comment');
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error('Comment content cannot be empty');
+
+  const now = new Date().toISOString();
+  db.prepare('UPDATE community_comments SET content = ?, updated_at = ? WHERE id = ?').run(trimmed, now, commentId);
+
+  sqliteRecordCommunityEvent('COMMENT_UPDATED', {
+    id: commentId,
+    postId: c.post_id,
+    content: trimmed
+  });
+
+  return {
+    id: c.id,
+    postId: c.post_id,
+    parentId: c.parent_id || null,
+    authorId: c.author_id,
+    authorName: c.author_name,
+    authorRole: c.author_role,
+    authorAvatar: c.author_avatar || null,
+    content: trimmed,
+    likesCount: c.likes_count,
+    isAmaAnswer: Boolean(c.is_ama_answer),
+    isDeleted: false,
+    createdAt: c.created_at,
+    updatedAt: now
+  };
+}
+
 function sqliteDeleteComment(commentId: string, actorId: string, isElevated = false): boolean {
-  const c = db.prepare('SELECT * FROM community_comments WHERE id = ?').get(commentId) as DbCommunityComment | undefined;
+  const c = sqliteGetCommentById(commentId);
   if (!c) return false;
   if (!isElevated && c.author_id !== actorId) return false;
+  if (c.is_deleted) return true;
 
-  db.prepare('DELETE FROM community_comments WHERE id = ?').run(commentId);
+  const now = new Date().toISOString();
+  const placeholder = (!isElevated || c.author_id === actorId)
+    ? '[This comment was deleted by the author]'
+    : '[This comment was removed by moderators]';
+
+  // NEVER permanently delete from database - all deletions are soft-deletions preserving tree relationships & audit history
+  db.prepare(`
+    UPDATE community_comments 
+    SET is_deleted = 1,
+        original_content = COALESCE(original_content, content),
+        content = ?,
+        author_name = '[deleted]',
+        author_avatar = NULL,
+        deleted_at = ?,
+        deleted_by = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(placeholder, now, actorId, now, commentId);
+
+  // Decrement active comments count on the post
   db.prepare('UPDATE community_posts SET comments_count = MAX(0, comments_count - 1) WHERE id = ?').run(c.post_id);
 
-  sqliteRecordCommunityEvent('COMMENT_DELETED', { id: commentId, postId: c.post_id });
+  sqliteRecordCommunityEvent('COMMENT_DELETED', { id: commentId, postId: c.post_id, isPlaceholder: true });
+  return true;
+}
+
+function sqliteRestoreComment(commentId: string, actorId: string, isElevated = false): boolean {
+  const c = sqliteGetCommentById(commentId);
+  if (!c) return false;
+  if (!isElevated && c.author_id !== actorId) return false;
+  if (!c.is_deleted) return true;
+
+  const now = new Date().toISOString();
+  const author = db.prepare('SELECT name FROM users WHERE id = ?').get(c.author_id) as { name?: string } | undefined;
+  const authorName = author?.name || 'Community Member';
+
+  db.prepare(`
+    UPDATE community_comments 
+    SET is_deleted = 0,
+        content = COALESCE(original_content, content),
+        author_name = ?,
+        deleted_at = NULL,
+        deleted_by = NULL,
+        updated_at = ?
+    WHERE id = ?
+  `).run(authorName, now, commentId);
+
+  db.prepare('UPDATE community_posts SET comments_count = comments_count + 1 WHERE id = ?').run(c.post_id);
+  sqliteRecordCommunityEvent('COMMENT_UPDATED', {
+    id: commentId,
+    postId: c.post_id,
+    content: c.original_content || c.content
+  });
   return true;
 }
 
@@ -4470,4 +4846,10 @@ function sqliteUpdateConferenceDetails(details: {
     now
   );
   return sqliteGetConferenceDetails();
+}
+
+export async function getActiveCommunityMemberIds(communityId: string): Promise<string[]> {
+  if (isPostgresAuthoritative()) return pgGetActiveCommunityMemberIds(communityId);
+  const rows = db.prepare("SELECT user_id FROM community_members WHERE community_id = ? AND status = 'ACTIVE'").all(communityId) as { user_id: string }[];
+  return rows.map(r => r.user_id);
 }

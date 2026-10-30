@@ -40,6 +40,11 @@ import {
   createPost,
   updatePost,
   deletePost,
+  requestPostDeletion,
+  approvePostDeletion,
+  rejectPostDeletion,
+  getPostDeletionRequests,
+  getSuperAdminUserIds,
   pinPost,
   upvotePost,
   togglePostLike,
@@ -52,8 +57,12 @@ import {
   checkDuplicateQuestion,
   getUserPublicProfile,
   getCommentsForPost,
+  getCommentById,
   createComment,
+  updateComment,
   deleteComment,
+  restoreComment,
+  getActiveCommunityMemberIds,
   toggleCommentLike,
   createModerationReport,
   getAllModerationReports,
@@ -321,6 +330,17 @@ app.get('/api/community/events', async (req: AuthenticatedRequest, res: Response
     removeSseClient(client);
   });
 });
+
+// Helper to get allowed audience for private community SSE events
+async function getPrivateCommunityAllowedViewers(communityId?: string | null, extraUserId?: string | null): Promise<string[] | null> {
+  if (!communityId) return null;
+  const comm = await getCommunityById(communityId);
+  if (!comm || comm.visibility !== 'PRIVATE') return null;
+  const memberIds = await getActiveCommunityMemberIds(communityId);
+  if (extraUserId && !memberIds.includes(extraUserId)) memberIds.push(extraUserId);
+  return memberIds;
+}
+
 
 // Authoritative Live Sync Status endpoint
 app.get('/api/live/sync-status', (_req: Request, res: Response): void => {
@@ -1258,6 +1278,35 @@ app.post('/api/users/:id/follow', requireAuth, requireUnrestricted, async (req: 
   }
 });
 
+// Restore soft-deleted comment
+app.post('/api/community/comments/:id/restore', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
+    const c = await getCommentById(req.params.id);
+    if (!c) {
+      res.status(404).json({ error: 'Comment not found' });
+      return;
+    }
+    const ok = await restoreComment(req.params.id, req.user.id, isElevated);
+    if (!ok) {
+      res.status(403).json({ error: 'Unauthorized to restore this comment' });
+      return;
+    }
+    const post = await getPostById(c.post_id);
+    const allowedUserIds = await getPrivateCommunityAllowedViewers(post?.communityId, post?.authorId);
+    broadcastSseEvent('COMMENT_UPDATED', {
+      commentId: req.params.id,
+      postId: c.post_id,
+      content: c.original_content || c.content,
+      updatedAt: new Date().toISOString()
+    }, undefined, allowedUserIds);
+    res.json({ success: true, message: 'Comment restored' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Fetch all community posts
 app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -1438,7 +1487,7 @@ app.put('/api/community/posts/:id', requireAuth, requireUnrestricted, async (req
   }
 });
 
-// Delete post
+// Delete post (Restricted to elevated roles; authors must submit a deletion request)
 app.delete('/api/community/posts/:id', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user.id);
@@ -1454,13 +1503,294 @@ app.delete('/api/community/posts/:id', requireAuth, requireUnrestricted, async (
       }
     }
     const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN' || isCommunityMod;
+    if (!isElevated) {
+      res.status(403).json({
+        error: 'Direct post deletion is disabled for post owners. Please submit a deletion request with a mandatory reason for Super Admin approval.'
+      });
+      return;
+    }
     const ok = await deletePost(req.params.id, req.user.id, isElevated);
     if (!ok) {
       res.status(403).json({ error: 'Unauthorized to delete this post' });
       return;
     }
+    await createAuditLog({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      actorRole: req.user.role,
+      action: 'DELETE_POST',
+      targetId: req.params.id,
+      details: { title: post.title }
+    });
     broadcastSseEvent('POST_DELETED', { id: req.params.id });
     res.json({ success: true, message: 'Post removed' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Community Post Owner-Initiated Deletion Request
+app.post('/api/community/posts/:id/request-deletion', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { reason } = req.body || {};
+    if (!reason || typeof reason !== 'string') {
+      res.status(400).json({ error: 'A mandatory deletion reason is required.' });
+      return;
+    }
+    const trimmedReason = reason.trim();
+    if (trimmedReason.length < 10 || trimmedReason.length > 500) {
+      res.status(400).json({ error: 'Deletion reason must be between 10 and 500 characters.' });
+      return;
+    }
+    if (/[<>]/.test(trimmedReason)) {
+      res.status(400).json({ error: 'Deletion reason cannot contain HTML tags.' });
+      return;
+    }
+
+    const post = await getPostById(req.params.id, req.user.id);
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    if (post.authorId !== req.user.id) {
+      res.status(403).json({ error: 'Only the post author can request deletion.' });
+      return;
+    }
+    if (post.status === 'DELETED') {
+      res.status(400).json({ error: 'Post is already deleted.' });
+      return;
+    }
+    if (post.status === 'PENDING_DELETION' || post.deletionStatus === 'PENDING') {
+      res.status(409).json({ error: 'A deletion request is already pending review for this post.' });
+      return;
+    }
+
+    const result = await requestPostDeletion(req.params.id, req.user.id, trimmedReason);
+    if (!result.success) {
+      res.status(400).json({ error: result.error || 'Failed to submit deletion request' });
+      return;
+    }
+
+    await createAuditLog({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      actorRole: req.user.role,
+      action: 'REQUEST_POST_DELETION',
+      targetId: post.id,
+      details: { reason: trimmedReason }
+    });
+
+    // In-app notification to the post author
+    try {
+      await createNotification({
+        userId: req.user.id,
+        actorId: 'system',
+        actorName: 'Property Studio Moderation',
+        type: 'MODERATION',
+        title: 'Post Deletion Requested',
+        message: `Your request to delete "${post.title}" has been submitted for Super Admin review. The post remains visible until approved.`,
+        linkUrl: '/?view=community&filter=my_posts'
+      });
+      broadcastSseEvent('NOTIFICATION_CREATED', { userId: req.user.id }, req.user.id);
+    } catch (notifErr) {
+      console.warn('[Property Studio] Failed to send deletion request notification to author:', notifErr);
+    }
+
+    // In-app notification to Super Admins
+    try {
+      const adminIds = await getSuperAdminUserIds();
+      for (const adminId of adminIds) {
+        await createNotification({
+          userId: adminId,
+          actorId: req.user.id,
+          actorName: req.user.name || 'User',
+          type: 'MODERATION',
+          title: 'Post Deletion Request Pending Review',
+          message: `${req.user.name || 'Author'} requested deletion of "${post.title}". Reason: ${trimmedReason}`,
+          linkUrl: '/admin?tab=MODERATION'
+        });
+        broadcastSseEvent('NOTIFICATION_CREATED', { userId: adminId }, adminId);
+      }
+    } catch (adminNotifErr) {
+      console.warn('[Property Studio] Failed to notify Super Admins of post deletion request:', adminNotifErr);
+    }
+
+    // Broadcast SSE live event
+    broadcastSseEvent('POST_DELETION_REQUESTED', {
+      postId: post.id,
+      authorId: post.authorId,
+      title: post.title,
+      reason: trimmedReason,
+      status: 'PENDING_DELETION'
+    });
+
+    res.json({
+      success: true,
+      message: 'Deletion request submitted for Super Admin review. The post remains visible until approved.',
+      post: result.post
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Super Admin Approve Post Deletion
+app.post('/api/admin/posts/:id/approve-deletion', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'DEVELOPER') {
+      res.status(403).json({ error: 'Only a Super Admin can approve post deletion requests.' });
+      return;
+    }
+    const post = await getPostById(req.params.id);
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    if (post.status !== 'PENDING_DELETION' && post.deletionStatus !== 'PENDING') {
+      res.status(400).json({ error: 'Post does not have a pending deletion request.' });
+      return;
+    }
+
+    const result = await approvePostDeletion(req.params.id, req.user.id);
+    if (!result.success) {
+      res.status(400).json({ error: result.error || 'Failed to approve deletion' });
+      return;
+    }
+
+    await createAuditLog({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      actorRole: req.user.role,
+      action: 'APPROVE_POST_DELETION',
+      targetId: post.id,
+      details: {
+        authorId: post.authorId,
+        reason: post.deletionReason
+      }
+    });
+
+    // Notify post author
+    if (post.authorId) {
+      try {
+        await createNotification({
+          userId: post.authorId,
+          actorId: req.user.id,
+          actorName: req.user.name || 'Super Admin',
+          type: 'MODERATION',
+          title: 'Post Deletion Approved',
+          message: `Your request to delete "${post.title}" was approved by Super Admin. The post has been removed from public feeds.`,
+          linkUrl: '/?view=community&filter=my_posts'
+        });
+        broadcastSseEvent('NOTIFICATION_CREATED', { userId: post.authorId }, post.authorId);
+      } catch (notifErr) {
+        console.warn('[Property Studio] Failed to notify author of deletion approval:', notifErr);
+      }
+    }
+
+    // Broadcast live events
+    broadcastSseEvent('POST_DELETION_APPROVED', {
+      postId: post.id,
+      authorId: post.authorId
+    });
+    broadcastSseEvent('POST_DELETED', { id: post.id });
+
+    res.json({
+      success: true,
+      message: 'Post deletion request approved. The post has been removed from feeds.',
+      post: result.post
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Super Admin Reject Post Deletion
+app.post('/api/admin/posts/:id/reject-deletion', requireAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'DEVELOPER') {
+      res.status(403).json({ error: 'Only a Super Admin can reject post deletion requests.' });
+      return;
+    }
+    const { reason } = req.body || {};
+    if (!reason || typeof reason !== 'string') {
+      res.status(400).json({ error: 'A mandatory rejection reason is required.' });
+      return;
+    }
+    const trimmedReason = reason.trim();
+    if (trimmedReason.length < 5 || trimmedReason.length > 500) {
+      res.status(400).json({ error: 'Rejection reason must be between 5 and 500 characters.' });
+      return;
+    }
+
+    const post = await getPostById(req.params.id);
+    if (!post) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    if (post.status !== 'PENDING_DELETION' && post.deletionStatus !== 'PENDING') {
+      res.status(400).json({ error: 'Post does not have a pending deletion request.' });
+      return;
+    }
+
+    const result = await rejectPostDeletion(req.params.id, req.user.id, trimmedReason);
+    if (!result.success) {
+      res.status(400).json({ error: result.error || 'Failed to reject deletion' });
+      return;
+    }
+
+    await createAuditLog({
+      actorId: req.user.id,
+      actorEmail: req.user.email,
+      actorRole: req.user.role,
+      action: 'REJECT_POST_DELETION',
+      targetId: post.id,
+      details: {
+        authorId: post.authorId,
+        rejectionReason: trimmedReason
+      }
+    });
+
+    // Notify post author
+    if (post.authorId) {
+      try {
+        await createNotification({
+          userId: post.authorId,
+          actorId: req.user.id,
+          actorName: req.user.name || 'Super Admin',
+          type: 'MODERATION',
+          title: 'Post Deletion Request Declined',
+          message: `Your request to delete "${post.title}" was declined by Super Admin. Reason: ${trimmedReason}`,
+          linkUrl: '/?view=community&filter=my_posts'
+        });
+        broadcastSseEvent('NOTIFICATION_CREATED', { userId: post.authorId }, post.authorId);
+      } catch (notifErr) {
+        console.warn('[Property Studio] Failed to notify author of deletion rejection:', notifErr);
+      }
+    }
+
+    // Broadcast live event
+    broadcastSseEvent('POST_DELETION_REJECTED', {
+      postId: post.id,
+      authorId: post.authorId,
+      rejectionReason: trimmedReason,
+      status: result.post?.status || 'APPROVED'
+    });
+
+    res.json({
+      success: true,
+      message: 'Post deletion request rejected. Post restored to original status.',
+      post: result.post
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get post deletion requests for admin
+app.get('/api/admin/posts/deletion-requests', requireAdmin, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const requests = await getPostDeletionRequests();
+    res.json({ requests });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1664,7 +1994,7 @@ app.post('/api/community/posts/:id/like', requireAuth, requireUnrestricted, asyn
 // COMMENTS & NESTED REPLIES
 // ==============================================================================
 
-// Fetch comments for a post
+// Fetch comments for a post (hierarchical Reddit-style tree, sorting & pagination)
 app.get('/api/community/posts/:id/comments', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
@@ -1683,8 +2013,19 @@ app.get('/api/community/posts/:id/comments', requireAuth, async (req: Authentica
       res.status(404).json({ error: 'Post not found' });
       return;
     }
-    const comments = await getCommentsForPost(req.params.id, req.user?.id);
-    res.json({ comments });
+    const sort = (req.query.sort as 'best' | 'newest' | 'oldest') || 'best';
+    const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
+    const limit = Math.max(0, parseInt(String(req.query.limit || '50'), 10) || 50);
+
+    const result = await getCommentsForPost(req.params.id, req.user?.id, sort, page, limit);
+    res.json({
+      comments: result.comments || result,
+      totalRoots: result.totalRoots ?? (Array.isArray(result) ? result.length : 0),
+      totalComments: result.totalComments ?? (Array.isArray(result) ? result.length : 0),
+      page: result.page ?? page,
+      limit: result.limit ?? limit,
+      hasMore: Boolean(result.hasMore)
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1696,6 +2037,10 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
     const { content, parentId, isAmaAnswer } = req.body;
     if (!content || !content.trim()) {
       res.status(400).json({ error: 'Comment content cannot be empty' });
+      return;
+    }
+    if (content.trim().length > 2000) {
+      res.status(400).json({ error: 'Comment content exceeds maximum limit of 2000 characters' });
       return;
     }
     const parentPost = await getPostById(req.params.id, req.user?.id);
@@ -1715,18 +2060,37 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
       return;
     }
 
+    if (parentId) {
+      const parentComment = await getCommentById(parentId);
+      if (!parentComment) {
+        res.status(404).json({ error: 'Parent comment not found' });
+        return;
+      }
+      if (parentComment.post_id !== req.params.id) {
+        res.status(400).json({ error: 'Parent comment does not belong to this discussion' });
+        return;
+      }
+    }
+
     const comment = await createComment({
       postId: req.params.id,
       parentId: parentId || null,
       authorId: req.user.id,
       authorName: req.user.name,
       authorRole: req.user.role,
+      authorAvatar: req.user.avatar || null,
       content: content.trim(),
       isAmaAnswer: Boolean(isAmaAnswer)
     });
 
+
     if (parentPost.status === 'APPROVED' || parentPost.status === 'PUBLISHED') {
-      broadcastSseEvent('COMMENT_CREATED', comment);
+      const allowedUserIds = await getPrivateCommunityAllowedViewers(parentPost.communityId, parentPost.authorId);
+      broadcastSseEvent('COMMENT_CREATED', {
+        comment,
+        postId: req.params.id,
+        parentId: parentId || null
+      }, undefined, allowedUserIds);
     }
     res.json({ success: true, comment });
   } catch (err: any) {
@@ -1734,16 +2098,51 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
   }
 });
 
+// Edit own comment
+app.patch('/api/community/comments/:id', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+      res.status(400).json({ error: 'Comment content cannot be empty' });
+      return;
+    }
+    if (content.trim().length > 2000) {
+      res.status(400).json({ error: 'Comment content exceeds maximum limit of 2000 characters' });
+      return;
+    }
+    const updated = await updateComment(req.params.id, req.user.id, content.trim());
+    const post = await getPostById(updated.postId);
+    const allowedUserIds = await getPrivateCommunityAllowedViewers(post?.communityId, post?.authorId);
+    broadcastSseEvent('COMMENT_UPDATED', {
+      commentId: req.params.id,
+      postId: updated.postId,
+      content: updated.content,
+      updatedAt: updated.updatedAt
+    }, undefined, allowedUserIds);
+    res.json({ success: true, comment: updated });
+  } catch (err: any) {
+    const status = err.message.includes('not found') ? 404 : err.message.includes('Unauthorized') ? 403 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 // Delete comment
 app.delete('/api/community/comments/:id', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const isElevated = req.user.role === 'DEVELOPER' || req.user.role === 'SUPER_ADMIN';
+    const c = await getCommentById(req.params.id);
+    if (!c) {
+      res.status(404).json({ error: 'Comment not found' });
+      return;
+    }
     const ok = await deleteComment(req.params.id, req.user.id, isElevated);
     if (!ok) {
       res.status(403).json({ error: 'Unauthorized to delete this comment' });
       return;
     }
-    broadcastSseEvent('COMMENT_DELETED', { id: req.params.id });
+    const post = await getPostById(c.post_id);
+    const allowedUserIds = await getPrivateCommunityAllowedViewers(post?.communityId, post?.authorId);
+    broadcastSseEvent('COMMENT_DELETED', { id: req.params.id, postId: c.post_id, isPlaceholder: true }, undefined, allowedUserIds);
     res.json({ success: true, message: 'Comment removed' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1754,6 +2153,10 @@ app.delete('/api/community/comments/:id', requireAuth, requireUnrestricted, asyn
 app.post('/api/community/comments/:id/like', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const result = await toggleCommentLike(req.params.id, req.user.id);
+    const c = await getCommentById(req.params.id);
+    const post = c ? await getPostById(c.post_id) : null;
+    const allowedUserIds = await getPrivateCommunityAllowedViewers(post?.communityId, post?.authorId);
+    broadcastSseEvent('COMMENT_LIKED', { commentId: req.params.id, likesCount: result.likesCount }, undefined, allowedUserIds);
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { CommunityPost, CommunityReply } from '../../types';
 import { communityPostShareUrl, isCommunityPostId, readCommunitySearch } from '../../shared/communityEngagement';
 import { AudioStoryPlayer } from '../common/AudioStoryPlayer';
+import { DiscussionDetailView } from './DiscussionDetailView';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import {
   MessageSquare,
@@ -48,6 +49,7 @@ import {
   Calendar,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
   AlertTriangle,
   Compass,
   Lock,
@@ -55,7 +57,8 @@ import {
   Settings,
   MapPin,
   Filter,
-  Shield
+  Shield,
+  Trash2
 } from 'lucide-react';
 
 interface CommunityForumViewProps {
@@ -102,13 +105,61 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     joinCommunity,
     leaveCommunity,
     repostDiscussion,
-    refreshCommunities
+    refreshCommunities,
+    refreshPosts
   } = useApp();
+
+  // Deletion Request Modal state
+  const [deletionRequestPost, setDeletionRequestPost] = useState<CommunityPost | null>(null);
+  const [deletionReason, setDeletionReason] = useState('');
+  const [isSubmittingDeletionRequest, setIsSubmittingDeletionRequest] = useState(false);
+  const [deletionRequestError, setDeletionRequestError] = useState<string | null>(null);
+
+  const handleSubmitDeletionRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletionRequestPost) return;
+    const trimmed = deletionReason.trim();
+    if (trimmed.length < 10) {
+      setDeletionRequestError('Please provide a mandatory reason of at least 10 characters.');
+      return;
+    }
+    if (trimmed.length > 500) {
+      setDeletionRequestError('Deletion reason cannot exceed 500 characters.');
+      return;
+    }
+    setIsSubmittingDeletionRequest(true);
+    setDeletionRequestError(null);
+    try {
+      const res = await fetch(`/api/community/posts/${deletionRequestPost.id}/request-deletion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: trimmed })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit deletion request');
+      showToast('Deletion request submitted for Super Admin review.');
+      setDeletionRequestPost(null);
+      setDeletionReason('');
+      refreshPosts();
+    } catch (err: any) {
+      setDeletionRequestError(err.message || 'Failed to submit deletion request');
+    } finally {
+      setIsSubmittingDeletionRequest(false);
+    }
+  };
 
   // Navigation & Filtering
   const [feedTab, setFeedTab] = useState<'FOR_YOU' | 'ALL' | 'AMAS' | 'FOLLOWING' | 'BOOKMARKS' | 'MY_POSTS'>('ALL');
   const [selectedTopic, setSelectedTopic] = useState<string>('ALL');
   const [selectedCommunityId, setSelectedCommunityId] = useState<'ALL' | string>('ALL');
+  // Dedicated Reddit-style Discussion Detail state
+  const [selectedDiscussionId, setSelectedDiscussionId] = useState<string | null>(null);
+  const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
+  const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+  const [isVotingPostId, setIsVotingPostId] = useState<string | null>(null);
+  const [isFollowingPostId, setIsFollowingPostId] = useState<string | null>(null);
+  const [isBookmarkingPostId, setIsBookmarkingPostId] = useState<string | null>(null);
+  const [repostingPostId, setRepostingPostId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'HOT' | 'TOP' | 'NEW'>('HOT');
   const [questionQuery, setQuestionQuery] = useState('');
 
@@ -285,13 +336,30 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     };
   };
 
-  // Upvote / Downvote Vote Handler
+  // Upvote / Downvote Vote Handler (Module 9 with optimistic update & rollback)
   const handleVote = async (post: CommunityPost, direction: 1 | -1) => {
     if (!isLoggedIn) {
       showToast('Please sign in to vote on community discussions.');
       onOpenLoginModal?.();
       return;
     }
+    const current = savedEngagement(post);
+    const newVote = current.userVote === direction ? 0 : direction;
+    const diffAgree = (newVote === 1 ? 1 : 0) - (current.userVote === 1 ? 1 : 0);
+    const diffDisagree = (newVote === -1 ? 1 : 0) - (current.userVote === -1 ? 1 : 0);
+
+    // Optimistic update
+    setEngagement(prev => ({
+      ...prev,
+      [post.id]: {
+        ...current,
+        agreeCount: Math.max(0, current.agreeCount + diffAgree),
+        disagreeCount: Math.max(0, current.disagreeCount + diffDisagree),
+        userVote: newVote
+      }
+    }));
+    setIsVotingPostId(post.id);
+
     try {
       const response = await fetch(`/api/community/posts/${post.id}/vote`, {
         method: 'POST',
@@ -300,7 +368,6 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Vote was not saved.');
-      const current = savedEngagement(post);
       setEngagement(prev => ({
         ...prev,
         [post.id]: {
@@ -311,22 +378,38 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
         }
       }));
     } catch (err: any) {
+      setEngagement(prev => ({ ...prev, [post.id]: current }));
       showToast(err.message || 'Vote was not saved.');
+    } finally {
+      setIsVotingPostId(null);
     }
   };
 
-  // Follow / Unfollow Discussion Handler
+  // Follow / Unfollow Discussion Handler (Module 9 with optimistic update & rollback)
   const handleFollow = async (post: CommunityPost) => {
     if (!isLoggedIn) {
       showToast('Please sign in to follow a discussion.');
       onOpenLoginModal?.();
       return;
     }
+    const current = savedEngagement(post);
+    const nextFollowing = !current.following;
+    const nextCount = Math.max(0, current.followerCount + (nextFollowing ? 1 : -1));
+
+    setEngagement(prev => ({
+      ...prev,
+      [post.id]: {
+        ...current,
+        following: nextFollowing,
+        followerCount: nextCount
+      }
+    }));
+    setIsFollowingPostId(post.id);
+
     try {
       const response = await fetch(`/api/community/posts/${post.id}/follow`, { method: 'POST' });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Follow was not saved.');
-      const current = savedEngagement(post);
       setEngagement(prev => ({
         ...prev,
         [post.id]: {
@@ -337,22 +420,38 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       }));
       showToast(data.following ? 'You are following this discussion.' : 'You unfollowed this discussion.');
     } catch (err: any) {
+      setEngagement(prev => ({ ...prev, [post.id]: current }));
       showToast(err.message || 'Follow was not saved.');
+    } finally {
+      setIsFollowingPostId(null);
     }
   };
 
-  // Bookmark / Unbookmark Handler
+  // Bookmark / Unbookmark Handler (Module 9 with optimistic update & rollback)
   const handleToggleBookmark = async (post: CommunityPost) => {
     if (!isLoggedIn) {
       showToast('Please sign in to bookmark discussions.');
       onOpenLoginModal?.();
       return;
     }
+    const current = savedEngagement(post);
+    const nextBm = !current.bookmarked;
+    const nextCount = Math.max(0, current.bookmarkCount + (nextBm ? 1 : -1));
+
+    setEngagement(prev => ({
+      ...prev,
+      [post.id]: {
+        ...current,
+        bookmarked: nextBm,
+        bookmarkCount: nextCount
+      }
+    }));
+    setIsBookmarkingPostId(post.id);
+
     try {
       const response = await fetch(`/api/community/posts/${post.id}/bookmark`, { method: 'POST' });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not update bookmark.');
-      const current = savedEngagement(post);
       setEngagement(prev => ({
         ...prev,
         [post.id]: {
@@ -369,7 +468,10 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       });
       showToast(data.bookmarked ? 'Discussion saved to your Bookmarks.' : 'Discussion removed from Bookmarks.');
     } catch (err: any) {
+      setEngagement(prev => ({ ...prev, [post.id]: current }));
       showToast(err.message || 'Bookmark action failed.');
+    } finally {
+      setIsBookmarkingPostId(null);
     }
   };
 
@@ -539,8 +641,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     }
   };
 
-  // Submit Question (Quora Style Modal)
-  const handleQuestionSubmit = (e: React.FormEvent) => {
+  // Submit Question (Quora Style Modal with Module 9 Loading State)
+  const handleQuestionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!questionForm.title.trim()) {
       showToast('Please enter a question title.');
@@ -552,30 +654,37 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       return;
     }
 
-    createCommunityPost({
-      authorName: currentUser.name,
-      authorRole: currentUser.role,
-      topic: questionForm.topic,
-      title: questionForm.title.trim(),
-      content: questionForm.context.trim() || questionForm.title.trim(),
-      mediaType: 'POST',
-      postType: 'QUESTION',
-      visibility: questionForm.visibility,
-      communityId: selectedCommunityId !== 'ALL' ? selectedCommunityId : undefined
-    });
+    setIsSubmittingQuestion(true);
+    try {
+      const res = await createCommunityPost({
+        authorName: currentUser.name,
+        authorRole: currentUser.role,
+        topic: questionForm.topic,
+        title: questionForm.title.trim(),
+        content: questionForm.context.trim() || questionForm.title.trim(),
+        mediaType: 'POST',
+        postType: 'QUESTION',
+        visibility: questionForm.visibility,
+        communityId: selectedCommunityId !== 'ALL' ? selectedCommunityId : undefined
+      });
 
-    setQuestionForm({
-      title: '',
-      context: '',
-      topic: 'Kokapet & Neopolis',
-      visibility: 'PUBLIC'
-    });
-    setDuplicateWarning(null);
-    setShowModal('NONE');
+      if (res && res.success) {
+        setQuestionForm({
+          title: '',
+          context: '',
+          topic: 'Kokapet & Neopolis',
+          visibility: 'PUBLIC'
+        });
+        setDuplicateWarning(null);
+        setShowModal('NONE');
+      }
+    } finally {
+      setIsSubmittingQuestion(false);
+    }
   };
 
   // Submit Post (Reddit & Quora Style Modal)
-  const handlePostSubmit = (e: React.FormEvent) => {
+  const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!postForm.title.trim()) {
       showToast('Please provide a post title.');
@@ -612,48 +721,55 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       postType = 'AMA';
     }
 
-    createCommunityPost({
-      authorName: currentUser.name,
-      authorRole: currentUser.role,
-      topic: postForm.topic,
-      title: postForm.title.trim(),
-      content: postForm.content.trim() || postForm.title.trim(),
-      propertyId: postForm.propertyId || undefined,
-      propertyName: prop ? prop.title : undefined,
-      communityId: selectedCommunityId !== 'ALL' ? selectedCommunityId : (postForm.communityId || undefined),
-      mediaType: postForm.mediaType,
-      mediaUrl: postForm.mediaUrl || postForm.linkUrl || undefined,
-      thumbnailUrl: postForm.photoUrl || undefined,
-      attachments,
-      postType,
-      visibility: postForm.visibility,
-      pollOptions,
-      amaHostName: postSubTab === 'AMA' ? (postForm.amaHostName.trim() || currentUser.name) : undefined,
-      amaHostRole: postSubTab === 'AMA' ? (postForm.amaHostRole.trim() || currentUser.profession || 'Host') : undefined,
-      amaStatus: postSubTab === 'AMA' ? postForm.amaStatus : undefined,
-      amaStartTime: postSubTab === 'AMA' ? postForm.amaStartTime : undefined
-    });
+    setIsSubmittingPost(true);
+    try {
+      const res = await createCommunityPost({
+        authorName: currentUser.name,
+        authorRole: currentUser.role,
+        topic: postForm.topic,
+        title: postForm.title.trim(),
+        content: postForm.content.trim() || postForm.title.trim(),
+        propertyId: postForm.propertyId || undefined,
+        propertyName: prop ? prop.title : undefined,
+        communityId: selectedCommunityId !== 'ALL' ? selectedCommunityId : (postForm.communityId || undefined),
+        mediaType: postForm.mediaType,
+        mediaUrl: postForm.mediaUrl || postForm.linkUrl || undefined,
+        thumbnailUrl: postForm.photoUrl || undefined,
+        attachments,
+        postType,
+        visibility: postForm.visibility,
+        pollOptions,
+        amaHostName: postSubTab === 'AMA' ? (postForm.amaHostName.trim() || currentUser.name) : undefined,
+        amaHostRole: postSubTab === 'AMA' ? (postForm.amaHostRole.trim() || currentUser.profession || 'Host') : undefined,
+        amaStatus: postSubTab === 'AMA' ? postForm.amaStatus : undefined,
+        amaStartTime: postSubTab === 'AMA' ? postForm.amaStartTime : undefined
+      });
 
-    setPostForm({
-      title: '',
-      content: '',
-      topic: 'Kokapet & Neopolis',
-      visibility: 'PUBLIC',
-      propertyId: '',
-      communityId: '',
-      mediaType: 'POST',
-      mediaUrl: '',
-      photoUrl: '',
-      linkUrl: '',
-      linkTitle: '',
-      pollOptions: ['', '', ''],
-      pollDuration: '7 days',
-      amaHostName: currentUser.name || '',
-      amaHostRole: currentUser.profession || currentUser.role || 'Industry Expert',
-      amaStatus: 'UPCOMING',
-      amaStartTime: ''
-    });
-    setShowModal('NONE');
+      if (res && res.success) {
+        setPostForm({
+          title: '',
+          content: '',
+          topic: 'Kokapet & Neopolis',
+          visibility: 'PUBLIC',
+          propertyId: '',
+          communityId: '',
+          mediaType: 'POST',
+          mediaUrl: '',
+          photoUrl: '',
+          linkUrl: '',
+          linkTitle: '',
+          pollOptions: ['', '', ''],
+          pollDuration: '7 days',
+          amaHostName: currentUser.name || '',
+          amaHostRole: currentUser.profession || currentUser.role || 'Industry Expert',
+          amaStatus: 'UPCOMING',
+          amaStartTime: ''
+        });
+        setShowModal('NONE');
+      }
+    } finally {
+      setIsSubmittingPost(false);
+    }
   };
 
   // Reply / Comment Submit
@@ -1320,22 +1436,39 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             </div>
           </div>
 
-          {/* Hub Category filter pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-            {COMMUNITY_CATEGORIES.map(cat => (
+          {/* Hub Category filter dropdown */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-0.5">
+            <div className="flex items-center gap-2 w-full sm:w-auto flex-1 max-w-sm">
+              <label htmlFor="hub-category-select" className="text-xs font-bold text-slate-700 shrink-0 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-amber-600" />
+                <span>Hub Category:</span>
+              </label>
+              <div className="relative flex-1">
+                <select
+                  id="hub-category-select"
+                  value={hubCategoryFilter}
+                  onChange={e => setHubCategoryFilter(e.target.value)}
+                  className="w-full appearance-none bg-white border border-slate-200 hover:border-slate-300 rounded-xl px-3.5 py-2 pr-9 text-xs font-semibold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer transition-all"
+                >
+                  {COMMUNITY_CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>
+                      {cat === 'ALL' ? 'All Categories (Show All)' : cat}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            {hubCategoryFilter !== 'ALL' && (
               <button
-                key={cat}
                 type="button"
-                onClick={() => setHubCategoryFilter(cat)}
-                className={`px-3 py-1 rounded-xl font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  hubCategoryFilter === cat
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                }`}
+                onClick={() => setHubCategoryFilter('ALL')}
+                className="text-xs text-amber-700 hover:text-amber-800 font-semibold cursor-pointer underline underline-offset-2 shrink-0 self-start sm:self-auto"
               >
-                {cat === 'ALL' ? 'All Categories' : cat}
+                Reset to All Categories
               </button>
-            ))}
+            )}
           </div>
 
           {/* Hubs Grid */}
@@ -1437,6 +1570,27 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column (2 Cols): Search, Tabs, and Posts Feed */}
         <div className="lg:col-span-2 space-y-6">
+          {selectedDiscussionId ? (
+            <DiscussionDetailView
+              postId={selectedDiscussionId}
+              onBack={() => setSelectedDiscussionId(null)}
+              currentUser={currentUser}
+              isLoggedIn={isLoggedIn}
+              onOpenLoginModal={onOpenLoginModal}
+              onOpenReportModal={handleOpenReportModal}
+              onOpenDeletionModal={p => {
+                setDeletionRequestPost(p);
+                setDeletionReason('');
+                setDeletionRequestError(null);
+              }}
+              onOpenUserProfile={handleOpenUserProfile}
+              allPosts={communityPosts}
+              showToast={showToast}
+              refreshPosts={refreshPosts}
+              repostDiscussion={repostDiscussion}
+            />
+          ) : (
+            <>
           {/* Real-time Search Box */}
           <form
             role="search"
@@ -1467,9 +1621,29 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             ) : null}
           </form>
 
-          {/* Feed Tabs (Quora & Reddit Reference Image 5) */}
+          {/* Feed Tabs: Mobile Dropdown, Tablet/Desktop Tabs */}
           <div className="bg-white p-1.5 sm:p-2 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-1 sm:gap-2">
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0 pr-1">
+            {/* Mobile Dropdown for Feed View */}
+            <div className="sm:hidden relative flex-1 min-w-0 pr-1">
+              <select
+                id="feed-view-select"
+                aria-label="Feed View"
+                value={feedTab}
+                onChange={e => setFeedTab(e.target.value as any)}
+                className="w-full appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 pr-8 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer transition-all"
+              >
+                <option value="ALL">🌐 All Discussions</option>
+                <option value="FOR_YOU">✨ For You</option>
+                {isLoggedIn && <option value="MY_POSTS">👤 My Submissions</option>}
+                <option value="AMAs">🎙️ AMAs</option>
+                <option value="FOLLOWING">👥 Following</option>
+                <option value="BOOKMARKS">🔖 Bookmarks</option>
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Desktop / Tablet Tabs */}
+            <div className="hidden sm:flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0 pr-1">
               {[
                 { id: 'ALL', label: 'All Discussions', icon: Globe },
                 { id: 'FOR_YOU', label: 'For You', icon: Sparkles },
@@ -1529,8 +1703,30 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             </div>
           </div>
 
-          {/* Topics Carousel / Horizontal Scroll */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5">
+          {/* Topics Selector: Dropdown on Mobile, Carousel on Desktop */}
+          <div className="sm:hidden flex items-center gap-2 w-full">
+            <label htmlFor="discussion-topic-select" className="text-xs font-bold text-slate-700 shrink-0 flex items-center gap-1">
+              <span>Topic:</span>
+            </label>
+            <div className="relative flex-1">
+              <select
+                id="discussion-topic-select"
+                aria-label="Filter by Topic"
+                value={selectedTopic}
+                onChange={e => setSelectedTopic(e.target.value)}
+                className="w-full appearance-none bg-white border border-slate-200 hover:border-slate-300 rounded-xl px-3.5 py-2 pr-9 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer transition-all"
+              >
+                {COMMUNITY_TOPIC_LIST.map(topic => (
+                  <option key={topic} value={topic}>
+                    {topic === 'ALL' ? 'All Topics & Categories' : `r/${topic}`}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5">
             {COMMUNITY_TOPIC_LIST.map(topic => (
               <button
                 key={topic}
@@ -1659,11 +1855,33 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 font-mono ${
                               post.status === 'PENDING_APPROVAL' || post.status === 'PENDING'
                                 ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : post.status === 'PENDING_DELETION'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-400 font-semibold'
+                                : post.status === 'DELETED'
+                                ? 'bg-slate-200 text-slate-700 border border-slate-400'
                                 : 'bg-rose-100 text-rose-800 border border-rose-300'
                             }`}>
-                              <span>{post.status === 'PENDING_APPROVAL' || post.status === 'PENDING' ? '⏳' : '❌'}</span>
-                              <span>{post.status === 'PENDING_APPROVAL' || post.status === 'PENDING' ? 'Pending Approval' : 'Rejected'}</span>
-                              {currentUser?.id === post.authorId && <span className="opacity-75">(Only you)</span>}
+                              <span>
+                                {post.status === 'PENDING_APPROVAL' || post.status === 'PENDING'
+                                  ? '⏳'
+                                  : post.status === 'PENDING_DELETION'
+                                  ? '⚠️'
+                                  : post.status === 'DELETED'
+                                  ? '🗑️'
+                                  : '❌'}
+                              </span>
+                              <span>
+                                {post.status === 'PENDING_APPROVAL' || post.status === 'PENDING'
+                                  ? 'Pending Approval'
+                                  : post.status === 'PENDING_DELETION'
+                                  ? 'Deletion Pending Review'
+                                  : post.status === 'DELETED'
+                                  ? 'Deleted'
+                                  : 'Rejected'}
+                              </span>
+                              {currentUser?.id === post.authorId && post.status !== 'PENDING_DELETION' && post.status !== 'DELETED' && (
+                                <span className="opacity-75">(Only you)</span>
+                              )}
                             </span>
                           )}
                           {post.status === 'APPROVED' && (post.authorRole === 'SUPER_ADMIN' || post.authorRole === 'DEVELOPER') && (
@@ -1683,9 +1901,40 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                         </div>
                       </div>
 
+                      {/* Author Status Callouts for Deletion Requests & Rejections */}
+                      {currentUser?.id === post.authorId && (post.status === 'PENDING_DELETION' || post.deletionStatus === 'PENDING') && (
+                        <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+                          <Clock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold">Deletion Request Pending Super Admin Approval</p>
+                            <p className="text-[11px] text-amber-800 mt-0.5">Stated reason: &quot;{post.deletionReason}&quot;</p>
+                            <p className="text-[10px] text-amber-700/80 mt-0.5">This discussion remains active for members until reviewed by Super Admin.</p>
+                          </div>
+                        </div>
+                      )}
+                      {currentUser?.id === post.authorId && post.deletionStatus === 'REJECTED' && post.deletionRejectionReason && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold">Deletion Request Declined by Super Admin</p>
+                            <p className="text-[11px] text-rose-800 mt-0.5">Admin explanation: &quot;{post.deletionRejectionReason}&quot;</p>
+                            <p className="text-[10px] text-rose-700/80 mt-0.5">The post remains published in the community feed.</p>
+                          </div>
+                        </div>
+                      )}
+                      {currentUser?.id === post.authorId && post.status === 'REJECTED' && post.rejectionReason && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold">Submission Declined by Super Admin</p>
+                            <p className="text-[11px] text-rose-800 mt-0.5">Reason: &quot;{post.rejectionReason}&quot;</p>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Post Title & Content */}
                       <div>
-                        <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                        <h3 onClick={() => setSelectedDiscussionId(post.id)} className="text-base sm:text-lg font-bold text-slate-900 leading-snug cursor-pointer hover:text-amber-600 transition-colors">
                           {post.title}
                         </h3>
                         <p className="text-xs sm:text-sm text-slate-700 leading-relaxed mt-2 whitespace-pre-line">
@@ -1862,7 +2111,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                           {/* Comments Pill: [ 💬 count ] */}
                           <button
                             type="button"
-                            onClick={() => setActiveReplyBox(activeReplyBox === post.id ? null : post.id)}
+                            onClick={() => setSelectedDiscussionId(post.id)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-semibold border border-slate-200/80 transition-colors cursor-pointer"
                           >
                             <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
@@ -1881,9 +2130,13 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                             }`}
                             title={row.hasReposted ? 'Remove repost' : 'Repost discussion to your profile'}
                           >
-                            <Repeat className={`w-3.5 h-3.5 ${row.hasReposted ? 'text-emerald-600' : 'text-slate-500'}`} />
+                            {repostingPostId === post.id ? (
+                              <Clock className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                            ) : (
+                              <Repeat className={`w-3.5 h-3.5 ${row.hasReposted ? 'text-emerald-600' : 'text-slate-500'}`} />
+                            )}
                             <span>{row.repostsCount ?? post.repostsCount ?? 0}</span>
-                            <span className="hidden sm:inline">{row.hasReposted ? 'Reposted' : 'Repost'}</span>
+                            <span className="hidden sm:inline">{repostingPostId === post.id ? 'Reposting...' : row.hasReposted ? 'Reposted' : 'Repost'}</span>
                           </button>
 
                           {/* Bookmark Pill: [ 🔖 Bookmark ] */}
@@ -1926,15 +2179,41 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                           </button>
                         </div>
 
-                        {/* Report Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenReportModal(post)}
-                          className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg transition-colors cursor-pointer"
-                          title="Report this post"
-                        >
-                          <Flag className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {currentUser && post.authorId === currentUser.id && post.status !== 'DELETED' && (
+                            <>
+                              {post.status === 'PENDING_DELETION' || post.deletionStatus === 'PENDING' ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-300 px-2.5 py-1 rounded-full">
+                                  <Clock className="w-3 h-3 text-amber-600" />
+                                  <span>Deletion Pending</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDeletionRequestPost(post);
+                                    setDeletionReason('');
+                                    setDeletionRequestError(null);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full transition-colors cursor-pointer"
+                                  title="Request deletion of your post"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Request Deletion</span>
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {/* Report Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReportModal(post)}
+                            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg transition-colors cursor-pointer"
+                            title="Report this post"
+                          >
+                            <Flag className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Threaded Nested Replies & Comments */}
@@ -2062,7 +2341,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             )}
           </div>
         )}
-      </div>
+      </>
+    )}
+  </div>
 
       {/* Right Sidebar (1 Col): Quora Recommended Topics, Who to Follow & AMA Schedule */}
         <div className="space-y-6">
@@ -2350,9 +2631,17 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all"
+                    disabled={isSubmittingQuestion}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all flex items-center gap-2 disabled:opacity-50"
                   >
-                    Add Question
+                    {isSubmittingQuestion ? (
+                      <>
+                        <Clock className="w-4 h-4 animate-spin text-white" />
+                        <span>Publishing...</span>
+                      </>
+                    ) : (
+                      <span>Publish Question</span>
+                    )}
                   </button>
                 </div>
               </form>
@@ -2397,7 +2686,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                 </div>
 
                 {/* Sub-tabs: Text, Images & Video, Link, Poll, AMA (Reddit Reference Image 3) */}
-                <div className="flex items-center gap-1 border-b border-slate-200 pb-2">
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar border-b border-slate-200 pb-2">
                   {[
                     { id: 'TEXT', label: 'Text', icon: List },
                     { id: 'MEDIA', label: 'Images & Video', icon: ImageIcon },
@@ -2412,7 +2701,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                         key={tab.id}
                         type="button"
                         onClick={() => setPostSubTab(tab.id as any)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                           active ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
                         }`}
                       >
@@ -2632,9 +2921,17 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all"
+                    disabled={isSubmittingPost}
+                    className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all flex items-center gap-2 disabled:opacity-50"
                   >
-                    Post Discussion
+                    {isSubmittingPost ? (
+                      <>
+                        <Clock className="w-4 h-4 animate-spin text-amber-400" />
+                        <span>Posting...</span>
+                      </>
+                    ) : (
+                      <span>Post Discussion</span>
+                    )}
                   </button>
                 </div>
               </form>
@@ -2809,6 +3106,104 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
                 >
                   {submittingReport ? 'Submitting...' : 'Submit Report'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* REQUEST POST DELETION MODAL */}
+      {deletionRequestPost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-4 text-xs">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Request Post Deletion</h3>
+                  <p className="text-[11px] text-slate-500">Requires Super Admin approval under community policy</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeletionRequestPost(null)}
+                disabled={isSubmittingDeletionRequest}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">Target Discussion</span>
+              <p className="font-bold text-slate-900 text-xs truncate">&quot;{deletionRequestPost.title}&quot;</p>
+              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
+                <span>r/{deletionRequestPost.topic}</span>
+                <span>•</span>
+                <span>Posted {deletionRequestPost.createdAt}</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 leading-relaxed">
+              <strong>Notice:</strong> Submitting a deletion request will notify the Super Admin team for review. To preserve ongoing discussion threads, this post will remain visible to community members until an administrator approves your request.
+            </div>
+
+            {deletionRequestError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[11px] flex items-center gap-1.5 font-medium">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{deletionRequestError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitDeletionRequest} className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-bold text-slate-700 text-xs">
+                    Reason for Deletion <span className="text-rose-600">*</span>
+                  </label>
+                  <span className={`text-[10px] font-mono ${deletionReason.trim().length < 10 || deletionReason.length > 500 ? 'text-rose-600 font-bold' : 'text-slate-400'}`}>
+                    {deletionReason.length}/500 chars (min 10)
+                  </span>
+                </div>
+                <textarea
+                  rows={4}
+                  value={deletionReason}
+                  onChange={e => setDeletionReason(e.target.value)}
+                  placeholder="Explain why this post should be deleted (e.g., incorrect property figures, requirement resolved, privacy preference)..."
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none"
+                  disabled={isSubmittingDeletionRequest}
+                  maxLength={500}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setDeletionRequestPost(null)}
+                  disabled={isSubmittingDeletionRequest}
+                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDeletionRequest || deletionReason.trim().length < 10 || deletionReason.length > 500}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingDeletionRequest ? (
+                    <>
+                      <Clock className="w-3.5 h-3.5 animate-spin" />
+                      <span>Submitting…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Submit Deletion Request</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

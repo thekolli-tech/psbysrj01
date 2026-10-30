@@ -39,15 +39,27 @@ export function getSseClientCount(): number {
   return sseClients.size;
 }
 
-export function broadcastSseEvent(eventType: string, data: any, targetUserId?: string): void {
+export function broadcastSseEvent(
+  eventType: string,
+  data: any,
+  targetUserId?: string,
+  allowedUserIds?: string[] | Set<string> | null
+): void {
   const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+  const allowedSet = allowedUserIds instanceof Set ? allowedUserIds : (Array.isArray(allowedUserIds) ? new Set(allowedUserIds) : null);
+
   for (const client of sseClients) {
-    if (!targetUserId || client.userId === targetUserId) {
-      try {
-        client.res.write(payload);
-      } catch (_e) {
-        sseClients.delete(client);
+    if (targetUserId && client.userId !== targetUserId) continue;
+    if (allowedSet) {
+      const isElevated = client.userRole === 'SUPER_ADMIN' || client.userRole === 'DEVELOPER';
+      if (!isElevated && (!client.userId || !allowedSet.has(client.userId))) {
+        continue;
       }
+    }
+    try {
+      client.res.write(payload);
+    } catch (_e) {
+      sseClients.delete(client);
     }
   }
 }

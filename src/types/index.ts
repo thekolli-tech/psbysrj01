@@ -243,13 +243,17 @@ export interface PostAttachment {
 export interface CommentItem {
   id: string;
   postId: string;
-  parentId?: string;
+  parentId?: string | null;
   authorId: string;
   authorName: string;
   authorRole: UserRole;
+  authorAvatar?: string | null;
   content: string;
   likesCount: number;
   userLiked?: boolean;
+  isAmaAnswer?: boolean;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
   replies?: CommentItem[];
   createdAt: string;
   updatedAt?: string;
@@ -286,8 +290,16 @@ export interface CommunityPost {
   amaEndTime?: string;
   bookmarked?: boolean;
   bookmarkCount?: number;
-  status?: 'APPROVED' | 'PUBLISHED' | 'PENDING_APPROVAL' | 'PENDING' | 'REJECTED' | 'FLAGGED' | 'ARCHIVED' | 'SUSPENDED';
+  status?: 'APPROVED' | 'PUBLISHED' | 'PENDING_APPROVAL' | 'PENDING' | 'REJECTED' | 'FLAGGED' | 'ARCHIVED' | 'SUSPENDED' | 'PENDING_DELETION' | 'DELETED';
   rejectionReason?: string;
+  deletionStatus?: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  deletionReason?: string;
+  deletionRequestedAt?: string;
+  deletionRequestedBy?: string;
+  deletionReviewedAt?: string;
+  deletionReviewedBy?: string;
+  deletionRejectionReason?: string;
+  previousStatus?: string;
   upvotes: number;
   agreeCount?: number;
   disagreeCount?: number;
@@ -304,6 +316,20 @@ export interface CommunityPost {
   comments?: CommentItem[];
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface PropertyRequirement {
+  id: string;
+  seekerId: string;
+  propertyType: string;
+  location: string;
+  budget: string;
+  details: string;
+  status?: 'ACTIVE' | 'DELETED';
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ModerationReport {

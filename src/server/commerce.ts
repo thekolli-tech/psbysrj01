@@ -651,7 +651,13 @@ export async function listUnlockHistory(professionalId: string): Promise<any[]> 
   return unlocksForProfessional(professionalId);
 }
 
-export async function listModerationQueue(): Promise<{ posts: any[]; communities: any[]; listings: any[]; professionals: any[] }> {
+export async function listModerationQueue(): Promise<{
+  posts: any[];
+  deletionRequests: any[];
+  communities: any[];
+  listings: any[];
+  professionals: any[];
+}> {
   if (isPostgresAuthoritative()) {
     const [posts, communities, listings, professionals] = await Promise.all([
       queryPostgres(`SELECT * FROM community_posts WHERE status NOT IN ('APPROVED', 'PUBLISHED') ORDER BY created_at DESC`),
@@ -659,12 +665,25 @@ export async function listModerationQueue(): Promise<{ posts: any[]; communities
       queryPostgres(`SELECT * FROM property_listings WHERE publication_status <> 'APPROVED' ORDER BY created_at DESC`),
       queryPostgres(`SELECT * FROM professional_profiles WHERE verification_status <> 'VERIFIED' ORDER BY updated_at DESC`)
     ]);
-    return { posts: posts.rows, communities: communities.rows, listings: listings.rows, professionals: professionals.rows };
+    const allPosts = posts.rows;
+    const pendingPosts = allPosts.filter(p => p.status !== 'DELETED' && p.status !== 'PENDING_DELETION');
+    const deletionRequests = allPosts.filter(p => p.status === 'PENDING_DELETION' || p.deletion_status === 'PENDING');
+    return {
+      posts: pendingPosts,
+      deletionRequests,
+      communities: communities.rows,
+      listings: listings.rows,
+      professionals: professionals.rows
+    };
   }
   requireSqlite();
   const db = getSqliteDb();
+  const allPosts = db.prepare(`SELECT * FROM community_posts WHERE status NOT IN ('APPROVED', 'PUBLISHED') ORDER BY created_at DESC`).all() as any[];
+  const pendingPosts = allPosts.filter(p => p.status !== 'DELETED' && p.status !== 'PENDING_DELETION');
+  const deletionRequests = allPosts.filter(p => p.status === 'PENDING_DELETION' || p.deletion_status === 'PENDING');
   return {
-    posts: db.prepare(`SELECT * FROM community_posts WHERE status NOT IN ('APPROVED', 'PUBLISHED') ORDER BY created_at DESC`).all() as any[],
+    posts: pendingPosts,
+    deletionRequests,
     communities: db.prepare(`SELECT * FROM communities WHERE status <> 'APPROVED' ORDER BY created_at DESC`).all() as any[],
     listings: db.prepare(`SELECT * FROM property_listings WHERE publication_status <> 'APPROVED' ORDER BY created_at DESC`).all() as any[],
     professionals: db.prepare(`SELECT * FROM professional_profiles WHERE verification_status <> 'VERIFIED' ORDER BY updated_at DESC`).all() as any[]

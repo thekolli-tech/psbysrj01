@@ -15,6 +15,7 @@ import { readRequirementInput, readReviewEdit, readReviewInput } from '../shared
 import {
   createRequirement,
   createReview,
+  deleteRequirement,
   listRequirementsForAdmin,
   listRequirementsForSeeker,
   listReviews,
@@ -52,7 +53,8 @@ import {
   getProfessionalProfile,
   verifyPaymentWebhook
 } from './commerce.ts';
-import { createAuditLog } from './db.ts';
+import { createAuditLog, createNotification } from './db.ts';
+import { broadcastSseEvent } from './events.ts';
 
 type Guard = (req: any, res: Response, next: () => void) => void;
 
@@ -575,6 +577,50 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
       const requirement = await createRequirement(req.user.id, input);
       res.status(201).json({ success: true, requirement });
     } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  app.delete('/api/requirements/:id', guards.requireAuth, requireUnrestricted, async (req: any, res: Response): Promise<void> => {
+    try {
+      const reqId = req.params.id;
+      if (!reqId) {
+        res.status(400).json({ error: 'Requirement ID is required.' });
+        return;
+      }
+      const deleted = await deleteRequirement(req.user.id, reqId);
+      if (!deleted) {
+        res.status(404).json({ error: 'Property requirement not found.' });
+        return;
+      }
+
+      await createNotification({
+        userId: req.user.id,
+        actorId: req.user.id,
+        actorName: req.user.name || 'Property Seeker',
+        type: 'SYSTEM',
+        title: 'Requirement Removed',
+        message: `Your property requirement for ${deleted.propertyType} in ${deleted.location || 'Hyderabad'} has been successfully removed.`,
+        linkUrl: '/dashboard'
+      }).catch(err => console.warn('[Property Studio] Notification error on requirement deletion:', err));
+
+      await createAuditLog({
+        actorId: req.user.id,
+        actorEmail: req.user.email || '',
+        actorRole: req.user.role || 'PROPERTY_SEEKER',
+        action: 'REQUIREMENT_DELETED',
+        targetId: reqId,
+        details: { propertyType: deleted.propertyType, location: deleted.location }
+      }).catch(err => console.warn('[Property Studio] Audit log error on requirement deletion:', err));
+
+      broadcastSseEvent('REQUIREMENT_DELETED', { id: reqId, seekerId: req.user.id });
+
+      res.json({ success: true, message: 'Property requirement deleted successfully.', requirement: deleted });
+    } catch (err: any) {
+      if (err.message === 'FORBIDDEN' || err.status === 403) {
+        res.status(403).json({ error: 'Unauthorized: You can only delete your own property requirements.' });
+        return;
+      }
       sendError(res, err);
     }
   });

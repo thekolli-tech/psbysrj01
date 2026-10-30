@@ -45,7 +45,7 @@ export const SELF_SERVE_ROLES = new Set([
   'CONTENT_CREATOR'
 ]);
 
-export const PUBLIC_CONTENT_STATUSES = new Set(['APPROVED', 'PUBLISHED']);
+export const PUBLIC_CONTENT_STATUSES = new Set(['APPROVED', 'PUBLISHED', 'PENDING_DELETION']);
 export const CONSENT_VERSION = '2026-10-15';
 export const CONSENT_PURPOSE =
   'Share my contact details with eligible verified professionals solely to respond to this property enquiry.';

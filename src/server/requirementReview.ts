@@ -20,6 +20,9 @@ export type RequirementRecord = {
   location: string;
   budget: string;
   details: string;
+  status: 'ACTIVE' | 'DELETED';
+  deletedAt?: string | null;
+  deletedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -32,6 +35,9 @@ function presentRequirement(row: any): RequirementRecord {
     location: row.location || '',
     budget: row.budget || '',
     details: row.details || '',
+    status: row.status || 'ACTIVE',
+    deletedAt: row.deleted_at || null,
+    deletedBy: row.deleted_by || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -42,31 +48,77 @@ export async function createRequirement(seekerId: string, input: RequirementInpu
   const now = nowIso();
   if (isPostgresAuthoritative()) {
     await queryPostgres(
-      `INSERT INTO property_requirements (id, seeker_id, property_type, location, budget, details, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$7)`,
+      `INSERT INTO property_requirements (id, seeker_id, property_type, location, budget, details, status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'ACTIVE',$7,$7)`,
       [requirementId, seekerId, input.propertyType, input.location, input.budget, input.details, now]
     );
   } else {
     getSqliteDb().prepare(
-      `INSERT INTO property_requirements (id, seeker_id, property_type, location, budget, details, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO property_requirements (id, seeker_id, property_type, location, budget, details, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`
     ).run(requirementId, seekerId, input.propertyType, input.location, input.budget, input.details, now, now);
   }
-  return (await listRequirementsForSeeker(seekerId)).find(row => row.id === requirementId)!;
+  return (await listRequirementsForSeeker(seekerId, true)).find(row => row.id === requirementId)!;
 }
 
-export async function listRequirementsForSeeker(seekerId: string): Promise<RequirementRecord[]> {
+export async function listRequirementsForSeeker(seekerId: string, includeDeleted = false): Promise<RequirementRecord[]> {
   if (isPostgresAuthoritative()) {
     const res = await queryPostgres(
-      'SELECT * FROM property_requirements WHERE seeker_id = $1 ORDER BY created_at DESC',
+      includeDeleted
+        ? 'SELECT * FROM property_requirements WHERE seeker_id = $1 ORDER BY created_at DESC'
+        : "SELECT * FROM property_requirements WHERE seeker_id = $1 AND (status != 'DELETED' OR status IS NULL) ORDER BY created_at DESC",
       [seekerId]
     );
     return res.rows.map(presentRequirement);
   }
   const rows = getSqliteDb().prepare(
-    'SELECT * FROM property_requirements WHERE seeker_id = ? ORDER BY created_at DESC'
+    includeDeleted
+      ? 'SELECT * FROM property_requirements WHERE seeker_id = ? ORDER BY created_at DESC'
+      : "SELECT * FROM property_requirements WHERE seeker_id = ? AND (status != 'DELETED' OR status IS NULL) ORDER BY created_at DESC"
   ).all(seekerId) as any[];
   return rows.map(presentRequirement);
+}
+
+export async function deleteRequirement(seekerId: string, requirementId: string): Promise<RequirementRecord | null> {
+  const now = nowIso();
+  if (isPostgresAuthoritative()) {
+    const existing = await queryPostgres(
+      'SELECT * FROM property_requirements WHERE id = $1',
+      [requirementId]
+    );
+    if (!existing.rows.length) return null;
+    const req = existing.rows[0];
+    if (req.seeker_id !== seekerId) {
+      return null;
+    }
+    if (req.status === 'DELETED') {
+      return presentRequirement(req);
+    }
+    const res = await queryPostgres(
+      `UPDATE property_requirements
+       SET status = 'DELETED', deleted_at = $1, deleted_by = $2, updated_at = $1
+       WHERE id = $3
+       RETURNING *`,
+      [now, seekerId, requirementId]
+    );
+    return res.rows[0] ? presentRequirement(res.rows[0]) : null;
+  }
+  const db = getSqliteDb();
+  const existing = db.prepare('SELECT * FROM property_requirements WHERE id = ?').get(requirementId) as any;
+  if (!existing) return null;
+  if (existing.seeker_id !== seekerId) {
+    return null;
+  }
+  if (existing.status === 'DELETED') {
+    return presentRequirement(existing);
+  }
+  db.prepare(
+    `UPDATE property_requirements
+     SET status = 'DELETED', deleted_at = ?, deleted_by = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(now, seekerId, now, requirementId);
+  const updated = db.prepare('SELECT * FROM property_requirements WHERE id = ?').get(requirementId) as any;
+  return updated ? presentRequirement(updated) : null;
 }
 
 export async function listRequirementsForAdmin(): Promise<RequirementRecord[]> {

@@ -1217,12 +1217,13 @@ export async function pgGetAllPosts(params?: {
     query += ` AND p.status = $${paramIdx++}`;
     args.push(params.status);
   } else if (params?.currentUserRole === 'SUPER_ADMIN' || params?.currentUserRole === 'DEVELOPER') {
-    // Platform administrators see all posts across feeds & moderation queues
+    // Platform administrators see active & pending posts in general feed, excluding DELETED unless requested
+    query += " AND p.status != 'DELETED'";
   } else if (params?.currentUserId) {
-    query += ` AND (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = $${paramIdx++} AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))`;
+    query += ` AND ((p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')) OR (p.author_id = $${paramIdx++} AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED', 'DELETED', 'PENDING_DELETION')))`;
     args.push(params.currentUserId);
   } else {
-    query += " AND p.status IN ('APPROVED', 'PUBLISHED')";
+    query += " AND p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')";
   }
 
   if (params?.communityId) {
@@ -1300,6 +1301,15 @@ export async function pgGetAllPosts(params?: {
       amaStartTime: p.ama_start_time || null,
       amaEndTime: p.ama_end_time || null,
       replies: await pgGetRepliesForPost(p.id),
+      rejectionReason: p.rejection_reason || null,
+      deletionStatus: p.deletion_status || 'NONE',
+      deletionReason: p.deletion_reason || null,
+      deletionRequestedAt: toIso(p.deletion_requested_at),
+      deletionRequestedBy: p.deletion_requested_by || null,
+      deletionReviewedAt: toIso(p.deletion_reviewed_at),
+      deletionReviewedBy: p.deletion_reviewed_by || null,
+      deletionRejectionReason: p.deletion_rejection_reason || null,
+      previousStatus: p.previous_status || null,
       createdAt: toIso(p.created_at),
       updatedAt: toIso(p.updated_at)
     };
@@ -1354,6 +1364,15 @@ export async function pgGetPostById(postId: string, currentUserId?: string): Pro
     amaEndTime: p.ama_end_time || null,
     replies: await pgGetRepliesForPost(p.id),
     comments: await pgGetCommentsForPost(p.id, currentUserId),
+    rejectionReason: p.rejection_reason || null,
+    deletionStatus: p.deletion_status || 'NONE',
+    deletionReason: p.deletion_reason || null,
+    deletionRequestedAt: toIso(p.deletion_requested_at),
+    deletionRequestedBy: p.deletion_requested_by || null,
+    deletionReviewedAt: toIso(p.deletion_reviewed_at),
+    deletionReviewedBy: p.deletion_reviewed_by || null,
+    deletionRejectionReason: p.deletion_rejection_reason || null,
+    previousStatus: p.previous_status || null,
     createdAt: toIso(p.created_at),
     updatedAt: toIso(p.updated_at)
   };
@@ -1492,9 +1511,163 @@ export async function pgDeletePost(postId: string, actorId?: string, isElevated 
   const post = res.rows[0];
   if (actorId && !isElevated && post.author_id !== actorId) return false;
 
-  await queryPostgres('DELETE FROM community_posts WHERE id = $1', [postId]);
-  await pgRecordCommunityEvent('POST_DELETED', { id: postId });
+  const now = new Date().toISOString();
+  await queryPostgres(
+    `UPDATE community_posts 
+     SET status = 'DELETED', 
+         deletion_status = 'APPROVED', 
+         deletion_reviewed_at = $1, 
+         deletion_reviewed_by = $2, 
+         updated_at = $1 
+     WHERE id = $3`,
+    [now, actorId || null, postId]
+  );
+  await pgRecordCommunityEvent('POST_DELETED', { id: postId, actorId });
   return true;
+}
+
+export async function pgRequestPostDeletion(
+  postId: string,
+  actorId: string,
+  reason: string
+): Promise<{ success: boolean; error?: string; post?: any }> {
+  const res = await queryPostgres('SELECT * FROM community_posts WHERE id = $1', [postId]);
+  if (res.rows.length === 0) {
+    return { success: false, error: 'Post not found' };
+  }
+  const post = res.rows[0];
+  if (post.author_id !== actorId) {
+    return { success: false, error: 'Forbidden: Only the post author can request deletion.' };
+  }
+  if (post.status === 'DELETED') {
+    return { success: false, error: 'Post is already deleted.' };
+  }
+  if (post.status === 'PENDING_DELETION' || post.deletion_status === 'PENDING') {
+    return { success: false, error: 'A deletion request is already pending review for this post.' };
+  }
+
+  const now = new Date().toISOString();
+  const prevStatus = post.status;
+  await queryPostgres(
+    `UPDATE community_posts 
+     SET status = 'PENDING_DELETION',
+         deletion_status = 'PENDING',
+         deletion_reason = $1,
+         deletion_requested_at = $2,
+         deletion_requested_by = $3,
+         previous_status = $4,
+         updated_at = $2
+     WHERE id = $5`,
+    [reason.trim(), now, actorId, prevStatus, postId]
+  );
+
+  await pgRecordCommunityEvent('POST_DELETION_REQUESTED', {
+    id: postId,
+    authorId: post.author_id,
+    reason: reason.trim()
+  });
+
+  const updated = await pgGetPostById(postId, actorId);
+  return { success: true, post: updated };
+}
+
+export async function pgApprovePostDeletion(
+  postId: string,
+  reviewerId: string
+): Promise<{ success: boolean; error?: string; post?: any }> {
+  const res = await queryPostgres('SELECT * FROM community_posts WHERE id = $1', [postId]);
+  if (res.rows.length === 0) {
+    return { success: false, error: 'Post not found' };
+  }
+  const post = res.rows[0];
+  const now = new Date().toISOString();
+
+  await queryPostgres(
+    `UPDATE community_posts 
+     SET status = 'DELETED',
+         deletion_status = 'APPROVED',
+         deletion_reviewed_at = $1,
+         deletion_reviewed_by = $2,
+         updated_at = $1
+     WHERE id = $3`,
+    [now, reviewerId, postId]
+  );
+
+  await pgRecordCommunityEvent('POST_DELETION_APPROVED', {
+    id: postId,
+    authorId: post.author_id,
+    reviewerId
+  });
+  await pgRecordCommunityEvent('POST_DELETED', { id: postId, reviewerId });
+
+  const updated = await pgGetPostById(postId, reviewerId);
+  return { success: true, post: updated };
+}
+
+export async function pgRejectPostDeletion(
+  postId: string,
+  reviewerId: string,
+  rejectionReason: string
+): Promise<{ success: boolean; error?: string; post?: any }> {
+  const res = await queryPostgres('SELECT * FROM community_posts WHERE id = $1', [postId]);
+  if (res.rows.length === 0) {
+    return { success: false, error: 'Post not found' };
+  }
+  const post = res.rows[0];
+  const restoredStatus = post.previous_status || 'APPROVED';
+  const now = new Date().toISOString();
+
+  await queryPostgres(
+    `UPDATE community_posts 
+     SET status = $1,
+         deletion_status = 'REJECTED',
+         deletion_rejection_reason = $2,
+         deletion_reviewed_at = $3,
+         deletion_reviewed_by = $4,
+         updated_at = $3
+     WHERE id = $5`,
+    [restoredStatus, rejectionReason.trim(), now, reviewerId, postId]
+  );
+
+  await pgRecordCommunityEvent('POST_DELETION_REJECTED', {
+    id: postId,
+    authorId: post.author_id,
+    reviewerId,
+    rejectionReason: rejectionReason.trim()
+  });
+
+  const updated = await pgGetPostById(postId, reviewerId);
+  return { success: true, post: updated };
+}
+
+export async function pgGetPostDeletionRequests(): Promise<any[]> {
+  const res = await queryPostgres(
+    `SELECT * FROM community_posts 
+     WHERE deletion_status = 'PENDING' OR status = 'PENDING_DELETION'
+     ORDER BY deletion_requested_at DESC NULLS LAST, created_at DESC`
+  );
+  return Promise.all(res.rows.map(async (p: any) => ({
+    id: p.id,
+    authorId: p.author_id,
+    authorName: p.author_name,
+    authorRole: p.author_role,
+    communityId: p.community_id,
+    communityName: p.community_name,
+    topic: p.topic,
+    title: p.title,
+    content: p.content,
+    status: p.status,
+    deletionStatus: p.deletion_status || 'NONE',
+    deletionReason: p.deletion_reason || null,
+    deletionRequestedAt: toIso(p.deletion_requested_at),
+    deletionRequestedBy: p.deletion_requested_by || null,
+    deletionReviewedAt: toIso(p.deletion_reviewed_at),
+    deletionReviewedBy: p.deletion_reviewed_by || null,
+    deletionRejectionReason: p.deletion_rejection_reason || null,
+    previousStatus: p.previous_status || null,
+    createdAt: toIso(p.created_at),
+    updatedAt: toIso(p.updated_at)
+  })));
 }
 
 export async function pgPinPost(postId: string, isPinned: boolean): Promise<boolean> {
@@ -1568,7 +1741,36 @@ export async function pgGetUserLikedPostIds(userId: string): Promise<Set<string>
 // COMMENTS & NESTED REPLIES (POSTGRESQL)
 // ==============================================================================
 
-export async function pgGetCommentsForPost(postId: string, currentUserId?: string): Promise<any[]> {
+export async function pgGetCommentById(commentId: string): Promise<DbCommunityComment | null> {
+  const res = await queryPostgres('SELECT * FROM community_comments WHERE id = $1', [commentId]);
+  if (!res.rows[0]) return null;
+  const c = res.rows[0];
+  return {
+    id: c.id,
+    post_id: c.post_id,
+    parent_id: c.parent_id,
+    author_id: c.author_id,
+    author_name: c.author_name,
+    author_role: c.author_role,
+    author_avatar: c.author_avatar || null,
+    content: c.content,
+    likes_count: Number(c.likes_count || 0),
+    is_ama_answer: Number(c.is_ama_answer || 0),
+    is_deleted: Number(c.is_deleted || 0),
+    deleted_at: toIso(c.deleted_at),
+    deleted_by: c.deleted_by || null,
+    created_at: toIso(c.created_at),
+    updated_at: toIso(c.updated_at)
+  };
+}
+
+export async function pgGetCommentsForPost(
+  postId: string,
+  currentUserId?: string,
+  sortMode: 'best' | 'newest' | 'oldest' = 'best',
+  page = 1,
+  limit = 50
+): Promise<any> {
   const res = await queryPostgres(
     'SELECT * FROM community_comments WHERE post_id = $1 ORDER BY created_at ASC',
     [postId]
@@ -1580,9 +1782,13 @@ export async function pgGetCommentsForPost(postId: string, currentUserId?: strin
     author_id: c.author_id,
     author_name: c.author_name,
     author_role: c.author_role,
+    author_avatar: c.author_avatar || null,
     content: c.content,
     likes_count: Number(c.likes_count || 0),
     is_ama_answer: Number(c.is_ama_answer || 0),
+    is_deleted: Number(c.is_deleted || 0),
+    deleted_at: toIso(c.deleted_at),
+    deleted_by: c.deleted_by || null,
     created_at: toIso(c.created_at),
     updated_at: toIso(c.updated_at)
   }));
@@ -1593,17 +1799,21 @@ export async function pgGetCommentsForPost(postId: string, currentUserId?: strin
   const rootComments: any[] = [];
 
   for (const c of comments) {
+    const isDeleted = Boolean(c.is_deleted);
     const item = {
       id: c.id,
       postId: c.post_id,
-      parentId: c.parent_id,
+      parentId: c.parent_id || null,
       authorId: c.author_id,
-      authorName: c.author_name,
+      authorName: isDeleted ? '[deleted]' : c.author_name,
       authorRole: c.author_role,
-      content: c.content,
-      likesCount: c.likes_count,
-      userLiked: userLikedCommentIds.has(c.id),
-      isAmaAnswer: (c as any).is_ama_answer,
+      authorAvatar: isDeleted ? null : (c.author_avatar || null),
+      content: isDeleted ? '[This comment was deleted by the author]' : c.content,
+      likesCount: isDeleted ? 0 : c.likes_count,
+      userLiked: isDeleted ? false : userLikedCommentIds.has(c.id),
+      isAmaAnswer: Boolean(c.is_ama_answer),
+      isDeleted,
+      deletedAt: c.deleted_at || null,
       replies: [],
       createdAt: c.created_at,
       updatedAt: c.updated_at
@@ -1620,7 +1830,34 @@ export async function pgGetCommentsForPost(postId: string, currentUserId?: strin
     }
   }
 
-  return rootComments;
+  // Sort child replies in each node chronologically
+  for (const item of commentMap.values()) {
+    item.replies.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  // Sort root comments
+  if (sortMode === 'best') {
+    rootComments.sort((a, b) => (b.likesCount - a.likesCount) || (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+  } else if (sortMode === 'newest') {
+    rootComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } else if (sortMode === 'oldest') {
+    rootComments.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
+  const totalRoots = rootComments.length;
+  const totalComments = comments.length;
+  const startIndex = Math.max(0, (page - 1) * limit);
+  const paginatedRoots = limit > 0 ? rootComments.slice(startIndex, startIndex + limit) : rootComments;
+  const hasMore = limit > 0 ? (startIndex + limit < totalRoots) : false;
+
+  const result: any = paginatedRoots;
+  result.comments = paginatedRoots;
+  result.totalRoots = totalRoots;
+  result.totalComments = totalComments;
+  result.page = page;
+  result.limit = limit;
+  result.hasMore = hasMore;
+  return result;
 }
 
 export async function pgCreateComment(data: {
@@ -1629,15 +1866,26 @@ export async function pgCreateComment(data: {
   authorId: string;
   authorName: string;
   authorRole: string;
+  authorAvatar?: string | null;
   content: string;
   isAmaAnswer?: boolean;
 }): Promise<any> {
+  if (data.parentId) {
+    const parent = await pgGetCommentById(data.parentId);
+    if (!parent) {
+      throw new Error('Parent comment not found');
+    }
+    if (parent.post_id !== data.postId) {
+      throw new Error('Parent comment does not belong to this discussion');
+    }
+  }
+
   const id = `comm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
 
   await queryPostgres(`
-    INSERT INTO community_comments (id, post_id, parent_id, author_id, author_name, author_role, content, likes_count, is_ama_answer, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10)
+    INSERT INTO community_comments (id, post_id, parent_id, author_id, author_name, author_role, author_avatar, content, likes_count, is_ama_answer, is_deleted, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, 0, $10, $11)
   `, [
     id,
     data.postId,
@@ -1645,6 +1893,7 @@ export async function pgCreateComment(data: {
     data.authorId,
     data.authorName,
     data.authorRole,
+    data.authorAvatar || null,
     data.content.trim(),
     data.isAmaAnswer ? 1 : 0,
     now,
@@ -1669,7 +1918,7 @@ export async function pgCreateComment(data: {
   await pgRecordCommunityEvent('COMMENT_CREATED', {
     id,
     postId: data.postId,
-    parentId: data.parentId,
+    parentId: data.parentId || null,
     authorName: data.authorName
   });
 
@@ -1680,25 +1929,109 @@ export async function pgCreateComment(data: {
     authorId: data.authorId,
     authorName: data.authorName,
     authorRole: data.authorRole,
-    content: data.content,
+    authorAvatar: data.authorAvatar || null,
+    content: data.content.trim(),
     likesCount: 0,
     isAmaAnswer: Boolean(data.isAmaAnswer),
+    isDeleted: false,
     replies: [],
     createdAt: now,
     updatedAt: now
   };
 }
 
-export async function pgDeleteComment(commentId: string, actorId: string, isElevated = false): Promise<boolean> {
-  const res = await queryPostgres('SELECT * FROM community_comments WHERE id = $1', [commentId]);
-  if (res.rows.length === 0) return false;
-  const c = res.rows[0];
-  if (!isElevated && c.author_id !== actorId) return false;
+export async function pgUpdateComment(commentId: string, actorId: string, content: string): Promise<any> {
+  const c = await pgGetCommentById(commentId);
+  if (!c) throw new Error('Comment not found');
+  if (c.author_id !== actorId) throw new Error('Unauthorized to edit this comment');
+  if (c.is_deleted) throw new Error('Cannot edit a deleted comment');
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error('Comment content cannot be empty');
 
-  await queryPostgres('DELETE FROM community_comments WHERE id = $1', [commentId]);
+  const now = new Date().toISOString();
+  await queryPostgres('UPDATE community_comments SET content = $1, updated_at = $2 WHERE id = $3', [trimmed, now, commentId]);
+
+  await pgRecordCommunityEvent('COMMENT_UPDATED', {
+    id: commentId,
+    postId: c.post_id,
+    content: trimmed
+  });
+
+  return {
+    id: c.id,
+    postId: c.post_id,
+    parentId: c.parent_id || null,
+    authorId: c.author_id,
+    authorName: c.author_name,
+    authorRole: c.author_role,
+    authorAvatar: c.author_avatar || null,
+    content: trimmed,
+    likesCount: c.likes_count,
+    isAmaAnswer: Boolean(c.is_ama_answer),
+    isDeleted: false,
+    createdAt: c.created_at,
+    updatedAt: now
+  };
+}
+
+export async function pgDeleteComment(commentId: string, actorId: string, isElevated = false): Promise<boolean> {
+  const c = await pgGetCommentById(commentId);
+  if (!c) return false;
+  if (!isElevated && c.author_id !== actorId) return false;
+  if (c.is_deleted) return true;
+
+  const now = new Date().toISOString();
+  const placeholder = (!isElevated || c.author_id === actorId)
+    ? '[This comment was deleted by the author]'
+    : '[This comment was removed by moderators]';
+
+  // NEVER permanently delete from database - all deletions are soft-deletions preserving tree relationships & audit history
+  await queryPostgres(`
+    UPDATE community_comments 
+    SET is_deleted = 1,
+        original_content = COALESCE(original_content, content),
+        content = $1,
+        author_name = '[deleted]',
+        author_avatar = NULL,
+        deleted_at = $2,
+        deleted_by = $3,
+        updated_at = $2
+    WHERE id = $4
+  `, [placeholder, now, actorId, commentId]);
+
   await queryPostgres('UPDATE community_posts SET comments_count = GREATEST(0, comments_count - 1) WHERE id = $1', [c.post_id]);
 
-  await pgRecordCommunityEvent('COMMENT_DELETED', { id: commentId, postId: c.post_id });
+  await pgRecordCommunityEvent('COMMENT_DELETED', { id: commentId, postId: c.post_id, isPlaceholder: true });
+  return true;
+}
+
+export async function pgRestoreComment(commentId: string, actorId: string, isElevated = false): Promise<boolean> {
+  const c = await pgGetCommentById(commentId);
+  if (!c) return false;
+  if (!isElevated && c.author_id !== actorId) return false;
+  if (!c.is_deleted) return true;
+
+  const now = new Date().toISOString();
+  const authorRes = await queryPostgres('SELECT name FROM users WHERE id = $1', [c.author_id]);
+  const authorName = authorRes.rows[0]?.name || 'Community Member';
+
+  await queryPostgres(`
+    UPDATE community_comments 
+    SET is_deleted = 0,
+        content = COALESCE(original_content, content),
+        author_name = $1,
+        deleted_at = NULL,
+        deleted_by = NULL,
+        updated_at = $2
+    WHERE id = $3
+  `, [authorName, now, commentId]);
+
+  await queryPostgres('UPDATE community_posts SET comments_count = comments_count + 1 WHERE id = $1', [c.post_id]);
+  await pgRecordCommunityEvent('COMMENT_UPDATED', {
+    id: commentId,
+    postId: c.post_id,
+    content: c.original_content || c.content
+  });
   return true;
 }
 
@@ -3183,4 +3516,9 @@ export async function pgGetUserPublicProfile(userId: string, currentUserId?: str
     },
     recentPosts: posts
   };
+}
+
+export async function pgGetActiveCommunityMemberIds(communityId: string): Promise<string[]> {
+  const res = await queryPostgres("SELECT user_id FROM community_members WHERE community_id = $1 AND status = 'ACTIVE'", [communityId]);
+  return res.rows.map(r => r.user_id);
 }
