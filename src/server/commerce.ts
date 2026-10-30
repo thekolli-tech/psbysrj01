@@ -706,6 +706,17 @@ export async function moderatePost(input: {
   }
   await recordModeration(input.actorId, 'POST', input.postId, input.status, input.reason);
 
+  try {
+    const { broadcastSseEvent, recordActivity } = await import('./events.ts');
+    broadcastSseEvent(input.status === 'APPROVED' ? 'POST_APPROVED' : 'POST_MODERATED', {
+      id: input.postId,
+      status: input.status
+    });
+    recordActivity('posts');
+  } catch (err) {
+    console.warn('[Property Studio] Could not broadcast post moderation event:', err);
+  }
+
   if (postAuthorId && (input.status === 'APPROVED' || input.status === 'REJECTED')) {
     try {
       const { notifyAuthorOnModerationDecision } = await import('./notifications.ts');
@@ -758,6 +769,17 @@ export async function suspendOrRestoreCommunity(input: {
     if (Number(result.changes) === 0) return false;
   }
   await recordModeration(input.actorId, 'COMMUNITY', input.communityId, input.status, input.reason);
+
+  try {
+    const { broadcastSseEvent, recordActivity } = await import('./events.ts');
+    broadcastSseEvent(input.status === 'APPROVED' ? 'COMMUNITY_APPROVED' : 'COMMUNITY_MODERATED', {
+      id: input.communityId,
+      status: input.status
+    });
+    recordActivity('communities');
+  } catch (err) {
+    console.warn('[Property Studio] Could not broadcast community moderation event:', err);
+  }
 
   if (creatorId && (input.status === 'APPROVED' || input.status === 'REJECTED')) {
     try {

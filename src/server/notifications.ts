@@ -155,6 +155,11 @@ export async function notifySuperAdminsOnSubmission(data: {
           message,
           linkUrl: '/admin?tab=MODERATION'
         });
+        try {
+          const { broadcastSseEvent, recordActivity } = await import('./events.ts');
+          broadcastSseEvent('NOTIFICATION_CREATED', { userId: adminId }, adminId);
+          recordActivity('notifications');
+        } catch {}
       } catch (err) {
         console.warn('[Property Studio] Failed to insert admin notification:', err);
       }
@@ -210,6 +215,11 @@ export async function notifyAuthorOnModerationDecision(data: {
       message,
       linkUrl: '/community'
     });
+    try {
+      const { broadcastSseEvent, recordActivity } = await import('./events.ts');
+      broadcastSseEvent('NOTIFICATION_CREATED', { userId: data.authorId }, data.authorId);
+      recordActivity('notifications');
+    } catch {}
   } catch (err: any) {
     console.warn('[Property Studio] Error in notifyAuthorOnModerationDecision:', err?.message || err);
   }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   User,
   UserRole,
@@ -286,28 +286,136 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (_err) {}
   };
 
-  // Live polling for community posts, hubs, and real-time updates
+  const lastSyncTimeRef = useRef<number>(Date.now());
+
+  // Real-time EventSource (SSE) connection with automatic auto-reconnect & event dispatching
   useEffect(() => {
-    const handlePoll = () => {
-      if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+    if (typeof window === 'undefined') return;
+
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let isDisposed = false;
+
+    const connectSSE = () => {
+      if (isDisposed) return;
+      try {
+        eventSource = new EventSource('/api/community/events');
+
+        const handlePostEvent = () => {
+          lastSyncTimeRef.current = Date.now();
+          refreshPosts();
+        };
+
+        const handleCommunityEvent = () => {
+          lastSyncTimeRef.current = Date.now();
+          refreshCommunities();
+        };
+
+        const postEvents = [
+          'POST_CREATED',
+          'POST_APPROVED',
+          'POST_MODERATED',
+          'POST_UPDATED',
+          'POST_DELETED',
+          'POST_VOTE_UPDATED',
+          'COMMENT_CREATED',
+          'COMMENT_DELETED',
+          'LIKE_CHANGED',
+          'POST_REPOSTED',
+          'POST_FOLLOW_UPDATED',
+          'POST_BOOKMARK_UPDATED',
+          'POST_POLL_VOTED'
+        ];
+
+        const commEvents = [
+          'COMMUNITY_CREATED',
+          'COMMUNITY_APPROVED',
+          'COMMUNITY_MODERATED',
+          'COMMUNITY_UPDATED',
+          'COMMUNITY_MEMBERSHIP_UPDATED',
+          'COMMUNITY_MEMBER_STATUS_UPDATED',
+          'COMMUNITY_MEMBER_ROLE_UPDATED'
+        ];
+
+        postEvents.forEach(type => {
+          eventSource?.addEventListener(type, handlePostEvent);
+        });
+
+        commEvents.forEach(type => {
+          eventSource?.addEventListener(type, handleCommunityEvent);
+        });
+
+        eventSource.onerror = () => {
+          eventSource?.close();
+          if (!reconnectTimeout && !isDisposed) {
+            reconnectTimeout = setTimeout(() => {
+              reconnectTimeout = null;
+              connectSSE();
+            }, 3000);
+          }
+        };
+      } catch (_err) {}
+    };
+
+    connectSSE();
+
+    return () => {
+      isDisposed = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      eventSource?.close();
+    };
+  }, [currentUser?.id]);
+
+  // Dual-mode active short-interval polling (3s) & window focus sync to guarantee delivery across browsers
+  useEffect(() => {
+    const syncAuthoritativeFeed = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      try {
+        const res = await fetch(`/api/live/sync-status?since=${lastSyncTimeRef.current}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.hasUpdates) {
+            lastSyncTimeRef.current = data.timestamps?.lastUpdated || Date.now();
+            if (data.postsUpdated) refreshPosts();
+            if (data.communitiesUpdated) refreshCommunities();
+          }
+        } else {
+          refreshPosts();
+          refreshCommunities();
+        }
+      } catch {
         refreshPosts();
         refreshCommunities();
       }
     };
 
-    const interval = setInterval(handlePoll, 6000);
-    const handleVisibility = () => {
+    const interval = setInterval(syncAuthoritativeFeed, 3000);
+
+    const handleFocusSync = () => {
       if (document.visibilityState === 'visible') {
-        handlePoll();
+        refreshPosts();
+        refreshCommunities();
+        lastSyncTimeRef.current = Date.now();
       }
     };
-    document.addEventListener('visibilitychange', handleVisibility);
+
+    const handleOnline = () => {
+      refreshPosts();
+      refreshCommunities();
+      lastSyncTimeRef.current = Date.now();
+    };
+
+    document.addEventListener('visibilitychange', handleFocusSync);
+    window.addEventListener('focus', handleFocusSync);
+    window.addEventListener('online', handleOnline);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
+      document.removeEventListener('visibilitychange', handleFocusSync);
+      window.removeEventListener('focus', handleFocusSync);
+      window.removeEventListener('online', handleOnline);
     };
-  }, [currentUser]);
+  }, [currentUser?.id, currentUser?.role]);
 
   // Sync live dynamic content from server database on load
   useEffect(() => {
@@ -766,6 +874,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: false };
       }
       showToast(data.reposted ? 'Discussion reposted to your profile!' : 'Discussion repost removed');
+      await refreshPosts();
       return { success: true, reposted: data.reposted, count: data.count };
     } catch (err: any) {
       showToast(err.message || 'Error reposting discussion');

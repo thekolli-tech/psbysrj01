@@ -103,10 +103,10 @@ const AppContent: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans overflow-x-hidden w-full ${
+      className={`min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans w-full ${
         isForcedMobile
           ? 'max-w-md mx-auto shadow-2xl border-x border-slate-300 min-h-dvh apk-mode no-scrollbar overflow-x-hidden'
-          : ''
+          : 'overflow-x-auto'
       }`}
     >
       {/* Dynamic Header: Mobile shell vs Desktop SaaS portal */}

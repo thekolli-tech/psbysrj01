@@ -1,3 +1,11 @@
+import {
+  broadcastSseEvent,
+  recordActivity,
+  getActivityTimestamps,
+  addSseClient,
+  removeSseClient
+} from './src/server/events.ts';
+import type { SseClient } from './src/server/events.ts';
 import 'dotenv/config';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
@@ -246,31 +254,12 @@ const requireDeveloper = (req: AuthenticatedRequest, res: Response, next: NextFu
 // REAL-TIME SSE (SERVER-SENT EVENTS) INFRASTRUCTURE
 // ==============================================================================
 
-interface SseClient {
-  id: string;
-  userId?: string;
-  res: Response;
-}
-
-const sseClients = new Set<SseClient>();
-
-export function broadcastSseEvent(eventType: string, data: any, targetUserId?: string): void {
-  const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const client of sseClients) {
-    if (!targetUserId || client.userId === targetUserId) {
-      try {
-        client.res.write(payload);
-      } catch (_e) {
-        sseClients.delete(client);
-      }
-    }
-  }
-}
+export { broadcastSseEvent, recordActivity, getActivityTimestamps };
 
 // SSE Connection Endpoint with persistent replay from database
 app.get('/api/community/events', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
@@ -279,9 +268,10 @@ app.get('/api/community/events', async (req: AuthenticatedRequest, res: Response
   const client: SseClient = {
     id: clientId,
     userId: req.user?.id,
+    userRole: req.user?.role,
     res
   };
-  sseClients.add(client);
+  addSseClient(client);
 
   // Send initial handshake
   res.write(`event: CONNECTED\ndata: ${JSON.stringify({ clientId, timestamp: new Date().toISOString() })}\n\n`);
@@ -312,13 +302,37 @@ app.get('/api/community/events', async (req: AuthenticatedRequest, res: Response
       res.write(': ping\n\n');
     } catch (_e) {
       clearInterval(heartbeatTimer);
-      sseClients.delete(client);
+      removeSseClient(client);
     }
   }, 15000);
 
+  // Auto-close after 25s for serverless host resilience (EventSource client auto-reconnects)
+  const serverlessTimer = setTimeout(() => {
+    try {
+      clearInterval(heartbeatTimer);
+      removeSseClient(client);
+      res.end();
+    } catch {}
+  }, 25000);
+
   req.on('close', () => {
+    clearTimeout(serverlessTimer);
     clearInterval(heartbeatTimer);
-    sseClients.delete(client);
+    removeSseClient(client);
+  });
+});
+
+// Authoritative Live Sync Status endpoint
+app.get('/api/live/sync-status', (_req: Request, res: Response): void => {
+  const since = Number(_req.query.since || 0);
+  const timestamps = getActivityTimestamps();
+  res.json({
+    hasUpdates: since < timestamps.lastUpdated,
+    postsUpdated: since < timestamps.posts,
+    communitiesUpdated: since < timestamps.communities,
+    notificationsUpdated: since < timestamps.notifications,
+    mediaUpdated: since < timestamps.media,
+    timestamps
   });
 });
 
@@ -1388,7 +1402,8 @@ app.post('/api/community/posts', requireAuth, requireUnrestricted, async (req: A
       }).catch(err => console.warn('[Property Studio] notifySuperAdminsOnSubmission post error:', err));
     }
 
-    broadcastSseEvent('POST_CREATED', { id: post.id, status: post.status }, req.user.id);
+    broadcastSseEvent('POST_CREATED', { id: post.id, status: post.status });
+    recordActivity('posts');
     res.json({ success: true, post });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -1484,6 +1499,8 @@ app.post('/api/community/posts/:id/vote', requireAuth, requireUnrestricted, asyn
       res.status(404).json({ error: 'Post not found' });
       return;
     }
+    broadcastSseEvent('POST_VOTE_UPDATED', { postId: req.params.id, ...result });
+    recordActivity('posts');
     res.json({ success: true, ...result });
   } catch {
     res.status(500).json({ error: 'Vote was not saved.' });
@@ -1506,6 +1523,8 @@ app.post('/api/community/posts/:id/follow', requireAuth, requireUnrestricted, as
       res.status(404).json({ error: 'Post not found' });
       return;
     }
+    broadcastSseEvent('POST_FOLLOW_UPDATED', { postId: req.params.id, ...result });
+    recordActivity('posts');
     res.json({ success: true, ...result });
   } catch {
     res.status(500).json({ error: 'Follow was not saved.' });
@@ -1981,6 +2000,8 @@ app.patch('/api/communities/:id', requireAuth, requireUnrestricted, async (req: 
 app.post('/api/communities/:id/join', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const result = await joinCommunity(req.params.id, req.user.id);
+    broadcastSseEvent('COMMUNITY_MEMBERSHIP_UPDATED', { communityId: req.params.id });
+    recordActivity('communities');
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -2144,6 +2165,8 @@ app.post('/api/community/posts/:id/repost', requireAuth, requireUnrestricted, as
     }
     const note = typeof req.body?.note === 'string' ? req.body.note.trim() : undefined;
     const result = await toggleDiscussionRepost(req.params.id, req.user.id, req.user.name, note);
+    broadcastSseEvent('POST_REPOSTED', { postId: req.params.id, ...result });
+    recordActivity('posts');
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -2263,6 +2286,8 @@ app.delete('/api/media/:id', requireSuperAdminOnly, async (req: AuthenticatedReq
 app.post('/api/media/:id/like', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const result = await toggleMediaLike(req.params.id, req.user.id);
+    broadcastSseEvent('MEDIA_ENGAGEMENT_UPDATED', { mediaId: req.params.id });
+    recordActivity('media');
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -2273,6 +2298,8 @@ app.post('/api/media/:id/react', requireAuth, requireUnrestricted, async (req: A
   try {
     const reactionType = req.body?.reactionType || 'THUMBS_UP';
     const result = await setMediaReaction(req.params.id, req.user.id, reactionType);
+    broadcastSseEvent('MEDIA_ENGAGEMENT_UPDATED', { mediaId: req.params.id });
+    recordActivity('media');
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -2307,6 +2334,8 @@ app.post('/api/media/:id/comment', requireAuth, requireUnrestricted, async (req:
       authorAvatar: req.user.avatar,
       text
     });
+    broadcastSseEvent('MEDIA_ENGAGEMENT_UPDATED', { mediaId: req.params.id });
+    recordActivity('media');
     res.json({ success: true, comment });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -2328,6 +2357,8 @@ app.post('/api/media/:id/repost', requireAuth, requireUnrestricted, async (req: 
   try {
     const note = req.body?.note ? String(req.body.note).trim() : undefined;
     const result = await toggleMediaRepost(req.params.id, req.user.id, req.user.name, note);
+    broadcastSseEvent('MEDIA_ENGAGEMENT_UPDATED', { mediaId: req.params.id });
+    recordActivity('media');
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
