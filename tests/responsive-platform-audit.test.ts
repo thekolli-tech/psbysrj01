@@ -57,3 +57,15 @@ test('6. Media & Podcast toolbar wraps smoothly on mobile devices', () => {
   // Toolbar flex wrap
   assert.match(media, /flex\s+flex-wrap\s+items-center\s+justify-between/);
 });
+
+test('7. Desktop Header occupies full available width on the left without missing buttons', () => {
+  const header = read('src/components/common/Header.tsx');
+  // Full width navigation occupying space to the left
+  assert.match(header, /w-full\s+px-4\s+sm:px-6\s+lg:px-8/);
+  assert.doesNotMatch(header, /max-w-7xl mx-auto px-4/);
+  // All navigation links rendered directly without a "More" dropdown
+  assert.doesNotMatch(header, />More</);
+  assert.doesNotMatch(header, /moreDropdown/);
+  // Concise label derivation removing trailing Property Studio suffix
+  assert.match(header, /replace\(\/\\s\+Property\\s\+Studio\$\/,\s*''\)/);
+});
