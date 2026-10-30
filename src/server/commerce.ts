@@ -678,7 +678,15 @@ export async function moderatePost(input: {
   reason?: string;
 }): Promise<boolean> {
   const now = nowIso();
+  let postAuthorId: string | null = null;
+  let postTitle = 'Discussion Question';
+
   if (isPostgresAuthoritative()) {
+    const postRes = await queryPostgres(`SELECT author_id, title FROM community_posts WHERE id = $1`, [input.postId]);
+    if (postRes.rows.length > 0) {
+      postAuthorId = postRes.rows[0].author_id;
+      postTitle = postRes.rows[0].title || postTitle;
+    }
     const res = await queryPostgres(
       `UPDATE community_posts SET status = $2, rejection_reason = $3, moderation_note = $3, updated_at = $4 WHERE id = $1`,
       [input.postId, input.status, input.reason || null, now]
@@ -686,12 +694,33 @@ export async function moderatePost(input: {
     if (res.rowCount === 0) return false;
   } else {
     requireSqlite();
+    const row = getSqliteDb().prepare(`SELECT author_id, title FROM community_posts WHERE id = ?`).get(input.postId) as any;
+    if (row) {
+      postAuthorId = row.author_id ? String(row.author_id) : null;
+      postTitle = row.title ? String(row.title) : postTitle;
+    }
     const result = getSqliteDb().prepare(
       `UPDATE community_posts SET status = ?, rejection_reason = ?, moderation_note = ?, updated_at = ? WHERE id = ?`
     ).run(input.status, input.reason || null, input.reason || null, now, input.postId);
     if (Number(result.changes) === 0) return false;
   }
   await recordModeration(input.actorId, 'POST', input.postId, input.status, input.reason);
+
+  if (postAuthorId && (input.status === 'APPROVED' || input.status === 'REJECTED')) {
+    try {
+      const { notifyAuthorOnModerationDecision } = await import('./notifications.ts');
+      await notifyAuthorOnModerationDecision({
+        authorId: postAuthorId,
+        targetType: 'POST',
+        title: postTitle,
+        status: input.status,
+        reason: input.reason
+      });
+    } catch (err) {
+      console.warn('[Property Studio] Could not notify author on post moderation:', err);
+    }
+  }
+
   return true;
 }
 
@@ -702,7 +731,15 @@ export async function suspendOrRestoreCommunity(input: {
   reason?: string;
 }): Promise<boolean> {
   const now = nowIso();
+  let creatorId: string | null = null;
+  let commName = 'Community Hub';
+
   if (isPostgresAuthoritative()) {
+    const commRes = await queryPostgres(`SELECT created_by_id, name FROM communities WHERE id = $1`, [input.communityId]);
+    if (commRes.rows.length > 0) {
+      creatorId = commRes.rows[0].created_by_id;
+      commName = commRes.rows[0].name || commName;
+    }
     const res = await queryPostgres(
       `UPDATE communities SET status = $2, rejection_reason = $3, suspension_reason = $4, updated_at = $5 WHERE id = $1`,
       [input.communityId, input.status, input.status === 'REJECTED' ? input.reason || '' : '', input.status === 'SUSPENDED' ? input.reason || '' : '', now]
@@ -710,12 +747,33 @@ export async function suspendOrRestoreCommunity(input: {
     if (res.rowCount === 0) return false;
   } else {
     requireSqlite();
+    const row = getSqliteDb().prepare(`SELECT created_by_id, name FROM communities WHERE id = ?`).get(input.communityId) as any;
+    if (row) {
+      creatorId = row.created_by_id ? String(row.created_by_id) : null;
+      commName = row.name ? String(row.name) : commName;
+    }
     const result = getSqliteDb().prepare(
       `UPDATE communities SET status = ?, rejection_reason = ?, suspension_reason = ?, updated_at = ? WHERE id = ?`
     ).run(input.status, input.status === 'REJECTED' ? input.reason || '' : '', input.status === 'SUSPENDED' ? input.reason || '' : '', now, input.communityId);
     if (Number(result.changes) === 0) return false;
   }
   await recordModeration(input.actorId, 'COMMUNITY', input.communityId, input.status, input.reason);
+
+  if (creatorId && (input.status === 'APPROVED' || input.status === 'REJECTED')) {
+    try {
+      const { notifyAuthorOnModerationDecision } = await import('./notifications.ts');
+      await notifyAuthorOnModerationDecision({
+        authorId: creatorId,
+        targetType: 'COMMUNITY',
+        title: commName,
+        status: input.status,
+        reason: input.reason
+      });
+    } catch (err) {
+      console.warn('[Property Studio] Could not notify creator on community moderation:', err);
+    }
+  }
+
   return true;
 }
 

@@ -1,6 +1,7 @@
 import { configuredWhatsAppProviders } from './whatsappOtp.ts';
 
-export { configuredWhatsAppProviders, sendWhatsAppOtp } from './whatsappOtp.ts';
+export { configuredWhatsAppProviders, sendWhatsAppOtp, sendWhatsAppModerationAlert } from './whatsappOtp.ts';
+export type { ModerationAlertData, WhatsAppAlertResult } from './whatsappOtp.ts';
 
 export interface EmailDispatchResult {
   success: boolean;
@@ -118,4 +119,98 @@ export function getNotificationGatewayStatus() {
     whatsappConfigured: whatsappProviders.length > 0,
     whatsappProviders
   };
+}
+
+
+import { createNotification, getSuperAdminUserIds } from './db.ts';
+import { sendWhatsAppModerationAlert } from './whatsappOtp.ts';
+
+export async function notifySuperAdminsOnSubmission(data: {
+  type: 'COMMUNITY_POST' | 'COMMUNITY_REQUEST';
+  title: string;
+  submitterId: string;
+  submitterName: string;
+  submitterRole: string;
+  communityName?: string;
+  itemId: string;
+}): Promise<void> {
+  try {
+    const adminIds = await getSuperAdminUserIds();
+    const notificationTitle = data.type === 'COMMUNITY_POST'
+      ? 'New Community Question Pending Approval'
+      : 'New Community Creation Request Pending Approval';
+
+    const message = data.type === 'COMMUNITY_POST'
+      ? `${data.submitterName} (${data.submitterRole}) submitted question "${data.title}" for review.`
+      : `${data.submitterName} (${data.submitterRole}) requested to create community "${data.title}".`;
+
+    for (const adminId of adminIds) {
+      try {
+        await createNotification({
+          userId: adminId,
+          actorId: data.submitterId,
+          actorName: data.submitterName,
+          type: 'MODERATION',
+          title: notificationTitle,
+          message,
+          linkUrl: '/admin?tab=MODERATION'
+        });
+      } catch (err) {
+        console.warn('[Property Studio] Failed to insert admin notification:', err);
+      }
+    }
+
+    // Trigger WhatsApp notification to Super Admin (+91 90300 57488)
+    const alertResult = await sendWhatsAppModerationAlert({
+      submissionType: data.type,
+      title: data.title,
+      submitterName: data.submitterName,
+      submitterRole: data.submitterRole,
+      communityName: data.communityName,
+      submissionTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+      pendingStatus: 'PENDING_APPROVAL',
+      moderationUrl: 'https://psbysrj01.vercel.app/admin?tab=MODERATION'
+    });
+
+    console.log('[Property Studio] Super Admin notification dispatched. In-app: ok. WhatsApp status:', alertResult.status);
+  } catch (err: any) {
+    console.warn('[Property Studio] Error in notifySuperAdminsOnSubmission:', err?.message || err);
+  }
+}
+
+export async function notifyAuthorOnModerationDecision(data: {
+  authorId: string;
+  targetType: 'POST' | 'COMMUNITY';
+  title: string;
+  status: 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  reason?: string;
+}): Promise<void> {
+  try {
+    const isPost = data.targetType === 'POST';
+    const isApproved = data.status === 'APPROVED';
+
+    const notifTitle = isApproved
+      ? (isPost ? 'Your Question Has Been Approved!' : 'Your Community Has Been Approved!')
+      : (isPost ? 'Question Review Status Update' : 'Community Review Status Update');
+
+    const message = isApproved
+      ? (isPost
+          ? `Your question "${data.title}" was approved by an administrator and is now live in the community feed.`
+          : `Your community "${data.title}" was approved by an administrator and is now live!`)
+      : (isPost
+          ? `Your question "${data.title}" was not approved${data.reason ? ': ' + data.reason : '.'}`
+          : `Your community "${data.title}" was not approved${data.reason ? ': ' + data.reason : '.'}`);
+
+    await createNotification({
+      userId: data.authorId,
+      actorId: 'system_admin',
+      actorName: 'Super Admin',
+      type: 'MODERATION',
+      title: notifTitle,
+      message,
+      linkUrl: '/community'
+    });
+  } catch (err: any) {
+    console.warn('[Property Studio] Error in notifyAuthorOnModerationDecision:', err?.message || err);
+  }
 }

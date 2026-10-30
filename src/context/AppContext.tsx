@@ -78,6 +78,7 @@ interface AppContextType {
 
   // Community
   communityPosts: CommunityPost[];
+  refreshPosts: () => Promise<void>;
   upvoteCommunityPost: (postId: string) => void;
   addCommunityReply: (postId: string, content: string) => void;
   createCommunityPost: (post: Omit<CommunityPost, 'id' | 'createdAt' | 'upvotes' | 'replies'>) => void;
@@ -241,6 +242,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
   const [communities, setCommunities] = useState<CommunityHub[]>([]);
 
+  const refreshPosts = async () => {
+    try {
+      const res = await fetch('/api/community/posts');
+      const data = await res.json();
+      if (Array.isArray(data?.posts)) {
+        setCommunityPosts(data.posts);
+      }
+    } catch (_err) {}
+  };
+
   const refreshCommunities = async () => {
     try {
       const url = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'DEVELOPER'
@@ -275,20 +286,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (_err) {}
   };
 
+  // Live polling for community posts, hubs, and real-time updates
+  useEffect(() => {
+    const handlePoll = () => {
+      if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+        refreshPosts();
+        refreshCommunities();
+      }
+    };
+
+    const interval = setInterval(handlePoll, 6000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handlePoll();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [currentUser]);
+
   // Sync live dynamic content from server database on load
   useEffect(() => {
     // 0. Communities
     refreshCommunities();
 
     // 1. Community Posts
-    fetch('/api/community/posts')
-      .then(res => res.json())
-      .then(data => {
-        if (data?.posts && Array.isArray(data.posts)) {
-          setCommunityPosts(data.posts);
-        }
-      })
-      .catch(() => {});
+    refreshPosts();
 
     // 2. Dynamic Media Items
     fetch('/api/media')
@@ -623,10 +650,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           showToast(data.error || 'The post was not submitted.');
           return;
         }
-        showToast('Post submitted for approval. It stays hidden from the public feed until a Super Admin approves it.');
-        const postsRes = await fetch('/api/community/posts');
-        const postsData = await postsRes.json();
-        if (Array.isArray(postsData?.posts)) setCommunityPosts(postsData.posts);
+        if (data.post?.status === 'APPROVED') {
+          showToast('Official post published live to the community!');
+        } else {
+          showToast('Question submitted! It is pending Super Admin approval before appearing publicly.');
+        }
+        await refreshPosts();
       })
       .catch(() => showToast('The post was not submitted.'));
   };
@@ -656,7 +685,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to submit proposal');
       }
-      showToast('Community proposal submitted! Super Admin approval is required for it to be available live.');
+      if (data.community?.status === 'APPROVED') {
+        showToast('Community created successfully and is now active!');
+      } else {
+        showToast('Community proposal submitted! Super Admin approval is required before it appears publicly.');
+      }
       await refreshCommunities();
       return { success: true, message: data.message };
     } catch (err: any) {
@@ -1116,6 +1149,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         votePoll,
         changeSlide,
         communityPosts,
+        refreshPosts,
         upvoteCommunityPost,
         addCommunityReply,
         createCommunityPost,

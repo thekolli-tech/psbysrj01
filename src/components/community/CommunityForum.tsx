@@ -21,6 +21,7 @@ import {
   Flame,
   Clock,
   Users,
+  User,
   ShieldAlert,
   X,
   Layers,
@@ -105,7 +106,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   } = useApp();
 
   // Navigation & Filtering
-  const [feedTab, setFeedTab] = useState<'FOR_YOU' | 'ALL' | 'AMAS' | 'FOLLOWING' | 'BOOKMARKS'>('ALL');
+  const [feedTab, setFeedTab] = useState<'FOR_YOU' | 'ALL' | 'AMAS' | 'FOLLOWING' | 'BOOKMARKS' | 'MY_POSTS'>('ALL');
   const [selectedTopic, setSelectedTopic] = useState<string>('ALL');
   const [selectedCommunityId, setSelectedCommunityId] = useState<'ALL' | string>('ALL');
   const [sortMode, setSortMode] = useState<'HOT' | 'TOP' | 'NEW'>('HOT');
@@ -700,10 +701,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       onOpenLoginModal?.();
       return;
     }
-    if (currentUser.role === 'PROPERTY_SEEKER') {
-      showToast('Property Seekers can discover, join, and participate in communities. Community creation is available for Developers, Agents, and Administrators.');
-      return;
-    }
+
     if (!commForm.name.trim() || !commForm.description.trim()) {
       showToast('Please fill out the community name and description.');
       return;
@@ -945,7 +943,10 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
 
   const filteredHubs = useMemo(() => {
     return communities.filter(c => {
-      if (c.status !== 'APPROVED') return false;
+      if (c.status !== 'APPROVED') {
+        const isOwn = currentUser && c.createdById === currentUser.id;
+        if (!isOwn) return false;
+      }
       if (hubCategoryFilter !== 'ALL' && c.category !== hubCategoryFilter) return false;
       if (hubVisibilityFilter !== 'ALL' && (c.visibility || 'PUBLIC') !== hubVisibilityFilter) return false;
       if (hubSearchQuery.trim()) {
@@ -957,7 +958,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       }
       return true;
     });
-  }, [communities, hubCategoryFilter, hubVisibilityFilter, hubSearchQuery]);
+  }, [communities, hubCategoryFilter, hubVisibilityFilter, hubSearchQuery, currentUser]);
 
   // Filter & Personalization Engine
   const parsedSearch = readCommunitySearch(questionQuery);
@@ -989,6 +990,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       if (selectedTopic !== 'ALL' && p.topic !== selectedTopic) return false;
 
       // Feed Tabs Filtering
+      if (feedTab === 'MY_POSTS') {
+        return currentUser && p.authorId === currentUser.id;
+      }
       if (feedTab === 'AMAS') {
         return p.postType === 'AMA';
       }
@@ -1092,22 +1096,20 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             <span>+ Create Post</span>
           </button>
 
-          {currentUser.role !== 'PROPERTY_SEEKER' && (
-            <button
-              onClick={() => {
-                if (!isLoggedIn) {
-                  showToast('Please sign in to create a community.');
-                  onOpenLoginModal?.();
-                } else {
-                  setShowModal('PROPOSE_COMMUNITY');
-                }
-              }}
-              className="px-3.5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
-            >
-              <Users className="w-4 h-4 text-slate-500" />
-              <span>+ Create Community</span>
-            </button>
-          )}
+          <button
+            onClick={() => {
+              if (!isLoggedIn) {
+                showToast('Please sign in to create a community.');
+                onOpenLoginModal?.();
+              } else {
+                setShowModal('PROPOSE_COMMUNITY');
+              }
+            }}
+            className="px-3.5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+          >
+            <Users className="w-4 h-4 text-slate-500" />
+            <span>+ Create Community</span>
+          </button>
         </div>
       </div>
 
@@ -1369,6 +1371,11 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                       </span>
                     </div>
 
+                    {comm.status !== 'APPROVED' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300 font-mono mb-1">
+                        <span>⏳</span> Pending Super Admin Approval
+                      </span>
+                    )}
                     <h3
                       onClick={() => setSelectedCommunityId(comm.id)}
                       className="text-xs sm:text-sm font-bold text-slate-900 leading-snug cursor-pointer hover:text-amber-600 transition-colors"
@@ -1466,6 +1473,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               {[
                 { id: 'ALL', label: 'All Discussions', icon: Globe },
                 { id: 'FOR_YOU', label: 'For You', icon: Sparkles },
+                ...(isLoggedIn ? [{ id: 'MY_POSTS', label: 'My Submissions', icon: User }] : []),
                 { id: 'AMAs', label: 'AMAs', icon: Radio },
                 { id: 'FOLLOWING', label: 'Following', icon: UserCheck },
                 { id: 'BOOKMARKS', label: 'Bookmarks', icon: Bookmark }
@@ -1645,8 +1653,25 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                           </button>
                         </div>
 
-                        {/* Badges / Topic Tag */}
-                        <div className="flex items-center gap-1.5">
+                        {/* Badges / Topic Tag / Approval Status */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {post.status && post.status !== 'APPROVED' && post.status !== 'PUBLISHED' && (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 font-mono ${
+                              post.status === 'PENDING_APPROVAL' || post.status === 'PENDING'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : 'bg-rose-100 text-rose-800 border border-rose-300'
+                            }`}>
+                              <span>{post.status === 'PENDING_APPROVAL' || post.status === 'PENDING' ? '⏳' : '❌'}</span>
+                              <span>{post.status === 'PENDING_APPROVAL' || post.status === 'PENDING' ? 'Pending Approval' : 'Rejected'}</span>
+                              {currentUser?.id === post.authorId && <span className="opacity-75">(Only you)</span>}
+                            </span>
+                          )}
+                          {post.status === 'APPROVED' && (post.authorRole === 'SUPER_ADMIN' || post.authorRole === 'DEVELOPER') && (
+                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1 font-mono">
+                              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                              <span>Official</span>
+                            </span>
+                          )}
                           {post.propertyName && (
                             <span className="text-amber-800 font-bold text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                               {post.propertyName}

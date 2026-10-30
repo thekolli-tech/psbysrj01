@@ -101,7 +101,7 @@ import {
 } from './src/server/db.ts';
 import { validateAvatarUpload } from './src/shared/avatar.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
-import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders } from './src/server/notifications.ts';
+import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders, notifySuperAdminsOnSubmission } from './src/server/notifications.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
 import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
@@ -1267,6 +1267,7 @@ app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, r
       }
     }
 
+    const status = req.query.status as string | undefined;
     const posts = await getAllPosts({
       communityId,
       topic,
@@ -1274,7 +1275,9 @@ app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, r
       q: search.q || undefined,
       limit,
       offset,
-      currentUserId: req.user?.id
+      currentUserId: req.user?.id,
+      currentUserRole: req.user?.role,
+      status
     });
 
     if (!communityId) {
@@ -1372,6 +1375,18 @@ app.post('/api/community/posts', requireAuth, requireUnrestricted, async (req: A
       amaStartTime,
       amaEndTime
     });
+
+    if (post.status === 'PENDING_APPROVAL') {
+      notifySuperAdminsOnSubmission({
+        type: 'COMMUNITY_POST',
+        title: post.title,
+        submitterId: req.user.id,
+        submitterName: req.user.name,
+        submitterRole: req.user.role,
+        communityName: post.communityName,
+        itemId: post.id
+      }).catch(err => console.warn('[Property Studio] notifySuperAdminsOnSubmission post error:', err));
+    }
 
     broadcastSseEvent('POST_CREATED', { id: post.id, status: post.status }, req.user.id);
     res.json({ success: true, post });
@@ -1881,16 +1896,15 @@ app.get('/api/admin/communities/all', requireAdmin, async (_req: Request, res: R
 
 app.post('/api/communities', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role === 'PROPERTY_SEEKER') {
-      res.status(403).json({ error: 'Property Seekers cannot create communities.' });
-      return;
-    }
-
     const { name, description, category, location, coverImage, bannerImage, banner_image, icon, visibility, rules } = req.body;
     if (!name || !description || !category) {
       res.status(400).json({ error: 'Name, description, and category are required' });
       return;
     }
+
+    const initialStatus = (req.user.role === 'SUPER_ADMIN' || req.user.role === 'DEVELOPER')
+      ? 'APPROVED'
+      : 'PENDING_APPROVAL';
 
     const newCommunity = await createCommunity({
       name,
@@ -1901,9 +1915,22 @@ app.post('/api/communities', requireAuth, requireUnrestricted, async (req: Authe
       bannerImage: bannerImage || coverImage || banner_image || '',
       visibility: visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC',
       rules,
+      status: initialStatus,
       createdById: req.user.id,
       createdByName: req.user.name
     });
+
+    if (newCommunity.status === 'PENDING_APPROVAL') {
+      notifySuperAdminsOnSubmission({
+        type: 'COMMUNITY_REQUEST',
+        title: newCommunity.name,
+        submitterId: req.user.id,
+        submitterName: req.user.name,
+        submitterRole: req.user.role,
+        communityName: newCommunity.name,
+        itemId: newCommunity.id
+      }).catch(err => console.warn('[Property Studio] notifySuperAdminsOnSubmission community error:', err));
+    }
 
     res.json({ success: true, community: newCommunity });
   } catch (err: any) {

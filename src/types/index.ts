@@ -286,7 +286,8 @@ export interface CommunityPost {
   amaEndTime?: string;
   bookmarked?: boolean;
   bookmarkCount?: number;
-  status?: 'PUBLISHED' | 'FLAGGED' | 'ARCHIVED';
+  status?: 'APPROVED' | 'PUBLISHED' | 'PENDING_APPROVAL' | 'PENDING' | 'REJECTED' | 'FLAGGED' | 'ARCHIVED' | 'SUSPENDED';
+  rejectionReason?: string;
   upvotes: number;
   agreeCount?: number;
   disagreeCount?: number;

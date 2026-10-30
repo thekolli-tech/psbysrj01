@@ -73,6 +73,7 @@ import {
   pgGetUnreadNotificationCount,
   pgMarkNotificationRead,
   pgMarkAllNotificationsRead,
+  pgGetSuperAdminUserIds,
   pgRecordCommunityEvent,
   pgGetCommunityEventsSince,
   pgEnsureInitialCommunities,
@@ -160,6 +161,10 @@ export function getSqliteDb(): SqliteDatabase {
     // builtin is loaded here only after the checks above have passed.
     const sqlite = process.getBuiltinModule('node:' + 'sqlite') as typeof import('node:sqlite');
     sqliteDb = new sqlite.DatabaseSync(dbFile);
+    try {
+      sqliteDb.exec('PRAGMA journal_mode = WAL;');
+      sqliteDb.exec('PRAGMA busy_timeout = 5000;');
+    } catch {}
   }
   return sqliteDb;
 }
@@ -925,6 +930,8 @@ export async function getAllPosts(params?: {
   limit?: number;
   offset?: number;
   currentUserId?: string;
+  currentUserRole?: string;
+  status?: string;
 }): Promise<any[]> {
   const posts = isPostgresAuthoritative() ? await pgGetAllPosts(params) : sqliteGetAllPosts(params);
   const withProfessions = await attachAuthorProfessions(posts);
@@ -1238,9 +1245,15 @@ export async function createCommunity(community: {
   bannerImage?: string;
   visibility?: 'PUBLIC' | 'PRIVATE';
   rules?: string;
+  status?: string;
 }): Promise<DbCommunity> {
   if (isPostgresAuthoritative()) return pgCreateCommunity(community);
   return sqliteCreateCommunity(community);
+}
+
+export async function getSuperAdminUserIds(): Promise<string[]> {
+  if (isPostgresAuthoritative()) return pgGetSuperAdminUserIds();
+  return sqliteGetSuperAdminUserIds();
 }
 
 export async function updateCommunity(id: string, updates: {
@@ -2958,9 +2971,23 @@ function sqliteGetAllPosts(params?: {
   limit?: number;
   offset?: number;
   currentUserId?: string;
+  currentUserRole?: string;
+  status?: string;
 }): any[] {
-  let query = "SELECT p.* FROM community_posts p WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
-  const args: any[] = [params?.currentUserId || ''];
+  let query = 'SELECT p.* FROM community_posts p WHERE 1=1';
+  const args: any[] = [];
+
+  if (params?.status) {
+    query += ' AND p.status = ?';
+    args.push(params.status);
+  } else if (params?.currentUserRole === 'SUPER_ADMIN' || params?.currentUserRole === 'DEVELOPER') {
+    // Platform administrators see all posts in feeds & moderation views
+  } else if (params?.currentUserId) {
+    query += " AND (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
+    args.push(params.currentUserId);
+  } else {
+    query += " AND p.status IN ('APPROVED', 'PUBLISHED')";
+  }
 
   if (params?.communityId) {
     query += ' AND p.community_id = ?';
@@ -3126,6 +3153,10 @@ function sqliteCreatePost(post: {
   const pollOptionsStr = post.pollOptions ? JSON.stringify(post.pollOptions) : null;
   const pollVotesStr = post.pollOptions ? JSON.stringify({}) : null;
 
+  const initialStatus = (post.authorRole === 'SUPER_ADMIN' || post.authorRole === 'DEVELOPER')
+    ? 'APPROVED'
+    : 'PENDING_APPROVAL';
+
   const stmt = db.prepare(`
     INSERT INTO community_posts (
       id, author_id, author_name, author_role, community_id, community_name,
@@ -3135,7 +3166,7 @@ function sqliteCreatePost(post: {
       ama_host_name, ama_host_role, ama_status, ama_start_time, ama_end_time,
       created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -3156,6 +3187,7 @@ function sqliteCreatePost(post: {
     post.mediaUrl || null,
     post.thumbnailUrl || null,
     post.duration || null,
+    initialStatus,
     post.postType || 'POST',
     post.visibility || 'PUBLIC',
     pollOptionsStr,
@@ -3175,7 +3207,7 @@ function sqliteCreatePost(post: {
     authorName: post.authorName,
     communityId: post.communityId,
     mediaType: post.mediaType || 'POST',
-    status: 'PENDING_APPROVAL'
+    status: initialStatus
   }, post.authorId || null);
 
   return sqliteGetPostById(id);
@@ -3701,6 +3733,17 @@ function sqliteGetCommunityById(id: string, currentUserId?: string): DbCommunity
   };
 }
 
+function sqliteGetSuperAdminUserIds(): string[] {
+  try {
+    const rows = db.prepare("SELECT id FROM users WHERE role = 'SUPER_ADMIN'").all() as any[];
+    const ids = rows.map(r => r.id);
+    if (ids.length > 0) return ids;
+  } catch (err) {
+    console.warn('[Property Studio] Failed to query super admins from sqlite:', err);
+  }
+  return [];
+}
+
 function sqliteCreateCommunity(community: {
   name: string;
   description: string;
@@ -3712,6 +3755,7 @@ function sqliteCreateCommunity(community: {
   bannerImage?: string;
   visibility?: 'PUBLIC' | 'PRIVATE';
   rules?: string;
+  status?: string;
 }): DbCommunity {
   const id = `comm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const slug = community.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + `-${Date.now().toString().slice(-4)}`;
@@ -3719,10 +3763,11 @@ function sqliteCreateCommunity(community: {
   const visibility = community.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC';
   const icon = community.icon?.trim() || 'Users';
   const bannerImage = community.bannerImage?.trim() || '';
+  const initialStatus = community.status || 'PENDING_APPROVAL';
 
   const insert = db.prepare(`
     INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, visibility, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_APPROVAL', '', 1, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', 1, ?, ?, ?, ?, ?, ?)
   `);
 
   insert.run(
@@ -3734,6 +3779,7 @@ function sqliteCreateCommunity(community: {
     community.location?.trim() || 'Western Corridor, Hyderabad',
     community.createdById || 'user_guest',
     community.createdByName || 'Property Seeker',
+    initialStatus,
     icon,
     bannerImage,
     community.rules?.trim() || 'Constructive civil discourse and RERA compliance verification.',

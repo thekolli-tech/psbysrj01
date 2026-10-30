@@ -1206,10 +1206,24 @@ export async function pgGetAllPosts(params?: {
   limit?: number;
   offset?: number;
   currentUserId?: string;
+  currentUserRole?: string;
+  status?: string;
 }): Promise<any[]> {
-  let query = "SELECT p.* FROM community_posts p WHERE (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = $1 AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))";
-  const args: any[] = [params?.currentUserId || ''];
-  let paramIdx = 2;
+  let query = 'SELECT p.* FROM community_posts p WHERE 1=1';
+  const args: any[] = [];
+  let paramIdx = 1;
+
+  if (params?.status) {
+    query += ` AND p.status = $${paramIdx++}`;
+    args.push(params.status);
+  } else if (params?.currentUserRole === 'SUPER_ADMIN' || params?.currentUserRole === 'DEVELOPER') {
+    // Platform administrators see all posts across feeds & moderation queues
+  } else if (params?.currentUserId) {
+    query += ` AND (p.status IN ('APPROVED', 'PUBLISHED') OR (p.author_id = $${paramIdx++} AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED')))`;
+    args.push(params.currentUserId);
+  } else {
+    query += " AND p.status IN ('APPROVED', 'PUBLISHED')";
+  }
 
   if (params?.communityId) {
     query += ` AND p.community_id = $${paramIdx++}`;
@@ -1378,6 +1392,10 @@ export async function pgCreatePost(post: {
   const pollOptionsStr = post.pollOptions ? JSON.stringify(post.pollOptions) : null;
   const pollVotesStr = post.pollOptions ? JSON.stringify({}) : null;
 
+  const initialStatus = (post.authorRole === 'SUPER_ADMIN' || post.authorRole === 'DEVELOPER')
+    ? 'APPROVED'
+    : 'PENDING_APPROVAL';
+
   await queryPostgres(`
     INSERT INTO community_posts (
       id, author_id, author_name, author_role, community_id, community_name,
@@ -1389,8 +1407,8 @@ export async function pgCreatePost(post: {
     )
     VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-      $14, $15, $16, $17, 'PENDING_APPROVAL', 0, 0, 0, 0,
-      $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+      $14, $15, $16, $17, $18, 0, 0, 0, 0,
+      $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
     )
   `, [
     id,
@@ -1410,6 +1428,7 @@ export async function pgCreatePost(post: {
     post.mediaUrl || null,
     post.thumbnailUrl || null,
     post.duration || null,
+    initialStatus,
     post.postType || 'POST',
     post.visibility || 'PUBLIC',
     pollOptionsStr,
@@ -1429,7 +1448,7 @@ export async function pgCreatePost(post: {
     authorName: post.authorName,
     communityId: post.communityId,
     mediaType: post.mediaType || 'POST',
-    status: 'PENDING_APPROVAL'
+    status: initialStatus
   }, post.authorId || null);
 
   return pgGetPostById(id);
@@ -1918,6 +1937,17 @@ export async function pgMarkAllNotificationsRead(userId: string): Promise<boolea
   return true;
 }
 
+export async function pgGetSuperAdminUserIds(): Promise<string[]> {
+  try {
+    const res = await queryPostgres("SELECT id FROM users WHERE role = 'SUPER_ADMIN'");
+    const ids = res.rows.map((r: any) => r.id);
+    if (ids.length > 0) return ids;
+  } catch (err) {
+    console.warn('[Property Studio] Failed to query super admins from postgres:', err);
+  }
+  return [];
+}
+
 // ==============================================================================
 // REAL-TIME COMMUNITY EVENT LOG (POSTGRESQL SSE PERSISTENCE)
 // ==============================================================================
@@ -2108,6 +2138,7 @@ export async function pgCreateCommunity(community: {
   bannerImage?: string;
   visibility?: 'PUBLIC' | 'PRIVATE';
   rules?: string;
+  status?: string;
 }): Promise<DbCommunity> {
   await ensurePostgresAdditiveSchema();
   const id = `comm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
@@ -2116,10 +2147,11 @@ export async function pgCreateCommunity(community: {
   const visibility = community.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC';
   const icon = community.icon?.trim() || 'Users';
   const bannerImage = community.bannerImage?.trim() || '';
+  const initialStatus = community.status || 'PENDING_APPROVAL';
 
   await queryPostgres(`
     INSERT INTO communities (id, name, slug, description, category, location, created_by_id, created_by_name, status, rejection_reason, member_count, icon, banner_image, rules, visibility, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING_APPROVAL', '', 1, $9, $10, $11, $12, $13, $14)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, '', 1, $10, $11, $12, $13, $14, $15)
   `, [
     id,
     community.name.trim(),
@@ -2129,6 +2161,7 @@ export async function pgCreateCommunity(community: {
     community.location?.trim() || 'Western Corridor, Hyderabad',
     community.createdById || 'user_guest',
     community.createdByName || 'Property Seeker',
+    initialStatus,
     icon,
     bannerImage,
     community.rules?.trim() || 'Constructive civil discourse and RERA compliance verification.',

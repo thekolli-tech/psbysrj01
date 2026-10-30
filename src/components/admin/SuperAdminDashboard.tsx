@@ -196,6 +196,23 @@ export const SuperAdminDashboard: React.FC = () => {
         setModerationListings(Array.isArray(pData.listings) ? pData.listings : []);
         setModerationProfessionals(Array.isArray(pData.professionals) ? pData.professionals : []);
         setModerationCommunities(Array.isArray(pData.communities) ? pData.communities : []);
+        const queued = Array.isArray(pData.posts) ? pData.posts : [];
+        setModerationPosts(queued);
+        setLivePosts(queued.map((p: any) => ({
+          id: p.id,
+          authorId: p.author_id,
+          authorName: p.author_name,
+          authorRole: p.author_role,
+          topic: p.topic,
+          title: p.title,
+          content: p.content,
+          status: p.status,
+          upvotes: Number(p.upvotes || 0),
+          isPinned: Boolean(p.is_pinned),
+          isFlagged: Boolean(p.is_flagged),
+          createdAt: p.created_at,
+          replies: []
+        })));
       }
 
       // Fetch Requirements
@@ -218,26 +235,6 @@ export const SuperAdminDashboard: React.FC = () => {
         const fData = await finRes.json();
         setFinanceData(fData);
       }
-
-      if (postRes.ok) {
-        const pData = await postRes.json();
-        const queued = Array.isArray(pData.posts) ? pData.posts : [];
-        setLivePosts(queued.map((p: any) => ({
-          id: p.id,
-          authorId: p.author_id,
-          authorName: p.author_name,
-          authorRole: p.author_role,
-          topic: p.topic,
-          title: p.title,
-          content: p.content,
-          status: p.status,
-          upvotes: Number(p.upvotes || 0),
-          isPinned: Boolean(p.is_pinned),
-          isFlagged: Boolean(p.is_flagged),
-          createdAt: p.created_at,
-          replies: []
-        })));
-      }
     } catch (e) {
       console.warn('Using client-side fallback data', e);
     } finally {
@@ -247,6 +244,12 @@ export const SuperAdminDashboard: React.FC = () => {
 
   useEffect(() => {
     refreshServerData();
+    const interval = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+        refreshServerData();
+      }
+    }, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleSavePrices = () => {
@@ -290,6 +293,44 @@ export const SuperAdminDashboard: React.FC = () => {
       refreshServerData();
     } catch (err: any) {
       showToast(err.message || 'Verification update failed');
+    } finally {
+      setModeratingItemId(null);
+    }
+  };
+
+  const handleModeratePost = async (postId: string, status: 'APPROVED' | 'REJECTED', reason?: string) => {
+    setModeratingItemId(postId);
+    try {
+      const res = await fetch(`/api/admin/posts/${postId}/moderation`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to moderate post');
+      showToast(`Question / Post marked as ${status}`);
+      refreshServerData();
+    } catch (err: any) {
+      showToast(err.message || 'Moderation failed');
+    } finally {
+      setModeratingItemId(null);
+    }
+  };
+
+  const handleModerateCommunity = async (communityId: string, status: 'APPROVED' | 'REJECTED', reason?: string) => {
+    setModeratingItemId(communityId);
+    try {
+      const res = await fetch(`/api/admin/communities/${communityId}/moderation`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to moderate community');
+      showToast(`Community marked as ${status}`);
+      refreshServerData();
+    } catch (err: any) {
+      showToast(err.message || 'Moderation failed');
     } finally {
       setModeratingItemId(null);
     }
@@ -593,7 +634,7 @@ export const SuperAdminDashboard: React.FC = () => {
         <div className="flex items-center gap-2 mt-6 pt-6 border-t border-slate-800 overflow-x-auto no-scrollbar">
           {[
             { id: 'OVERVIEW', label: 'Platform Metrics' },
-            { id: 'MODERATION', label: `Moderation Queue (${moderationListings.length + moderationProfessionals.length + moderationPosts.length})`, highlight: true },
+            { id: 'MODERATION', label: `Moderation Queue (${moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length})`, highlight: true },
             { id: 'USERS_DIRECTORY', label: `User Accounts (${liveUsers.length || users.length})`, highlight: true },
             { id: 'REQUIREMENTS', label: `Buyer Requirements (${adminRequirements.length})`, highlight: true },
             { id: 'AUDIT_LOGS', label: `Audit Trail (${auditLogs.length})`, highlight: true },
@@ -840,6 +881,138 @@ export const SuperAdminDashboard: React.FC = () => {
                             handleModerateProfessional(item.user_id, 'REJECTED', reason);
                           }}
                           disabled={moderatingItemId === item.user_id}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sub-Queue: Community Posts & Questions Pending Approval */}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-amber-600" />
+                  <span>Community Questions & Discussions Pending Review ({moderationPosts.length})</span>
+                </h3>
+              </div>
+              {moderationPosts.length === 0 ? (
+                <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                  No community questions or discussions currently awaiting moderation.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {moderationPosts.map(item => (
+                    <div
+                      key={item.id}
+                      className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                    >
+                      <div className="space-y-1 max-w-xl">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 text-sm">{item.title}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800">
+                            {item.status || 'PENDING'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-200 text-slate-700">
+                            r/{item.topic}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 line-clamp-2 text-xs">{item.content}</p>
+                        <div className="flex flex-wrap items-center gap-3 text-slate-500 text-[11px]">
+                          <span>Author: <strong>{item.author_name || item.authorName}</strong> ({item.author_role || item.authorRole})</span>
+                          {item.created_at && (
+                            <span>Submitted: {new Date(item.created_at).toLocaleString()}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                        <button
+                          onClick={() => handleModeratePost(item.id, 'APPROVED')}
+                          disabled={moderatingItemId === item.id}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Approve & Publish</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            const reason = window.prompt('Enter rejection reason (optional):') || undefined;
+                            handleModeratePost(item.id, 'REJECTED', reason);
+                          }}
+                          disabled={moderatingItemId === item.id}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sub-Queue: Community Hub Creation Requests Pending Approval */}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-amber-600" />
+                  <span>Community Creation Proposals Pending Review ({moderationCommunities.length})</span>
+                </h3>
+              </div>
+              {moderationCommunities.length === 0 ? (
+                <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                  No community creation proposals currently awaiting review.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {moderationCommunities.map(item => (
+                    <div
+                      key={item.id}
+                      className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                    >
+                      <div className="space-y-1 max-w-xl">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 text-sm">{item.name}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800">
+                            {item.status || 'PENDING'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-200 text-slate-800">
+                            {item.visibility || 'PUBLIC'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-800 border border-amber-200">
+                            {item.category}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 line-clamp-2 text-xs">{item.description}</p>
+                        <div className="flex flex-wrap items-center gap-3 text-slate-500 text-[11px]">
+                          <span>Created By: <strong>{item.created_by_name || 'Requester'}</strong> ({item.created_by_id})</span>
+                          {item.location && <span>Location: {item.location}</span>}
+                          {item.created_at && (
+                            <span>Requested: {new Date(item.created_at).toLocaleString()}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                        <button
+                          onClick={() => handleModerateCommunity(item.id, 'APPROVED')}
+                          disabled={moderatingItemId === item.id}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Approve Community</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            const reason = window.prompt('Enter rejection reason (optional):') || undefined;
+                            handleModerateCommunity(item.id, 'REJECTED', reason);
+                          }}
+                          disabled={moderatingItemId === item.id}
                           className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
                         >
                           <XCircle className="w-3.5 h-3.5" />

@@ -19,10 +19,10 @@ test('Schema and UI invariants for Community creation, membership, and discussio
   assert.match(POSTGRES_ADDITIVE_SQL, /UNIQUE\s*\(\s*community_id\s*,\s*user_id\s*\)/i);
   assert.match(POSTGRES_ADDITIVE_SQL, /UNIQUE\s*\(\s*post_id\s*,\s*user_id\s*\)/i);
 
-  // 2. CommunityForum.tsx UI guards: Property Seeker cannot create community
+  // 2. CommunityForum.tsx UI: Community proposal modal and submission
   const communityForum = read('src/components/community/CommunityForum.tsx');
-  assert.match(communityForum, /currentUser\.role !== 'PROPERTY_SEEKER'/);
-  assert.match(communityForum, /Property Seekers can discover, join, and participate in communities/);
+  assert.match(communityForum, /PROPOSE_COMMUNITY/);
+  assert.match(communityForum, /handleCreateCommunitySubmit/);
 
   // 3. Discussion Repost with Repeat icon and attribution
   assert.match(communityForum, /handleToggleRepost/);
@@ -74,7 +74,7 @@ test.after(() => {
   server.close();
 });
 
-test('Community Creation Permissions: Property Seekers blocked, Developers, Agents, and Super Admins allowed', async () => {
+test('Community Creation Permissions: Property Seekers request defaults to PENDING_APPROVAL, Developers and Admins approved', async () => {
   // Create test accounts
   const seeker = await createUser({
     name: 'Seeker Rajesh',
@@ -116,7 +116,7 @@ test('Community Creation Permissions: Property Seekers blocked, Developers, Agen
   });
   const adminSession = await createSession(superAdmin.id);
 
-  // 1. Property Seeker cannot create community -> 403 Forbidden
+  // 1. Property Seeker requests community -> 200 Success with status PENDING_APPROVAL
   const seekerCreateRes = await fetch(`${baseUrl}/api/communities`, {
     method: 'POST',
     headers: {
@@ -124,16 +124,16 @@ test('Community Creation Permissions: Property Seekers blocked, Developers, Agen
       Authorization: `Bearer ${seekerSession.token}`
     },
     body: JSON.stringify({
-      name: 'Seeker Unauthorized Community',
+      name: 'Seeker Proposed Community',
       category: 'Residential',
       location: 'Gachibowli, Hyderabad',
-      description: 'Attempted creation by seeker',
+      description: 'Proposed by seeker awaiting admin review',
       visibility: 'PUBLIC'
     })
   });
-  assert.equal(seekerCreateRes.status, 403);
-  const seekerErr = await seekerCreateRes.json();
-  assert.match(seekerErr.error, /Property Seekers cannot create communities/i);
+  assert.equal(seekerCreateRes.status, 200);
+  const seekerData = await seekerCreateRes.json();
+  assert.equal(seekerData.community.status, 'PENDING_APPROVAL');
 
   // 2. Developer can create public community -> 200/201 Success
   const devCreateRes = await fetch(`${baseUrl}/api/communities`, {
