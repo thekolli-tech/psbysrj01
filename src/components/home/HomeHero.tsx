@@ -168,7 +168,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 shadow-xs">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-2.5 items-center">
                 {/* 1. Keyword Input */}
-                <div className="md:col-span-5 lg:col-span-5 relative">
+                <div className="md:col-span-4 lg:col-span-5 relative">
                   <label htmlFor="home-search-keyword" className="sr-only">
                     Search by project, developer, or keyword
                   </label>
@@ -221,7 +221,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 </div>
 
                 {/* 3. Property Type Dropdown */}
-                <div className="md:col-span-3 lg:col-span-3">
+                <div className="md:col-span-3 lg:col-span-2">
                   <label htmlFor="home-search-property-type" className="sr-only">
                     Property Type
                   </label>
@@ -240,12 +240,12 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 </div>
 
                 {/* 4. Search Button */}
-                <div className="md:col-span-1 lg:col-span-1 flex items-center gap-2">
+                <div className="md:col-span-2 lg:col-span-2 flex items-center gap-2">
                   <button
                     type="submit"
-                    className="w-full py-2.5 px-4 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                    className="w-full py-2.5 px-3 sm:px-4 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[42px]"
                   >
-                    <Search className="w-4 h-4" />
+                    <Search className="w-4 h-4 shrink-0" />
                     <span>Search</span>
                   </button>
                 </div>
@@ -487,13 +487,13 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
+              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 pt-1">
                 <button
                   onClick={() => {
                     setActiveView('PROPERTIES');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-slate-900/10 active:scale-95 transition-all cursor-pointer"
+                  className="w-full sm:w-auto justify-center px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-slate-900/10 active:scale-95 transition-all cursor-pointer min-h-[44px]"
                 >
                   <Building2 className="w-4 h-4 text-amber-400" />
                   <span>Explore Audited Projects</span>
@@ -506,7 +506,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                       setActiveView('LEADS_MARKET');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="px-5 py-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
                   >
                     <Users className="w-4 h-4 text-amber-600" />
                     <span>Buyer Leads</span>
@@ -517,7 +517,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                       setActiveView('MARKET_INSIGHTS');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="px-5 py-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
                   >
                     <TrendingUp className="w-4 h-4 text-amber-600" />
                     <span>Market Trends</span>
@@ -527,7 +527,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                 {onOpenSupport && (
                   <button
                     onClick={onOpenSupport}
-                    className="px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all shadow-xs cursor-pointer"
+                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all shadow-xs cursor-pointer min-h-[44px]"
                   >
                     <LifeBuoy className="w-4 h-4 text-amber-600" />
                     <span>Official Support Desk</span>
@@ -536,16 +536,16 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               </div>
 
               {/* Key Trust Metrics */}
-              <div className="grid grid-cols-3 gap-3 sm:gap-4 pt-4 border-t border-slate-200/80">
-                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4 pt-4 border-t border-slate-200/80">
+                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
                   <div className="text-xl sm:text-2xl font-black font-mono-numbers text-slate-900">5 Pillars</div>
                   <div className="text-[11px] font-medium text-slate-500 mt-0.5">PropTech Integration</div>
                 </div>
-                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs">
+                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
                   <div className="text-xl sm:text-2xl font-black font-mono-numbers text-amber-700">24+ Years</div>
                   <div className="text-[11px] font-medium text-slate-500 mt-0.5">Corporate Governance</div>
                 </div>
-                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs">
+                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
                   <div className="text-xl sm:text-2xl font-black font-mono-numbers text-emerald-700">100%</div>
                   <div className="text-[11px] font-medium text-slate-500 mt-0.5">Data Masking Privacy</div>
                 </div>

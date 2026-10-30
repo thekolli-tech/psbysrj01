@@ -410,8 +410,8 @@ export const MediaEngine: React.FC<{
               </div>
 
               {/* Interactive Toolbar */}
-              <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleLike}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${

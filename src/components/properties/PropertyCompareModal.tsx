@@ -39,17 +39,17 @@ export const PropertyCompareModal: React.FC<PropertyCompareModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-compare-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
     >
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+        <div className="p-4 sm:p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">
               <Building2 className="w-4 h-4" />
               <span>Architectural & Financial Side-by-Side Audit</span>
             </div>
-            <h2 id="modal-compare-title" className="text-2xl font-black text-slate-900 font-display">
+            <h2 id="modal-compare-title" className="text-lg sm:text-2xl font-black text-slate-900 font-display">
               Comparative Property Intelligence
             </h2>
           </div>
@@ -63,7 +63,7 @@ export const PropertyCompareModal: React.FC<PropertyCompareModalProps> = ({
         </div>
 
         {/* Scrollable Comparison Matrix */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-8">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6 sm:space-y-8">
           {/* Top Cards Grid */}
           <div className={`grid grid-cols-1 md:grid-cols-${properties.length} gap-6`}>
             {properties.map(p => (

@@ -805,11 +805,11 @@ export const SuperAdminDashboard: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 self-start sm:self-center">
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
                         <button
                           onClick={() => handleModerateListing(item.id, 'APPROVED')}
                           disabled={moderatingItemId === item.id}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
                         >
                           <Check className="w-3.5 h-3.5" />
                           <span>Approve & Publish</span>
@@ -820,7 +820,7 @@ export const SuperAdminDashboard: React.FC = () => {
                             handleModerateListing(item.id, 'REJECTED', reason);
                           }}
                           disabled={moderatingItemId === item.id}
-                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span>Reject</span>
@@ -866,11 +866,11 @@ export const SuperAdminDashboard: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 self-start sm:self-center">
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
                         <button
                           onClick={() => handleModerateProfessional(item.user_id, 'VERIFIED')}
                           disabled={moderatingItemId === item.user_id}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
                         >
                           <Check className="w-3.5 h-3.5" />
                           <span>Grant Verified Badge</span>
@@ -881,7 +881,7 @@ export const SuperAdminDashboard: React.FC = () => {
                             handleModerateProfessional(item.user_id, 'REJECTED', reason);
                           }}
                           disabled={moderatingItemId === item.user_id}
-                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span>Reject</span>
@@ -930,11 +930,11 @@ export const SuperAdminDashboard: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-center shrink-0">
                         <button
                           onClick={() => handleModeratePost(item.id, 'APPROVED')}
                           disabled={moderatingItemId === item.id}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
                         >
                           <Check className="w-3.5 h-3.5" />
                           <span>Approve & Publish</span>
@@ -945,7 +945,7 @@ export const SuperAdminDashboard: React.FC = () => {
                             handleModeratePost(item.id, 'REJECTED', reason);
                           }}
                           disabled={moderatingItemId === item.id}
-                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span>Reject</span>
@@ -998,11 +998,11 @@ export const SuperAdminDashboard: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-center shrink-0">
                         <button
                           onClick={() => handleModerateCommunity(item.id, 'APPROVED')}
                           disabled={moderatingItemId === item.id}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
                         >
                           <Check className="w-3.5 h-3.5" />
                           <span>Approve Community</span>
@@ -1013,7 +1013,7 @@ export const SuperAdminDashboard: React.FC = () => {
                             handleModerateCommunity(item.id, 'REJECTED', reason);
                           }}
                           disabled={moderatingItemId === item.id}
-                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50 min-h-[36px]"
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span>Reject</span>
