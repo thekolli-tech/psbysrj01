@@ -1468,8 +1468,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
           </form>
 
           {/* Feed Tabs (Quora & Reddit Reference Image 5) */}
-          <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          <div className="bg-white p-1.5 sm:p-2 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-1 sm:gap-2">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0 pr-1">
               {[
                 { id: 'ALL', label: 'All Discussions', icon: Globe },
                 { id: 'FOR_YOU', label: 'For You', icon: Sparkles },
@@ -1484,7 +1484,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   <button
                     key={tab.id}
                     onClick={() => setFeedTab(tab.id as any)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                       active
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -1498,7 +1498,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             </div>
 
             {/* Sort Dropdown / Modes */}
-            <div className="flex items-center gap-1 shrink-0 px-1">
+            <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 pl-1.5 border-l border-slate-200/80">
               <button
                 onClick={() => setSortMode('HOT')}
                 className={`p-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
@@ -1530,7 +1530,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
           </div>
 
           {/* Topics Carousel / Horizontal Scroll */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5">
             {COMMUNITY_TOPIC_LIST.map(topic => (
               <button
                 key={topic}

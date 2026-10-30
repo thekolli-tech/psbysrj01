@@ -146,7 +146,7 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Main View Router */}
-      <main className={`flex-1 ${isForcedMobile ? 'pb-20' : 'pb-16 md:pb-8'}`}>
+      <main className="flex-1 pb-8">
         {activeView === 'HOME' && (
           <HomeHero
             onOpenRoleModal={() => setProfileModalOpen(true)}
@@ -366,10 +366,7 @@ const AppContent: React.FC = () => {
         )}
       </main>
 
-      {/* Mobile Bottom Navigation Dock */}
-      <div className="block md:hidden">
-        <MobileBottomNav onOpenLoginModal={() => setLoginModalOpen(true)} />
-      </div>
+      {/* Mobile navigation is integrated directly into the sticky top MobileHeader drawer */}
 
       {/* Production Footer */}
       <footer className="bg-white border-t border-slate-200 py-12 px-4 sm:px-6 lg:px-8 mt-auto">

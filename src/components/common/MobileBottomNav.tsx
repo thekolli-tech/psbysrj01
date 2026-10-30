@@ -33,7 +33,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenLoginMod
   const tabs = linkedEndUserNavigation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-1 pb-safe no-scrollbar">
+    <nav className="hidden" aria-label="Bottom Navigation">
       <div className="grid grid-cols-4 items-center min-h-16 max-w-lg mx-auto">
         {tabs.map(tab => {
           const isActive = activeView === tab.view;

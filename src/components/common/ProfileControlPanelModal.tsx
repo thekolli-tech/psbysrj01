@@ -303,35 +303,36 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] my-auto">
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+        <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
               {getRoleIcon()}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold">
                 <span>Profile Control Panel</span>
               </div>
-              <h2 className="text-lg font-bold font-display text-white">{currentUser.name}</h2>
-              <span className="text-xs text-slate-400 block">{currentUser.email}</span>
+              <h2 className="text-base sm:text-lg font-bold font-display text-white truncate">{currentUser.name}</h2>
+              <span className="text-xs text-slate-400 block truncate">{currentUser.email}</span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-3 gap-2">
+        <div className="flex border-b border-slate-200 bg-slate-50 px-4 sm:px-6 pt-3 gap-2 shrink-0 overflow-x-auto no-scrollbar">
           <button
             onClick={() => { setActiveTab('PROFILE'); setErrorMsg(null); setSuccessMsg(null); }}
-            className={`pb-3 px-3 text-xs font-bold transition-all relative ${
+            className={`pb-3 px-3 text-xs font-bold transition-all relative shrink-0 cursor-pointer ${
               activeTab === 'PROFILE'
                 ? 'text-slate-900 border-b-2 border-amber-600'
                 : 'text-slate-500 hover:text-slate-800'
@@ -341,7 +342,7 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
           </button>
           <button
             onClick={() => { setActiveTab('CHANGE_PASSWORD'); setErrorMsg(null); setSuccessMsg(null); }}
-            className={`pb-3 px-3 text-xs font-bold transition-all relative flex items-center gap-1.5 ${
+            className={`pb-3 px-3 text-xs font-bold transition-all relative flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'CHANGE_PASSWORD'
                 ? 'text-slate-900 border-b-2 border-amber-600'
                 : 'text-slate-500 hover:text-slate-800'
@@ -353,17 +354,17 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 overscroll-contain">
           {activeTab === 'PROFILE' && (
-            <div className="space-y-5">
+            <div className="space-y-4 sm:space-y-5">
               {/* Profile Card & Avatar Management */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-                <div className="flex items-center gap-4">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex items-center gap-3 sm:gap-4">
                   <div className="relative group flex-shrink-0">
                     <img
                       src={getSafeAvatar(currentUser.avatar)}
                       alt={currentUser.name}
-                      className="w-16 h-16 rounded-2xl object-cover border border-slate-300 shadow-sm"
+                      className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border border-slate-300 shadow-sm"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                       }}
@@ -376,10 +377,10 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                   </div>
 
                   <div className="space-y-1 flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-slate-900 truncate">{currentUser.name}</span>
-                      <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-100 text-amber-900 border border-amber-200">
-                        {currentUser.role.replace('_', ' ')}
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span className="text-sm sm:text-base font-bold text-slate-900 break-words leading-tight">{currentUser.name}</span>
+                      <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-mono font-bold rounded-full bg-amber-100 text-amber-900 border border-amber-200 shrink-0">
+                        {currentUser.role.replace(/_/g, ' ')}
                       </span>
                     </div>
                     <div className="text-xs text-slate-600 flex items-center gap-1.5 truncate">
