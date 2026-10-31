@@ -537,82 +537,7 @@ export const INITIAL_LEADS: Lead[] = [
   }
 ];
 
-export const INITIAL_MEDIA_ITEMS: MediaItem[] = [
-  {
-    id: 'media_01',
-    title: 'Kokapet vs. Neopolis: The $15 Billion Micro-Market Masterclass',
-    type: 'MASTERCLASS',
-    duration: '38:45',
-    host: 'Swamy Reddy Javidi',
-    guest: 'Maheshwar Rao',
-    guestTitle: 'Managing Director, Aparna Infra',
-    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Placeholder streamable link
-    thumbnail: ASSET_IMAGES.studioBroadcast,
-    summary: 'Swamy Reddy Javidi breaks down the urban planning blueprint, upcoming 100-meter Trumpet interchanges, FSI regulations, and realistic yield timelines for high-rise sky mansions in Kokapet & Neopolis.',
-    keyTakeaways: [
-      'Why Neopolis land auctions at ₹100 Cr/acre set a floor price of ₹11,000/sqft',
-      'Hydrological impact study of the Musi River rejuvenation on western corridor drainage',
-      'Structural comparison: Steel composite columns vs. high-strength M80 concrete',
-      'Upcoming metro connectivity timeline under Hyderabad Metro Phase 2'
-    ],
-    timestamps: [
-      { time: '00:00', label: 'Executive Intro & Land Auction Retrospective' },
-      { time: '08:20', label: 'Neopolis Infrastructure & Trumpet Interchange Blueprints' },
-      { time: '17:45', label: 'FSI Relaxations & High-Rise Wind Engineering Challenges' },
-      { time: '29:10', label: 'Investor ROI Forecast: 2026 to 2030 Horizon' }
-    ],
-    views: 48200,
-    publishedDate: 'Sep 28, 2026'
-  },
-  {
-    id: 'media_02',
-    title: 'High-Rise Structural Audits: Wind Load Analysis & Soil Testing Norms',
-    type: 'MASTERCLASS',
-    duration: '44:12',
-    host: 'Swamy Reddy Javidi',
-    guest: 'Dr. V. S. Murthy',
-    guestTitle: 'Chief Structural Consultant, Premier Engineering',
-    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    thumbnail: ASSET_IMAGES.heroSkyline,
-    summary: 'An uncompromised deep dive into how buyers and investors must evaluate soil load-bearing capacities, pile depths, and wind tunnel tests for buildings exceeding 50 storeys in Hyderabad Deccan plateau.',
-    keyTakeaways: [
-      'How Deccan granite bedrock influences pile foundation depth',
-      'Wind dampening systems: Tuned mass dampers vs. aerodynamic corner chamfering',
-      'The red flags to check in RERA Form 4 and civil structural certificates'
-    ],
-    timestamps: [
-      { time: '00:00', label: 'Why 50+ Floor Buildings Require Different Physics' },
-      { time: '12:15', label: 'Soil Boring Reports & Standard Penetration Test (SPT) Values' },
-      { time: '24:50', label: 'Vortex Shedding & Aero-elastic Structural Modeling' }
-    ],
-    views: 31900,
-    publishedDate: 'Sep 15, 2026'
-  },
-  {
-    id: 'media_03',
-    title: 'Builder MD Podcast #43: The Future of Biophilic Luxury Communities',
-    type: 'PODCAST',
-    duration: '52:10',
-    host: 'Swamy Reddy Javidi',
-    guest: 'Sudheer Reddy',
-    guestTitle: 'Executive Director, Green Horizon Developers',
-    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    thumbnail: ASSET_IMAGES.commercialHub,
-    summary: 'A candid conversation on whether biophilic sky gardens increase long-term maintenance costs, water consumption realities in gated communities, and how high-net-worth buyers define quiet luxury.',
-    keyTakeaways: [
-      'Subsurface drip irrigation with recycled RO reject water',
-      'Acoustic insulation between floors in open-plan multi-generational layouts',
-      'Transparent builder-buyer escrow protocols under TS-RERA 2.0'
-    ],
-    timestamps: [
-      { time: '00:00', label: 'Defining Biophilic Architecture in Indian Climates' },
-      { time: '18:30', label: 'Maintenance Cost Realities: ₹6 vs ₹12 per sq.ft/month' },
-      { time: '37:10', label: 'Buyer Mindset: What Ultra HNIs Demand in 2026' }
-    ],
-    views: 27400,
-    publishedDate: 'Aug 30, 2026'
-  }
-];
+export const INITIAL_MEDIA_ITEMS: MediaItem[] = [];
 
 export const INITIAL_CONFERENCE: CorporateConference = {
   id: 'conf_live_01',
@@ -826,21 +751,6 @@ export const INITIAL_COMMUNITY_POSTS: CommunityPost[] = [
         createdAt: '18 hours ago'
       }
     ]
-  },
-  {
-    id: 'post_audio_podcast_briefing',
-    authorName: 'Swamy Reddy Javidi',
-    authorRole: 'SUPER_ADMIN',
-    topic: 'Resale & Rental Yield',
-    title: 'Executive Audio Briefing: Western Corridor 2026 Price Appreciation Drivers',
-    content: 'Listen to my 3-minute executive voice note analyzing why Kokapet Neopolis and Radial Road 7 continue to outperform central Hyderabad in capital appreciation and rental yield.',
-    upvotes: 89,
-    createdAt: '3 days ago',
-    mediaType: 'PODCAST',
-    mediaUrl: '/audio/briefing-western-corridor-macro.mp3',
-    thumbnailUrl: ASSET_IMAGES.swamyPortrait,
-    duration: '3:12',
-    replies: []
   },
   {
     id: 'post_rera_due_diligence',

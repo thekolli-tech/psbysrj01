@@ -114,11 +114,24 @@ import {
   toggleDiscussionRepost,
   getUserDiscussionReposts,
   updateLastLogin,
-  restrictUser
+  restrictUser,
+  publishMedia,
+  archiveMedia,
+  createStudioBroadcast,
+  getStudioBroadcastById,
+  getAllStudioBroadcasts,
+  updateStudioBroadcast,
+  startStudioBroadcast,
+  endStudioBroadcast,
+  publishBroadcastReplay,
+  deleteStudioBroadcast
 } from './src/server/db.ts';
+import { resolveAuthoritativeOtpDestination, maskEmailForDisplay, validatePasswordPolicy } from './src/server/otpPolicy.ts';
+import { getMediaStorageConfig, createUploadIntent } from './src/server/mediaStorage.ts';
+import { getLiveStreamingConfig, initializeBroadcastStream, sanitizeBroadcastForViewer } from './src/server/liveStreamService.ts';
 import { validateAvatarUpload } from './src/shared/avatar.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
-import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders, notifySuperAdminsOnSubmission } from './src/server/notifications.ts';
+import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders, notifySuperAdminsOnSubmission, sendPasswordChangeConfirmation } from './src/server/notifications.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
 import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
@@ -650,7 +663,11 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promi
     const existingUser = await findUserByEmail(email);
     if (existingUser) {
       try {
-        await issueEmailOtp(email, 'PASSWORD_RESET');
+        const destination = resolveAuthoritativeOtpDestination(existingUser);
+        await issueEmailOtp(existingUser.email, 'PASSWORD_RESET', fetch, {
+          deliveryRecipient: destination.recipientEmail,
+          purposeLabel: 'Password Reset'
+        });
       } catch (err: any) {
         if (!(err instanceof OtpCooldownError) && err?.name !== 'OtpCooldownError') {
           console.warn('[Property Studio] Password reset email was not issued.');
@@ -941,20 +958,83 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
   }
 });
 
-// Change Password
+// Request Password Change OTP (Authenticated)
+app.post('/api/auth/request-password-change-otp', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  if (rejectIfRateLimited(req, res, 'request-password-change-otp', req.user.id)) return;
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      res.status(404).json({ error: 'User account not found' });
+      return;
+    }
+    const destination = resolveAuthoritativeOtpDestination(user);
+    const masked = maskEmailForDisplay(destination.recipientEmail);
+    await issueEmailOtp(user.email, 'PASSWORD_CHANGE', fetch, {
+      deliveryRecipient: destination.recipientEmail,
+      purposeLabel: 'Password Change'
+    });
+    res.json({
+      success: true,
+      message: `Verification code dispatched to ${masked}`,
+      destination: masked
+    });
+  } catch (err: any) {
+    if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
+      res.status(429).json({ error: err.message });
+      return;
+    }
+    res.status(400).json({ error: err.message || 'Failed to dispatch verification code' });
+  }
+});
+
+// Change Password with mandatory OTP
 app.post('/api/auth/change-password', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword, otp } = req.body;
     if (!currentPassword || !newPassword) {
       res.status(400).json({ error: 'Current password and new password are required' });
       return;
     }
+    if (!otp || typeof otp !== 'string' || !otp.trim()) {
+      res.status(400).json({ error: 'Verification code (OTP) is required to change password' });
+      return;
+    }
 
-    const ok = await changePassword(req.user.id, currentPassword, newPassword);
+    const policyError = validatePasswordPolicy(newPassword);
+    if (policyError) {
+      res.status(400).json({ error: policyError });
+      return;
+    }
+
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      res.status(404).json({ error: 'User account not found' });
+      return;
+    }
+
+    const destination = resolveAuthoritativeOtpDestination(user);
+    const isValidOtp = await verifyOtp(user.email, 'PASSWORD_CHANGE', otp.trim());
+    if (!isValidOtp) {
+      res.status(400).json({ error: 'Invalid or expired verification code' });
+      return;
+    }
+
+    const ok = await changePassword(user.id, currentPassword, newPassword);
     if (!ok) {
       res.status(400).json({ error: 'Incorrect current password' });
       return;
     }
+
+    await createAuditLog({
+      actorId: user.id,
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'USER_PASSWORD_CHANGE_VIA_OTP',
+      targetId: user.id,
+      details: `Password changed successfully via OTP sent to ${destination.recipientEmail}`
+    });
+
+    sendPasswordChangeConfirmation(destination.recipientEmail, user.name).catch(() => {});
 
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (err: any) {
@@ -2619,20 +2699,74 @@ app.delete('/api/admin/communities/:id', requireAdmin, async (req: Request, res:
 // MEDIA, LEADS & CONFERENCE
 // ==============================================================================
 
-app.get('/api/media', async (_req: Request, res: Response): Promise<void> => {
+// Media Storage Configuration (Honest disclosure of provider status)
+app.get('/api/media/storage/config', (_req: Request, res: Response): void => {
+  res.json(getMediaStorageConfig());
+});
+
+// Create Upload Intent (Super Admin only, validates file type & size)
+app.post('/api/media/upload-intent', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const items = await getAllMedia();
+    const { filename, fileName, contentType, mimeType, fileSizeBytes, fileSize, mediaCategory, purpose, title } = req.body;
+    const resolvedName = filename || fileName;
+    const resolvedType = contentType || mimeType;
+    const resolvedSize = Number(fileSizeBytes || fileSize);
+    const rawCategory = String(mediaCategory || purpose || 'VIDEO').toUpperCase();
+    const resolvedCategory = (rawCategory === 'AUDIO' || rawCategory === 'IMAGE') ? rawCategory : 'VIDEO';
+
+    if (!resolvedName || !resolvedType || !resolvedSize) {
+      res.status(400).json({ error: 'filename, contentType, and fileSizeBytes are required.' });
+      return;
+    }
+    const intent = createUploadIntent({
+      filename: resolvedName,
+      contentType: resolvedType,
+      fileSizeBytes: resolvedSize,
+      mediaCategory: resolvedCategory,
+      podcastOrVideoTitle: title
+    });
+    if (!intent.allowed) {
+      res.status(400).json({ error: intent.error || 'Upload not permitted' });
+      return;
+    }
+    res.json(intent);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// List Media Items (Filters drafts/archived for regular users, full access for Super Admin)
+app.get('/api/media', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+    const type = req.query.type as string | undefined;
+    const category = req.query.category as string | undefined;
+    const status = req.query.status as string | undefined;
+    const includeDrafts = isSuperAdmin && req.query.includeDrafts === 'true';
+
+    const items = await getAllMedia({
+      type,
+      category,
+      status: isSuperAdmin && status ? status : (includeDrafts ? undefined : 'PUBLISHED'),
+      includeDrafts
+    });
     res.json({ items });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/media/:id', async (req: Request, res: Response): Promise<void> => {
+// Get Media Item by ID
+app.get('/api/media/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const item = await getMediaById(req.params.id);
     if (!item) {
-      res.status(404).json({ error: 'Media broadcast not found.' });
+      res.status(404).json({ error: 'Media item not found.' });
+      return;
+    }
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+    if (item.status !== 'PUBLISHED' && !isSuperAdmin) {
+      res.status(403).json({ error: 'This media item has not been published.' });
       return;
     }
     res.json({ item });
@@ -2641,45 +2775,264 @@ app.get('/api/media/:id', async (req: Request, res: Response): Promise<void> => 
   }
 });
 
+// Create Media Item (Super Admin only - supports Podcasts & Videos)
 app.post('/api/media', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { title, summary, video_url, thumbnail, type, duration, author_name } = req.body;
+    const {
+      title,
+      summary,
+      video_url,
+      audio_url,
+      media_url,
+      thumbnail,
+      type,
+      category,
+      duration,
+      tags,
+      episode_title,
+      episode_number,
+      host,
+      guest,
+      guest_title,
+      published_date,
+      status,
+      file_size,
+      mime_type,
+      storage_provider,
+      storage_key,
+      author_name
+    } = req.body;
+
     if (!title || typeof title !== 'string' || !title.trim()) {
-      res.status(400).json({ error: 'Title is required for video broadcast.' });
+      res.status(400).json({ error: 'Title is required for media item.' });
       return;
     }
-    if (!summary || typeof summary !== 'string' || !summary.trim()) {
-      res.status(400).json({ error: 'Summary is required for video broadcast.' });
-      return;
-    }
+
     const mediaId = await createMedia({
       title: title.trim(),
-      summary: summary.trim(),
-      video_url: video_url?.trim() || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      thumbnail: thumbnail?.trim() || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+      summary: summary?.trim() || '',
+      video_url: video_url?.trim() || null,
+      audio_url: audio_url?.trim() || null,
+      media_url: media_url?.trim() || video_url?.trim() || audio_url?.trim() || null,
+      thumbnail: thumbnail?.trim() || null,
       type: type || 'MASTERCLASS',
-      duration: duration || '20:00',
-      author_name: author_name?.trim() || req.user?.name || 'Swamy Reddy Javidi'
+      category: category?.trim() || 'General',
+      duration: duration?.trim() || '15:00',
+      tags: tags ? (Array.isArray(tags) ? JSON.stringify(tags) : String(tags)) : null,
+      episode_title: episode_title?.trim() || null,
+      episode_number: episode_number ? Number(episode_number) : null,
+      host: host?.trim() || author_name?.trim() || req.user?.name || 'Property Studio Host',
+      guest: guest?.trim() || null,
+      guest_title: guest_title?.trim() || null,
+      published_date: published_date || (status !== 'DRAFT' ? new Date().toISOString() : null),
+      status: status || 'PUBLISHED',
+      file_size: file_size ? Number(file_size) : null,
+      mime_type: mime_type?.trim() || null,
+      storage_provider: storage_provider?.trim() || null,
+      storage_key: storage_key?.trim() || null,
+      author_id: req.user?.id || null,
+      author_name: author_name?.trim() || req.user?.name || 'Property Studio Host'
     });
+
     res.json({ success: true, mediaId });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
 
+// Update Media Item (Super Admin only)
 app.put('/api/media/:id', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     await updateMedia(req.params.id, req.body);
-    res.json({ success: true, message: 'Media broadcast updated' });
+    res.json({ success: true, message: 'Media item updated' });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
 
+// Publish/Unpublish Media Item (Super Admin only)
+app.post('/api/media/:id/publish', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const published = req.body?.published !== false;
+    const updated = await publishMedia(req.params.id, published);
+    if (!updated) {
+      res.status(404).json({ error: 'Media item not found' });
+      return;
+    }
+    res.json({ success: true, item: updated, message: published ? 'Media published' : 'Media unpublished (draft)' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Archive Media Item (Super Admin only)
+app.post('/api/media/:id/archive', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const updated = await archiveMedia(req.params.id);
+    if (!updated) {
+      res.status(404).json({ error: 'Media item not found' });
+      return;
+    }
+    res.json({ success: true, item: updated, message: 'Media archived' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Delete Media Item (Super Admin only)
 app.delete('/api/media/:id', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     await deleteMedia(req.params.id);
     res.json({ success: true, message: 'Media item deleted' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==============================================================================
+// STUDIO BROADCAST / LIVE TELECAST ENDPOINTS (MODULE 4)
+// ==============================================================================
+
+// Live Streaming Provider Configuration Status
+app.get('/api/studio/config', (_req: Request, res: Response): void => {
+  res.json(getLiveStreamingConfig());
+});
+
+// List broadcasts (sanitized for viewers, private stream credentials reserved for Super Admin)
+app.get('/api/studio/broadcasts', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const status = req.query.status as string | undefined;
+    const includeArchived = req.query.includeArchived === 'true' || status === 'ARCHIVED';
+    let broadcasts = await getAllStudioBroadcasts(includeArchived);
+    if (status) {
+      broadcasts = broadcasts.filter(b => b.status === status);
+    }
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+
+    if (isSuperAdmin) {
+      res.json({ broadcasts });
+    } else {
+      res.json({ broadcasts: broadcasts.map(sanitizeBroadcastForViewer) });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get broadcast by ID
+app.get('/api/studio/broadcasts/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const broadcast = await getStudioBroadcastById(req.params.id);
+    if (!broadcast) {
+      res.status(404).json({ error: 'Broadcast not found' });
+      return;
+    }
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+    if (isSuperAdmin) {
+      res.json({ broadcast });
+    } else {
+      res.json({ broadcast: sanitizeBroadcastForViewer(broadcast) });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create Broadcast (Super Admin only)
+app.post('/api/studio/broadcasts', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { title, description, scheduledStartTime, scheduled_at, thumbnail, poster_url } = req.body;
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      res.status(400).json({ error: 'Broadcast title is required' });
+      return;
+    }
+
+    const streamConfig = await initializeBroadcastStream('pending', title.trim());
+    const broadcastId = await createStudioBroadcast({
+      title: title.trim(),
+      description: description?.trim() || undefined,
+      poster_url: (thumbnail || poster_url)?.trim() || undefined,
+      scheduled_at: scheduledStartTime || scheduled_at || new Date().toISOString(),
+      stream_url: streamConfig.playbackUrl,
+      ingest_url: streamConfig.ingestUrl,
+      stream_key: streamConfig.streamKey,
+      provider: getLiveStreamingConfig().provider || 'unconfigured',
+      created_by: req.user.id
+    });
+
+    const broadcast = await getStudioBroadcastById(broadcastId);
+    res.status(201).json({ success: true, broadcast });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Update Broadcast (Super Admin only)
+app.put('/api/studio/broadcasts/:id', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const updated = await updateStudioBroadcast(req.params.id, req.body);
+    if (!updated) {
+      res.status(404).json({ error: 'Broadcast not found' });
+      return;
+    }
+    res.json({ success: true, broadcast: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Start Broadcast (Super Admin only - status moves to LIVE)
+app.post('/api/studio/broadcasts/:id/start', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const updated = await startStudioBroadcast(req.params.id);
+    if (!updated) {
+      res.status(404).json({ error: 'Broadcast not found' });
+      return;
+    }
+    res.json({ success: true, broadcast: updated, message: 'Broadcast is now LIVE' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// End Broadcast (Super Admin only - status moves to ENDED)
+app.post('/api/studio/broadcasts/:id/end', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const updated = await endStudioBroadcast(req.params.id);
+    if (!updated) {
+      res.status(404).json({ error: 'Broadcast not found' });
+      return;
+    }
+    res.json({ success: true, broadcast: updated, message: 'Broadcast ended' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Publish Replay (Super Admin only - status moves to REPLAY_AVAILABLE)
+app.post('/api/studio/broadcasts/:id/publish-replay', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { replayUrl } = req.body;
+    if (!replayUrl || typeof replayUrl !== 'string') {
+      res.status(400).json({ error: 'Replay URL is required' });
+      return;
+    }
+    const updated = await publishBroadcastReplay(req.params.id, replayUrl.trim());
+    if (!updated) {
+      res.status(404).json({ error: 'Broadcast not found' });
+      return;
+    }
+    res.json({ success: true, broadcast: updated, message: 'Replay published' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Delete Broadcast (Super Admin only)
+app.delete('/api/studio/broadcasts/:id', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    await deleteStudioBroadcast(req.params.id);
+    res.json({ success: true, message: 'Broadcast deleted' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

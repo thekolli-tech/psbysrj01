@@ -1,7 +1,7 @@
 import { discardUnconsumedOtp, generateOtp } from './db.ts';
 import { sendResendOtp } from './notifications.ts';
 
-type OtpPurpose = 'EMAIL_VERIFICATION' | 'PASSWORD_RESET';
+export type OtpPurpose = 'EMAIL_VERIFICATION' | 'PASSWORD_RESET' | 'PASSWORD_CHANGE' | string;
 
 export type EmailOtpFailureCode =
   | 'OTP_NOT_CONFIGURED'
@@ -35,22 +35,32 @@ function emailFailureCode(error: string): EmailOtpFailureCode {
 
 /**
  * Creates a single-use email code and hands it only to Resend.
- * A provider failure deletes the unconsumed code and does not verify an account.
+ * Backward compatible: (target, type, fetchImpl, options)
+ * Supports delivery to a designated security destination (e.g. for Super Admin or Developer)
+ * while binding the database OTP challenge to the authoritative target.
+ * A provider failure deletes the unconsumed code.
  */
 export async function issueEmailOtp(
-  email: string,
+  target: string,
   type: OtpPurpose,
-  fetchImpl: typeof fetch = fetch
-): Promise<{ sent: true; expiresAt: number; provider: string } | { sent: false; code: EmailOtpFailureCode; error: string }> {
+  fetchImpl: typeof fetch = fetch,
+  options: {
+    deliveryRecipient?: string;
+    purposeLabel?: string;
+  } = {}
+): Promise<{ sent: true; expiresAt: number; provider: string; deliveredTo?: string } | { sent: false; code: EmailOtpFailureCode; error: string }> {
   if (!process.env.OTP_HASH_SECRET) {
     return { sent: false, code: 'OTP_NOT_CONFIGURED', error: 'OTP_HASH_SECRET is not configured.' };
   }
-  const { otp, expiresAt } = await generateOtp(email, type);
-  const delivery = await sendResendOtp(email.trim().toLowerCase(), otp, fetchImpl);
+  const deliveryRecipient = (options.deliveryRecipient || target).trim().toLowerCase();
+  const purpose = options.purposeLabel || (type === 'PASSWORD_CHANGE' ? 'Password Change' : (type === 'PASSWORD_RESET' ? 'Password Reset' : 'Account Verification'));
+
+  const { otp, expiresAt } = await generateOtp(target, type as any);
+  const delivery = await sendResendOtp(deliveryRecipient, otp, purpose, fetchImpl);
   if (!delivery.success) {
-    await discardUnconsumedOtp(email, type);
+    await discardUnconsumedOtp(target, type as any);
     const error = delivery.error || 'Email delivery failed.';
     return { sent: false, code: emailFailureCode(error), error };
   }
-  return { sent: true, expiresAt, provider: delivery.provider };
+  return { sent: true, expiresAt, provider: delivery.provider, deliveredTo: deliveryRecipient };
 }

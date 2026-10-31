@@ -247,7 +247,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const res = await fetch('/api/community/posts');
       const data = await res.json();
       if (Array.isArray(data?.posts)) {
-        setCommunityPosts(data.posts);
+        setCommunityPosts(data.posts.filter((p: any) => p.status !== 'DELETED'));
       }
     } catch (_err) {}
   };

@@ -1092,6 +1092,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
 
   const filteredPosts = useMemo(() => {
     return communityPosts.filter(p => {
+      // Deleted posts should never be visible to users in community feeds
+      if (p.status === 'DELETED') return false;
+
       // Search filter
       if (searchError) return false;
       if (searchTerm) {
@@ -1623,8 +1626,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
 
           {/* Feed Tabs: Mobile Dropdown, Tablet/Desktop Tabs */}
           <div className="bg-white p-1.5 sm:p-2 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-1 sm:gap-2">
-            {/* Mobile Dropdown for Feed View */}
-            <div className="sm:hidden relative flex-1 min-w-0 pr-1">
+            {/* Mobile/Tablet Dropdown for Feed View */}
+            <div className="md:hidden relative flex-1 min-w-0 pr-1">
               <select
                 id="feed-view-select"
                 aria-label="Feed View"
@@ -1642,8 +1645,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
-            {/* Desktop / Tablet Tabs */}
-            <div className="hidden sm:flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0 pr-1">
+            {/* Desktop Tabs */}
+            <div className="hidden md:flex items-center gap-1 overflow-x-auto no-scrollbar flex-1 min-w-0 pr-1">
               {[
                 { id: 'ALL', label: 'All Discussions', icon: Globe },
                 { id: 'FOR_YOU', label: 'For You', icon: Sparkles },
@@ -1703,8 +1706,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             </div>
           </div>
 
-          {/* Topics Selector: Dropdown on Mobile, Carousel on Desktop */}
-          <div className="sm:hidden flex items-center gap-2 w-full">
+          {/* Topics Selector: Dropdown on Mobile/Tablet, Carousel on Desktop */}
+          <div className="md:hidden flex items-center gap-2 w-full">
             <label htmlFor="discussion-topic-select" className="text-xs font-bold text-slate-700 shrink-0 flex items-center gap-1">
               <span>Topic:</span>
             </label>
@@ -1726,7 +1729,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5">
+          <div className="hidden md:flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5">
             {COMMUNITY_TOPIC_LIST.map(topic => (
               <button
                 key={topic}

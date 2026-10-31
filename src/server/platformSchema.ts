@@ -69,6 +69,23 @@ ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_reviewed_at TIMEST
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_reviewed_by VARCHAR(64);
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS deletion_rejection_reason TEXT;
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS previous_status VARCHAR(32);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'PUBLISHED';
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS category VARCHAR(128) DEFAULT 'Real Estate Intelligence';
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS tags TEXT DEFAULT '[]';
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS episode_title VARCHAR(255);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS episode_number VARCHAR(32);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS host VARCHAR(255) DEFAULT 'Swamy Reddy Javidi';
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS guest VARCHAR(255);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS guest_title VARCHAR(255);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS published_date VARCHAR(64);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS audio_url TEXT;
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS media_url TEXT;
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS file_size BIGINT DEFAULT 0;
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS mime_type VARCHAR(128);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(64) DEFAULT 'PERSISTENT_STORAGE';
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS storage_key TEXT;
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS author_id VARCHAR(64);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS professional_profiles (
   user_id VARCHAR(64) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -297,6 +314,28 @@ CREATE TABLE IF NOT EXISTS community_post_reposts (
 );
 CREATE INDEX IF NOT EXISTS idx_comm_reposts_post ON community_post_reposts(post_id);
 CREATE INDEX IF NOT EXISTS idx_comm_reposts_user ON community_post_reposts(user_id);
+
+CREATE TABLE IF NOT EXISTS studio_broadcasts (
+  id VARCHAR(64) PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  poster_url TEXT,
+  scheduled_at TIMESTAMPTZ,
+  started_at TIMESTAMPTZ,
+  ended_at TIMESTAMPTZ,
+  status VARCHAR(32) NOT NULL DEFAULT 'SCHEDULED',
+  stream_url TEXT,
+  replay_url TEXT,
+  ingest_url TEXT,
+  stream_key TEXT,
+  provider VARCHAR(64) DEFAULT 'CLOUDFLARE_STREAM',
+  viewer_count INTEGER DEFAULT 0,
+  recording_enabled SMALLINT DEFAULT 1,
+  created_by VARCHAR(64),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_studio_broadcasts_status ON studio_broadcasts(status, scheduled_at);
 `;
 
 export const ESSENTIAL_CONFIG_SQL = `
@@ -354,7 +393,24 @@ export const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE community_posts ADD COLUMN deletion_reviewed_at TEXT',
   'ALTER TABLE community_posts ADD COLUMN deletion_reviewed_by TEXT',
   'ALTER TABLE community_posts ADD COLUMN deletion_rejection_reason TEXT',
-  'ALTER TABLE community_posts ADD COLUMN previous_status TEXT'
+  'ALTER TABLE community_posts ADD COLUMN previous_status TEXT',
+  'ALTER TABLE media_items ADD COLUMN status TEXT DEFAULT \'PUBLISHED\'',
+  'ALTER TABLE media_items ADD COLUMN category TEXT DEFAULT \'Real Estate Intelligence\'',
+  'ALTER TABLE media_items ADD COLUMN tags TEXT DEFAULT \'[]\'',
+  'ALTER TABLE media_items ADD COLUMN episode_title TEXT',
+  'ALTER TABLE media_items ADD COLUMN episode_number TEXT',
+  'ALTER TABLE media_items ADD COLUMN host TEXT DEFAULT \'Swamy Reddy Javidi\'',
+  'ALTER TABLE media_items ADD COLUMN guest TEXT',
+  'ALTER TABLE media_items ADD COLUMN guest_title TEXT',
+  'ALTER TABLE media_items ADD COLUMN published_date TEXT',
+  'ALTER TABLE media_items ADD COLUMN audio_url TEXT',
+  'ALTER TABLE media_items ADD COLUMN media_url TEXT',
+  'ALTER TABLE media_items ADD COLUMN file_size INTEGER DEFAULT 0',
+  'ALTER TABLE media_items ADD COLUMN mime_type TEXT',
+  'ALTER TABLE media_items ADD COLUMN storage_provider TEXT DEFAULT \'PERSISTENT_STORAGE\'',
+  'ALTER TABLE media_items ADD COLUMN storage_key TEXT',
+  'ALTER TABLE media_items ADD COLUMN author_id TEXT',
+  'ALTER TABLE media_items ADD COLUMN updated_at TEXT'
 ];
 
 export const SQLITE_TABLE_SQL = `
@@ -540,6 +596,26 @@ CREATE TABLE IF NOT EXISTS community_post_reposts (
   note TEXT,
   created_at TEXT NOT NULL,
   UNIQUE (post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS studio_broadcasts (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  poster_url TEXT,
+  scheduled_at TEXT,
+  started_at TEXT,
+  ended_at TEXT,
+  status TEXT NOT NULL DEFAULT 'SCHEDULED',
+  stream_url TEXT,
+  replay_url TEXT,
+  ingest_url TEXT,
+  stream_key TEXT,
+  provider TEXT DEFAULT 'CLOUDFLARE_STREAM',
+  viewer_count INTEGER DEFAULT 0,
+  recording_enabled INTEGER DEFAULT 1,
+  created_by TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 );
 `;
 

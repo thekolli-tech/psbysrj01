@@ -787,7 +787,7 @@ async function withPgTransaction<T>(lockKeys: string[], fn: (client: PoolClient)
 
 export async function pgGenerateOtp(
   target: string,
-  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET'
+  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET' | 'PASSWORD_CHANGE' | string
 ): Promise<{ otp: string; expiresAt: number }> {
   const normalizedTarget = canonicalOtpTarget(type, target);
   return withPgTransaction([`otp:${type}:${normalizedTarget}`], async (client) => {
@@ -822,7 +822,7 @@ export async function pgGenerateOtp(
 
 export async function pgVerifyOtp(
   target: string,
-  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET',
+  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET' | 'PASSWORD_CHANGE' | string,
   code: string
 ): Promise<boolean> {
   const normalizedTarget = canonicalOtpTarget(type, target);
@@ -1220,7 +1220,7 @@ export async function pgGetAllPosts(params?: {
     // Platform administrators see active & pending posts in general feed, excluding DELETED unless requested
     query += " AND p.status != 'DELETED'";
   } else if (params?.currentUserId) {
-    query += ` AND ((p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')) OR (p.author_id = $${paramIdx++} AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED', 'DELETED', 'PENDING_DELETION')))`;
+    query += ` AND ((p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')) OR (p.author_id = ${paramIdx++} AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED', 'PENDING_DELETION')))`;
     args.push(params.currentUserId);
   } else {
     query += " AND p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')";
@@ -2850,48 +2850,127 @@ export async function pgDeleteCommunity(id: string): Promise<boolean> {
 // MEDIA, LEADS, CONFERENCE (POSTGRESQL)
 // ==============================================================================
 
-export async function pgGetAllMedia(): Promise<DbMediaItem[]> {
-  await ensurePostgresAdditiveSchema();
-  const res = await queryPostgres('SELECT * FROM media_items ORDER BY created_at DESC');
-  if (res.rows.length === 0) {
-    for (const item of DEFAULT_MEDIA_ITEMS) {
-      try {
-        await queryPostgres(`
-          INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          ON CONFLICT (id) DO NOTHING
-        `, [item.id, item.title, item.summary, item.video_url, item.thumbnail, item.type, item.duration, item.views, item.author_name, item.created_at]);
-      } catch {}
-    }
-    const seeded = await queryPostgres('SELECT * FROM media_items ORDER BY created_at DESC');
-    if (seeded.rows.length > 0) {
-      return seeded.rows.map((m: any) => ({
-        id: m.id,
-        title: m.title,
-        summary: m.summary,
-        video_url: m.video_url,
-        thumbnail: m.thumbnail,
-        type: m.type,
-        duration: m.duration,
-        views: Number(m.views || 0),
-        author_name: m.author_name,
-        created_at: toIso(m.created_at)
-      }));
-    }
-    return DEFAULT_MEDIA_ITEMS;
-  }
-  return res.rows.map((m: any) => ({
+export interface DbStudioBroadcast {
+  id: string;
+  title: string;
+  description: string;
+  poster_url: string;
+  scheduled_at: string;
+  started_at?: string;
+  ended_at?: string;
+  status: 'SCHEDULED' | 'LIVE' | 'ENDED' | 'REPLAY_AVAILABLE' | 'ARCHIVED';
+  stream_url?: string;
+  replay_url?: string;
+  ingest_url?: string;
+  stream_key?: string;
+  provider: string;
+  viewer_count: number;
+  recording_enabled: number;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapPgMediaItem(m: any): DbMediaItem {
+  return {
     id: m.id,
     title: m.title,
-    summary: m.summary,
-    video_url: m.video_url,
-    thumbnail: m.thumbnail,
+    summary: m.summary || '',
+    video_url: m.video_url || '',
+    thumbnail: m.thumbnail || '',
     type: m.type,
-    duration: m.duration,
+    duration: m.duration || '15:00',
     views: Number(m.views || 0),
-    author_name: m.author_name,
-    created_at: toIso(m.created_at)
-  }));
+    author_name: m.author_name || 'Swamy Reddy Javidi',
+    created_at: toIso(m.created_at),
+    status: m.status || 'PUBLISHED',
+    category: m.category || 'Real Estate Intelligence',
+    tags: m.tags || '[]',
+    episode_title: m.episode_title || '',
+    episode_number: m.episode_number || '',
+    host: m.host || 'Swamy Reddy Javidi',
+    guest: m.guest || '',
+    guest_title: m.guest_title || '',
+    published_date: m.published_date || '',
+    audio_url: m.audio_url || '',
+    media_url: m.media_url || '',
+    file_size: Number(m.file_size || 0),
+    mime_type: m.mime_type || '',
+    storage_provider: m.storage_provider || 'PERSISTENT_STORAGE',
+    storage_key: m.storage_key || '',
+    author_id: m.author_id || '',
+    updated_at: toIso(m.updated_at)
+  };
+}
+
+function mapPgStudioBroadcast(b: any): DbStudioBroadcast {
+  return {
+    id: b.id,
+    title: b.title,
+    description: b.description || '',
+    poster_url: b.poster_url || '',
+    scheduled_at: toIso(b.scheduled_at),
+    started_at: b.started_at ? toIso(b.started_at) : undefined,
+    ended_at: b.ended_at ? toIso(b.ended_at) : undefined,
+    status: b.status || 'SCHEDULED',
+    stream_url: b.stream_url || '',
+    replay_url: b.replay_url || '',
+    ingest_url: b.ingest_url || '',
+    stream_key: b.stream_key || '',
+    provider: b.provider || 'CLOUDFLARE_STREAM',
+    viewer_count: Number(b.viewer_count || 0),
+    recording_enabled: Number(b.recording_enabled ?? 1),
+    created_by: b.created_by || '',
+    created_at: toIso(b.created_at),
+    updated_at: toIso(b.updated_at)
+  };
+}
+
+export async function pgGetAllMedia(params?: {
+  type?: string;
+  status?: string;
+  category?: string;
+  includeDrafts?: boolean;
+}): Promise<DbMediaItem[]> {
+  await ensurePostgresAdditiveSchema();
+  let query = "SELECT * FROM media_items WHERE 1=1 AND id NOT IN ('media_01', 'media_02') AND status != 'DELETED'";
+  const args: any[] = [];
+  let idx = 1;
+
+  if (!params?.includeDrafts) {
+    query += " AND (status = 'PUBLISHED' OR status IS NULL OR status = '')";
+  } else if (params?.status) {
+    query += " AND status = $" + (idx++);
+    args.push(params.status);
+  }
+
+  if (params?.type && params.type !== 'ALL') {
+    query += " AND type = $" + (idx++);
+    args.push(params.type);
+  }
+
+  if (params?.category) {
+    query += " AND category = $" + (idx++);
+    args.push(params.category);
+  }
+
+  query += ' ORDER BY created_at DESC';
+  const res = await queryPostgres(query, args);
+
+  if (res.rows.length === 0 && (!params || Object.keys(params).length === 0 || params.includeDrafts)) {
+    for (const item of DEFAULT_MEDIA_ITEMS) {
+      try {
+        await queryPostgres(
+          "INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'PUBLISHED') ON CONFLICT (id) DO NOTHING",
+          [item.id, item.title, item.summary, item.video_url, item.thumbnail, item.type, item.duration, item.views, item.author_name, item.created_at]
+        );
+      } catch {}
+    }
+    const fresh = await queryPostgres('SELECT * FROM media_items ORDER BY created_at DESC');
+    return fresh.rows.map(mapPgMediaItem);
+  }
+
+  return res.rows.map(mapPgMediaItem);
 }
 
 export async function pgGetMediaById(id: string): Promise<DbMediaItem | null> {
@@ -2899,75 +2978,205 @@ export async function pgGetMediaById(id: string): Promise<DbMediaItem | null> {
   const res = await queryPostgres('SELECT * FROM media_items WHERE id = $1', [id]);
   if (res.rows.length === 0) {
     const fallback = DEFAULT_MEDIA_ITEMS.find(m => m.id === id);
-    return fallback || null;
+    return fallback ? mapPgMediaItem(fallback) : null;
   }
-  const m = res.rows[0];
-  return {
-    id: m.id,
-    title: m.title,
-    summary: m.summary,
-    video_url: m.video_url,
-    thumbnail: m.thumbnail,
-    type: m.type,
-    duration: m.duration,
-    views: Number(m.views || 0),
-    author_name: m.author_name,
-    created_at: toIso(m.created_at)
-  };
+  return mapPgMediaItem(res.rows[0]);
 }
 
 export async function pgCreateMedia(item: {
   title: string;
   summary: string;
-  video_url: string;
-  thumbnail: string;
-  type: 'MASTERCLASS' | 'PODCAST' | 'SITE_AUDIT';
+  video_url?: string;
+  thumbnail?: string;
+  type: string;
   duration?: string;
   author_name?: string;
+  status?: string;
+  category?: string;
+  tags?: string;
+  episode_title?: string;
+  episode_number?: string;
+  host?: string;
+  guest?: string;
+  guest_title?: string;
+  published_date?: string;
+  audio_url?: string;
+  media_url?: string;
+  file_size?: number;
+  mime_type?: string;
+  storage_provider?: string;
+  storage_key?: string;
+  author_id?: string;
 }): Promise<string> {
   await ensurePostgresAdditiveSchema();
-  const id = `media_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  const id = "media_" + Date.now() + "_" + crypto.randomBytes(3).toString('hex');
   const now = new Date().toISOString();
-  await queryPostgres(`
-    INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9)
-  `, [
-    id,
-    item.title,
-    item.summary,
-    item.video_url,
-    item.thumbnail,
-    item.type,
-    item.duration || '15:00',
-    item.author_name || 'Swamy Reddy Javidi',
-    now
-  ]);
+  await queryPostgres(
+    "INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at, status, category, tags, episode_title, episode_number, host, guest, guest_title, published_date, audio_url, media_url, file_size, mime_type, storage_provider, storage_key, author_id, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)",
+    [
+      id,
+      item.title,
+      item.summary || '',
+      item.video_url || item.media_url || '',
+      item.thumbnail || '',
+      item.type,
+      item.duration || '15:00',
+      item.author_name || 'Swamy Reddy Javidi',
+      now,
+      item.status || 'PUBLISHED',
+      item.category || 'Real Estate Intelligence',
+      item.tags || '[]',
+      item.episode_title || '',
+      item.episode_number || '',
+      item.host || 'Swamy Reddy Javidi',
+      item.guest || '',
+      item.guest_title || '',
+      item.published_date || '',
+      item.audio_url || '',
+      item.media_url || '',
+      item.file_size || 0,
+      item.mime_type || '',
+      item.storage_provider || 'PERSISTENT_STORAGE',
+      item.storage_key || '',
+      item.author_id || '',
+      now
+    ]
+  );
   return id;
 }
 
 export async function pgUpdateMedia(
   id: string,
-  updates: Partial<{ title: string; summary: string; video_url: string; thumbnail: string; type: string; duration: string }>
+  updates: Record<string, any>
 ): Promise<boolean> {
   await ensurePostgresAdditiveSchema();
-  const fields: string[] = [];
-  const args: any[] = [];
+  const fields = [];
+  const args = [];
   let idx = 1;
-  if (updates.title) { fields.push(`title = $${idx++}`); args.push(updates.title); }
-  if (updates.summary) { fields.push(`summary = $${idx++}`); args.push(updates.summary); }
-  if (updates.video_url) { fields.push(`video_url = $${idx++}`); args.push(updates.video_url); }
-  if (updates.thumbnail) { fields.push(`thumbnail = $${idx++}`); args.push(updates.thumbnail); }
-  if (updates.type) { fields.push(`type = $${idx++}`); args.push(updates.type); }
-  if (updates.duration) { fields.push(`duration = $${idx++}`); args.push(updates.duration); }
+
+  for (const [key, val] of Object.entries(updates)) {
+    if (val !== undefined && key !== 'id') {
+      fields.push(key + " = $" + (idx++));
+      args.push(val);
+    }
+  }
   if (fields.length === 0) return true;
+  fields.push("updated_at = NOW()");
   args.push(id);
-  await queryPostgres(`UPDATE media_items SET ${fields.join(', ')} WHERE id = $${idx}`, args);
+  await queryPostgres("UPDATE media_items SET " + fields.join(', ') + " WHERE id = $" + idx, args);
   return true;
 }
 
 export async function pgDeleteMedia(id: string): Promise<boolean> {
   await ensurePostgresAdditiveSchema();
   await queryPostgres('DELETE FROM media_items WHERE id = $1', [id]);
+  return true;
+}
+
+export async function pgPublishMedia(id: string, published: boolean): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  const status = published ? 'PUBLISHED' : 'DRAFT';
+  await queryPostgres("UPDATE media_items SET status = $1, updated_at = NOW() WHERE id = $2", [status, id]);
+  return true;
+}
+
+export async function pgArchiveMedia(id: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  await queryPostgres("UPDATE media_items SET status = 'ARCHIVED', updated_at = NOW() WHERE id = $1", [id]);
+  return true;
+}
+
+export async function pgCreateStudioBroadcast(item: {
+  id?: string;
+  title: string;
+  description?: string;
+  poster_url?: string;
+  scheduled_at?: string;
+  stream_url?: string;
+  replay_url?: string;
+  ingest_url?: string;
+  stream_key?: string;
+  provider?: string;
+  created_by?: string;
+}): Promise<string> {
+  await ensurePostgresAdditiveSchema();
+  const id = item.id || ("sb_" + Date.now() + "_" + crypto.randomBytes(3).toString('hex'));
+  const scheduledAt = item.scheduled_at ? new Date(item.scheduled_at).toISOString() : new Date().toISOString();
+  await queryPostgres(
+    "INSERT INTO studio_broadcasts (id, title, description, poster_url, scheduled_at, status, stream_url, replay_url, ingest_url, stream_key, provider, viewer_count, recording_enabled, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, 'SCHEDULED', $6, $7, $8, $9, $10, 0, 1, $11, NOW(), NOW())",
+    [
+      id,
+      item.title,
+      item.description || '',
+      item.poster_url || '',
+      scheduledAt,
+      item.stream_url || '',
+      item.replay_url || '',
+      item.ingest_url || '',
+      item.stream_key || '',
+      item.provider || 'CLOUDFLARE_STREAM',
+      item.created_by || 'admin'
+    ]
+  );
+  return id;
+}
+
+export async function pgGetStudioBroadcastById(id: string): Promise<DbStudioBroadcast | null> {
+  await ensurePostgresAdditiveSchema();
+  const res = await queryPostgres('SELECT * FROM studio_broadcasts WHERE id = $1', [id]);
+  if (res.rows.length === 0) return null;
+  return mapPgStudioBroadcast(res.rows[0]);
+}
+
+export async function pgGetAllStudioBroadcasts(includeArchived = false): Promise<DbStudioBroadcast[]> {
+  await ensurePostgresAdditiveSchema();
+  const sql = includeArchived
+    ? 'SELECT * FROM studio_broadcasts ORDER BY scheduled_at DESC'
+    : "SELECT * FROM studio_broadcasts WHERE status != 'ARCHIVED' ORDER BY scheduled_at DESC";
+  const res = await queryPostgres(sql);
+  return res.rows.map(mapPgStudioBroadcast);
+}
+
+export async function pgUpdateStudioBroadcast(id: string, updates: Record<string, any>): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  const fields = [];
+  const args = [];
+  let idx = 1;
+
+  for (const [key, val] of Object.entries(updates)) {
+    if (val !== undefined && key !== 'id') {
+      fields.push(key + " = $" + (idx++));
+      args.push(key === 'scheduled_at' && val ? new Date(val).toISOString() : val);
+    }
+  }
+  if (fields.length === 0) return true;
+  fields.push("updated_at = NOW()");
+  args.push(id);
+  await queryPostgres("UPDATE studio_broadcasts SET " + fields.join(', ') + " WHERE id = $" + idx, args);
+  return true;
+}
+
+export async function pgStartStudioBroadcast(id: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  await queryPostgres("UPDATE studio_broadcasts SET status = 'LIVE', started_at = NOW(), updated_at = NOW() WHERE id = $1", [id]);
+  return true;
+}
+
+export async function pgEndStudioBroadcast(id: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  await queryPostgres("UPDATE studio_broadcasts SET status = 'ENDED', ended_at = NOW(), updated_at = NOW() WHERE id = $1", [id]);
+  return true;
+}
+
+export async function pgPublishBroadcastReplay(id: string, replayUrl: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  await queryPostgres("UPDATE studio_broadcasts SET status = 'REPLAY_AVAILABLE', replay_url = $1, updated_at = NOW() WHERE id = $2", [replayUrl, id]);
+  return true;
+}
+
+export async function pgDeleteStudioBroadcast(id: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  await queryPostgres('DELETE FROM studio_broadcasts WHERE id = $1', [id]);
   return true;
 }
 

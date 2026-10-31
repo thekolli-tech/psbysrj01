@@ -47,7 +47,7 @@ export const MediaEngine: React.FC<{
 
   const isSuperAdmin = Boolean(isLoggedIn && currentUser?.role === 'SUPER_ADMIN');
 
-  const [activeTab, setActiveTab] = useState<'ALL' | 'MASTERCLASS' | 'PODCAST'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'MASTERCLASS'>('ALL');
   const [engagement, setEngagement] = useState<{
     likesCount: number;
     hasLiked: boolean;
@@ -77,7 +77,8 @@ export const MediaEngine: React.FC<{
   const [newSummary, setNewSummary] = useState('');
   const [newHost, setNewHost] = useState(currentUser?.name || 'Swamy Reddy Javidi');
 
-  const activeVideo = selectedMedia || (mediaItems.length > 0 ? mediaItems[0] : null);
+  const visibleMedia = mediaItems.filter(m => m.type !== 'PODCAST');
+  const activeVideo = selectedMedia && selectedMedia.type !== 'PODCAST' ? selectedMedia : (visibleMedia.length > 0 ? visibleMedia[0] : null);
 
   // Sync engagement & comments from server for active video
   useEffect(() => {
@@ -296,6 +297,7 @@ export const MediaEngine: React.FC<{
   };
 
   const filteredItems = mediaItems.filter(item => {
+    if (item.id === 'media_01' || item.id === 'media_02' || item.status === 'DELETED') return false;
     if (activeTab === 'ALL') return true;
     return item.type === activeTab;
   });
@@ -310,7 +312,7 @@ export const MediaEngine: React.FC<{
             YOUTUBE-STYLE VISUAL STORIES & STRUCTURAL AUDITS
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white font-display">
-            Masterclasses & Builder MD Podcasts
+            Masterclasses & Video Broadcasts
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
             Hosted by <strong className="text-white">Swamy Reddy Javidi</strong>. Unbiased technical breakdowns, soil load certifications, and candid interviews with top infrastructure leaders.
@@ -536,11 +538,11 @@ export const MediaEngine: React.FC<{
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-3">
             <h3 className="text-base font-bold text-slate-900 font-display">
-              All Broadcasts & Podcasts ({filteredItems.length})
+              All Broadcasts & Masterclasses ({filteredItems.length})
             </h3>
 
             <div className="flex gap-2">
-              {(['ALL', 'MASTERCLASS', 'PODCAST'] as const).map(tab => (
+              {(['ALL', 'MASTERCLASS'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -550,7 +552,7 @@ export const MediaEngine: React.FC<{
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  {tab === 'ALL' ? 'All Formats' : tab}
+                  {tab === 'ALL' ? 'All Formats' : 'Masterclasses'}
                 </button>
               ))}
             </div>

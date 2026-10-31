@@ -16,7 +16,7 @@ process.env.NODE_ENV = 'test';
 // Empty, not deleted. Importing server.ts loads dotenv, which would fill a missing DATABASE_URL from .env and attach these tests to Neon.
 process.env.DATABASE_URL = '';
 process.env.DB_ENGINE = 'sqlite';
-process.env.SQLITE_PATH = `/tmp/ps-email-otp-${process.pid}.db`;
+process.env.SQLITE_PATH = `/tmp/ps-email-otp-${process.pid}-${Date.now()}.db`;
 process.env.OTP_HASH_SECRET = 'test-pepper-not-used-in-production';
 delete process.env.RESEND_API_KEY;
 delete process.env.EMAIL_FROM;

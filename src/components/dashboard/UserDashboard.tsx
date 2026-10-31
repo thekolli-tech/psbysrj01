@@ -263,6 +263,10 @@ export const UserDashboard: React.FC = () => {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordSuccessMsg, setPasswordSuccessMsg] = useState<string | null>(null);
   const [passwordErrorMsg, setPasswordErrorMsg] = useState<string | null>(null);
+  const [passwordStep, setPasswordStep] = useState<'INPUT' | 'OTP'>('INPUT');
+  const [passwordOtp, setPasswordOtp] = useState('');
+  const [otpDestination, setOtpDestination] = useState<string | null>(null);
+  const [requestingOtp, setRequestingOtp] = useState(false);
 
   // Fetch requirements
   const fetchRequirements = useCallback(async () => {
@@ -550,11 +554,16 @@ export const UserDashboard: React.FC = () => {
     }
   };
 
-  // Change password
-  const handleChangePassword = async (e: React.FormEvent) => {
+  // Request Password Change OTP
+  const handleRequestPasswordOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordSuccessMsg(null);
     setPasswordErrorMsg(null);
+
+    if (!currentPassword) {
+      setPasswordErrorMsg('Please enter your current password.');
+      return;
+    }
 
     if (newPassword.length < 8) {
       setPasswordErrorMsg('New password must be at least 8 characters long.');
@@ -566,28 +575,60 @@ export const UserDashboard: React.FC = () => {
       return;
     }
 
-    setSavingPassword(true);
+    setRequestingOtp(true);
+    try {
+      const res = await fetch('/api/auth/request-password-change-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to request verification code');
 
+      setOtpDestination(data.destination || 'your registered email');
+      setPasswordStep('OTP');
+      showToast('Security verification code dispatched.');
+    } catch (err: any) {
+      setPasswordErrorMsg(err.message || 'Failed to request verification code.');
+    } finally {
+      setRequestingOtp(false);
+    }
+  };
+
+  // Confirm Password Change with OTP
+  const handleConfirmPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordSuccessMsg(null);
+    setPasswordErrorMsg(null);
+
+    if (!passwordOtp || passwordOtp.trim().length !== 6) {
+      setPasswordErrorMsg('Please enter the 6-digit verification code.');
+      return;
+    }
+
+    setSavingPassword(true);
     try {
       const res = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           currentPassword,
-          newPassword
+          newPassword,
+          otp: passwordOtp.trim()
         })
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update password');
 
-      setPasswordSuccessMsg('Password changed successfully.');
+      setPasswordSuccessMsg(`Password changed successfully! A confirmation notice was sent to ${otpDestination || 'your email'}.`);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setPasswordOtp('');
+      setPasswordStep('INPUT');
       showToast('Password updated.');
     } catch (err: any) {
-      setPasswordErrorMsg(err.message || 'Failed to update password. Check your current password.');
+      setPasswordErrorMsg(err.message || 'Failed to update password. Check your verification code and current password.');
     } finally {
       setSavingPassword(false);
     }
@@ -2343,69 +2384,118 @@ export const UserDashboard: React.FC = () => {
                 </div>
               )}
 
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Current Password</label>
-                  <div className="relative">
+              {passwordStep === 'INPUT' ? (
+                <form onSubmit={handleRequestPasswordOtp} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Current Password</label>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={e => setCurrentPassword(e.target.value)}
+                        placeholder="Enter current password"
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">New Password</label>
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        placeholder="Minimum 8 characters"
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Confirm New Password</label>
                     <input
-                      type={showCurrentPassword ? 'text' : 'password'}
-                      value={currentPassword}
-                      onChange={e => setCurrentPassword(e.target.value)}
-                      placeholder="Enter current password"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter new password"
                       className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       required
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">New Password</label>
-                  <div className="relative">
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Security Notice: An OTP code will be sent to your registered email to confirm this change.</span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={requestingOtp}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                  >
+                    {requestingOtp ? 'Dispatching Verification Code...' : 'Request Security Code (OTP)'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleConfirmPasswordChange} className="space-y-4">
+                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 space-y-1">
+                    <span className="font-bold block">Security Code Dispatched</span>
+                    <p className="text-[11px] text-blue-800">
+                      Enter the 6-digit verification code sent to <strong className="font-mono">{otpDestination}</strong>.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">6-Digit Code</label>
                     <input
-                      type={showNewPassword ? 'text' : 'password'}
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      placeholder="Minimum 8 characters"
-                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      value={passwordOtp}
+                      onChange={e => setPasswordOtp(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Enter 6-digit code"
+                      className="w-full px-3.5 py-3 text-center text-lg font-mono font-bold tracking-widest border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       required
+                      autoFocus
                     />
+                  </div>
+
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      onClick={() => setPasswordStep('INPUT')}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
                     >
-                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingPassword || passwordOtp.length !== 6}
+                      className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                    >
+                      {savingPassword ? 'Verifying & Updating...' : 'Confirm & Update Password'}
                     </button>
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Confirm New Password</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    placeholder="Re-enter new password"
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={savingPassword}
-                  className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-sm"
-                >
-                  {savingPassword ? 'Updating Password...' : 'Update Password'}
-                </button>
-              </form>
+                </form>
+              )}
             </div>
           </div>
 

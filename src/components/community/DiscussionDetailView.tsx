@@ -691,6 +691,28 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
   const pollOpts = post.pollOptions || [];
   const totalPollVotes = pollOpts.reduce((sum: number, opt: any) => sum + Number(opt.votes || 0), 0);
 
+  if (post.status === 'DELETED') {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center space-y-4">
+        <div className="w-16 h-16 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center mx-auto text-2xl">
+          🗑️
+        </div>
+        <h2 className="text-xl font-bold text-slate-800">This discussion has been deleted</h2>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          The requested discussion post is no longer available as it has been deleted.
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Return to Discussions</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200" id="discussion-detail-container">
       {/* Back Navigation Bar */}
@@ -970,7 +992,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {currentUser && post.authorId === currentUser.id && post.status !== 'DELETED' && (
+            {currentUser && post.authorId === currentUser.id && (
               <>
                 {post.status === 'PENDING_DELETION' || post.deletionStatus === 'PENDING' ? (
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-300 px-2.5 py-1 rounded-full">

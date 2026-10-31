@@ -108,6 +108,16 @@ import {
   pgCreateMedia,
   pgUpdateMedia,
   pgDeleteMedia,
+  pgPublishMedia,
+  pgArchiveMedia,
+  pgCreateStudioBroadcast,
+  pgGetStudioBroadcastById,
+  pgGetAllStudioBroadcasts,
+  pgUpdateStudioBroadcast,
+  pgStartStudioBroadcast,
+  pgEndStudioBroadcast,
+  pgPublishBroadcastReplay,
+  pgDeleteStudioBroadcast,
   pgToggleMediaLike,
   pgSetMediaReaction,
   pgAddMediaComment,
@@ -246,7 +256,7 @@ export interface DbSession {
 export interface DbOtp {
   id: string;
   target: string;
-  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET';
+  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET' | 'PASSWORD_CHANGE' | string | 'PASSWORD_CHANGE' | string | 'PASSWORD_CHANGE' | string;
   otp_hash: string;
   otp_raw?: string;
   expires_at: number;
@@ -465,11 +475,49 @@ export interface DbMediaItem {
   summary: string;
   video_url: string;
   thumbnail: string;
-  type: 'MASTERCLASS' | 'PODCAST' | 'SITE_AUDIT';
+  type: string;
   duration: string;
   views: number;
   author_name: string;
   created_at: string;
+  status?: string;
+  category?: string;
+  tags?: string;
+  episode_title?: string;
+  episode_number?: string;
+  host?: string;
+  guest?: string;
+  guest_title?: string;
+  published_date?: string;
+  audio_url?: string;
+  media_url?: string;
+  file_size?: number;
+  mime_type?: string;
+  storage_provider?: string;
+  storage_key?: string;
+  author_id?: string;
+  updated_at?: string;
+}
+
+export interface DbStudioBroadcast {
+  id: string;
+  title: string;
+  description: string;
+  poster_url: string;
+  scheduled_at: string;
+  started_at?: string;
+  ended_at?: string;
+  status: 'SCHEDULED' | 'LIVE' | 'ENDED' | 'REPLAY_AVAILABLE' | 'ARCHIVED';
+  stream_url?: string;
+  replay_url?: string;
+  ingest_url?: string;
+  stream_key?: string;
+  provider: string;
+  viewer_count: number;
+  recording_enabled: number;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DbMediaComment {
@@ -510,32 +558,7 @@ export interface DbUserRepostItem {
   originalCreator: string;
 }
 
-export const DEFAULT_MEDIA_ITEMS: DbMediaItem[] = [
-  {
-    id: 'media_01',
-    title: 'Kokapet vs. Neopolis: The $15 Billion Micro-Market Masterclass',
-    summary: 'Swamy Reddy Javidi breaks down the urban planning blueprint, upcoming 100-meter Trumpet interchanges, FSI regulations, and realistic yield timelines for high-rise sky mansions in Kokapet & Neopolis.',
-    video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    thumbnail: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
-    type: 'MASTERCLASS',
-    duration: '38:45',
-    views: 48200,
-    author_name: 'Swamy Reddy Javidi',
-    created_at: '2026-09-28T10:00:00.000Z'
-  },
-  {
-    id: 'media_02',
-    title: 'High-Rise Structural Audits: Wind Load Analysis & Soil Testing Norms',
-    summary: 'An uncompromised deep dive into how buyers and investors must evaluate soil load-bearing capacities, pile depths, and wind tunnel tests for buildings exceeding 50 storeys in Hyderabad Deccan plateau.',
-    video_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    thumbnail: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80',
-    type: 'MASTERCLASS',
-    duration: '44:12',
-    views: 31400,
-    author_name: 'Swamy Reddy Javidi',
-    created_at: '2026-10-02T14:30:00.000Z'
-  }
-];
+export const DEFAULT_MEDIA_ITEMS: DbMediaItem[] = [];
 
 export interface DbBuyerLead {
   id: string;
@@ -889,7 +912,7 @@ export async function generateOtp(
 
 export async function verifyOtp(
   target: string,
-  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET',
+  type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET' | 'PASSWORD_CHANGE' | string,
   code: string
 ): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgVerifyOtp(target, type, code);
@@ -1408,9 +1431,14 @@ export async function deleteCommunity(id: string): Promise<boolean> {
   return sqliteDeleteCommunity(id);
 }
 
-export async function getAllMedia(): Promise<DbMediaItem[]> {
-  if (isPostgresAuthoritative()) return pgGetAllMedia();
-  return sqliteGetAllMedia();
+export async function getAllMedia(params?: {
+  type?: string;
+  status?: string;
+  category?: string;
+  includeDrafts?: boolean;
+}): Promise<DbMediaItem[]> {
+  if (isPostgresAuthoritative()) return pgGetAllMedia(params);
+  return sqliteGetAllMedia(params);
 }
 
 export async function getMediaById(id: string): Promise<DbMediaItem | null> {
@@ -1418,22 +1446,14 @@ export async function getMediaById(id: string): Promise<DbMediaItem | null> {
   return sqliteGetMediaById(id);
 }
 
-export async function createMedia(item: {
-  title: string;
-  summary: string;
-  video_url: string;
-  thumbnail: string;
-  type: 'MASTERCLASS' | 'PODCAST' | 'SITE_AUDIT';
-  duration?: string;
-  author_name?: string;
-}): Promise<string> {
-  if (isPostgresAuthoritative()) return pgCreateMedia(item);
+export async function createMedia(item: Record<string, any>): Promise<string> {
+  if (isPostgresAuthoritative()) return pgCreateMedia(item as any);
   return sqliteCreateMedia(item);
 }
 
 export async function updateMedia(
   id: string,
-  updates: Partial<{ title: string; summary: string; video_url: string; thumbnail: string; type: string; duration: string }>
+  updates: Record<string, any>
 ): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgUpdateMedia(id, updates);
   return sqliteUpdateMedia(id, updates);
@@ -1442,6 +1462,68 @@ export async function updateMedia(
 export async function deleteMedia(id: string): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgDeleteMedia(id);
   return sqliteDeleteMedia(id);
+}
+
+export async function publishMedia(id: string, published: boolean): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgPublishMedia(id, published);
+  return sqlitePublishMedia(id, published);
+}
+
+export async function archiveMedia(id: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgArchiveMedia(id);
+  return sqliteArchiveMedia(id);
+}
+
+export async function createStudioBroadcast(item: {
+  id?: string;
+  title: string;
+  description?: string;
+  poster_url?: string;
+  scheduled_at?: string;
+  stream_url?: string;
+  replay_url?: string;
+  ingest_url?: string;
+  stream_key?: string;
+  provider?: string;
+  created_by?: string;
+}): Promise<string> {
+  if (isPostgresAuthoritative()) return pgCreateStudioBroadcast(item);
+  return sqliteCreateStudioBroadcast(item);
+}
+
+export async function getStudioBroadcastById(id: string): Promise<DbStudioBroadcast | null> {
+  if (isPostgresAuthoritative()) return pgGetStudioBroadcastById(id);
+  return sqliteGetStudioBroadcastById(id);
+}
+
+export async function getAllStudioBroadcasts(includeArchived = false): Promise<DbStudioBroadcast[]> {
+  if (isPostgresAuthoritative()) return pgGetAllStudioBroadcasts(includeArchived);
+  return sqliteGetAllStudioBroadcasts(includeArchived);
+}
+
+export async function updateStudioBroadcast(id: string, updates: Record<string, any>): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgUpdateStudioBroadcast(id, updates);
+  return sqliteUpdateStudioBroadcast(id, updates);
+}
+
+export async function startStudioBroadcast(id: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgStartStudioBroadcast(id);
+  return sqliteStartStudioBroadcast(id);
+}
+
+export async function endStudioBroadcast(id: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgEndStudioBroadcast(id);
+  return sqliteEndStudioBroadcast(id);
+}
+
+export async function publishBroadcastReplay(id: string, replayUrl: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgPublishBroadcastReplay(id, replayUrl);
+  return sqlitePublishBroadcastReplay(id, replayUrl);
+}
+
+export async function deleteStudioBroadcast(id: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgDeleteStudioBroadcast(id);
+  return sqliteDeleteStudioBroadcast(id);
 }
 
 export async function toggleMediaLike(mediaId: string, userId: string): Promise<{ liked: boolean; count: number }> {
@@ -2905,7 +2987,7 @@ function sqliteGenerateOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_V
   });
 }
 
-function sqliteVerifyOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET', code: string): boolean {
+function sqliteVerifyOtp(target: string, type: string, code: string): boolean {
   const normalizedTarget = canonicalOtpTarget(type, target);
   return sqliteTransaction(() => claimOtpProofSync(sqliteRunner(), normalizedTarget, type, code));
 }
@@ -3053,7 +3135,7 @@ function sqliteGetAllPosts(params?: {
     // Platform administrators see active & pending posts in general feed, excluding DELETED unless requested
     query += " AND p.status != 'DELETED'";
   } else if (params?.currentUserId) {
-    query += " AND ((p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')) OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED', 'DELETED', 'PENDING_DELETION')))";
+    query += " AND ((p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')) OR (p.author_id = ? AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED', 'PENDING_DELETION')))";
     args.push(params.currentUserId);
   } else {
     query += " AND p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')";
@@ -4487,16 +4569,42 @@ function sqliteDeleteCommunity(id: string): boolean {
   return true;
 }
 
-function sqliteGetAllMedia(): DbMediaItem[] {
-  const stmt = db.prepare('SELECT * FROM media_items ORDER BY created_at DESC');
-  const rows = stmt.all() as unknown as DbMediaItem[];
-  if (rows.length === 0) {
+function sqliteGetAllMedia(params?: {
+  type?: string;
+  status?: string;
+  category?: string;
+  includeDrafts?: boolean;
+}): DbMediaItem[] {
+  let query = "SELECT * FROM media_items WHERE 1=1 AND id NOT IN ('media_01', 'media_02') AND status != 'DELETED'";
+  const args: any[] = [];
+
+  if (!params?.includeDrafts) {
+    query += " AND (status = 'PUBLISHED' OR status IS NULL OR status = '')";
+  } else if (params?.status) {
+    query += ' AND status = ?';
+    args.push(params.status);
+  }
+
+  if (params?.type && params.type !== 'ALL') {
+    query += ' AND type = ?';
+    args.push(params.type);
+  }
+
+  if (params?.category) {
+    query += ' AND category = ?';
+    args.push(params.category);
+  }
+
+  query += ' ORDER BY created_at DESC';
+  const stmt = db.prepare(query);
+  const rows = stmt.all(...args) as unknown as DbMediaItem[];
+
+  if (rows.length === 0 && (!params || Object.keys(params).length === 0 || params.includeDrafts)) {
     for (const item of DEFAULT_MEDIA_ITEMS) {
       try {
-        db.prepare(`
-          INSERT OR IGNORE INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(item.id, item.title, item.summary, item.video_url, item.thumbnail, item.type, item.duration, item.views, item.author_name, item.created_at);
+        db.prepare(
+          "INSERT OR IGNORE INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED')"
+        ).run(item.id, item.title, item.summary, item.video_url, item.thumbnail, item.type, item.duration, item.views, item.author_name, item.created_at);
       } catch {}
     }
     return db.prepare('SELECT * FROM media_items ORDER BY created_at DESC').all() as unknown as DbMediaItem[];
@@ -4514,30 +4622,38 @@ function sqliteGetMediaById(id: string): DbMediaItem | null {
   return item;
 }
 
-function sqliteCreateMedia(item: {
-  title: string;
-  summary: string;
-  video_url: string;
-  thumbnail: string;
-  type: 'MASTERCLASS' | 'PODCAST' | 'SITE_AUDIT';
-  duration?: string;
-  author_name?: string;
-}): string {
-  const id = `media_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+function sqliteCreateMedia(item: Record<string, any>): string {
+  const id = item.id || ('media_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex'));
   const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-  `);
+  const insert = db.prepare(
+    "INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at, status, category, tags, episode_title, episode_number, host, guest, guest_title, published_date, audio_url, media_url, file_size, mime_type, storage_provider, storage_key, author_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  );
   insert.run(
     id,
     item.title,
-    item.summary,
-    item.video_url,
-    item.thumbnail,
-    item.type,
+    item.summary || '',
+    item.video_url || item.media_url || '',
+    item.thumbnail || '',
+    item.type || 'MASTERCLASS',
     item.duration || '15:00',
     item.author_name || 'Swamy Reddy Javidi',
+    now,
+    item.status || 'PUBLISHED',
+    item.category || 'Real Estate Intelligence',
+    item.tags || '[]',
+    item.episode_title || '',
+    item.episode_number || '',
+    item.host || 'Swamy Reddy Javidi',
+    item.guest || '',
+    item.guest_title || '',
+    item.published_date || '',
+    item.audio_url || '',
+    item.media_url || '',
+    item.file_size || 0,
+    item.mime_type || '',
+    item.storage_provider || 'PERSISTENT_STORAGE',
+    item.storage_key || '',
+    item.author_id || '',
     now
   );
   return id;
@@ -4545,19 +4661,20 @@ function sqliteCreateMedia(item: {
 
 function sqliteUpdateMedia(
   id: string,
-  updates: Partial<{ title: string; summary: string; video_url: string; thumbnail: string; type: string; duration: string }>
+  updates: Record<string, any>
 ): boolean {
   const fields: string[] = [];
   const args: any[] = [];
-  if (updates.title) { fields.push('title = ?'); args.push(updates.title); }
-  if (updates.summary) { fields.push('summary = ?'); args.push(updates.summary); }
-  if (updates.video_url) { fields.push('video_url = ?'); args.push(updates.video_url); }
-  if (updates.thumbnail) { fields.push('thumbnail = ?'); args.push(updates.thumbnail); }
-  if (updates.type) { fields.push('type = ?'); args.push(updates.type); }
-  if (updates.duration) { fields.push('duration = ?'); args.push(updates.duration); }
+  for (const [key, val] of Object.entries(updates)) {
+    if (val !== undefined && key !== 'id') {
+      fields.push(key + ' = ?');
+      args.push(val);
+    }
+  }
   if (fields.length === 0) return true;
+  fields.push("updated_at = datetime('now')");
   args.push(id);
-  const stmt = db.prepare(`UPDATE media_items SET ${fields.join(', ')} WHERE id = ?`);
+  const stmt = db.prepare("UPDATE media_items SET " + fields.join(', ') + " WHERE id = ?");
   stmt.run(...args);
   return true;
 }
@@ -4565,6 +4682,102 @@ function sqliteUpdateMedia(
 function sqliteDeleteMedia(id: string): boolean {
   const stmt = db.prepare('DELETE FROM media_items WHERE id = ?');
   stmt.run(id);
+  return true;
+}
+
+function sqlitePublishMedia(id: string, published: boolean): boolean {
+  const status = published ? 'PUBLISHED' : 'DRAFT';
+  db.prepare("UPDATE media_items SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
+  return true;
+}
+
+function sqliteArchiveMedia(id: string): boolean {
+  db.prepare("UPDATE media_items SET status = 'ARCHIVED', updated_at = datetime('now') WHERE id = ?").run(id);
+  return true;
+}
+
+function sqliteCreateStudioBroadcast(item: {
+  id?: string;
+  title: string;
+  description?: string;
+  poster_url?: string;
+  scheduled_at?: string;
+  stream_url?: string;
+  replay_url?: string;
+  ingest_url?: string;
+  stream_key?: string;
+  provider?: string;
+  created_by?: string;
+}): string {
+  const id = item.id || ('sb_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex'));
+  const now = new Date().toISOString();
+  const scheduledAt = item.scheduled_at ? new Date(item.scheduled_at).toISOString() : now;
+  db.prepare(
+    "INSERT INTO studio_broadcasts (id, title, description, poster_url, scheduled_at, status, stream_url, replay_url, ingest_url, stream_key, provider, viewer_count, recording_enabled, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?, ?, 0, 1, ?, ?, ?)"
+  ).run(
+    id,
+    item.title,
+    item.description || '',
+    item.poster_url || '',
+    scheduledAt,
+    item.stream_url || '',
+    item.replay_url || '',
+    item.ingest_url || '',
+    item.stream_key || '',
+    item.provider || 'CLOUDFLARE_STREAM',
+    item.created_by || 'admin',
+    now,
+    now
+  );
+  return id;
+}
+
+function sqliteGetStudioBroadcastById(id: string): DbStudioBroadcast | null {
+  const row = db.prepare('SELECT * FROM studio_broadcasts WHERE id = ?').get(id) as any;
+  if (!row) return null;
+  return row as DbStudioBroadcast;
+}
+
+function sqliteGetAllStudioBroadcasts(includeArchived = false): DbStudioBroadcast[] {
+  const sql = includeArchived
+    ? 'SELECT * FROM studio_broadcasts ORDER BY scheduled_at DESC'
+    : "SELECT * FROM studio_broadcasts WHERE status != 'ARCHIVED' ORDER BY scheduled_at DESC";
+  return db.prepare(sql).all() as unknown as DbStudioBroadcast[];
+}
+
+function sqliteUpdateStudioBroadcast(id: string, updates: Record<string, any>): boolean {
+  const fields: string[] = [];
+  const args: any[] = [];
+  for (const [key, val] of Object.entries(updates)) {
+    if (val !== undefined && key !== 'id') {
+      fields.push(key + ' = ?');
+      args.push(key === 'scheduled_at' && val ? new Date(val).toISOString() : val);
+    }
+  }
+  if (fields.length === 0) return true;
+  fields.push("updated_at = datetime('now')");
+  args.push(id);
+  db.prepare("UPDATE studio_broadcasts SET " + fields.join(', ') + " WHERE id = ?").run(...args);
+  return true;
+}
+
+function sqliteStartStudioBroadcast(id: string): boolean {
+  db.prepare("UPDATE studio_broadcasts SET status = 'LIVE', started_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(id);
+  return true;
+}
+
+function sqliteEndStudioBroadcast(id: string): boolean {
+  db.prepare("UPDATE studio_broadcasts SET status = 'ENDED', ended_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(id);
+  return true;
+}
+
+function sqlitePublishBroadcastReplay(id: string, replayUrl: string): boolean {
+  db.prepare("UPDATE studio_broadcasts SET status = 'REPLAY_AVAILABLE', replay_url = ?, updated_at = datetime('now') WHERE id = ?").run(replayUrl, id);
+  return true;
+}
+
+function sqliteDeleteStudioBroadcast(id: string): boolean {
+  db.prepare('DELETE FROM studio_broadcasts WHERE id = ?').run(id);
   return true;
 }
 

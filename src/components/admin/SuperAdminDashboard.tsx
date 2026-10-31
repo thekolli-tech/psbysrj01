@@ -163,6 +163,11 @@ export const SuperAdminDashboard: React.FC = () => {
   const [adminNewPassword, setAdminNewPassword] = useState('');
   const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
   const [adminPwdStatus, setAdminPwdStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [adminPwdStep, setAdminPwdStep] = useState<'INPUT' | 'OTP'>('INPUT');
+  const [adminPwdOtp, setAdminPwdOtp] = useState('');
+  const [adminOtpDestination, setAdminOtpDestination] = useState<string | null>(null);
+  const [adminRequestingOtp, setAdminRequestingOtp] = useState(false);
+  const [adminSavingPassword, setAdminSavingPassword] = useState(false);
 
   // Property Admin Provisioning Form State
   const [pmoForm, setPmoForm] = useState({
@@ -550,35 +555,76 @@ export const SuperAdminDashboard: React.FC = () => {
   };
 
   // Super Admin Password Form Handler
-  const handleAdminPasswordChange = async (e: React.FormEvent) => {
+  const handleAdminRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdminPwdStatus(null);
+
+    if (!adminCurrentPassword) {
+      setAdminPwdStatus({ type: 'error', text: 'Please enter current password.' });
+      return;
+    }
+
+    if (adminNewPassword.length < 8) {
+      setAdminPwdStatus({ type: 'error', text: 'New password must be at least 8 characters long.' });
+      return;
+    }
 
     if (adminNewPassword !== adminConfirmPassword) {
       setAdminPwdStatus({ type: 'error', text: 'New password and confirm password do not match.' });
       return;
     }
 
+    setAdminRequestingOtp(true);
+    try {
+      const res = await fetch('/api/auth/request-password-change-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to request verification code');
+      setAdminOtpDestination(data.destination || 'info@propertystudio.org');
+      setAdminPwdStep('OTP');
+      showToast('Super Admin verification code dispatched.');
+    } catch (err: any) {
+      setAdminPwdStatus({ type: 'error', text: err.message || 'Error requesting verification code.' });
+    } finally {
+      setAdminRequestingOtp(false);
+    }
+  };
+
+  const handleAdminConfirmPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminPwdStatus(null);
+
+    if (!adminPwdOtp || adminPwdOtp.trim().length !== 6) {
+      setAdminPwdStatus({ type: 'error', text: 'Please enter the 6-digit verification code.' });
+      return;
+    }
+
+    setAdminSavingPassword(true);
     try {
       const res = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: currentUser.id,
           currentPassword: adminCurrentPassword,
-          newPassword: adminNewPassword
+          newPassword: adminNewPassword,
+          otp: adminPwdOtp.trim()
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update password');
-
-      setAdminPwdStatus({ type: 'success', text: 'Super Admin password updated successfully in the live database!' });
-      showToast('Super Admin password updated');
+      setAdminPwdStatus({ type: 'success', text: 'Super Admin password updated! Confirmation sent to ' + (adminOtpDestination || 'info@propertystudio.org') });
       setAdminCurrentPassword('');
       setAdminNewPassword('');
       setAdminConfirmPassword('');
+      setAdminPwdOtp('');
+      setAdminPwdStep('INPUT');
+      showToast('Super Admin password updated.');
     } catch (err: any) {
       setAdminPwdStatus({ type: 'error', text: err.message || 'Error updating password.' });
+    } finally {
+      setAdminSavingPassword(false);
     }
   };
 
@@ -2052,51 +2098,101 @@ export const SuperAdminDashboard: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleAdminPasswordChange} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Current Password</label>
-                <input
-                  type="password"
-                  value={adminCurrentPassword}
-                  onChange={e => setAdminCurrentPassword(e.target.value)}
-                  placeholder="Enter current password"
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
+            {adminPwdStep === 'INPUT' ? (
+              <form onSubmit={handleAdminRequestOtp} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Current Password</label>
+                  <input
+                    type="password"
+                    value={adminCurrentPassword}
+                    onChange={e => setAdminCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">New Password</label>
-                <input
-                  type="password"
-                  value={adminNewPassword}
-                  onChange={e => setAdminNewPassword(e.target.value)}
-                  placeholder="Minimum 6 characters"
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">New Password</label>
+                  <input
+                    type="password"
+                    value={adminNewPassword}
+                    onChange={e => setAdminNewPassword(e.target.value)}
+                    placeholder="Minimum 8 characters"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Confirm New Password</label>
-                <input
-                  type="password"
-                  value={adminConfirmPassword}
-                  onChange={e => setAdminConfirmPassword(e.target.value)}
-                  placeholder="Re-enter new password"
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={adminConfirmPassword}
+                    onChange={e => setAdminConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+                </div>
 
-              <button
-                type="submit"
-                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]"
-              >
-                <KeyRound className="w-4 h-4 text-amber-400" />
-                <span>Save New Super Admin Password</span>
-              </button>
-            </form>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Super Admin Policy: Code dispatched strictly to designated address: info@propertystudio.org</span>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={adminRequestingOtp}
+                  className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                >
+                  <KeyRound className="w-4 h-4 text-amber-400" />
+                  <span>{adminRequestingOtp ? 'Dispatching Verification Code...' : 'Request Super Admin OTP'}</span>
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleAdminConfirmPassword} className="space-y-3 text-xs">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 space-y-1">
+                  <span className="font-bold block">Super Admin Verification Code Dispatched</span>
+                  <p className="text-[11px] text-blue-800">
+                    A single-use verification code was sent to <strong className="font-mono">{adminOtpDestination}</strong>. Enter it below to authorize this password change.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">6-Digit Verification Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={adminPwdOtp}
+                    onChange={e => setAdminPwdOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Enter 6-digit code"
+                    className="w-full px-3.5 py-3 text-center text-lg font-mono font-bold tracking-widest border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdminPwdStep('INPUT')}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={adminSavingPassword || adminPwdOtp.length !== 6}
+                    className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl font-bold shadow-md transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                  >
+                    {adminSavingPassword ? 'Verifying & Updating...' : 'Confirm & Update Password'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

@@ -155,18 +155,47 @@ export interface Lead {
 export interface MediaItem {
   id: string;
   title: string;
-  type: 'MASTERCLASS' | 'PODCAST' | 'PROJECT_WALKTHROUGH' | 'MARKET_ANALYSIS';
+  type: 'MASTERCLASS' | 'PODCAST' | 'PROJECT_WALKTHROUGH' | 'MARKET_ANALYSIS' | 'VIDEO';
   duration: string;
   host: string;
   guest?: string;
   guestTitle?: string;
-  videoUrl: string;
+  videoUrl?: string;
+  audioUrl?: string;
+  mediaUrl?: string;
   thumbnail: string;
   summary: string;
-  keyTakeaways: string[];
-  timestamps: { time: string; label: string }[];
+  keyTakeaways?: string[];
+  timestamps?: { time: string; label: string }[];
   views: number;
   publishedDate: string;
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'DELETED';
+  category?: string;
+  tags?: string[] | string;
+  episodeTitle?: string;
+  episodeNumber?: number;
+  fileSize?: number;
+  mimeType?: string;
+}
+
+export interface StudioBroadcast {
+  id: string;
+  title: string;
+  description?: string;
+  posterUrl?: string;
+  scheduledAt: string;
+  status: 'SCHEDULED' | 'LIVE' | 'ENDED' | 'REPLAY_AVAILABLE' | 'ARCHIVED';
+  streamUrl?: string;
+  replayUrl?: string;
+  ingestUrl?: string;
+  streamKey?: string;
+  provider?: string;
+  viewerCount?: number;
+  createdBy?: string;
+  startedAt?: string;
+  endedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ConferenceQuestion {

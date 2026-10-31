@@ -59,6 +59,10 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [passwordStep, setPasswordStep] = useState<'INPUT' | 'OTP'>('INPUT');
+  const [passwordOtp, setPasswordOtp] = useState('');
+  const [otpDestination, setOtpDestination] = useState<string | null>(null);
+  const [requestingOtp, setRequestingOtp] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -242,7 +246,7 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
     }
   };
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
+  const handleRequestPasswordOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -252,13 +256,43 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
       return;
     }
 
-    if (newPassword.length < 6) {
-      setErrorMsg('New password must be at least 6 characters long');
+    if (newPassword.length < 8) {
+      setErrorMsg('New password must be at least 8 characters long');
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setErrorMsg('New password and confirm password do not match');
+      return;
+    }
+
+    setRequestingOtp(true);
+    try {
+      const response = await fetch('/api/auth/request-password-change-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to request verification code');
+      }
+      setOtpDestination(data.destination || 'your designated email address');
+      setPasswordStep('OTP');
+      showToast('Security verification code dispatched.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error requesting verification code');
+    } finally {
+      setRequestingOtp(false);
+    }
+  };
+
+  const handleConfirmPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!passwordOtp || passwordOtp.trim().length !== 6) {
+      setErrorMsg('Please enter the 6-digit verification code');
       return;
     }
 
@@ -268,9 +302,9 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: currentUser.id,
           currentPassword,
-          newPassword
+          newPassword,
+          otp: passwordOtp.trim()
         })
       });
 
@@ -279,13 +313,15 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
         throw new Error(data.error || 'Failed to update password');
       }
 
-      setSuccessMsg('Your password has been successfully updated in the live database!');
+      setSuccessMsg(`Password successfully updated! Confirmation email dispatched to ${otpDestination || 'your registered email'}.`);
       showToast('Password updated successfully');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setPasswordOtp('');
+      setPasswordStep('INPUT');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error updating password. Please try again.');
+      setErrorMsg(err.message || 'Error updating password. Please check your verification code.');
     } finally {
       setLoading(false);
     }
@@ -584,13 +620,9 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
           )}
 
           {activeTab === 'CHANGE_PASSWORD' && (
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div className="text-xs text-slate-600">
-                Update your account password in the live server database. Your new credentials will take effect immediately.
-              </div>
-
+            <div className="space-y-4">
               {errorMsg && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                   <span>{errorMsg}</span>
                 </div>
@@ -603,72 +635,128 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                 </div>
               )}
 
-              {/* Current Password */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Current Password</label>
-                <div className="relative">
-                  <input
-                    type={showCurrent ? 'text' : 'password'}
-                    value={currentPassword}
-                    onChange={e => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
-                    required
-                  />
+              {passwordStep === 'INPUT' ? (
+                <form onSubmit={handleRequestPasswordOtp} className="space-y-4">
+                  <div className="text-xs text-slate-600">
+                    Update your account password in the live server database. Your new credentials will take effect immediately upon security code verification.
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Current Password</label>
+                    <div className="relative">
+                      <input
+                        type={showCurrent ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={e => setCurrentPassword(e.target.value)}
+                        placeholder="Enter current password"
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrent(!showCurrent)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                      >
+                        {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">New Password</label>
+                    <div className="relative">
+                      <input
+                        type={showNew ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        placeholder="Minimum 8 characters"
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNew(!showNew)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                      >
+                        {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Confirm New Password</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter new password"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    />
+                  </div>
+
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span>Mandatory Security Policy: Changing your password requires verifying a single-use code sent to your designated email.</span>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => setShowCurrent(!showCurrent)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                    type="submit"
+                    disabled={requestingOtp}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                   >
-                    {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    <KeyRound className="w-4 h-4 text-amber-400" />
+                    <span>{requestingOtp ? 'Dispatching Verification Code...' : 'Request Security Code (OTP)'}</span>
                   </button>
-                </div>
-              </div>
+                </form>
+              ) : (
+                <form onSubmit={handleConfirmPasswordChange} className="space-y-4">
+                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-blue-600" />
+                      <span>Security Code Dispatched</span>
+                    </div>
+                    <p className="text-[11px] text-blue-800">
+                      We sent a 6-digit verification code to <strong className="text-blue-950 font-mono">{otpDestination}</strong>. Enter it below to authorize this password change.
+                    </p>
+                  </div>
 
-              {/* New Password */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">New Password</label>
-                <div className="relative">
-                  <input
-                    type={showNew ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    placeholder="Minimum 6 characters"
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNew(!showNew)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
-                  >
-                    {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">6-Digit Verification Code</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      value={passwordOtp}
+                      onChange={e => setPasswordOtp(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Enter 6-digit code"
+                      className="w-full px-3.5 py-3 text-center text-lg font-mono font-bold tracking-widest border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                      autoFocus
+                    />
+                  </div>
 
-              {/* Confirm New Password */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Confirm New Password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="Re-enter new password"
-                  className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] disabled:opacity-50"
-              >
-                <KeyRound className="w-4 h-4 text-amber-400" />
-                <span>{loading ? 'Updating Password...' : 'Save New Password'}</span>
-              </button>
-            </form>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPasswordStep('INPUT')}
+                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading || passwordOtp.length !== 6}
+                      className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                    >
+                      <KeyRound className="w-4 h-4 text-slate-950" />
+                      <span>{loading ? 'Verifying & Updating...' : 'Confirm & Update Password'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           )}
         </div>
 
