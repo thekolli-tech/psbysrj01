@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { isPlatformAdmin, isPropertySeeker } from '../../shared/policy';
+import { isPlatformAdmin, isPropertySeeker, isProfessionalRole } from '../../shared/policy';
 import { linkedEndUserNavigation, roleUtilityDestinations } from '../../shared/endUserNavigation';
 import { BrandLogo } from './BrandLogo';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
@@ -17,7 +17,13 @@ import {
   Users,
   Briefcase,
   Terminal,
-  Building
+  Building,
+  Compass,
+  Landmark,
+  Handshake,
+  TrendingUp,
+  Award,
+  Video
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -34,9 +40,21 @@ const getRoleIcon = (role: string) => {
     case 'DEVELOPER':
       return <span title="Platform Developer"><Terminal className="w-3.5 h-3.5 text-emerald-600 shrink-0" /></span>;
     case 'PROPERTY_SEEKER':
-      return <span title="Property Seeker"><LayoutDashboard className="w-3.5 h-3.5 text-blue-600 shrink-0" /></span>;
+      return <span title="Property Seeker"><Compass className="w-3.5 h-3.5 text-blue-600 shrink-0" /></span>;
     case 'PROPERTY_ADMIN':
       return <span title="Property Admin"><Building className="w-3.5 h-3.5 text-indigo-600 shrink-0" /></span>;
+    case 'LANDOWNER':
+    case 'LAND_OWNER':
+      return <span title="Verified Landowner"><Landmark className="w-3.5 h-3.5 text-emerald-600 shrink-0" /></span>;
+    case 'CHANNEL_PARTNER':
+      return <span title="Channel Partner"><Handshake className="w-3.5 h-3.5 text-teal-600 shrink-0" /></span>;
+    case 'RESELLER':
+      return <span title="Strategic Reseller"><TrendingUp className="w-3.5 h-3.5 text-cyan-600 shrink-0" /></span>;
+    case 'RERA_AGENT':
+      return <span title="RERA Agent"><Award className="w-3.5 h-3.5 text-amber-600 shrink-0" /></span>;
+    case 'REAL_ESTATE_MEDIA':
+    case 'CONTENT_CREATOR':
+      return <span title="Real Estate Media"><Video className="w-3.5 h-3.5 text-rose-600 shrink-0" /></span>;
     case 'AGENT':
       return <span title="Verified Agent"><Briefcase className="w-3.5 h-3.5 text-violet-600 shrink-0" /></span>;
     default:
@@ -63,11 +81,13 @@ export const Header: React.FC<HeaderProps> = ({
   const navLinks = linkedEndUserNavigation();
   const utilityLinks = roleUtilityDestinations(currentUser.role, isLoggedIn);
 
-  // Derive concise display label (e.g. trims ' — All Stakeholders and Projects' without hardcoding forbidden strings)
-  const getDisplayLabel = (label: string) =>
-    label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '');
+  // Derive concise display label (cleans podcast references, trims long stakeholder phrases and brand suffixes)
+  const getDisplayLabel = (label: string, view?: string) => {
+    if (view === 'MEDIA') return 'Media Studio';
+    return label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '');
+  };
 
-  // Compact label for constrained desktop viewports (< 2xl), full label for wide viewports
+  // Compact label for constrained desktop viewports (< 1920px), full label for wide 1080p+ viewports
   const getCompactLabel = (view: string, fullLabel: string) => {
     switch (view) {
       case 'MEDIA': return 'Media';
@@ -75,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'REVIEWS': return 'Reviews';
       case 'COMMUNITY': return 'Community';
       case 'CONFERENCE': return 'Live';
-      case 'REQUIREMENT': return 'Requirement';
+      case 'REQUIREMENT': return 'Requirements';
       case 'CHAT': return 'Contact';
       default: return fullLabel;
     }
@@ -149,11 +169,11 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Zone 2: Navigation Links (Desktop - Left-aligned, directly following Logo) */}
         <nav
           aria-label="Primary navigation"
-          className="hidden xl:flex items-center justify-start gap-1 min-[1680px]:gap-1.5 text-xs font-semibold text-slate-600 whitespace-nowrap ml-2 xl:ml-3 min-[1680px]:ml-5 flex-1 min-w-0"
+          className="hidden xl:flex items-center justify-start gap-1 min-[1680px]:gap-1.5 text-xs font-semibold text-slate-600 whitespace-nowrap ml-2 xl:ml-3 min-[1680px]:ml-5 shrink-0"
         >
           {navLinks.map(link => {
             const isActive = activeView === link.view;
-            const displayLabel = getDisplayLabel(link.label);
+            const displayLabel = getDisplayLabel(link.label, link.view);
             return (
               <button
                 key={link.view}
@@ -171,8 +191,8 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'hover:text-slate-900 hover:bg-slate-100/80'
                 }`}
               >
-                <span className="min-[1680px]:hidden">{getCompactLabel(link.view, displayLabel)}</span>
-                <span className="hidden min-[1680px]:inline">{displayLabel}</span>
+                <span className="min-[1920px]:hidden">{getCompactLabel(link.view, displayLabel)}</span>
+                <span className="hidden min-[1920px]:inline">{displayLabel}</span>
               </button>
             );
           })}
@@ -194,7 +214,10 @@ export const Header: React.FC<HeaderProps> = ({
               title="Buyer Leads"
             >
               <Users className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="whitespace-nowrap font-bold"><span className="hidden xl:inline">Buyer </span>Leads</span>
+              <span className="whitespace-nowrap font-bold">
+                <span className="hidden min-[1680px]:inline">Buyer Leads</span>
+                <span className="min-[1680px]:hidden">Leads</span>
+              </span>
             </button>
           )}
 
@@ -295,6 +318,25 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
+          {/* Professional direct button for partner roles */}
+          {isLoggedIn && isProfessionalRole(currentUser.role) && (
+            <button
+              onClick={() => {
+                setActiveView('PROFESSIONAL');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0 shadow-xs ${
+                activeView === 'PROFESSIONAL'
+                  ? 'bg-violet-900 text-white border-violet-900 shadow-sm'
+                  : 'bg-violet-50 text-violet-900 border-violet-300 hover:bg-violet-100'
+              }`}
+              title="Professional Workspace"
+            >
+              <Briefcase className="w-3.5 h-3.5 text-violet-600 shrink-0" />
+              <span className="whitespace-nowrap font-bold">Pro Workspace</span>
+            </button>
+          )}
+
           {/* Wallet credit balance button (only if logged in) */}
           {isLoggedIn ? (
             <button
@@ -335,7 +377,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {currentUser.name}
                 </span>
                 <span className="text-[9px] text-slate-500 uppercase font-semibold block leading-none">
-                  {currentUser.role.replace('_', ' ')}
+                  {currentUser.role.replace(/_/g, ' ')}
                 </span>
               </div>
               <KeyRound className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -380,7 +422,7 @@ export const Header: React.FC<HeaderProps> = ({
                       {getRoleIcon(currentUser.role)}
                     </div>
                     <span className="text-[10px] text-slate-500 uppercase font-semibold font-mono">
-                      {currentUser.role.replace('_', ' ')}
+                      {currentUser.role.replace(/_/g, ' ')}
                     </span>
                   </div>
                 </div>
@@ -422,7 +464,7 @@ export const Header: React.FC<HeaderProps> = ({
                           : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
-                      <span>{link.label}</span>
+                      <span>{getDisplayLabel(link.label, link.view)}</span>
                       {isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />}
                     </button>
                   );
@@ -444,9 +486,10 @@ export const Header: React.FC<HeaderProps> = ({
                         setActiveView('DASHBOARD');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white transition-colors cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white transition-colors cursor-pointer flex items-center gap-1.5"
                     >
-                      Member Dashboard
+                      <LayoutDashboard className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Member Dashboard</span>
                     </button>
                   )}
                   {utilityLinks.includes('LEADS_MARKET') && (
@@ -456,9 +499,10 @@ export const Header: React.FC<HeaderProps> = ({
                         setActiveView('LEADS_MARKET');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer flex items-center gap-1.5"
                     >
-                      Buyer Leads
+                      <Building className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Buyer Leads</span>
                     </button>
                   )}
                   {utilityLinks.includes('PROFESSIONAL') && (
@@ -468,9 +512,10 @@ export const Header: React.FC<HeaderProps> = ({
                         setActiveView('PROFESSIONAL');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer flex items-center gap-1.5"
                     >
-                      Workspace
+                      <Briefcase className="w-3.5 h-3.5 text-violet-600" />
+                      <span>Workspace</span>
                     </button>
                   )}
                   {isLoggedIn && isPlatformAdmin(currentUser.role) && (

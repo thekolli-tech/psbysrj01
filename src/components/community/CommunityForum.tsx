@@ -1093,7 +1093,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   const filteredPosts = useMemo(() => {
     return communityPosts.filter(p => {
       // Deleted posts should never be visible to users in community feeds
-      if (p.status === 'DELETED') return false;
+      if (p.status === 'DELETED' || p.status?.toUpperCase() === 'DELETED' || (p as any).isDeleted || (p as any).is_deleted) return false;
 
       // Search filter
       if (searchError) return false;
@@ -1781,6 +1781,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             <div className="space-y-4">
               {visiblePosts.length > 0 ? (
               visiblePosts.map(post => {
+                if (post.status === 'DELETED' || (post as any).isDeleted) return null;
                 const row = savedEngagement(post);
                 const score = row.agreeCount - row.disagreeCount;
                 const isBookmarked = row.bookmarked;
@@ -1860,8 +1861,6 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                                 ? 'bg-amber-100 text-amber-800 border border-amber-300'
                                 : post.status === 'PENDING_DELETION'
                                 ? 'bg-amber-100 text-amber-900 border border-amber-400 font-semibold'
-                                : post.status === 'DELETED'
-                                ? 'bg-slate-200 text-slate-700 border border-slate-400'
                                 : 'bg-rose-100 text-rose-800 border border-rose-300'
                             }`}>
                               <span>
@@ -1869,8 +1868,6 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                                   ? '⏳'
                                   : post.status === 'PENDING_DELETION'
                                   ? '⚠️'
-                                  : post.status === 'DELETED'
-                                  ? '🗑️'
                                   : '❌'}
                               </span>
                               <span>
@@ -1878,11 +1875,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                                   ? 'Pending Approval'
                                   : post.status === 'PENDING_DELETION'
                                   ? 'Deletion Pending Review'
-                                  : post.status === 'DELETED'
-                                  ? 'Deleted'
                                   : 'Rejected'}
                               </span>
-                              {currentUser?.id === post.authorId && post.status !== 'PENDING_DELETION' && post.status !== 'DELETED' && (
+                              {currentUser?.id === post.authorId && post.status !== 'PENDING_DELETION' && (
                                 <span className="opacity-75">(Only you)</span>
                               )}
                             </span>
@@ -2183,7 +2178,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {currentUser && post.authorId === currentUser.id && post.status !== 'DELETED' && (
+                          {currentUser && post.authorId === currentUser.id && (
                             <>
                               {post.status === 'PENDING_DELETION' || post.deletionStatus === 'PENDING' ? (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-300 px-2.5 py-1 rounded-full">

@@ -1209,7 +1209,7 @@ export async function pgGetAllPosts(params?: {
   currentUserRole?: string;
   status?: string;
 }): Promise<any[]> {
-  let query = 'SELECT p.* FROM community_posts p WHERE 1=1';
+  let query = "SELECT p.* FROM community_posts p WHERE 1=1 AND p.status != 'DELETED'";
   const args: any[] = [];
   let paramIdx = 1;
 
@@ -1220,7 +1220,7 @@ export async function pgGetAllPosts(params?: {
     // Platform administrators see active & pending posts in general feed, excluding DELETED unless requested
     query += " AND p.status != 'DELETED'";
   } else if (params?.currentUserId) {
-    query += ` AND ((p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')) OR (p.author_id = ${paramIdx++} AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED', 'PENDING_DELETION')))`;
+    query += ` AND ((p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')) OR (p.author_id = $${paramIdx++} AND p.status IN ('PENDING_APPROVAL', 'REJECTED', 'SUSPENDED', 'PENDING_DELETION')))`;
     args.push(params.currentUserId);
   } else {
     query += " AND p.status IN ('APPROVED', 'PUBLISHED', 'PENDING_DELETION')";
@@ -2966,7 +2966,7 @@ export async function pgGetAllMedia(params?: {
         );
       } catch {}
     }
-    const fresh = await queryPostgres('SELECT * FROM media_items ORDER BY created_at DESC');
+    const fresh = await queryPostgres("SELECT * FROM media_items WHERE id NOT IN ('media_01', 'media_02') AND status != 'DELETED' ORDER BY created_at DESC");
     return fresh.rows.map(mapPgMediaItem);
   }
 

@@ -19,7 +19,13 @@ import {
   HelpCircle,
   ShieldCheck,
   KeyRound,
-  Terminal
+  Terminal,
+  Compass,
+  Landmark,
+  Handshake,
+  TrendingUp,
+  Award,
+  Video
 } from 'lucide-react';
 
 interface MobileHeaderProps {
@@ -36,9 +42,21 @@ const getRoleIcon = (role: string) => {
     case 'DEVELOPER':
       return <span title="Platform Developer"><Terminal className="w-3.5 h-3.5 text-emerald-600 shrink-0" /></span>;
     case 'PROPERTY_SEEKER':
-      return <span title="Property Seeker"><LayoutDashboard className="w-3.5 h-3.5 text-blue-600 shrink-0" /></span>;
+      return <span title="Property Seeker"><Compass className="w-3.5 h-3.5 text-blue-600 shrink-0" /></span>;
     case 'PROPERTY_ADMIN':
       return <span title="Property Admin"><Building className="w-3.5 h-3.5 text-indigo-600 shrink-0" /></span>;
+    case 'LANDOWNER':
+    case 'LAND_OWNER':
+      return <span title="Verified Landowner"><Landmark className="w-3.5 h-3.5 text-emerald-600 shrink-0" /></span>;
+    case 'CHANNEL_PARTNER':
+      return <span title="Channel Partner"><Handshake className="w-3.5 h-3.5 text-teal-600 shrink-0" /></span>;
+    case 'RESELLER':
+      return <span title="Strategic Reseller"><TrendingUp className="w-3.5 h-3.5 text-cyan-600 shrink-0" /></span>;
+    case 'RERA_AGENT':
+      return <span title="RERA Agent"><Award className="w-3.5 h-3.5 text-amber-600 shrink-0" /></span>;
+    case 'REAL_ESTATE_MEDIA':
+    case 'CONTENT_CREATOR':
+      return <span title="Real Estate Media"><Video className="w-3.5 h-3.5 text-rose-600 shrink-0" /></span>;
     case 'AGENT':
       return <span title="Verified Agent"><Briefcase className="w-3.5 h-3.5 text-violet-600 shrink-0" /></span>;
     default:
@@ -81,13 +99,13 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
       case 'DASHBOARD': return 'Member Dashboard';
       case 'PROPERTIES': return 'Curated Projects';
       case 'LEADS_MARKET': return 'Buyer Leads';
-      case 'MEDIA': return 'Media & Podcast';
+      case 'MEDIA': return 'Media Studio';
       case 'CONFERENCE': return 'Live & Latest';
       case 'MARKET_INSIGHTS': return 'Market Trends & Insights';
       case 'COMMUNITY': return 'Community Q&A';
-      case 'REVIEWS': return 'Review & Rating';
+      case 'REVIEWS': return 'Reviews & Ratings';
       case 'REQUIREMENT': return 'Property Requirement';
-      case 'CHAT': return 'Contact & Connect Property Studio';
+      case 'CHAT': return 'Contact & Connect';
       case 'ADMIN': return 'Super Admin Console';
       case 'PROPERTY_ADMIN': return 'Scoped PMO Workspace';
       case 'STUDIO': return 'Studio Broadcast';
@@ -273,7 +291,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                           : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
-                      <span>{link.label}</span>
+                      <span>{link.view === 'MEDIA' ? 'Media Studio' : link.label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '')}</span>
                       {isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />}
                     </button>
                   );

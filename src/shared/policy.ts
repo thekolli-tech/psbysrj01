@@ -139,7 +139,7 @@ export function canViewModeratedContent(
   authorId: string | null | undefined,
   viewer?: Viewer | null
 ): boolean {
-  if (status === 'DELETED') return Boolean(viewer && canModerate(viewer.role));
+  if (status === 'DELETED') return false;
   if (PUBLIC_CONTENT_STATUSES.has(String(status || ''))) return true;
   if (!viewer) return false;
   if (viewer.id && authorId && viewer.id === authorId) return true;

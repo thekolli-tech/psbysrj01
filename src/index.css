@@ -1,5 +1,28 @@
 @import "tailwindcss";
 
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* ==============================================================================
+   LARGE DISPLAYS & TELEVISIONS (2K, 4K, 85-100 INCH SCREEN ADAPTATION)
+   Scaling base rem units allows rem-based Tailwind layouts to scale naturally
+   ============================================================================== */
+@media (min-width: 2560px) {
+  :root {
+    font-size: 18px;
+  }
+}
+
+@media (min-width: 3840px) {
+  :root {
+    font-size: 22px;
+  }
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -13,6 +36,79 @@
     font-family: 'JetBrains Mono', monospace;
     font-variant-numeric: tabular-nums;
   }
+
+  /* Accessible focus indicators */
+  *:focus-visible {
+    outline: 2px solid #d97706;
+    outline-offset: 2px;
+  }
+}
+
+/* ==============================================================================
+   SAFE AREA & TOUCH TARGET UTILITIES FOR MODERN SMARTPHONES
+   ============================================================================== */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.min-h-screen-safe {
+  min-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
+.touch-target-44 {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.min-touch {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==============================================================================
+   FLUID TYPOGRAPHY UTILITIES USING CSS CLAMP()
+   ============================================================================== */
+.text-fluid-sm {
+  font-size: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+}
+
+.text-fluid-base {
+  font-size: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
+}
+
+.text-fluid-lg {
+  font-size: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+}
+
+.text-fluid-xl {
+  font-size: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
+}
+
+.text-fluid-2xl {
+  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
+}
+
+.text-fluid-3xl {
+  font-size: clamp(1.875rem, 1.5rem + 1.8vw, 3rem);
+}
+
+.text-fluid-4xl {
+  font-size: clamp(2.25rem, 1.8rem + 2.5vw, 4rem);
 }
 
 /* ==============================================================================
@@ -131,4 +227,14 @@
 }
 .touch-press:active {
   transform: scale(0.96);
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

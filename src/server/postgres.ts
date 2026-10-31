@@ -594,6 +594,7 @@ export async function ensurePostgresAdditiveSchema(): Promise<void> {
       `);
       // 2. Full additive schema statements
       await client.query(POSTGRES_ADDITIVE_SQL);
+      await client.query("UPDATE media_items SET status = 'DELETED' WHERE id IN ('media_01', 'media_02')");
       additiveSchemaEnsured = true;
       console.log('[PostgreSQL Schema] Additive schema reconciled successfully.');
     } finally {

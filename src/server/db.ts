@@ -3125,7 +3125,7 @@ function sqliteGetAllPosts(params?: {
   currentUserRole?: string;
   status?: string;
 }): any[] {
-  let query = 'SELECT p.* FROM community_posts p WHERE 1=1';
+  let query = "SELECT p.* FROM community_posts p WHERE 1=1 AND p.status != 'DELETED'";
   const args: any[] = [];
 
   if (params?.status) {
@@ -4607,7 +4607,7 @@ function sqliteGetAllMedia(params?: {
         ).run(item.id, item.title, item.summary, item.video_url, item.thumbnail, item.type, item.duration, item.views, item.author_name, item.created_at);
       } catch {}
     }
-    return db.prepare('SELECT * FROM media_items ORDER BY created_at DESC').all() as unknown as DbMediaItem[];
+    return db.prepare("SELECT * FROM media_items WHERE id NOT IN ('media_01', 'media_02') AND status != 'DELETED' ORDER BY created_at DESC").all() as unknown as DbMediaItem[];
   }
   return rows;
 }

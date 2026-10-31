@@ -77,8 +77,8 @@ export const MediaEngine: React.FC<{
   const [newSummary, setNewSummary] = useState('');
   const [newHost, setNewHost] = useState(currentUser?.name || 'Swamy Reddy Javidi');
 
-  const visibleMedia = mediaItems.filter(m => m.type !== 'PODCAST');
-  const activeVideo = selectedMedia && selectedMedia.type !== 'PODCAST' ? selectedMedia : (visibleMedia.length > 0 ? visibleMedia[0] : null);
+  const visibleMedia = mediaItems.filter(m => m.id !== 'media_01' && m.id !== 'media_02' && m.status !== 'DELETED' && m.type !== 'PODCAST');
+  const activeVideo = selectedMedia && selectedMedia.id !== 'media_01' && selectedMedia.id !== 'media_02' && selectedMedia.status !== 'DELETED' && selectedMedia.type !== 'PODCAST' ? selectedMedia : (visibleMedia.length > 0 ? visibleMedia[0] : null);
 
   // Sync engagement & comments from server for active video
   useEffect(() => {

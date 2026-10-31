@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Wallet, CreditCard, ArrowRight, X, ShieldCheck } from 'lucide-react';
+import { Wallet, ShieldCheck, ArrowRight, X, CreditCard } from 'lucide-react';
 
 interface WalletModalProps {
   isOpen: boolean;
@@ -25,11 +25,11 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden my-auto">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 shrink-0">
               <Wallet className="w-5 h-5" />
             </div>
             <div>
@@ -39,13 +39,14 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
+            aria-label="Close wallet modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center justify-between">
             <div>
               <span className="text-xs text-slate-500 font-medium">Available Balance</span>
@@ -74,7 +75,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
                     setSelectedAmount(amt);
                     setCustomAmount('');
                   }}
-                  className={`py-3 px-4 rounded-xl text-sm font-semibold border transition-all text-left flex items-center justify-between ${
+                  className={`py-3 px-4 rounded-xl text-sm font-semibold border transition-all text-left flex items-center justify-between cursor-pointer ${
                     selectedAmount === amt && !customAmount
                       ? 'border-amber-600 bg-amber-50/50 text-amber-900 ring-2 ring-amber-500/20'
                       : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
@@ -115,7 +116,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
 
           <button
             onClick={handleRecharge}
-            className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10 active:scale-[0.98] transition-all"
+            className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10 active:scale-[0.98] transition-all cursor-pointer min-h-[44px]"
           >
             <CreditCard className="w-4 h-4 text-amber-400" />
             <span>
