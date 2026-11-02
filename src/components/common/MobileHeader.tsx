@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { useTranslation } from '../../i18n/useTranslation';
-import { LanguageSelector } from './LanguageSelector';
 import { ViewType } from '../../types';
 import { BrandLogo } from './BrandLogo';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
@@ -79,7 +77,6 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     walletBalance,
     isLoggedIn
   } = useApp();
-  const { t } = useTranslation();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const navLinks = linkedEndUserNavigation();
@@ -100,17 +97,17 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     switch (view) {
       case 'HOME': return 'Property Studio';
       case 'DASHBOARD': return 'Member Dashboard';
-      case 'PROPERTIES': return t('properties.verifiedProperties');
-      case 'LEADS_MARKET': return t('nav.buyerLeads');
-      case 'MEDIA': return t('nav.media');
-      case 'CONFERENCE': return t('nav.live');
-      case 'MARKET_INSIGHTS': return t('nav.trends');
-      case 'COMMUNITY': return t('nav.community');
-      case 'REVIEWS': return t('nav.reviews');
-      case 'REQUIREMENT': return t('nav.requirement');
-      case 'CHAT': return t('nav.contact');
-      case 'ADMIN': return t('nav.superAdminConsole');
-      case 'PROPERTY_ADMIN': return t('nav.pmoWorkspace');
+      case 'PROPERTIES': return 'Verified Properties';
+      case 'LEADS_MARKET': return 'Buyer Leads';
+      case 'MEDIA': return 'Media & Podcast';
+      case 'CONFERENCE': return 'Live & Latest';
+      case 'MARKET_INSIGHTS': return 'Market Trends & Insights';
+      case 'COMMUNITY': return 'Community Q&A';
+      case 'REVIEWS': return 'Review & Rating';
+      case 'REQUIREMENT': return 'Property Requirement';
+      case 'CHAT': return 'Contact & Connect';
+      case 'ADMIN': return 'Super Admin Console';
+      case 'PROPERTY_ADMIN': return 'PMO Workspace';
       case 'STUDIO': return 'Studio Broadcast';
       case 'CONTACT': return 'Property Admin Application';
       default: return 'Property Studio';
@@ -220,8 +217,6 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             </button>
           )}
 
-          <LanguageSelector variant="mobile" />
-
           {/* User Sign In / Profile Control Panel */}
           {!isLoggedIn ? (
             <button
@@ -271,10 +266,6 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           className="border-t border-slate-200 bg-white shadow-xl px-4 py-4 animate-in slide-in-from-top-2 duration-200 max-h-[calc(100vh-80px)] overflow-y-auto"
         >
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl mb-3">
-              <span className="text-xs font-semibold text-slate-700">{t('lang.selectLanguage')}</span>
-              <LanguageSelector variant="mobile" />
-            </div>
             <div>
               <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest block mb-2">
                 Platform Navigation
@@ -300,7 +291,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                           : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
-                      <span>{t('nav.' + link.key) || link.label}</span>
+                      <span>{link.label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '')}</span>
                       {isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />}
                     </button>
                   );

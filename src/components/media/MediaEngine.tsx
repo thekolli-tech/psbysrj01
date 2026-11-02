@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { useTranslation } from '../../i18n/useTranslation';
 import { MediaItem } from '../../types';
 import {
   parseYouTubeUrl,
@@ -67,7 +66,6 @@ export const MediaEngine: React.FC<{
     deleteMediaItem,
     refreshMedia
   } = useApp();
-  const { t } = useTranslation();
 
   const isSuperAdmin = Boolean(isLoggedIn && currentUser?.role === 'SUPER_ADMIN');
 
@@ -656,16 +654,16 @@ export const MediaEngine: React.FC<{
                 )}
                 <span>
                   {tab.key === 'ALL'
-                    ? t('media.allMedia')
+                    ? 'All Media'
                     : tab.key === 'VIDEOS'
-                    ? t('media.videos')
+                    ? 'Videos'
                     : tab.key === 'PODCASTS'
-                    ? t('media.podcasts')
+                    ? 'Podcasts'
                     : tab.key === 'LIVE_NOW'
-                    ? t('media.liveNow')
+                    ? 'LIVE NOW'
                     : tab.key === 'UPCOMING'
-                    ? t('media.upcoming')
-                    : t('media.recorded')}
+                    ? 'UPCOMING'
+                    : 'RECORDED'}
                 </span>
               </button>
             );

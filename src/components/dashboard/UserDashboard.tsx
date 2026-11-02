@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import { useTranslation } from '../../i18n/useTranslation';
-import { LanguageSelector } from '../common/LanguageSelector';
 import { Property } from '../../types';
 import { PropertyCategorySelect } from '../properties/PropertyCategorySelect';
 import { PropertyDetailModal } from '../properties/PropertyDetailModal';
@@ -151,7 +149,6 @@ function maskPhoneNumber(phone?: string): string {
 
 export const UserDashboard: React.FC = () => {
   const { currentUser, setActiveView, walletBalance, showToast, refreshSession, properties, constructionLogs, setSelectedMedia, mediaItems } = useApp();
-  const { t } = useTranslation();
 
   const [activeTab, setActiveTab] = useState<TabType>('OVERVIEW');
 
@@ -696,8 +693,6 @@ export const UserDashboard: React.FC = () => {
                 ₹{walletBalance.toLocaleString('en-IN')}
               </span>
             </div>
-
-            <LanguageSelector variant="header" />
 
             <button
               onClick={() => setActiveTab('SETTINGS')}

@@ -1,7 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { useTranslation } from '../../i18n/useTranslation';
-import { LanguageSelector } from './LanguageSelector';
 import { isPlatformAdmin, isPropertySeeker, isProfessionalRole } from '../../shared/policy';
 import { linkedEndUserNavigation, roleUtilityDestinations } from '../../shared/endUserNavigation';
 import { BrandLogo } from './BrandLogo';
@@ -82,14 +80,11 @@ export const Header: React.FC<HeaderProps> = ({
 
   const navLinks = linkedEndUserNavigation();
   const utilityLinks = roleUtilityDestinations(currentUser.role, isLoggedIn);
-
   // Derive exact display label (cleans long stakeholder phrases and brand suffixes)
-  const { t } = useTranslation();
-
   const getDisplayLabel = (link: any) => {
-    const key = typeof link === 'object' && link?.key ? link.key : '';
-    const fallback = typeof link === 'object' && link?.label ? link.label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '') : String(link || '');
-    return key ? (t('nav.' + key) || fallback) : fallback;
+    return typeof link === 'object' && link?.label
+      ? link.label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '')
+      : String(link || '');
   };
 
   // Close mobile drawer on Escape key
@@ -338,9 +333,6 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           ) : null}
 
-          {/* Multilingual Selector */}
-          <LanguageSelector variant="header" />
-
           {/* User Sign In / Profile Control Panel */}
           {!isLoggedIn ? (
             <button
@@ -433,10 +425,6 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
             <div>
-            <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl mb-4">
-              <span className="text-xs font-semibold text-slate-700">{t('lang.selectLanguage')}</span>
-              <LanguageSelector variant="mobile" />
-            </div>
               <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest block mb-2">
                 Platform Navigation
               </span>

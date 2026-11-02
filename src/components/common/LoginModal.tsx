@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { useTranslation } from '../../i18n/useTranslation';
-import { LanguageSelector } from './LanguageSelector';
 import { isPropertySeeker, postLoginDestination } from '../../shared/policy';
 import { isPhoneOtpRequired } from '../../shared/authConfig';
 import { readApiResponse } from '../../lib/apiResponse';
@@ -43,7 +41,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     setActiveView,
     showToast
   } = useApp();
-  const { t } = useTranslation();
 
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [emailInput, setEmailInput] = useState('');
@@ -328,7 +325,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <LanguageSelector variant="mobile" />
             <button
               onClick={onClose}
               className="p-1 sm:p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
