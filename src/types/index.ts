@@ -37,6 +37,7 @@ export interface User {
   accountStatus?: 'ACTIVE' | 'SUSPENDED' | 'DISABLED';
   mustChangePassword?: boolean;
   lastLoginAt?: string;
+  preferredLanguage?: string;
 }
 
 export interface PropertyAdminAssignment {
@@ -155,7 +156,7 @@ export interface Lead {
 export interface MediaItem {
   id: string;
   title: string;
-  type: 'MASTERCLASS' | 'PODCAST' | 'PROJECT_WALKTHROUGH' | 'MARKET_ANALYSIS' | 'VIDEO';
+  type: 'MASTERCLASS' | 'PODCAST' | 'PROJECT_WALKTHROUGH' | 'MARKET_ANALYSIS' | 'VIDEO' | 'LIVE_VIDEO' | 'LIVE_AUDIO';
   duration: string;
   host: string;
   guest?: string;
@@ -176,6 +177,17 @@ export interface MediaItem {
   episodeNumber?: number;
   fileSize?: number;
   mimeType?: string;
+  contentType?: 'VIDEO' | 'PODCAST' | 'LIVE_VIDEO' | 'LIVE_AUDIO';
+  provider?: 'YOUTUBE' | 'GOOGLE_DRIVE' | 'EXTERNAL_HLS' | 'EXTERNAL_DASH' | 'EXTERNAL_AUDIO' | 'EXTERNAL_VIDEO' | 'CUSTOM' | string;
+  providerVideoId?: string;
+  broadcastStatus?: 'LIVE' | 'UPCOMING' | 'ENDED' | null;
+  scheduledStartTime?: string;
+  actualStartTime?: string;
+  endTime?: string;
+  replayUrl?: string;
+  viewerCount?: number;
+  isLive?: boolean;
+  externalPlaybackUrl?: string;
 }
 
 export interface StudioBroadcast {

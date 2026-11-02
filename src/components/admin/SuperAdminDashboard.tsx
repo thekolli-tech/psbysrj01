@@ -47,6 +47,7 @@ interface ManagedUser {
   role: UserRole;
   avatar: string;
   organization: string;
+  profession?: string | null;
   wallet_balance: number;
   postCount?: number;
   created_at?: string;
@@ -1815,6 +1816,9 @@ export const SuperAdminDashboard: React.FC = () => {
                               )}
                             </div>
                             <div className="text-slate-500 font-mono text-[11px]">{u.email}</div>
+                            {u.profession && (
+                              <span className="text-[10px] text-amber-800 font-medium block">Profession: {u.profession}</span>
+                            )}
                             {u.organization && (
                               <span className="text-[10px] text-slate-400 block">{u.organization}</span>
                             )}

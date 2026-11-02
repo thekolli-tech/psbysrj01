@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useTranslation } from '../../i18n/useTranslation';
+import { LanguageSelector } from './LanguageSelector';
 import { isPropertySeeker } from '../../shared/policy';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import {
@@ -41,6 +43,7 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
     Array.isArray((currentUser as any).interests) ? (currentUser as any).interests : []
   );
   const [profileSaving, setProfileSaving] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -545,6 +548,10 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                         );
                       })}
                     </div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">{t('dashboard.preferredLanguage')}</label>
+                    <LanguageSelector variant="settings" />
                   </div>
                   {errorMsg && activeTab === 'PROFILE' && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">{errorMsg}</div>

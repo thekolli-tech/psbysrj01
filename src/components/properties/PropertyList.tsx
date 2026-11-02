@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useTranslation } from '../../i18n/useTranslation';
 import { Property } from '../../types';
 import { PropertyCategorySelect } from './PropertyCategorySelect';
 import { ALL_PROPERTY_TYPES, displayPropertyType, matchesPropertyTypeFilter } from '../../shared/propertyCategories';
@@ -35,6 +36,7 @@ interface PropertyListProps {
 
 export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onContactAdmin }) => {
   const { properties, constructionLogs, setActiveView } = useApp();
+  const { t } = useTranslation();
 
   // Active view mode: Grid vs Corridor Map
   const [viewMode, setViewMode] = useState<'GRID' | 'MAP'>('GRID');
@@ -205,7 +207,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
         filtered.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm space-y-4">
             <Building2 className="w-12 h-12 text-slate-400 mx-auto" />
-            <h3 className="text-lg font-bold text-slate-900 font-display">No developments match your current filters</h3>
+            <h3 className="text-lg font-bold text-slate-900 font-display">{t('properties.noResults')}</h3>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
               Try selecting a different corridor, lowering the civil progress threshold, or resetting all filters.
             </p>

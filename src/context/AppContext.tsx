@@ -448,14 +448,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             title: it.title,
             type: it.type || 'MASTERCLASS',
             duration: it.duration || '15:00',
-            host: it.author_name || 'Swamy Reddy Javidi',
-            videoUrl: it.video_url || '',
+            host: it.author_name || it.host || 'Swamy Reddy Javidi',
+            guest: it.guest || undefined,
+            guestTitle: it.guest_title || undefined,
+            videoUrl: it.video_url || it.media_url || '',
+            audioUrl: it.audio_url || '',
+            mediaUrl: it.media_url || it.video_url || it.audio_url || '',
             thumbnail: it.thumbnail || '',
             summary: it.summary || '',
-            keyTakeaways: [],
-            timestamps: [],
+            keyTakeaways: Array.isArray(it.key_takeaways) ? it.key_takeaways : [],
+            timestamps: Array.isArray(it.timestamps) ? it.timestamps : [],
             views: it.views || 0,
-            publishedDate: it.created_at ? new Date(it.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
+            publishedDate: it.created_at ? new Date(it.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
+            status: it.status || 'PUBLISHED',
+            category: it.category || 'Real Estate Intelligence',
+            tags: it.tags || '[]',
+            episodeTitle: it.episode_title || undefined,
+            episodeNumber: it.episode_number ? Number(it.episode_number) : undefined,
+            contentType: it.content_type || (it.type === 'PODCAST' ? 'PODCAST' : 'VIDEO'),
+            provider: it.storage_provider || undefined,
+            providerVideoId: it.provider_video_id || undefined,
+            broadcastStatus: it.broadcast_status || null,
+            scheduledStartTime: it.scheduled_start_time || undefined,
+            actualStartTime: it.actual_start_time || undefined,
+            endTime: it.end_time || undefined,
+            replayUrl: it.replay_url || undefined,
+            isLive: it.broadcast_status === 'LIVE' || it.type === 'LIVE_VIDEO' || it.type === 'LIVE_AUDIO'
           }));
           setMediaItems(mapped);
         }
@@ -950,14 +968,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: itemData.title,
         summary: itemData.summary,
         video_url: itemData.videoUrl,
+        audio_url: itemData.audioUrl,
+        media_url: itemData.mediaUrl || itemData.videoUrl || itemData.audioUrl,
         thumbnail: itemData.thumbnail,
         type: itemData.type,
         duration: itemData.duration,
-        author_name: itemData.host
+        author_name: itemData.host,
+        category: itemData.category,
+        broadcast_status: itemData.broadcastStatus,
+        scheduled_start_time: itemData.scheduledStartTime,
+        actual_start_time: itemData.actualStartTime,
+        end_time: itemData.endTime,
+        replay_url: itemData.replayUrl,
+        content_type: itemData.contentType,
+        provider: itemData.provider,
+        provider_video_id: itemData.providerVideoId
       })
     })
       .then(res => res.json())
       .then(resData => {
+        if (!resData.success && resData.error) {
+          showToast(resData.error);
+          return;
+        }
         const newItem: MediaItem = {
           ...itemData,
           id: resData.mediaId || `media_${Date.now()}`,
@@ -965,7 +998,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           publishedDate: 'Just now'
         };
         setMediaItems(prev => [newItem, ...prev]);
-        showToast(`Video broadcast "${itemData.title}" uploaded successfully!`);
+        showToast(`Broadcast "${itemData.title}" published successfully!`);
       })
       .catch(() => {
         showToast('Failed to upload broadcast to server.');
@@ -987,19 +1020,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const data = await res.json();
       if (data?.items && Array.isArray(data.items)) {
         const mapped: MediaItem[] = data.items.map((it: any) => ({
-          id: it.id,
-          title: it.title,
-          type: it.type || 'MASTERCLASS',
-          duration: it.duration || '15:00',
-          host: it.author_name || 'Swamy Reddy Javidi',
-          videoUrl: it.media_url || it.video_url || '',
-          thumbnail: it.thumbnail || '',
-          summary: it.summary || '',
-          keyTakeaways: [],
-          timestamps: [],
-          views: it.views || 0,
-          publishedDate: it.created_at ? new Date(it.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
-        }));
+            id: it.id,
+            title: it.title,
+            type: it.type || 'MASTERCLASS',
+            duration: it.duration || '15:00',
+            host: it.author_name || it.host || 'Swamy Reddy Javidi',
+            guest: it.guest || undefined,
+            guestTitle: it.guest_title || undefined,
+            videoUrl: it.video_url || it.media_url || '',
+            audioUrl: it.audio_url || '',
+            mediaUrl: it.media_url || it.video_url || it.audio_url || '',
+            thumbnail: it.thumbnail || '',
+            summary: it.summary || '',
+            keyTakeaways: Array.isArray(it.key_takeaways) ? it.key_takeaways : [],
+            timestamps: Array.isArray(it.timestamps) ? it.timestamps : [],
+            views: it.views || 0,
+            publishedDate: it.created_at ? new Date(it.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
+            status: it.status || 'PUBLISHED',
+            category: it.category || 'Real Estate Intelligence',
+            tags: it.tags || '[]',
+            episodeTitle: it.episode_title || undefined,
+            episodeNumber: it.episode_number ? Number(it.episode_number) : undefined,
+            contentType: it.content_type || (it.type === 'PODCAST' ? 'PODCAST' : 'VIDEO'),
+            provider: it.storage_provider || undefined,
+            providerVideoId: it.provider_video_id || undefined,
+            broadcastStatus: it.broadcast_status || null,
+            scheduledStartTime: it.scheduled_start_time || undefined,
+            actualStartTime: it.actual_start_time || undefined,
+            endTime: it.end_time || undefined,
+            replayUrl: it.replay_url || undefined,
+            isLive: it.broadcast_status === 'LIVE' || it.type === 'LIVE_VIDEO' || it.type === 'LIVE_AUDIO'
+          }));
         setMediaItems(mapped);
       }
     } catch (_e) {}

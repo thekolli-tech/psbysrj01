@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { LanguageProvider, useTranslation } from './i18n/LanguageContext';
+import { LanguageSelector } from './components/common/LanguageSelector';
 import { Header } from './components/common/Header';
 import { MobileHeader } from './components/common/MobileHeader';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
@@ -47,6 +49,7 @@ const AppContent: React.FC = () => {
     deviceMode,
     isLoggedIn
   } = useApp();
+  const { t } = useTranslation();
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -726,10 +729,12 @@ const AppContent: React.FC = () => {
 
           {/* Sub-Footer Copyright & Inquiries */}
           <div className="mt-10 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-4">
-            <div>
-              © 2026 Property Studio Media & Intelligence. All rights reserved.
+            <div className="flex items-center gap-2">
+              <span>© 2026 Property Studio Media & Intelligence. {t('footer.rights')}.</span>
             </div>
             <div className="flex items-center gap-3">
+              <LanguageSelector variant="footer" />
+              <span>·</span>
               <button
                 onClick={() => {
                   setActiveView('PRIVACY');
@@ -737,7 +742,7 @@ const AppContent: React.FC = () => {
                 }}
                 className="hover:text-slate-900 underline cursor-pointer"
               >
-                Privacy Policy
+                {t('footer.privacy')}
               </button>
               <span>·</span>
               <button
@@ -747,7 +752,7 @@ const AppContent: React.FC = () => {
                 }}
                 className="hover:text-slate-900 underline cursor-pointer"
               >
-                Terms & Conditions
+                {t('footer.terms')}
               </button>
               <span>·</span>
               <span>Inquiries: <span className="font-mono text-slate-700">info@propertystudio.org</span></span>
@@ -806,7 +811,9 @@ const AppContent: React.FC = () => {
 export default function App() {
   return (
     <AppProvider>
-      <AppContent />
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
     </AppProvider>
   );
 }

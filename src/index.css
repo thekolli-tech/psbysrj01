@@ -238,3 +238,55 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ==============================================================================
+   MULTILINGUAL & UNICODE SCRIPT TYPOGRAPHY + RTL LAYOUT SUPPORT
+   ============================================================================== */
+[lang="te"] {
+  font-family: 'Plus Jakarta Sans', 'Gautami', 'Vani', 'Nirmala UI', system-ui, sans-serif;
+}
+[lang="hi"], [lang="mr"] {
+  font-family: 'Plus Jakarta Sans', 'Mangal', 'Nirmala UI', system-ui, sans-serif;
+}
+[lang="kn"] {
+  font-family: 'Plus Jakarta Sans', 'Tunga', 'Nirmala UI', system-ui, sans-serif;
+}
+[lang="ta"] {
+  font-family: 'Plus Jakarta Sans', 'Latha', 'Vijaya', 'Nirmala UI', system-ui, sans-serif;
+}
+[lang="ml"] {
+  font-family: 'Plus Jakarta Sans', 'Kartika', 'Nirmala UI', system-ui, sans-serif;
+}
+[lang="bn"] {
+  font-family: 'Plus Jakarta Sans', 'Vrinda', 'Shonar Bangla', 'Nirmala UI', system-ui, sans-serif;
+}
+[lang="gu"] {
+  font-family: 'Plus Jakarta Sans', 'Shruti', 'Nirmala UI', system-ui, sans-serif;
+}
+[lang="pa"] {
+  font-family: 'Plus Jakarta Sans', 'Raavi', 'Nirmala UI', system-ui, sans-serif;
+}
+[lang="ur"], [dir="rtl"] {
+  font-family: 'Noto Nastaliq Urdu', 'Urdu Typesetting', 'Jameel Noori Nastaleeq', 'Segoe UI', Tahoma, sans-serif;
+}
+
+[dir="rtl"] {
+  text-align: right;
+  direction: rtl;
+}
+
+[dir="rtl"] input,
+[dir="rtl"] textarea,
+[dir="rtl"] select {
+  text-align: right;
+  direction: rtl;
+}
+
+[dir="rtl"] .font-mono-numbers,
+[dir="rtl"] .font-mono,
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="number"],
+[dir="rtl"] input[type="email"] {
+  direction: ltr;
+  text-align: left;
+}

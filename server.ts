@@ -133,6 +133,11 @@ import {
 } from './src/server/db.ts';
 import { resolveAuthoritativeOtpDestination, maskEmailForDisplay, validatePasswordPolicy } from './src/server/otpPolicy.ts';
 import {
+  parseYouTubeUrl,
+  validateMediaUrl,
+  detectMediaConfig
+} from './src/shared/mediaParser.ts';
+import {
   getMediaStorageConfig,
   createUploadIntent,
   verifyObjectInStorage,
@@ -445,6 +450,7 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
       user: {
         ...safeUser,
         isVerified: Boolean(safeUser.is_verified),
+        preferredLanguage: safeUser.preferred_language || 'en',
         assignedPropertyIds
       }
     });
@@ -511,11 +517,32 @@ app.patch('/api/me/profile', requireAuth, async (req: AuthenticatedRequest, res:
         avatar: updated.avatar || '',
         interests: typeof updated.interests === 'string' ? JSON.parse(updated.interests) : (updated.interests || []),
         isVerified: Boolean(updated.is_verified),
+        preferredLanguage: updated.preferred_language || 'en',
         assignedPropertyIds: JSON.parse(updated.assigned_properties || '[]')
       }
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Profile was not saved.' });
+  }
+});
+
+// Update preferred language preference
+app.put('/api/me/language', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const language = String(req.body?.language || '').trim().toLowerCase();
+    const allowed = ['en', 'te', 'hi', 'kn', 'ta', 'ml', 'bn', 'mr', 'gu', 'pa', 'ur'];
+    if (!allowed.includes(language)) {
+      res.status(400).json({ error: `Invalid language code. Supported locales: ${allowed.join(', ')}` });
+      return;
+    }
+    const updated = await updateUserProfileFields(req.user!.id, { preferredLanguage: language });
+    if (!updated) {
+      res.status(404).json({ error: 'User account not found.' });
+      return;
+    }
+    res.json({ success: true, preferredLanguage: language });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to update preferred language.' });
   }
 });
 
@@ -609,6 +636,7 @@ app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
       company: (safeUser as any).company || '',
       interests: typeof (safeUser as any).interests === 'string' ? JSON.parse((safeUser as any).interests) : ((safeUser as any).interests || []),
       isVerified: Boolean(safeUser.is_verified),
+      preferredLanguage: safeUser.preferred_language || 'en',
       assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
     }
   });
@@ -907,10 +935,21 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
     });
 
     let validatedProfession: string | null = null;
-    if (profession) {
+    if (profession !== undefined) {
+      if (typeof profession !== 'string' || !profession.trim()) {
+        res.status(400).json({ error: 'Please enter your profession.' });
+        return;
+      }
       const fieldRes = readProfileField(profession, true, 'Profession');
-      if (!('error' in fieldRes) && !fieldRes.omit && fieldRes.value) {
-        validatedProfession = fieldRes.value;
+      if ('error' in fieldRes) {
+        res.status(400).json({ error: fieldRes.error });
+        return;
+      }
+      if (!fieldRes.omit && fieldRes.value && fieldRes.value.trim()) {
+        validatedProfession = fieldRes.value.trim();
+      } else {
+        res.status(400).json({ error: 'Please enter your profession.' });
+        return;
       }
     }
     let validatedCompany: string | null = null;
@@ -3206,13 +3245,17 @@ app.get('/api/media', async (req: AuthenticatedRequest, res: Response): Promise<
     const type = req.query.type as string | undefined;
     const category = req.query.category as string | undefined;
     const status = req.query.status as string | undefined;
+    const contentType = req.query.contentType as string | undefined;
+    const broadcastStatus = req.query.broadcastStatus as string | undefined;
     const includeDrafts = isSuperAdmin && req.query.includeDrafts === 'true';
 
     const items = await getAllMedia({
       type,
       category,
       status: isSuperAdmin && status ? status : (includeDrafts ? undefined : 'PUBLISHED'),
-      includeDrafts
+      includeDrafts,
+      contentType,
+      broadcastStatus
     });
     res.json({ items });
   } catch (err: any) {
@@ -3239,7 +3282,7 @@ app.get('/api/media/:id', async (req: AuthenticatedRequest, res: Response): Prom
   }
 });
 
-// Create Media Item (Super Admin only - supports Podcasts & Videos)
+// Create Media Item (Super Admin only - supports Podcasts, Videos & Live Broadcasts)
 app.post('/api/media', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const {
@@ -3264,12 +3307,48 @@ app.post('/api/media', requireSuperAdminOnly, async (req: AuthenticatedRequest, 
       mime_type,
       storage_provider,
       storage_key,
-      author_name
+      author_name,
+      broadcast_status,
+      scheduled_start_time,
+      actual_start_time,
+      end_time,
+      replay_url,
+      content_type
     } = req.body;
 
     if (!title || typeof title !== 'string' || !title.trim()) {
       res.status(400).json({ error: 'Title is required for media item.' });
       return;
+    }
+
+    const inputUrl = (video_url || media_url || audio_url || '').trim();
+    let resolvedProvider = storage_provider?.trim() || 'PERSISTENT_STORAGE';
+    let resolvedThumbnail = thumbnail?.trim() || null;
+    let resolvedVideoId = null;
+    let resolvedContentType = content_type || (type === 'PODCAST' ? 'PODCAST' : 'VIDEO');
+    const isLive = broadcast_status === 'LIVE';
+
+    if (inputUrl) {
+      const val = validateMediaUrl(inputUrl);
+      if (!val.isValid) {
+        res.status(400).json({ error: val.error || 'Invalid media URL.' });
+        return;
+      }
+
+      const detected = detectMediaConfig(inputUrl, {
+        explicitContentType: resolvedContentType,
+        isLiveBroadcast: isLive,
+        customThumbnail: resolvedThumbnail
+      });
+
+      resolvedProvider = detected.provider;
+      resolvedContentType = detected.contentType;
+      if (detected.providerVideoId) {
+        resolvedVideoId = detected.providerVideoId;
+      }
+      if (!resolvedThumbnail && detected.thumbnailUrl) {
+        resolvedThumbnail = detected.thumbnailUrl;
+      }
     }
 
     const mediaId = await createMedia({
@@ -3278,7 +3357,7 @@ app.post('/api/media', requireSuperAdminOnly, async (req: AuthenticatedRequest, 
       video_url: video_url?.trim() || null,
       audio_url: audio_url?.trim() || null,
       media_url: media_url?.trim() || video_url?.trim() || audio_url?.trim() || null,
-      thumbnail: thumbnail?.trim() || null,
+      thumbnail: resolvedThumbnail,
       type: type || 'MASTERCLASS',
       category: category?.trim() || 'General',
       duration: duration?.trim() || '15:00',
@@ -3292,13 +3371,47 @@ app.post('/api/media', requireSuperAdminOnly, async (req: AuthenticatedRequest, 
       status: status || 'PUBLISHED',
       file_size: file_size ? Number(file_size) : null,
       mime_type: mime_type?.trim() || null,
-      storage_provider: storage_provider?.trim() || null,
+      storage_provider: resolvedProvider,
       storage_key: storage_key?.trim() || null,
       author_id: req.user?.id || null,
-      author_name: author_name?.trim() || req.user?.name || 'Property Studio Host'
+      author_name: author_name?.trim() || req.user?.name || 'Property Studio Host',
+      broadcast_status: broadcast_status || null,
+      scheduled_start_time: scheduled_start_time || null,
+      actual_start_time: actual_start_time || null,
+      end_time: end_time || null,
+      replay_url: replay_url?.trim() || null,
+      provider_video_id: resolvedVideoId,
+      content_type: resolvedContentType
     });
 
     res.json({ success: true, mediaId });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Update Media Broadcast Status (Super Admin only - LIVE, UPCOMING, ENDED)
+app.post('/api/media/:id/broadcast-status', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { broadcast_status, actual_start_time, end_time, replay_url } = req.body;
+    if (broadcast_status !== null && !['LIVE', 'UPCOMING', 'ENDED'].includes(broadcast_status)) {
+      res.status(400).json({ error: 'Invalid broadcast status. Must be LIVE, UPCOMING, ENDED, or null.' });
+      return;
+    }
+    const updates: Record<string, any> = { broadcast_status };
+    if (broadcast_status === 'LIVE') {
+      updates.actual_start_time = actual_start_time || new Date().toISOString();
+    } else if (broadcast_status === 'ENDED') {
+      updates.end_time = end_time || new Date().toISOString();
+      if (replay_url) updates.replay_url = replay_url.trim();
+    }
+    const updated = await updateMedia(req.params.id, updates);
+    if (!updated) {
+      res.status(404).json({ error: 'Media broadcast item not found.' });
+      return;
+    }
+    broadcastSseEvent('MEDIA_BROADCAST_UPDATED', { id: req.params.id, broadcast_status });
+    res.json({ success: true, message: `Broadcast status updated to ${broadcast_status || 'standard'}` });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

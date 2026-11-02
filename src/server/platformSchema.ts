@@ -37,6 +37,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT DEFAULT '[]';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted SMALLINT DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(10) DEFAULT 'en';
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS post_type VARCHAR(32) DEFAULT 'POST';
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS visibility VARCHAR(32) DEFAULT 'PUBLIC';
 ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS poll_options TEXT DEFAULT '[]';
@@ -86,6 +87,13 @@ ALTER TABLE media_items ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(64) DE
 ALTER TABLE media_items ADD COLUMN IF NOT EXISTS storage_key TEXT;
 ALTER TABLE media_items ADD COLUMN IF NOT EXISTS author_id VARCHAR(64);
 ALTER TABLE media_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS broadcast_status VARCHAR(32);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS scheduled_start_time TIMESTAMPTZ;
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS actual_start_time TIMESTAMPTZ;
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS end_time TIMESTAMPTZ;
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS replay_url TEXT;
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS provider_video_id VARCHAR(128);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS content_type VARCHAR(32) DEFAULT 'VIDEO';
 
 CREATE TABLE IF NOT EXISTS media_upload_intents (
   id VARCHAR(64) PRIMARY KEY,
@@ -379,6 +387,7 @@ export const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE users ADD COLUMN company TEXT',
   'ALTER TABLE users ADD COLUMN is_restricted INTEGER DEFAULT 0',
   'ALTER TABLE users ADD COLUMN restricted_reason TEXT',
+  'ALTER TABLE users ADD COLUMN preferred_language TEXT DEFAULT \'en\'',
   'ALTER TABLE community_posts ADD COLUMN post_type TEXT DEFAULT \'POST\'',
   'ALTER TABLE community_posts ADD COLUMN visibility TEXT DEFAULT \'PUBLIC\'',
   'ALTER TABLE community_posts ADD COLUMN poll_options TEXT DEFAULT \'[]\'',
@@ -427,7 +436,14 @@ export const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE media_items ADD COLUMN storage_provider TEXT DEFAULT \'PERSISTENT_STORAGE\'',
   'ALTER TABLE media_items ADD COLUMN storage_key TEXT',
   'ALTER TABLE media_items ADD COLUMN author_id TEXT',
-  'ALTER TABLE media_items ADD COLUMN updated_at TEXT'
+  'ALTER TABLE media_items ADD COLUMN updated_at TEXT',
+  'ALTER TABLE media_items ADD COLUMN broadcast_status TEXT',
+  'ALTER TABLE media_items ADD COLUMN scheduled_start_time TEXT',
+  'ALTER TABLE media_items ADD COLUMN actual_start_time TEXT',
+  'ALTER TABLE media_items ADD COLUMN end_time TEXT',
+  'ALTER TABLE media_items ADD COLUMN replay_url TEXT',
+  'ALTER TABLE media_items ADD COLUMN provider_video_id TEXT',
+  'ALTER TABLE media_items ADD COLUMN content_type TEXT DEFAULT \'VIDEO\''
 ];
 
 export const SQLITE_TABLE_SQL = `

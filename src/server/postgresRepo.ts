@@ -71,6 +71,7 @@ function mapUserRow(row: any): DbUser {
     email_verified: Number(row.email_verified || 0),
     phone_verified: Number(row.phone_verified || 0),
     account_status: row.account_status,
+    preferred_language: row.preferred_language || 'en',
     must_change_password: Number(row.must_change_password || 0),
     assigned_properties: typeof row.assigned_properties === 'string' ? row.assigned_properties : JSON.stringify(row.assigned_properties || []),
     password_hash: row.password_hash,
@@ -147,6 +148,7 @@ export async function pgGetAllUsers(): Promise<Array<Omit<DbUser, 'password_hash
     email_verified: Number(row.email_verified || 0),
     phone_verified: Number(row.phone_verified || 0),
     account_status: row.account_status,
+    preferred_language: row.preferred_language || 'en',
     must_change_password: Number(row.must_change_password || 0),
     assigned_properties: typeof row.assigned_properties === 'string' ? row.assigned_properties : JSON.stringify(row.assigned_properties || []),
     last_login_at: toNullableIso(row.last_login_at),
@@ -240,7 +242,7 @@ export async function pgUpdateUser(id: string, updates: Partial<{
 
 export async function pgUpdateProfileFields(
   id: string,
-  fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null }
+  fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null; preferredLanguage?: string | null }
 ): Promise<DbUser | null> {
   await ensurePostgresAdditiveSchema();
   const sets: string[] = [];
@@ -265,6 +267,10 @@ export async function pgUpdateProfileFields(
   if (fields.interests !== undefined) {
     sets.push(`interests = $${paramIdx++}`);
     values.push(fields.interests ? JSON.stringify(fields.interests) : null);
+  }
+  if (fields.preferredLanguage !== undefined) {
+    sets.push(`preferred_language = $${paramIdx++}`);
+    values.push(fields.preferredLanguage);
   }
   if (sets.length === 0) return pgFindUserById(id);
   sets.push(`updated_at = $${paramIdx++}`);
@@ -675,6 +681,7 @@ export async function pgGetSession(rawToken: string): Promise<(DbSession & { use
     SELECT s.*, u.id as u_id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
            u.town_city, u.profession, u.company, u.interests, u.is_restricted, u.restricted_reason,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
+           u.preferred_language,
            u.must_change_password, u.assigned_properties, u.created_at as u_created_at, u.updated_at as u_updated_at
     FROM sessions s
     JOIN users u ON s.user_id = u.id
@@ -722,6 +729,7 @@ export async function pgGetSession(rawToken: string): Promise<(DbSession & { use
       email_verified: Number(row.email_verified || 0),
       phone_verified: Number(row.phone_verified || 0),
       account_status: row.account_status,
+      preferred_language: row.preferred_language || 'en',
       must_change_password: Number(row.must_change_password || 0),
       assigned_properties: typeof row.assigned_properties === 'string' ? row.assigned_properties : JSON.stringify(row.assigned_properties || []),
       password_hash: '',
@@ -2899,7 +2907,14 @@ function mapPgMediaItem(m: any): DbMediaItem {
     storage_provider: m.storage_provider || 'PERSISTENT_STORAGE',
     storage_key: m.storage_key || '',
     author_id: m.author_id || '',
-    updated_at: toIso(m.updated_at)
+    updated_at: toIso(m.updated_at),
+    broadcast_status: m.broadcast_status || null,
+    scheduled_start_time: m.scheduled_start_time ? toIso(m.scheduled_start_time) : undefined,
+    actual_start_time: m.actual_start_time ? toIso(m.actual_start_time) : undefined,
+    end_time: m.end_time ? toIso(m.end_time) : undefined,
+    replay_url: m.replay_url || undefined,
+    provider_video_id: m.provider_video_id || undefined,
+    content_type: m.content_type || 'VIDEO'
   };
 }
 
@@ -2931,6 +2946,8 @@ export async function pgGetAllMedia(params?: {
   status?: string;
   category?: string;
   includeDrafts?: boolean;
+  contentType?: string;
+  broadcastStatus?: string;
 }): Promise<DbMediaItem[]> {
   await ensurePostgresAdditiveSchema();
   let query = "SELECT * FROM media_items WHERE 1=1 AND id NOT IN ('media_01', 'media_02') AND status != 'DELETED'";
@@ -2952,6 +2969,16 @@ export async function pgGetAllMedia(params?: {
   if (params?.category) {
     query += " AND category = $" + (idx++);
     args.push(params.category);
+  }
+
+  if (params?.contentType) {
+    query += " AND content_type = $" + (idx++);
+    args.push(params.contentType);
+  }
+
+  if (params?.broadcastStatus) {
+    query += " AND broadcast_status = $" + (idx++);
+    args.push(params.broadcastStatus);
   }
 
   query += ' ORDER BY created_at DESC';
@@ -3007,12 +3034,19 @@ export async function pgCreateMedia(item: {
   storage_provider?: string;
   storage_key?: string;
   author_id?: string;
+  broadcast_status?: string;
+  scheduled_start_time?: string;
+  actual_start_time?: string;
+  end_time?: string;
+  replay_url?: string;
+  provider_video_id?: string;
+  content_type?: string;
 }): Promise<string> {
   await ensurePostgresAdditiveSchema();
   const id = "media_" + Date.now() + "_" + crypto.randomBytes(3).toString('hex');
   const now = new Date().toISOString();
   await queryPostgres(
-    "INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at, status, category, tags, episode_title, episode_number, host, guest, guest_title, published_date, audio_url, media_url, file_size, mime_type, storage_provider, storage_key, author_id, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)",
+    "INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at, status, category, tags, episode_title, episode_number, host, guest, guest_title, published_date, audio_url, media_url, file_size, mime_type, storage_provider, storage_key, author_id, updated_at, broadcast_status, scheduled_start_time, actual_start_time, end_time, replay_url, provider_video_id, content_type) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)",
     [
       id,
       item.title,
@@ -3039,7 +3073,14 @@ export async function pgCreateMedia(item: {
       item.storage_provider || 'PERSISTENT_STORAGE',
       item.storage_key || '',
       item.author_id || '',
-      now
+      now,
+      item.broadcast_status || null,
+      item.scheduled_start_time || null,
+      item.actual_start_time || null,
+      item.end_time || null,
+      item.replay_url || null,
+      item.provider_video_id || null,
+      item.content_type || 'VIDEO'
     ]
   );
   return id;

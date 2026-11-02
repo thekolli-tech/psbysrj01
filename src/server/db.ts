@@ -238,6 +238,7 @@ export interface DbUser {
   account_status: 'ACTIVE' | 'SUSPENDED' | 'DISABLED' | 'RESTRICTED';
   is_restricted?: number;
   restricted_reason?: string | null;
+  preferred_language?: string | null;
   must_change_password: number;
   assigned_properties: string; // JSON
   password_hash: string;
@@ -516,6 +517,13 @@ export interface DbMediaItem {
   storage_key?: string;
   author_id?: string;
   updated_at?: string;
+  broadcast_status?: string;
+  scheduled_start_time?: string;
+  actual_start_time?: string;
+  end_time?: string;
+  replay_url?: string;
+  provider_video_id?: string;
+  content_type?: string;
 }
 
 export interface DbStudioBroadcast {
@@ -808,7 +816,7 @@ export async function updateUser(id: string, updates: Partial<{
 /** Updates only town/city and profession. Omitted keys are left unchanged. Role is not accepted. */
 export async function updateUserProfileFields(
   id: string,
-  fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null }
+  fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null; preferredLanguage?: string | null }
 ): Promise<DbUser | null> {
   if (isPostgresAuthoritative()) return pgUpdateProfileFields(id, fields);
   return sqliteUpdateProfileFields(id, fields);
@@ -1455,6 +1463,8 @@ export async function getAllMedia(params?: {
   status?: string;
   category?: string;
   includeDrafts?: boolean;
+  contentType?: string;
+  broadcastStatus?: string;
 }): Promise<DbMediaItem[]> {
   if (isPostgresAuthoritative()) return pgGetAllMedia(params);
   return sqliteGetAllMedia(params);
@@ -1689,6 +1699,7 @@ function sqliteInitDatabase(): void {
       email_verified INTEGER DEFAULT 0,
       phone_verified INTEGER DEFAULT 0,
       account_status TEXT DEFAULT 'ACTIVE',
+      preferred_language TEXT DEFAULT 'en',
       must_change_password INTEGER DEFAULT 0,
       assigned_properties TEXT DEFAULT '[]',
       password_hash TEXT NOT NULL,
@@ -2515,7 +2526,7 @@ function sqliteUpdateUser(id: string, updates: Partial<{
 
 function sqliteUpdateProfileFields(
   id: string,
-  fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null }
+  fields: { townCity?: string | null; profession?: string | null; company?: string | null; avatar?: string | null; interests?: string[] | null; preferredLanguage?: string | null }
 ): DbUser | null {
   const sets: string[] = [];
   const values: Array<string | null> = [];
@@ -2538,6 +2549,10 @@ function sqliteUpdateProfileFields(
   if (fields.interests !== undefined) {
     sets.push('interests = ?');
     values.push(fields.interests ? JSON.stringify(fields.interests) : null);
+  }
+  if (fields.preferredLanguage !== undefined) {
+    sets.push('preferred_language = ?');
+    values.push(fields.preferredLanguage);
   }
   if (sets.length === 0) return sqliteFindUserById(id);
   sets.push('updated_at = ?');
@@ -2907,6 +2922,7 @@ function sqliteGetSession(rawToken: string): (DbSession & { user: DbUser }) | nu
     SELECT s.*, u.id as u_id, u.public_id, u.name, u.email, u.phone, u.role, u.avatar, u.organization,
            u.town_city, u.profession, u.company, u.interests, u.is_restricted, u.restricted_reason,
            u.wallet_balance, u.is_verified, u.email_verified, u.phone_verified, u.account_status,
+           u.preferred_language,
            u.must_change_password, u.assigned_properties, u.created_at as u_created_at, u.updated_at as u_updated_at
     FROM sessions s
     JOIN users u ON s.user_id = u.id
@@ -2952,6 +2968,7 @@ function sqliteGetSession(rawToken: string): (DbSession & { user: DbUser }) | nu
       email_verified: row.email_verified,
       phone_verified: row.phone_verified,
       account_status: row.account_status,
+      preferred_language: row.preferred_language || 'en',
       must_change_password: row.must_change_password,
       assigned_properties: row.assigned_properties,
       password_hash: '',
@@ -4636,6 +4653,8 @@ function sqliteGetAllMedia(params?: {
   status?: string;
   category?: string;
   includeDrafts?: boolean;
+  contentType?: string;
+  broadcastStatus?: string;
 }): DbMediaItem[] {
   let query = "SELECT * FROM media_items WHERE 1=1 AND id NOT IN ('media_01', 'media_02') AND status != 'DELETED'";
   const args: any[] = [];
@@ -4655,6 +4674,16 @@ function sqliteGetAllMedia(params?: {
   if (params?.category) {
     query += ' AND category = ?';
     args.push(params.category);
+  }
+
+  if (params?.contentType) {
+    query += ' AND content_type = ?';
+    args.push(params.contentType);
+  }
+
+  if (params?.broadcastStatus) {
+    query += ' AND broadcast_status = ?';
+    args.push(params.broadcastStatus);
   }
 
   query += ' ORDER BY created_at DESC';
@@ -4688,7 +4717,7 @@ function sqliteCreateMedia(item: Record<string, any>): string {
   const id = item.id || ('media_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex'));
   const now = new Date().toISOString();
   const insert = db.prepare(
-    "INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at, status, category, tags, episode_title, episode_number, host, guest, guest_title, published_date, audio_url, media_url, file_size, mime_type, storage_provider, storage_key, author_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO media_items (id, title, summary, video_url, thumbnail, type, duration, views, author_name, created_at, status, category, tags, episode_title, episode_number, host, guest, guest_title, published_date, audio_url, media_url, file_size, mime_type, storage_provider, storage_key, author_id, updated_at, broadcast_status, scheduled_start_time, actual_start_time, end_time, replay_url, provider_video_id, content_type) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
   insert.run(
     id,
@@ -4716,7 +4745,14 @@ function sqliteCreateMedia(item: Record<string, any>): string {
     item.storage_provider || 'PERSISTENT_STORAGE',
     item.storage_key || '',
     item.author_id || '',
-    now
+    now,
+    item.broadcast_status || null,
+    item.scheduled_start_time || null,
+    item.actual_start_time || null,
+    item.end_time || null,
+    item.replay_url || null,
+    item.provider_video_id || null,
+    item.content_type || 'VIDEO'
   );
   return id;
 }

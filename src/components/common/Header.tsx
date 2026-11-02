@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useTranslation } from '../../i18n/useTranslation';
+import { LanguageSelector } from './LanguageSelector';
 import { isPlatformAdmin, isPropertySeeker, isProfessionalRole } from '../../shared/policy';
 import { linkedEndUserNavigation, roleUtilityDestinations } from '../../shared/endUserNavigation';
 import { BrandLogo } from './BrandLogo';
@@ -82,8 +84,12 @@ export const Header: React.FC<HeaderProps> = ({
   const utilityLinks = roleUtilityDestinations(currentUser.role, isLoggedIn);
 
   // Derive exact display label (cleans long stakeholder phrases and brand suffixes)
-  const getDisplayLabel = (label: string) => {
-    return label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '');
+  const { t } = useTranslation();
+
+  const getDisplayLabel = (link: any) => {
+    const key = typeof link === 'object' && link?.key ? link.key : '';
+    const fallback = typeof link === 'object' && link?.label ? link.label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '') : String(link || '');
+    return key ? (t('nav.' + key) || fallback) : fallback;
   };
 
   // Close mobile drawer on Escape key
@@ -158,7 +164,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {navLinks.map(link => {
             const isActive = activeView === link.view;
-            const displayLabel = getDisplayLabel(link.label);
+            const displayLabel = getDisplayLabel(link);
             return (
               <button
                 key={link.view}
@@ -172,8 +178,8 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
                 className={`px-1 xl:px-1.5 2xl:px-2 min-[1680px]:px-2.5 py-1 2xl:py-1.5 rounded-lg transition-all cursor-pointer shrink-0 tracking-tight min-[1440px]:tracking-normal ${
                   isActive
-                    ? 'text-amber-900 bg-amber-500/10 font-bold border-b-2 border-amber-600'
-                    : 'hover:text-slate-900 hover:bg-slate-100/80'
+                    ? 'text-amber-900 bg-[#FFF8EE] font-bold border border-amber-300 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-medium'
                 }`}
               >
                 <span>{displayLabel}</span>
@@ -332,6 +338,9 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           ) : null}
 
+          {/* Multilingual Selector */}
+          <LanguageSelector variant="header" />
+
           {/* User Sign In / Profile Control Panel */}
           {!isLoggedIn ? (
             <button
@@ -424,6 +433,10 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
             <div>
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl mb-4">
+              <span className="text-xs font-semibold text-slate-700">{t('lang.selectLanguage')}</span>
+              <LanguageSelector variant="mobile" />
+            </div>
               <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest block mb-2">
                 Platform Navigation
               </span>
@@ -448,7 +461,7 @@ export const Header: React.FC<HeaderProps> = ({
                           : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
-                      <span>{getDisplayLabel(link.label)}</span>
+                      <span>{getDisplayLabel(link)}</span>
                       {isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />}
                     </button>
                   );

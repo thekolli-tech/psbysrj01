@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useTranslation } from '../../i18n/useTranslation';
+import { LanguageSelector } from './LanguageSelector';
 import { isPropertySeeker, postLoginDestination } from '../../shared/policy';
 import { isPhoneOtpRequired } from '../../shared/authConfig';
 import { readApiResponse } from '../../lib/apiResponse';
@@ -41,6 +43,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     setActiveView,
     showToast
   } = useApp();
+  const { t } = useTranslation();
 
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [emailInput, setEmailInput] = useState('');
@@ -50,7 +53,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [phoneInput, setPhoneInput] = useState('');
   const [organizationInput, setOrganizationInput] = useState('');
   const [locationInput, setLocationInput] = useState(DEFAULT_SIGNUP_LOCATION);
-  const [professionInput, setProfessionInput] = useState('Buyer');
+  const [professionInput, setProfessionInput] = useState('');
   const [companyInput, setCompanyInput] = useState('');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([
     'Kokapet & Neopolis',
@@ -183,6 +186,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
+    if (!professionInput.trim()) {
+      setErrorMsg('Please enter your profession.');
+      return;
+    }
+
     if (passwordInput.length < 6) {
       setErrorMsg('Password must be at least 6 characters.');
       return;
@@ -242,6 +250,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     if (submitting.current) return;
     setErrorMsg(null);
 
+    if (!professionInput.trim()) {
+      setErrorMsg('Please enter your profession.');
+      return;
+    }
+
     if (!otpInput.trim() || otpInput.trim().length < 4) {
       setErrorMsg('Please enter the 6-digit email verification code received.');
       return;
@@ -268,7 +281,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           role: roleInput,
           phone: phoneInput.trim(),
           organization: organizationInput.trim(),
-          profession: professionInput.trim() || undefined,
+          profession: professionInput.trim(),
           company: companyInput.trim() || undefined,
           interests: selectedInterests,
           townCity: DEFAULT_SIGNUP_LOCATION,
@@ -314,12 +327,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 sm:p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <LanguageSelector variant="mobile" />
+            <button
+              onClick={onClose}
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -531,24 +547,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label htmlFor="signup-profession" className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Profession
+                        Profession *
                       </label>
-                      <select
+                      <input
                         id="signup-profession"
+                        name="profession"
+                        type="text"
+                        required
                         value={professionInput}
                         onChange={e => setProfessionInput(e.target.value)}
+                        placeholder="Enter your profession"
+                        autoComplete="off"
+                        maxLength={80}
                         className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                      >
-                        <option value="Buyer">Buyer</option>
-                        <option value="Seller">Seller</option>
-                        <option value="Real Estate Agent">Real Estate Agent</option>
-                        <option value="Builder / Developer">Builder / Developer</option>
-                        <option value="Investor">Investor</option>
-                        <option value="Architect">Architect</option>
-                        <option value="Interior Designer">Interior Designer</option>
-                        <option value="Property Consultant">Property Consultant</option>
-                        <option value="Other">Other</option>
-                      </select>
+                      />
                     </div>
                     <div>
                       <label htmlFor="signup-company" className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
