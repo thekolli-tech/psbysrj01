@@ -59,6 +59,7 @@ interface AppContextType {
   setSelectedMedia: (item: MediaItem | null) => void;
   createMediaItem: (item: Omit<MediaItem, 'id' | 'views' | 'publishedDate'>) => void;
   deleteMediaItem: (id: string) => void;
+  refreshMedia: () => Promise<void>;
 
   // Leads
   createBuyerLead: (lead: Omit<Lead, 'id' | 'isUnlocked' | 'createdAt'> & {
@@ -980,6 +981,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .catch(() => {});
   };
 
+  const refreshMedia = async () => {
+    try {
+      const res = await fetch('/api/media');
+      const data = await res.json();
+      if (data?.items && Array.isArray(data.items)) {
+        const mapped: MediaItem[] = data.items.map((it: any) => ({
+          id: it.id,
+          title: it.title,
+          type: it.type || 'MASTERCLASS',
+          duration: it.duration || '15:00',
+          host: it.author_name || 'Swamy Reddy Javidi',
+          videoUrl: it.media_url || it.video_url || '',
+          thumbnail: it.thumbnail || '',
+          summary: it.summary || '',
+          keyTakeaways: [],
+          timestamps: [],
+          views: it.views || 0,
+          publishedDate: it.created_at ? new Date(it.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'
+        }));
+        setMediaItems(mapped);
+      }
+    } catch (_e) {}
+  };
+
   const createBuyerLead = (leadData: Omit<Lead, 'id' | 'isUnlocked' | 'createdAt'> & {
     consentGranted?: boolean;
     consentVersion?: string;
@@ -1265,6 +1290,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedMedia,
         createMediaItem,
         deleteMediaItem,
+        refreshMedia,
         createBuyerLead,
         deleteBuyerLead,
         conference,

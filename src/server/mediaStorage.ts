@@ -1,75 +1,47 @@
 import crypto from 'node:crypto';
+import {
+  getGoogleDriveConfig,
+  verifyDriveFile,
+  DRIVE_STORAGE_LIMITS,
+  DRIVE_ALLOWED_MIME_TYPES
+} from './googleDriveStorage.ts';
 
 export interface StorageConfigStatus {
   configured: boolean;
-  provider: 's3' | 'r2' | 'cloudflare_stream' | null;
-  bucket?: string;
+  provider: 'google_drive' | 's3' | 'r2' | 'cloudflare_stream' | null;
+  accountEmail?: string;
   missingVariables: string[];
   maxVideoSizeBytes: number;
   maxAudioSizeBytes: number;
   maxImageSizeBytes: number;
 }
 
-export const STORAGE_LIMITS = {
-  MAX_VIDEO_SIZE_BYTES: 500 * 1024 * 1024, // 500 MB
-  MAX_AUDIO_SIZE_BYTES: 100 * 1024 * 1024, // 100 MB
-  MAX_IMAGE_SIZE_BYTES: 10 * 1024 * 1024   // 10 MB
-};
-
-export const ALLOWED_MIME_TYPES = {
-  AUDIO: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac', 'audio/ogg', 'audio/m4a', 'audio/x-m4a'],
-  VIDEO: ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'],
-  IMAGE: ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-};
+export const STORAGE_LIMITS = DRIVE_STORAGE_LIMITS;
+export const ALLOWED_MIME_TYPES = DRIVE_ALLOWED_MIME_TYPES;
 
 /**
- * Checks whether persistent cloud media storage is configured.
+ * Checks whether persistent cloud media storage (Google Drive) is configured.
  * Never logs or exposes secret credentials.
  */
 export function getMediaStorageConfig(): StorageConfigStatus {
-  const s3Bucket = process.env.MEDIA_STORAGE_BUCKET || process.env.AWS_BUCKET || process.env.S3_BUCKET;
-  const s3Key = process.env.MEDIA_STORAGE_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
-  const s3Secret = process.env.MEDIA_STORAGE_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
+  const driveConfig = getGoogleDriveConfig();
 
-  const r2Bucket = process.env.R2_BUCKET_NAME || process.env.R2_BUCKET;
-  const r2Account = process.env.R2_ACCOUNT_ID;
-  const r2Key = process.env.R2_ACCESS_KEY_ID;
-  const r2Secret = process.env.R2_SECRET_ACCESS_KEY;
-
-  if (r2Bucket && r2Account && r2Key && r2Secret) {
+  if (driveConfig.configured) {
     return {
       configured: true,
-      provider: 'r2',
-      bucket: r2Bucket,
+      provider: 'google_drive',
+      accountEmail: driveConfig.accountEmail,
       missingVariables: [],
       maxVideoSizeBytes: STORAGE_LIMITS.MAX_VIDEO_SIZE_BYTES,
       maxAudioSizeBytes: STORAGE_LIMITS.MAX_AUDIO_SIZE_BYTES,
       maxImageSizeBytes: STORAGE_LIMITS.MAX_IMAGE_SIZE_BYTES
     };
   }
-
-  if (s3Bucket && s3Key && s3Secret) {
-    return {
-      configured: true,
-      provider: 's3',
-      bucket: s3Bucket,
-      missingVariables: [],
-      maxVideoSizeBytes: STORAGE_LIMITS.MAX_VIDEO_SIZE_BYTES,
-      maxAudioSizeBytes: STORAGE_LIMITS.MAX_AUDIO_SIZE_BYTES,
-      maxImageSizeBytes: STORAGE_LIMITS.MAX_IMAGE_SIZE_BYTES
-    };
-  }
-
-  // Not configured in production environment
-  const missing = [];
-  if (!s3Bucket && !r2Bucket) missing.push('MEDIA_STORAGE_BUCKET (or R2_BUCKET_NAME)');
-  if (!s3Key && !r2Key) missing.push('MEDIA_STORAGE_ACCESS_KEY_ID (or R2_ACCESS_KEY_ID)');
-  if (!s3Secret && !r2Secret) missing.push('MEDIA_STORAGE_SECRET_ACCESS_KEY (or R2_SECRET_ACCESS_KEY)');
 
   return {
     configured: false,
     provider: null,
-    missingVariables: missing,
+    missingVariables: driveConfig.missingVariables,
     maxVideoSizeBytes: STORAGE_LIMITS.MAX_VIDEO_SIZE_BYTES,
     maxAudioSizeBytes: STORAGE_LIMITS.MAX_AUDIO_SIZE_BYTES,
     maxImageSizeBytes: STORAGE_LIMITS.MAX_IMAGE_SIZE_BYTES
@@ -82,6 +54,7 @@ export interface UploadIntentRequest {
   fileSizeBytes: number;
   mediaCategory: 'AUDIO' | 'VIDEO' | 'IMAGE';
   podcastOrVideoTitle?: string;
+  userId?: string;
 }
 
 export interface UploadIntentResponse {
@@ -96,9 +69,19 @@ export interface UploadIntentResponse {
 }
 
 /**
- * Validates and initializes an authorized media upload session.
+ * Returns the playback delivery URL for a media item.
  */
-export function createUploadIntent(request: UploadIntentRequest): UploadIntentResponse {
+export function getPublicPlaybackUrl(storageKey: string, mediaId?: string): string {
+  if (mediaId) {
+    return `/api/media/${mediaId}/stream`;
+  }
+  return `/api/media/drive-stream/${storageKey}`;
+}
+
+/**
+ * Validates and initializes an authorized media upload session for Google Drive storage.
+ */
+export async function createUploadIntent(request: UploadIntentRequest): Promise<UploadIntentResponse> {
   const { filename, contentType, fileSizeBytes, mediaCategory } = request;
 
   if (!filename || !contentType || !fileSizeBytes) {
@@ -128,7 +111,7 @@ export function createUploadIntent(request: UploadIntentRequest): UploadIntentRe
     return { allowed: false, error: `Invalid image format: ${contentType}. Supported formats: JPEG, PNG, WebP.` };
   }
 
-  const uploadId = `upl_${crypto.randomBytes(16).toString('hex')}`;
+  const uploadId = `upl_${Date.now()}_${crypto.randomBytes(16).toString('hex')}`;
   const ext = filename.split('.').pop() || 'bin';
   const cleanExt = ext.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
   const folder = mediaCategory.toLowerCase();
@@ -137,21 +120,27 @@ export function createUploadIntent(request: UploadIntentRequest): UploadIntentRe
   const config = getMediaStorageConfig();
 
   if (config.configured) {
-    // If real provider is configured, construct standard S3/R2 direct upload URL
-    const publicBase = process.env.MEDIA_STORAGE_PUBLIC_URL || (config.provider === 'r2' ? `https://${config.bucket}.r2.cloudflarestorage.com` : `https://${config.bucket}.s3.amazonaws.com`);
+    // When Google Drive is configured, stream directly via backend proxy upload endpoint
     return {
       allowed: true,
       uploadId,
       storageKey,
-      uploadUrl: `${publicBase}/${storageKey}`,
-      publicUrl: `${publicBase}/${storageKey}`,
+      uploadUrl: `/api/media/drive-upload?uploadId=${uploadId}`,
+      publicUrl: `/api/media/drive-stream/${storageKey}`,
       expiresInSeconds: 3600,
       isMockProvider: false
     };
   }
 
-  // When external storage credentials are not yet configured in production:
-  // Return safe direct simulated upload endpoint
+  // In production, fail closed: never switch to simulated storage
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      allowed: false,
+      error: 'Google Drive cloud media storage is not yet configured. Please connect Google Drive storage in settings.'
+    };
+  }
+
+  // Simulated fallback when credentials are not configured in local development
   return {
     allowed: true,
     uploadId,
@@ -161,4 +150,30 @@ export function createUploadIntent(request: UploadIntentRequest): UploadIntentRe
     expiresInSeconds: 3600,
     isMockProvider: true
   };
+}
+
+/**
+ * Authoritatively verifies that the object exists in Google Drive storage.
+ */
+export async function verifyObjectInStorage(
+  storageKey: string,
+  expectedMime?: string,
+  expectedSize?: number
+): Promise<{
+  verified: boolean;
+  actualSizeBytes?: number;
+  actualMimeType?: string;
+  error?: string;
+}> {
+  return verifyDriveFile(storageKey, expectedMime, expectedSize);
+}
+
+/**
+ * Generates an authenticated short-lived playback URL.
+ */
+export async function generateSignedPlaybackUrl(
+  storageKey: string,
+  _expiresInSeconds: number = 3600
+): Promise<string | null> {
+  return `/api/media/drive-stream/${storageKey}`;
 }

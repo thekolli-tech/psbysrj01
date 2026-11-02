@@ -16,7 +16,12 @@ import {
   X,
   ShieldCheck,
   CheckCircle2,
-  Repeat
+  Repeat,
+  UploadCloud,
+  AlertCircle,
+  FileVideo,
+  RefreshCw,
+  Check
 } from 'lucide-react';
 
 interface Comment {
@@ -42,7 +47,8 @@ export const MediaEngine: React.FC<{
     isLoggedIn,
     showToast,
     createMediaItem,
-    deleteMediaItem
+    deleteMediaItem,
+    refreshMedia
   } = useApp();
 
   const isSuperAdmin = Boolean(isLoggedIn && currentUser?.role === 'SUPER_ADMIN');
@@ -76,6 +82,151 @@ export const MediaEngine: React.FC<{
   const [newVideoUrl, setNewVideoUrl] = useState('');
   const [newSummary, setNewSummary] = useState('');
   const [newHost, setNewHost] = useState(currentUser?.name || 'Swamy Reddy Javidi');
+  // Cloudflare R2 Upload State
+  const [uploadSource, setUploadSource] = useState<'DRIVE_FILE' | 'EXTERNAL_URL'>('DRIVE_FILE');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<'IDLE' | 'GETTING_INTENT' | 'UPLOADING' | 'VERIFYING' | 'SUCCESS' | 'ERROR'>('IDLE');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const resetUploadModal = () => {
+    setIsPostModalOpen(false);
+    setNewTitle('');
+    setNewSummary('');
+    setNewVideoUrl('');
+    setSelectedFile(null);
+    setUploadProgress(0);
+    setUploadStatus('IDLE');
+    setUploadError(null);
+    setUploadSource('DRIVE_FILE');
+  };
+
+  const validateAndSelectFile = (file: File) => {
+    setUploadError(null);
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const isAudio = ['mp3', 'wav', 'aac', 'm4a', 'ogg'].includes(ext) || file.type.startsWith('audio/');
+    const isVideo = ['mp4', 'webm', 'mov', 'avi'].includes(ext) || file.type.startsWith('video/');
+
+    if (!isAudio && !isVideo) {
+      setUploadError('Unsupported file type. Please upload MP4, WebM, QuickTime, MP3, WAV, AAC, or M4A.');
+      return;
+    }
+
+    const maxVideo = 500 * 1024 * 1024;
+    const maxAudio = 100 * 1024 * 1024;
+    if (isVideo && file.size > maxVideo) {
+      setUploadError(`Video exceeds maximum 500 MB limit (${Math.round(file.size / 1024 / 1024)} MB).`);
+      return;
+    }
+    if (isAudio && file.size > maxAudio) {
+      setUploadError(`Audio exceeds maximum 100 MB limit (${Math.round(file.size / 1024 / 1024)} MB).`);
+      return;
+    }
+
+    setSelectedFile(file);
+    if (!newTitle.trim()) {
+      const rawName = file.name.replace(/\.[^/.]+$/, '');
+      setNewTitle(rawName.replace(/[-_]/g, ' '));
+    }
+    if (isAudio && newType !== 'PODCAST') {
+      setNewType('PODCAST');
+    }
+  };
+
+  const executeDriveUpload = async () => {
+    if (!selectedFile) return;
+    setUploadStatus('GETTING_INTENT');
+    setUploadProgress(0);
+    setUploadError(null);
+
+    try {
+      const category = newType === 'PODCAST' ? 'AUDIO' : 'VIDEO';
+      const intentRes = await fetch('/api/media/upload-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: selectedFile.name,
+          contentType: selectedFile.type || (category === 'AUDIO' ? 'audio/mpeg' : 'video/mp4'),
+          fileSizeBytes: selectedFile.size,
+          mediaCategory: category,
+          title: newTitle.trim()
+        })
+      });
+
+      const intentData = await intentRes.json();
+      if (!intentRes.ok || !intentData.allowed) {
+        throw new Error(intentData.error || 'Failed to initialize upload session');
+      }
+
+      const { uploadUrl, uploadId } = intentData;
+      setUploadStatus('UPLOADING');
+
+      // Streaming binary upload to backend Google Drive proxy
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadUrl, true);
+        xhr.setRequestHeader('Content-Type', selectedFile.type || (category === 'AUDIO' ? 'audio/mpeg' : 'video/mp4'));
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setUploadProgress(percent);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Storage rejected upload with status ${xhr.status}: ${xhr.statusText}`));
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(new Error('Network connection failed during upload. Check storage configuration.'));
+        };
+
+        xhr.send(selectedFile);
+      });
+
+      // Verification via HeadObject on backend
+      setUploadStatus('VERIFYING');
+      const completeRes = await fetch('/api/media/upload-complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uploadId,
+          title: newTitle.trim(),
+          summary: newSummary.trim(),
+          type: newType,
+          category: 'Real Estate Intelligence',
+          duration: newDuration || '20:00',
+          host: newHost.trim() || 'Swamy Reddy Javidi',
+          thumbnail: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+          status: 'PUBLISHED'
+        })
+      });
+
+      const completeData = await completeRes.json();
+      if (!completeRes.ok) {
+        throw new Error(completeData.error || 'Failed to verify upload on server.');
+      }
+
+      setUploadStatus('SUCCESS');
+      showToast(`Broadcast "${newTitle.trim()}" successfully uploaded and verified in Google Drive!`);
+      await refreshMedia();
+
+      setTimeout(() => {
+        resetUploadModal();
+      }, 1200);
+
+    } catch (err: any) {
+      setUploadStatus('ERROR');
+      setUploadError(err.message || 'Upload failed');
+      showToast(err.message || 'Upload failed');
+    }
+  };
 
   const visibleMedia = mediaItems.filter(m => m.id !== 'media_01' && m.id !== 'media_02' && m.status !== 'DELETED' && m.type !== 'PODCAST');
   const activeVideo = selectedMedia && selectedMedia.id !== 'media_01' && selectedMedia.id !== 'media_02' && selectedMedia.status !== 'DELETED' && selectedMedia.type !== 'PODCAST' ? selectedMedia : (visibleMedia.length > 0 ? visibleMedia[0] : null);
@@ -260,7 +411,7 @@ export const MediaEngine: React.FC<{
     }
   };
 
-  const handleCreateBroadcast = (e: React.FormEvent) => {
+  const handleCreateBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSuperAdmin) {
       showToast('Only Super Admin can upload or publish video broadcasts.');
@@ -271,29 +422,34 @@ export const MediaEngine: React.FC<{
       return;
     }
 
-    createMediaItem({
-      title: newTitle.trim(),
-      type: newType,
-      duration: newDuration || '20:00',
-      host: newHost.trim() || 'Swamy Reddy Javidi',
-      videoUrl: newVideoUrl.trim() || 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      thumbnail: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
-      summary: newSummary.trim(),
-      keyTakeaways: [
-        'Regulatory due diligence and structural verification',
-        'Direct vector masterplan inspection without marketing fluff',
-        'Accredited market evaluation standards'
-      ],
-      timestamps: [
-        { time: '00:00', label: 'Executive Intro & Foundation Audit' },
-        { time: '08:15', label: 'Detailed Engineering Breakdown' }
-      ]
-    });
+    if (uploadSource === 'DRIVE_FILE') {
+      if (!selectedFile && uploadStatus !== 'SUCCESS') {
+        setUploadError('Please select or drop a video/audio file to upload.');
+        return;
+      }
+      await executeDriveUpload();
+    } else {
+      createMediaItem({
+        title: newTitle.trim(),
+        type: newType,
+        duration: newDuration || '20:00',
+        host: newHost.trim() || 'Swamy Reddy Javidi',
+        videoUrl: newVideoUrl.trim() || 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        thumbnail: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+        summary: newSummary.trim(),
+        keyTakeaways: [
+          'Regulatory due diligence and structural verification',
+          'Direct vector masterplan inspection without marketing fluff',
+          'Accredited market evaluation standards'
+        ],
+        timestamps: [
+          { time: '00:00', label: 'Executive Intro & Foundation Audit' },
+          { time: '08:15', label: 'Detailed Engineering Breakdown' }
+        ]
+      });
 
-    setIsPostModalOpen(false);
-    setNewTitle('');
-    setNewSummary('');
-    setNewVideoUrl('');
+      resetUploadModal();
+    }
   };
 
   const filteredItems = mediaItems.filter(item => {
@@ -607,26 +763,205 @@ export const MediaEngine: React.FC<{
         </div>
       )}
 
-      {/* Modal: Post New Broadcast (Super Admin Only) */}
+      {/* Modal: Post New Broadcast (Super Admin Only with Cloudflare R2 Upload) */}
       {isPostModalOpen && isSuperAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150">
+            <div className="p-5 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10 border-b border-slate-800">
               <div className="flex items-center gap-2.5">
-                <Video className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white font-display">
-                  Publish Video Audit or Podcast
-                </h3>
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                  <Video className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white font-display">
+                      Publish Video Audit or Podcast
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30 uppercase tracking-wider">
+                      Google Drive
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">Centralized Google Drive API v3 object storage</p>
+                </div>
               </div>
               <button
-                onClick={() => setIsPostModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+                onClick={resetUploadModal}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateBroadcast} className="p-6 space-y-4 text-xs">
+              {/* Upload Source Selector */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">Media Source Option</label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => { setUploadSource('DRIVE_FILE'); setUploadError(null); }}
+                    className={`py-2 px-3 rounded-lg font-bold flex items-center justify-center gap-2 transition ${
+                      uploadSource === 'DRIVE_FILE'
+                        ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <UploadCloud className="w-4 h-4 text-amber-500" />
+                    <span>Upload to Google Drive</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setUploadSource('EXTERNAL_URL'); setUploadError(null); }}
+                    className={`py-2 px-3 rounded-lg font-bold flex items-center justify-center gap-2 transition ${
+                      uploadSource === 'EXTERNAL_URL'
+                        ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Video className="w-4 h-4 text-slate-500" />
+                    <span>External URL (YouTube)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* R2 File Picker / Drag & Drop Area */}
+              {uploadSource === 'DRIVE_FILE' ? (
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Select Media File <span className="font-normal text-slate-500">(Video max 500 MB, Audio max 100 MB)</span>
+                  </label>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      if (e.dataTransfer.files?.[0]) validateAndSelectFile(e.dataTransfer.files[0]);
+                    }}
+                    className={`border-2 border-dashed rounded-2xl p-5 text-center transition cursor-pointer ${
+                      isDragging
+                        ? 'border-amber-500 bg-amber-50/50'
+                        : selectedFile
+                        ? 'border-emerald-400 bg-emerald-50/30'
+                        : 'border-slate-300 hover:border-slate-400 bg-slate-50/50'
+                    }`}
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'video/mp4,video/webm,video/quicktime,audio/mpeg,audio/mp3,audio/wav,audio/aac,audio/m4a,audio/ogg';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (file) validateAndSelectFile(file);
+                      };
+                      input.click();
+                    }}
+                  >
+                    {selectedFile ? (
+                      <div className="flex items-center justify-between gap-3 text-left">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                            <FileVideo className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900 truncate max-w-xs">{selectedFile.name}</p>
+                            <p className="text-[11px] text-slate-500">
+                              {(selectedFile.size / 1024 / 1024).toFixed(1)} MB • {selectedFile.type || 'Media File'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                          className="px-2.5 py-1 text-slate-500 hover:text-red-600 rounded-lg text-xs font-bold"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center mx-auto">
+                          <UploadCloud className="w-5 h-5 text-slate-700" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800">Drag & drop video/audio here, or <span className="text-amber-600 underline">browse</span></p>
+                          <p className="text-[11px] text-slate-500">MP4, WebM, MOV, MP3, WAV, AAC, M4A</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload Progress & Status Bar */}
+                  {uploadStatus !== 'IDLE' && (
+                    <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="flex items-center gap-1.5 text-slate-800">
+                          {uploadStatus === 'GETTING_INTENT' && <RefreshCw className="w-3.5 h-3.5 text-amber-500 animate-spin" />}
+                          {uploadStatus === 'UPLOADING' && <UploadCloud className="w-3.5 h-3.5 text-amber-500 animate-pulse" />}
+                          {uploadStatus === 'VERIFYING' && <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />}
+                          {uploadStatus === 'SUCCESS' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                          {uploadStatus === 'ERROR' && <AlertCircle className="w-3.5 h-3.5 text-red-600" />}
+                          <span>
+                            {uploadStatus === 'GETTING_INTENT' && 'Initializing secure Google Drive upload session...'}
+                            {uploadStatus === 'UPLOADING' && `Uploading directly to Google Drive... ${uploadProgress}%`}
+                            {uploadStatus === 'VERIFYING' && 'Verifying uploaded file in Google Drive...'}
+                            {uploadStatus === 'SUCCESS' && 'Verified & successfully published to Google Drive!'}
+                            {uploadStatus === 'ERROR' && 'Upload error occurred'}
+                          </span>
+                        </span>
+                        <span className="text-slate-600 font-mono">{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            uploadStatus === 'SUCCESS'
+                              ? 'bg-emerald-500'
+                              : uploadStatus === 'ERROR'
+                              ? 'bg-red-500'
+                              : 'bg-amber-500'
+                          }`}
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error Notification with Retry */}
+                  {uploadError && (
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                        <span>{uploadError}</span>
+                      </div>
+                      {uploadStatus === 'ERROR' && (
+                        <button
+                          type="button"
+                          onClick={executeDriveUpload}
+                          className="px-2.5 py-1 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 flex items-center gap-1 shrink-0"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Retry</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* External URL Input */
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">External Video Stream URL</label>
+                  <input
+                    type="url"
+                    value={newVideoUrl}
+                    onChange={e => setNewVideoUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required={uploadSource === 'EXTERNAL_URL'}
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">Accepts YouTube, Vimeo or external CDN embed links.</p>
+                </div>
+              )}
+
+              {/* Title Input */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Broadcast Title</label>
                 <input
@@ -639,6 +974,7 @@ export const MediaEngine: React.FC<{
                 />
               </div>
 
+              {/* Category & Duration */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Format Category</label>
@@ -664,6 +1000,7 @@ export const MediaEngine: React.FC<{
                 </div>
               </div>
 
+              {/* Host Input */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Host / Broadcaster Name</label>
                 <input
@@ -675,17 +1012,7 @@ export const MediaEngine: React.FC<{
                 />
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Video Stream URL</label>
-                <input
-                  type="url"
-                  value={newVideoUrl}
-                  onChange={e => setNewVideoUrl(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
-
+              {/* Summary */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Summary & Technical Scope</label>
                 <textarea
@@ -698,20 +1025,32 @@ export const MediaEngine: React.FC<{
                 />
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+              {/* Footer Actions */}
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsPostModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50"
+                  onClick={resetUploadModal}
+                  disabled={uploadStatus === 'UPLOADING' || uploadStatus === 'VERIFYING'}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 disabled:opacity-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 flex items-center gap-2 cursor-pointer shadow-sm"
+                  disabled={uploadStatus === 'UPLOADING' || uploadStatus === 'VERIFYING'}
+                  className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-sm transition"
                 >
-                  <Plus className="w-4 h-4 text-amber-400" />
-                  <span>Publish Update</span>
+                  {uploadStatus === 'UPLOADING' || uploadStatus === 'VERIFYING' ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" />
+                      <span>{uploadStatus === 'UPLOADING' ? `Uploading (${uploadProgress}%)` : 'Verifying Drive File...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 text-amber-400" />
+                      <span>{uploadSource === 'DRIVE_FILE' ? 'Upload & Publish' : 'Publish Broadcast'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

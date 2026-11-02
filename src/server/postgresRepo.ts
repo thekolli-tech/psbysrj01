@@ -3086,6 +3086,98 @@ export async function pgArchiveMedia(id: string): Promise<boolean> {
   return true;
 }
 
+export async function pgCreateUploadIntentRecord(intent: {
+  id: string;
+  user_id: string;
+  storage_key: string;
+  storage_provider?: string;
+  expected_mime_type: string;
+  expected_file_size: number;
+  media_category: string;
+  status?: string;
+  expires_at: string;
+  created_at?: string;
+  updated_at?: string;
+}): Promise<void> {
+  await ensurePostgresAdditiveSchema();
+  await queryPostgres(
+    `INSERT INTO media_upload_intents (
+      id, user_id, storage_key, storage_provider, expected_mime_type,
+      expected_file_size, media_category, status, expires_at, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      intent.id,
+      intent.user_id,
+      intent.storage_key,
+      intent.storage_provider || 'CLOUDFLARE_R2',
+      intent.expected_mime_type,
+      intent.expected_file_size,
+      intent.media_category,
+      intent.status || 'PENDING',
+      intent.expires_at,
+      intent.created_at || new Date().toISOString(),
+      intent.updated_at || new Date().toISOString()
+    ]
+  );
+}
+
+export async function pgGetUploadIntentById(id: string): Promise<any | null> {
+  await ensurePostgresAdditiveSchema();
+  const res = await queryPostgres(
+    `SELECT * FROM media_upload_intents WHERE id = $1`,
+    [id]
+  );
+  if (res.rows.length === 0) return null;
+  const row = res.rows[0];
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    storage_key: row.storage_key,
+    storage_provider: row.storage_provider,
+    expected_mime_type: row.expected_mime_type,
+    expected_file_size: Number(row.expected_file_size),
+    media_category: row.media_category,
+    status: row.status,
+    expires_at: toIso(row.expires_at),
+    completed_at: row.completed_at ? toIso(row.completed_at) : null,
+    created_at: toIso(row.created_at),
+    updated_at: toIso(row.updated_at)
+  };
+}
+
+export async function pgUpdateUploadIntentStatus(
+  id: string,
+  status: 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
+  completedAt?: string
+): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  if (completedAt) {
+    await queryPostgres(
+      `UPDATE media_upload_intents SET status = $1, completed_at = $2, updated_at = NOW() WHERE id = $3`,
+      [status, completedAt, id]
+    );
+  } else {
+    await queryPostgres(
+      `UPDATE media_upload_intents SET status = $1, updated_at = NOW() WHERE id = $2`,
+      [status, id]
+    );
+  }
+  return true;
+}
+
+export async function pgUpdateUploadIntentStorageKey(
+  id: string,
+  storageKey: string,
+  storageProvider: string = 'GOOGLE_DRIVE'
+): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  await queryPostgres(
+    `UPDATE media_upload_intents SET storage_key = $1, storage_provider = $2, updated_at = NOW() WHERE id = $3`,
+    [storageKey, storageProvider, id]
+  );
+  return true;
+}
+
 export async function pgCreateStudioBroadcast(item: {
   id?: string;
   title: string;

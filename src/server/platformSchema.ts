@@ -87,6 +87,23 @@ ALTER TABLE media_items ADD COLUMN IF NOT EXISTS storage_key TEXT;
 ALTER TABLE media_items ADD COLUMN IF NOT EXISTS author_id VARCHAR(64);
 ALTER TABLE media_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
+CREATE TABLE IF NOT EXISTS media_upload_intents (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  storage_key TEXT NOT NULL,
+  storage_provider VARCHAR(64) NOT NULL DEFAULT 'GOOGLE_DRIVE',
+  expected_mime_type VARCHAR(128) NOT NULL,
+  expected_file_size BIGINT NOT NULL,
+  media_category VARCHAR(32) NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+  expires_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_media_upload_intents_user ON media_upload_intents(user_id);
+CREATE INDEX IF NOT EXISTS idx_media_upload_intents_status ON media_upload_intents(status);
+
 CREATE TABLE IF NOT EXISTS professional_profiles (
   user_id VARCHAR(64) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   professional_role VARCHAR(32) NOT NULL,
@@ -617,6 +634,22 @@ CREATE TABLE IF NOT EXISTS studio_broadcasts (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS media_upload_intents (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  storage_key TEXT NOT NULL,
+  storage_provider TEXT NOT NULL DEFAULT 'GOOGLE_DRIVE',
+  expected_mime_type TEXT NOT NULL,
+  expected_file_size INTEGER NOT NULL,
+  media_category TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  expires_at TEXT NOT NULL,
+  completed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sqlite_media_upload_intents_user ON media_upload_intents(user_id);
+CREATE INDEX IF NOT EXISTS idx_sqlite_media_upload_intents_status ON media_upload_intents(status);
 `;
 
 export function applySqliteAdditiveSchema(database: { exec: (sql: string) => void }): void {

@@ -130,7 +130,11 @@ import {
   pgCreateLead,
   pgDeleteLead,
   pgGetConferenceDetails,
-  pgUpdateConferenceDetails
+  pgUpdateConferenceDetails,
+  pgCreateUploadIntentRecord,
+  pgGetUploadIntentById,
+  pgUpdateUploadIntentStatus,
+  pgUpdateUploadIntentStorageKey
 } from './postgresRepo.ts';
 
 type SqliteDatabase = import('node:sqlite').DatabaseSync;
@@ -467,6 +471,21 @@ export interface DbCommunityReply {
   is_verified_builder: number;
   content: string;
   created_at: string;
+}
+
+export interface DbMediaUploadIntent {
+  id: string;
+  user_id: string;
+  storage_key: string;
+  storage_provider: string;
+  expected_mime_type: string;
+  expected_file_size: number;
+  media_category: 'VIDEO' | 'AUDIO' | 'IMAGE';
+  status: 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'FAILED';
+  expires_at: string;
+  completed_at?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DbMediaItem {
@@ -1469,6 +1488,34 @@ export async function publishMedia(id: string, published: boolean): Promise<bool
   return sqlitePublishMedia(id, published);
 }
 
+export async function createUploadIntentRecord(intent: DbMediaUploadIntent): Promise<void> {
+  if (isPostgresAuthoritative()) return pgCreateUploadIntentRecord(intent);
+  return sqliteCreateUploadIntentRecord(intent);
+}
+
+export async function getUploadIntentById(id: string): Promise<DbMediaUploadIntent | null> {
+  if (isPostgresAuthoritative()) return pgGetUploadIntentById(id);
+  return sqliteGetUploadIntentById(id);
+}
+
+export async function updateUploadIntentStatus(
+  id: string,
+  status: 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
+  completedAt?: string
+): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgUpdateUploadIntentStatus(id, status, completedAt);
+  return sqliteUpdateUploadIntentStatus(id, status, completedAt);
+}
+
+export async function updateUploadIntentStorageKey(
+  id: string,
+  storageKey: string,
+  storageProvider: string = 'GOOGLE_DRIVE'
+): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgUpdateUploadIntentStorageKey(id, storageKey, storageProvider);
+  return sqliteUpdateUploadIntentStorageKey(id, storageKey, storageProvider);
+}
+
 export async function archiveMedia(id: string): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgArchiveMedia(id);
   return sqliteArchiveMedia(id);
@@ -1896,6 +1943,21 @@ function sqliteInitDatabase(): void {
       views INTEGER DEFAULT 0,
       author_name TEXT DEFAULT 'Swamy Reddy Javidi',
       created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS media_upload_intents (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      storage_key TEXT NOT NULL,
+      storage_provider TEXT NOT NULL DEFAULT 'CLOUDFLARE_R2',
+      expected_mime_type TEXT NOT NULL,
+      expected_file_size INTEGER NOT NULL,
+      media_category TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      expires_at TEXT NOT NULL,
+      completed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS buyer_leads (
@@ -4907,6 +4969,82 @@ function sqliteToggleMediaRepost(mediaId: string, userId: string, userName?: str
   }
   const countRow = db.prepare('SELECT COUNT(*) as count FROM media_reposts WHERE media_id = ?').get(mediaId) as { count: number };
   return { reposted, count: Number(countRow?.count || 0) };
+}
+
+function sqliteCreateUploadIntentRecord(intent: DbMediaUploadIntent): void {
+  db.prepare(`
+    INSERT INTO media_upload_intents (
+      id, user_id, storage_key, storage_provider, expected_mime_type,
+      expected_file_size, media_category, status, expires_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    intent.id,
+    intent.user_id,
+    intent.storage_key,
+    intent.storage_provider || 'CLOUDFLARE_R2',
+    intent.expected_mime_type,
+    intent.expected_file_size,
+    intent.media_category,
+    intent.status || 'PENDING',
+    intent.expires_at,
+    intent.created_at || new Date().toISOString(),
+    intent.updated_at || new Date().toISOString()
+  );
+}
+
+function sqliteGetUploadIntentById(id: string): DbMediaUploadIntent | null {
+  const row = db.prepare('SELECT * FROM media_upload_intents WHERE id = ?').get(id) as any;
+  if (!row) return null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    storage_key: row.storage_key,
+    storage_provider: row.storage_provider,
+    expected_mime_type: row.expected_mime_type,
+    expected_file_size: Number(row.expected_file_size),
+    media_category: row.media_category,
+    status: row.status,
+    expires_at: row.expires_at,
+    completed_at: row.completed_at || null,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+function sqliteUpdateUploadIntentStatus(
+  id: string,
+  status: 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
+  completedAt?: string
+): boolean {
+  if (completedAt) {
+    db.prepare('UPDATE media_upload_intents SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?').run(
+      status,
+      completedAt,
+      new Date().toISOString(),
+      id
+    );
+  } else {
+    db.prepare('UPDATE media_upload_intents SET status = ?, updated_at = ? WHERE id = ?').run(
+      status,
+      new Date().toISOString(),
+      id
+    );
+  }
+  return true;
+}
+
+function sqliteUpdateUploadIntentStorageKey(
+  id: string,
+  storageKey: string,
+  storageProvider: string = 'GOOGLE_DRIVE'
+): boolean {
+  db.prepare('UPDATE media_upload_intents SET storage_key = ?, storage_provider = ?, updated_at = ? WHERE id = ?').run(
+    storageKey,
+    storageProvider,
+    new Date().toISOString(),
+    id
+  );
+  return true;
 }
 
 function sqliteGetMediaEngagement(mediaId: string, userId?: string): DbMediaEngagement {

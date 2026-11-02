@@ -99,11 +99,11 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
       case 'DASHBOARD': return 'Member Dashboard';
       case 'PROPERTIES': return 'Curated Projects';
       case 'LEADS_MARKET': return 'Buyer Leads';
-      case 'MEDIA': return 'Media Studio';
+      case 'MEDIA': return 'Media & Podcast';
       case 'CONFERENCE': return 'Live & Latest';
       case 'MARKET_INSIGHTS': return 'Market Trends & Insights';
       case 'COMMUNITY': return 'Community Q&A';
-      case 'REVIEWS': return 'Reviews & Ratings';
+      case 'REVIEWS': return 'Review & Rating';
       case 'REQUIREMENT': return 'Property Requirement';
       case 'CHAT': return 'Contact & Connect';
       case 'ADMIN': return 'Super Admin Console';
@@ -291,7 +291,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                           : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
-                      <span>{link.view === 'MEDIA' ? 'Media Studio' : link.label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '')}</span>
+                      <span>{link.label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '')}</span>
                       {isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />}
                     </button>
                   );

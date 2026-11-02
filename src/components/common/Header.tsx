@@ -81,24 +81,9 @@ export const Header: React.FC<HeaderProps> = ({
   const navLinks = linkedEndUserNavigation();
   const utilityLinks = roleUtilityDestinations(currentUser.role, isLoggedIn);
 
-  // Derive concise display label (cleans podcast references, trims long stakeholder phrases and brand suffixes)
-  const getDisplayLabel = (label: string, view?: string) => {
-    if (view === 'MEDIA') return 'Media Studio';
+  // Derive exact display label (cleans long stakeholder phrases and brand suffixes)
+  const getDisplayLabel = (label: string) => {
     return label.split(' — ')[0].replace(/\s+Property\s+Studio$/, '');
-  };
-
-  // Compact label for constrained desktop viewports (< 1920px), full label for wide 1080p+ viewports
-  const getCompactLabel = (view: string, fullLabel: string) => {
-    switch (view) {
-      case 'MEDIA': return 'Media';
-      case 'MARKET_INSIGHTS': return 'Trends';
-      case 'REVIEWS': return 'Reviews';
-      case 'COMMUNITY': return 'Community';
-      case 'CONFERENCE': return 'Live';
-      case 'REQUIREMENT': return 'Requirements';
-      case 'CHAT': return 'Contact';
-      default: return fullLabel;
-    }
   };
 
   // Close mobile drawer on Escape key
@@ -150,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Main Navigation Bar: Desktop 3-Zone & Responsive Shell */}
-      <div className="w-full px-4 sm:px-6 lg:px-8 min-h-20 flex items-center justify-between gap-3 xl:gap-4">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-3 2xl:px-6 min-[1920px]:px-8 min-h-20 flex items-center justify-between gap-1.5 xl:gap-2 2xl:gap-4">
         {/* Zone 1: Brand & Logo (Left) */}
         <div className="flex items-center shrink-0">
           <button
@@ -169,11 +154,11 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Zone 2: Navigation Links (Desktop - Left-aligned, directly following Logo) */}
         <nav
           aria-label="Primary navigation"
-          className="hidden xl:flex items-center justify-start gap-1 min-[1680px]:gap-1.5 text-xs font-semibold text-slate-600 whitespace-nowrap ml-2 xl:ml-3 min-[1680px]:ml-5 shrink-0"
+          className="hidden xl:flex items-center justify-start gap-0.5 xl:gap-0.5 2xl:gap-1 min-[1680px]:gap-1.5 text-[10.5px] min-[1366px]:text-[11px] min-[1440px]:text-[11.5px] 2xl:text-xs font-semibold text-slate-600 whitespace-nowrap ml-1.5 xl:ml-2 2xl:ml-3 min-[1680px]:ml-5 shrink-0"
         >
           {navLinks.map(link => {
             const isActive = activeView === link.view;
-            const displayLabel = getDisplayLabel(link.label, link.view);
+            const displayLabel = getDisplayLabel(link.label);
             return (
               <button
                 key={link.view}
@@ -185,14 +170,13 @@ export const Header: React.FC<HeaderProps> = ({
                   setActiveView(link.view);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className={`px-1.5 min-[1680px]:px-2.5 py-1.5 rounded-lg transition-all cursor-pointer shrink-0 ${
+                className={`px-1 xl:px-1.5 2xl:px-2 min-[1680px]:px-2.5 py-1 2xl:py-1.5 rounded-lg transition-all cursor-pointer shrink-0 tracking-tight min-[1440px]:tracking-normal ${
                   isActive
                     ? 'text-amber-900 bg-amber-500/10 font-bold border-b-2 border-amber-600'
                     : 'hover:text-slate-900 hover:bg-slate-100/80'
                 }`}
               >
-                <span className="min-[1920px]:hidden">{getCompactLabel(link.view, displayLabel)}</span>
-                <span className="hidden min-[1920px]:inline">{displayLabel}</span>
+                <span>{displayLabel}</span>
               </button>
             );
           })}
@@ -464,7 +448,7 @@ export const Header: React.FC<HeaderProps> = ({
                           : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
-                      <span>{getDisplayLabel(link.label, link.view)}</span>
+                      <span>{getDisplayLabel(link.label)}</span>
                       {isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />}
                     </button>
                   );

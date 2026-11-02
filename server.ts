@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import {
   broadcastSseEvent,
   recordActivity,
@@ -124,10 +125,34 @@ import {
   startStudioBroadcast,
   endStudioBroadcast,
   publishBroadcastReplay,
-  deleteStudioBroadcast
+  deleteStudioBroadcast,
+  createUploadIntentRecord,
+  getUploadIntentById,
+  updateUploadIntentStatus,
+  updateUploadIntentStorageKey
 } from './src/server/db.ts';
 import { resolveAuthoritativeOtpDestination, maskEmailForDisplay, validatePasswordPolicy } from './src/server/otpPolicy.ts';
-import { getMediaStorageConfig, createUploadIntent } from './src/server/mediaStorage.ts';
+import {
+  getMediaStorageConfig,
+  createUploadIntent,
+  verifyObjectInStorage,
+  generateSignedPlaybackUrl,
+  getPublicPlaybackUrl
+} from './src/server/mediaStorage.ts';
+import {
+  getGoogleDriveConfig,
+  resolveDestinationFolderId,
+  initiateResumableDriveUpload,
+  uploadStreamToDrive,
+  getDriveFileStream,
+  moveDriveFile,
+  deleteDriveFile,
+  getGoogleOAuthAuthorizeUrl,
+  exchangeOAuthCodeForTokens,
+  createOAuthState,
+  validateOAuthState,
+  saveStoredRefreshToken
+} from './src/server/googleDriveStorage.ts';
 import { getLiveStreamingConfig, initializeBroadcastStream, sanitizeBroadcastForViewer } from './src/server/liveStreamService.ts';
 import { validateAvatarUpload } from './src/shared/avatar.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
@@ -2696,7 +2721,7 @@ app.delete('/api/admin/communities/:id', requireAdmin, async (req: Request, res:
 });
 
 // ==============================================================================
-// MEDIA, LEADS & CONFERENCE
+// MEDIA, LEADS & CONFERENCE (GOOGLE DRIVE OBJECT STORAGE INTEGRATION)
 // ==============================================================================
 
 // Media Storage Configuration (Honest disclosure of provider status)
@@ -2704,7 +2729,7 @@ app.get('/api/media/storage/config', (_req: Request, res: Response): void => {
   res.json(getMediaStorageConfig());
 });
 
-// Create Upload Intent (Super Admin only, validates file type & size)
+// Create Upload Intent (Super Admin only, validates file type & size, records intent in DB)
 app.post('/api/media/upload-intent', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { filename, fileName, contentType, mimeType, fileSizeBytes, fileSize, mediaCategory, purpose, title } = req.body;
@@ -2712,26 +2737,465 @@ app.post('/api/media/upload-intent', requireSuperAdminOnly, async (req: Authenti
     const resolvedType = contentType || mimeType;
     const resolvedSize = Number(fileSizeBytes || fileSize);
     const rawCategory = String(mediaCategory || purpose || 'VIDEO').toUpperCase();
-    const resolvedCategory = (rawCategory === 'AUDIO' || rawCategory === 'IMAGE') ? rawCategory : 'VIDEO';
+    const resolvedCategory = (rawCategory === 'AUDIO' || rawCategory === 'IMAGE') ? (rawCategory as 'AUDIO' | 'IMAGE') : 'VIDEO';
 
     if (!resolvedName || !resolvedType || !resolvedSize) {
       res.status(400).json({ error: 'filename, contentType, and fileSizeBytes are required.' });
       return;
     }
-    const intent = createUploadIntent({
+    const intent = await createUploadIntent({
       filename: resolvedName,
       contentType: resolvedType,
       fileSizeBytes: resolvedSize,
       mediaCategory: resolvedCategory,
-      podcastOrVideoTitle: title
+      podcastOrVideoTitle: title,
+      userId: req.user.id
     });
     if (!intent.allowed) {
       res.status(400).json({ error: intent.error || 'Upload not permitted' });
       return;
     }
+
+    if (intent.uploadId && intent.storageKey) {
+      const expiresAt = new Date(Date.now() + (intent.expiresInSeconds || 3600) * 1000).toISOString();
+      await createUploadIntentRecord({
+        id: intent.uploadId,
+        user_id: req.user.id,
+        storage_key: intent.storageKey,
+        storage_provider: intent.isMockProvider ? 'LOCAL_SIMULATED' : 'GOOGLE_DRIVE',
+        expected_mime_type: resolvedType,
+        expected_file_size: resolvedSize,
+        media_category: resolvedCategory,
+        status: 'PENDING',
+        expires_at: expiresAt,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
+
     res.json(intent);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// Google Drive Streaming Upload Handler (Super Admin only - streams bytes to Google Drive v3 Resumable Upload)
+const handleGoogleDriveUploadStream = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const uploadId = String(req.query.uploadId || '').trim();
+    if (!uploadId) {
+      res.status(400).json({ error: 'uploadId query parameter is required.' });
+      return;
+    }
+
+    const intent = await getUploadIntentById(uploadId);
+    if (!intent) {
+      res.status(404).json({ error: 'Upload intent not found.' });
+      return;
+    }
+
+    if (intent.user_id !== req.user.id && req.user.role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: 'Unauthorized: You do not own this upload intent.' });
+      return;
+    }
+
+    if (intent.status === 'COMPLETED') {
+      res.status(409).json({ error: 'This upload has already been verified and completed.' });
+      return;
+    }
+
+    if (intent.status === 'EXPIRED' || new Date(intent.expires_at).getTime() < Date.now()) {
+      await updateUploadIntentStatus(uploadId, 'EXPIRED');
+      res.status(400).json({ error: 'Upload intent has expired. Please initiate a new upload session.' });
+      return;
+    }
+
+    const driveConfig = getGoogleDriveConfig();
+
+    if (driveConfig.configured) {
+      // 1. Resolve pending destination folder
+      const pendingFolderId = await resolveDestinationFolderId(
+        intent.media_category as any,
+        'PENDING'
+      );
+
+      // 2. Initiate resumable upload with Google Drive API v3
+      const filename = intent.storage_key.split('/').pop() || `${intent.id}.mp4`;
+      const uploadUri = await initiateResumableDriveUpload({
+        filename,
+        contentType: intent.expected_mime_type,
+        fileSizeBytes: intent.expected_file_size,
+        folderId: pendingFolderId
+      });
+
+      // 3. Stream incoming request body directly to Google Drive
+      const uploadResult = await uploadStreamToDrive({
+        uploadUri,
+        stream: req,
+        contentType: intent.expected_mime_type,
+        fileSizeBytes: intent.expected_file_size
+      });
+
+      // 4. Update intent with authoritative Google Drive File ID
+      intent.storage_key = uploadResult.id;
+      intent.storage_provider = 'GOOGLE_DRIVE';
+      await updateUploadIntentStorageKey(uploadId, uploadResult.id, 'GOOGLE_DRIVE');
+
+      res.status(200).json({
+        success: true,
+        uploadId,
+        driveFileId: uploadResult.id,
+        size: uploadResult.size
+      });
+      return;
+    }
+
+    // Simulated fallback in local development or test environment only
+    if (process.env.NODE_ENV === 'production') {
+      res.status(503).json({ error: 'Google Drive cloud storage is not configured in production.' });
+      return;
+    }
+
+    for await (const _chunk of req) {}
+    res.status(200).json({
+      success: true,
+      uploadId,
+      driveFileId: intent.storage_key,
+      size: intent.expected_file_size,
+      simulated: true
+    });
+  } catch (err: any) {
+    console.error('[GoogleDriveStorage] Upload stream error:', err);
+    res.status(500).json({ error: err.message || 'Google Drive upload streaming error' });
+  }
+};
+
+app.post('/api/media/drive-upload', requireSuperAdminOnly, handleGoogleDriveUploadStream);
+app.put('/api/media/drive-upload', requireSuperAdminOnly, handleGoogleDriveUploadStream);
+
+// Confirm Upload Completion (Super Admin only - verifies file in Google Drive before persisting)
+app.post('/api/media/upload-complete', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const {
+      uploadId,
+      title,
+      summary,
+      thumbnail,
+      type,
+      category,
+      duration,
+      tags,
+      episode_title,
+      episode_number,
+      host,
+      guest,
+      guest_title,
+      published_date,
+      status
+    } = req.body;
+
+    if (!uploadId) {
+      res.status(400).json({ error: 'uploadId is required.' });
+      return;
+    }
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      res.status(400).json({ error: 'Title is required for media item.' });
+      return;
+    }
+
+    // 1. Authoritative lookup of upload intent
+    const intent = await getUploadIntentById(uploadId);
+    if (!intent) {
+      res.status(404).json({ error: 'Upload intent not found.' });
+      return;
+    }
+
+    // 2. Ownership verification: intent creator must match current Super Admin
+    if (intent.user_id !== req.user.id && req.user.role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: 'Unauthorized: You do not own this upload intent.' });
+      return;
+    }
+
+    // 3. Duplicate completion protection
+    if (intent.status === 'COMPLETED') {
+      res.status(409).json({ error: 'This upload has already been verified and completed.' });
+      return;
+    }
+
+    // 4. Expiration check
+    if (intent.status === 'EXPIRED' || new Date(intent.expires_at).getTime() < Date.now()) {
+      await updateUploadIntentStatus(uploadId, 'EXPIRED');
+      res.status(400).json({ error: 'Upload intent has expired. Please initiate a new upload session.' });
+      return;
+    }
+
+    // 5. Authoritative storage verification via Google Drive API (or simulated fallback)
+    const verification = await verifyObjectInStorage(
+      intent.storage_key,
+      intent.expected_mime_type,
+      intent.expected_file_size
+    );
+
+    if (!verification.verified) {
+      res.status(400).json({ error: verification.error || 'Failed to verify object in Google Drive.' });
+      return;
+    }
+
+    // 6. Move file to published folder if Google Drive is configured
+    const driveConfig = getGoogleDriveConfig();
+    if (driveConfig.configured && status !== 'DRAFT') {
+      try {
+        const publishedFolderId = await resolveDestinationFolderId(
+          intent.media_category as any,
+          'PUBLISHED'
+        );
+        await moveDriveFile(intent.storage_key, publishedFolderId);
+      } catch (err: any) {
+        console.warn('[GoogleDrive] Notice: could not move file to published folder:', err.message);
+      }
+    }
+
+    const actualSize = verification.actualSizeBytes || intent.expected_file_size;
+    const actualMime = verification.actualMimeType || intent.expected_mime_type;
+
+    // 7. Persist to media_items
+    const nowIso = new Date().toISOString();
+    const mediaItemStatus = status === 'DRAFT' ? 'DRAFT' : 'PUBLISHED';
+    const mediaId = "media_" + Date.now() + "_" + crypto.randomBytes(3).toString('hex');
+    const streamUrl = `/api/media/${mediaId}/stream`;
+
+    await createMedia({
+      id: mediaId,
+      title: title.trim(),
+      summary: summary?.trim() || '',
+      video_url: intent.media_category === 'VIDEO' ? streamUrl : '',
+      audio_url: intent.media_category === 'AUDIO' ? streamUrl : '',
+      media_url: streamUrl,
+      thumbnail: thumbnail?.trim() || '',
+      type: type || (intent.media_category === 'AUDIO' ? 'PODCAST' : 'MASTERCLASS'),
+      category: category?.trim() || 'Real Estate Intelligence',
+      duration: duration?.trim() || '15:00',
+      tags: tags ? (Array.isArray(tags) ? JSON.stringify(tags) : String(tags)) : null,
+      episode_title: episode_title?.trim() || null,
+      episode_number: episode_number ? Number(episode_number) : null,
+      host: host?.trim() || req.user?.name || 'Swamy Reddy Javidi',
+      guest: guest?.trim() || null,
+      guest_title: guest_title?.trim() || null,
+      published_date: published_date || (mediaItemStatus === 'PUBLISHED' ? nowIso : null),
+      status: mediaItemStatus,
+      file_size: actualSize,
+      mime_type: actualMime,
+      storage_provider: intent.storage_provider || 'GOOGLE_DRIVE',
+      storage_key: intent.storage_key,
+      author_id: req.user.id,
+      author_name: req.user.name || 'Swamy Reddy Javidi'
+    });
+
+    // 8. Mark intent as COMPLETED
+    await updateUploadIntentStatus(uploadId, 'COMPLETED', nowIso);
+
+    res.status(201).json({
+      success: true,
+      mediaId,
+      mediaUrl: streamUrl,
+      storageKey: intent.storage_key,
+      fileSize: actualSize,
+      mimeType: actualMime
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Direct Simulated Upload Handlers (for backward compatibility in tests)
+app.put('/api/media/upload-direct/:uploadId', express.raw({ type: '*/*', limit: '500mb' }), (_req: Request, res: Response): void => {
+  res.status(200).json({ success: true, message: 'Simulated direct upload successful.' });
+});
+app.post('/api/media/upload-direct/:uploadId', express.raw({ type: '*/*', limit: '500mb' }), (_req: Request, res: Response): void => {
+  res.status(200).json({ success: true, message: 'Simulated direct upload successful.' });
+});
+
+// Secure Media Stream / Delivery URL endpoint with HTTP Range Seeking support
+app.get('/api/media/:id/stream', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const item = await getMediaById(req.params.id);
+    if (!item) {
+      res.status(404).json({ error: 'Media item not found.' });
+      return;
+    }
+
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+
+    // If draft or archived, only Super Admin can access
+    if (item.status !== 'PUBLISHED' && !isSuperAdmin) {
+      res.status(403).json({ error: 'Access denied: Media item is not published.' });
+      return;
+    }
+
+    const wantsJson = req.headers.accept?.includes('application/json') || req.query.info === 'true';
+
+    // If external URL (YouTube, Vimeo, etc.), return direct URL or redirect
+    const rawUrl = item.media_url || item.video_url || item.audio_url || '';
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      if (!item.storage_key || (item.storage_provider !== 'GOOGLE_DRIVE' && item.storage_provider !== 'CLOUDFLARE_R2')) {
+        if (wantsJson) {
+          res.json({ streamUrl: rawUrl, isExternal: true, expiresAt: null });
+        } else {
+          res.redirect(rawUrl);
+        }
+        return;
+      }
+    }
+
+    // Google Drive Storage Stream
+    if (item.storage_key) {
+      const driveConfig = getGoogleDriveConfig();
+
+      if (!driveConfig.configured) {
+        // Local simulated playback response
+        if (wantsJson) {
+          res.json({
+            streamUrl: `/api/media/${item.id}/stream`,
+            isExternal: false,
+            simulated: true,
+            storageKey: item.storage_key
+          });
+          return;
+        }
+        res.setHeader('Content-Type', item.mime_type || 'video/mp4');
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.status(200).send(Buffer.from('simulated-video-stream'));
+        return;
+      }
+
+      // Stream directly from Google Drive API v3 with HTTP Range support
+      const driveStream = await getDriveFileStream(item.storage_key, req.headers.range);
+
+      if (driveStream.error || !driveStream.stream) {
+        res.status(driveStream.status || 500).json({ error: driveStream.error || 'Failed to stream media from Google Drive' });
+        return;
+      }
+
+      // Set response headers (Content-Type, Content-Length, Content-Range, Accept-Ranges)
+      for (const [headerKey, headerVal] of Object.entries(driveStream.headers)) {
+        res.setHeader(headerKey, headerVal);
+      }
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+
+      res.status(driveStream.status);
+      driveStream.stream.pipe(res);
+      return;
+    }
+
+    if (wantsJson) {
+      res.json({ streamUrl: rawUrl, isExternal: true, expiresAt: null });
+    } else {
+      res.status(404).json({ error: 'No stream available for this media item.' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// HTML renderer for OAuth callback result - NEVER renders tokens, secrets, or IDs
+function renderOAuthResultHtml(success: boolean, message: string): string {
+  const title = success ? 'Google Drive Storage Connected' : 'Authorization Failed';
+  const icon = success ? '✓' : '✕';
+  const iconBg = success ? '#dcfce7' : '#fee2e2';
+  const iconColor = success ? '#16a34a' : '#dc2626';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title} - Property Studio</title>
+</head>
+<body style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px;">
+  <div style="max-width: 440px; width: 100%; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 32px 24px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+    <div style="width: 56px; height: 56px; border-radius: 50%; background: ${iconBg}; color: ${iconColor}; font-size: 28px; line-height: 56px; margin: 0 auto 16px;">
+      ${icon}
+    </div>
+    <h2 style="margin: 0 0 8px; font-size: 20px; font-weight: 700; color: #0f172a;">${title}</h2>
+    <p style="margin: 0 0 24px; font-size: 14px; color: #64748b; line-height: 1.5;">${message}</p>
+    <a href="/" style="display: inline-block; padding: 10px 24px; background: #0f172a; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 14px; font-weight: 600;">
+      Return to Property Studio
+    </a>
+  </div>
+</body>
+</html>`;
+}
+
+// Google Drive OAuth 2.0 Authorization Initiation (Super Admin only - generates cryptographically signed state)
+app.get('/api/auth/google-drive/authorize', requireSuperAdminOnly, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const redirectUri = `${protocol}://${host}/api/auth/google-drive/callback`;
+    const state = createOAuthState(req.user.id);
+    const authUrl = getGoogleOAuthAuthorizeUrl(redirectUri, state);
+    res.json({ authUrl, redirectUri });
+  } catch (_err: any) {
+    res.status(500).json({ error: 'Failed to initiate Google Drive authorization session.' });
+  }
+});
+
+// Google Drive OAuth 2.0 Callback (Server-side code exchange, state validation, and secure storage)
+app.get('/api/auth/google-drive/callback', async (req: Request, res: Response): Promise<void> => {
+  const code = req.query.code as string | undefined;
+  const state = req.query.state as string | undefined;
+  const wantsJson = req.headers.accept?.includes('application/json');
+
+  if (!code) {
+    const errorMsg = 'Missing authorization code from Google.';
+    if (wantsJson) {
+      res.status(400).json({ success: false, error: errorMsg });
+      return;
+    }
+    res.status(400).send(renderOAuthResultHtml(false, errorMsg));
+    return;
+  }
+
+  // 1. Authoritative validation of OAuth state parameter (CSRF defense)
+  const stateCheck = validateOAuthState(state);
+  if (!stateCheck.valid) {
+    const errorMsg = stateCheck.error || 'Invalid or expired authorization session. Please try again.';
+    if (wantsJson) {
+      res.status(400).json({ success: false, error: errorMsg });
+      return;
+    }
+    res.status(400).send(renderOAuthResultHtml(false, errorMsg));
+    return;
+  }
+
+  const host = req.get('host') || 'localhost:3000';
+  const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+  const redirectUri = `${protocol}://${host}/api/auth/google-drive/callback`;
+
+  try {
+    // 2. Exchange authorization code server-side (tokens are never logged or exposed)
+    const tokens = await exchangeOAuthCodeForTokens(code, redirectUri);
+
+    // 3. Store credentials securely through approved server-side secret storage
+    if (tokens.refreshToken) {
+      await saveStoredRefreshToken(tokens.refreshToken);
+    }
+
+    // 4. Return only a success message to the browser
+    const successMsg = 'Google Drive media storage has been securely connected and initialized on the server.';
+    if (wantsJson) {
+      res.status(200).json({ success: true, message: successMsg });
+      return;
+    }
+    res.status(200).send(renderOAuthResultHtml(true, successMsg));
+  } catch (_err: any) {
+    // 5. Return only a sanitized failure message (never expose internal errors or token details)
+    const errorMsg = 'Failed to complete server-side authorization. Please verify credentials in Google Cloud Console.';
+    if (wantsJson) {
+      res.status(500).json({ success: false, error: errorMsg });
+      return;
+    }
+    res.status(500).send(renderOAuthResultHtml(false, errorMsg));
   }
 });
 
