@@ -735,29 +735,38 @@ export function canActorRestrictUser(
 // DATABASE INITIALIZATION & MIGRATIONS
 // ==============================================================================
 
+let dbInitPromise: Promise<void> | null = null;
+
 export async function initDatabase(): Promise<void> {
-  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
-    throw new Error('Production startup requires DATABASE_URL. Refusing to start on SQLite or an unconfigured database.');
-  }
-  if (isPostgresAuthoritative()) {
-    const health = await checkPostgresHealth();
-    if (!health.connected) {
-      throw new Error(`Authoritative PostgreSQL is unavailable (${health.failure || 'UNKNOWN'}: ${health.error || 'connection failed'}). Startup refused. SQLite fallback is disabled.`);
+  if (dbInitPromise) return dbInitPromise;
+  dbInitPromise = (async () => {
+    if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+      throw new Error('Production startup requires DATABASE_URL. Refusing to start on SQLite or an unconfigured database.');
     }
-    const schema = await checkSchemaReadiness();
-    if (!schema.ready) {
-      throw new Error(`PostgreSQL schema is not ready. Missing: ${schema.missing.join(', ') || 'unknown'}. Run npm run db:init. Startup does not migrate, seed, import, or bootstrap accounts.`);
+    if (isPostgresAuthoritative()) {
+      const health = await checkPostgresHealth();
+      if (!health.connected) {
+        throw new Error(`Authoritative PostgreSQL is unavailable (${health.failure || 'UNKNOWN'}: ${health.error || 'connection failed'}). Startup refused. SQLite fallback is disabled.`);
+      }
+      const schema = await checkSchemaReadiness();
+      if (!schema.ready) {
+        throw new Error(`PostgreSQL schema is not ready. Missing: ${schema.missing.join(', ') || 'unknown'}. Run npm run db:init. Startup does not migrate, seed, import, or bootstrap accounts.`);
+      }
+      await ensurePostgresAdditiveSchema();
+      console.log('[Database] PostgreSQL connected and schema ready. No automatic seed, import, or account bootstrap.');
+      return;
     }
-    await ensurePostgresAdditiveSchema();
-    console.log('[Database] PostgreSQL connected and schema ready. No automatic seed, import, or account bootstrap.');
-    return;
-  }
-  if (isSqliteExplicit()) {
-    console.log('[Database] Explicit local SQLite mode. No demo seed and no privileged bootstrap.');
-    sqliteInitDatabase();
-    return;
-  }
-  throw new Error('No authoritative database configured. Set DATABASE_URL for Neon PostgreSQL. SQLite is available only when DB_ENGINE=sqlite and DATABASE_URL is unset.');
+    if (isSqliteExplicit()) {
+      console.log('[Database] Explicit local SQLite mode. No demo seed and no privileged bootstrap.');
+      sqliteInitDatabase();
+      return;
+    }
+    throw new Error('No authoritative database configured. Set DATABASE_URL for Neon PostgreSQL. SQLite is available only when DB_ENGINE=sqlite and DATABASE_URL is unset.');
+  })().catch(err => {
+    dbInitPromise = null;
+    throw err;
+  });
+  return dbInitPromise;
 }
 
 // ==============================================================================
