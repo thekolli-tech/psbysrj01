@@ -362,6 +362,8 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                           <img
                             src={prop.heroImage || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'}
                             alt={prop.title}
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             onError={e => {
                               (e.target as HTMLImageElement).src =

@@ -4,35 +4,51 @@ import { Header } from './components/common/Header';
 import { MobileHeader } from './components/common/MobileHeader';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import { Toast } from './components/common/Toast';
-import { ProfileControlPanelModal } from './components/common/ProfileControlPanelModal';
 import { LoginModal } from './components/common/LoginModal';
-import { WalletModal } from './components/modals/WalletModal';
-import { AgentOnboardModal } from './components/modals/AgentOnboardModal';
-import { ClaimProjectModal } from './components/modals/ClaimProjectModal';
 import { HomeHero } from './components/home/HomeHero';
 import { PropertyList } from './components/properties/PropertyList';
-import { LeadMarketplace } from './components/leads/LeadMarketplace';
-import { MediaEngine } from './components/media/MediaEngine';
-import { CorporateConferenceView } from './components/conference/CorporateConference';
-import { MarketTrendsView } from './components/trends/MarketTrendsView';
-import { CommunityForumView } from './components/community/CommunityForum';
-import { PropertyRequirementView } from './components/requirements/PropertyRequirementView';
-import { ReviewRatingView } from './components/reviews/ReviewRatingView';
-import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
-import { DeveloperDashboard } from './components/admin/DeveloperDashboard';
-import { ProfessionalDashboard } from './components/admin/ProfessionalDashboard';
-import { PropertyAdminDashboard } from './components/admin/PropertyAdminDashboard';
-import { UserDashboard } from './components/dashboard/UserDashboard';
+import { SupportDeskButton } from './components/support/SupportDeskButton';
 import { canAccessProfessionalSurface, isPropertySeeker } from './shared/policy';
 import { COMPANY_CONTACT_DISPLAY, COMPANY_CONTACT_TEL, COMPANY_SUPPORT_WHATSAPP } from './shared/companyContact';
 import { linkedEndUserNavigation, roleUtilityDestinations } from './shared/endUserNavigation';
 import { isCommunityPostId } from './shared/communityEngagement';
-import { StudioBroadcastView } from './components/studio/StudioBroadcastView';
-import { ContactPropertyAdmin } from './components/contact/ContactPropertyAdmin';
-import { PropertyStudioSupportDesk } from './components/support/PropertyStudioSupportDesk';
-import { SupportDeskButton } from './components/support/SupportDeskButton';
-import { PrivacyPolicyView } from './components/legal/PrivacyPolicyView';
-import { TermsConditionsView } from './components/legal/TermsConditionsView';
+import { prefetchView } from './lib/prefetch';
+
+// Ultra-fast Code Splitting: Lazy-load non-critical views and modals
+const LeadMarketplace = React.lazy(() => import('./components/leads/LeadMarketplace').then(m => ({ default: m.LeadMarketplace })));
+const MediaEngine = React.lazy(() => import('./components/media/MediaEngine').then(m => ({ default: m.MediaEngine })));
+const CorporateConferenceView = React.lazy(() => import('./components/conference/CorporateConference').then(m => ({ default: m.CorporateConferenceView })));
+const MarketTrendsView = React.lazy(() => import('./components/trends/MarketTrendsView').then(m => ({ default: m.MarketTrendsView })));
+const CommunityForumView = React.lazy(() => import('./components/community/CommunityForum').then(m => ({ default: m.CommunityForumView })));
+const PropertyRequirementView = React.lazy(() => import('./components/requirements/PropertyRequirementView').then(m => ({ default: m.PropertyRequirementView })));
+const ReviewRatingView = React.lazy(() => import('./components/reviews/ReviewRatingView').then(m => ({ default: m.ReviewRatingView })));
+const SuperAdminDashboard = React.lazy(() => import('./components/admin/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
+const DeveloperDashboard = React.lazy(() => import('./components/admin/DeveloperDashboard').then(m => ({ default: m.DeveloperDashboard })));
+const ProfessionalDashboard = React.lazy(() => import('./components/admin/ProfessionalDashboard').then(m => ({ default: m.ProfessionalDashboard })));
+const PropertyAdminDashboard = React.lazy(() => import('./components/admin/PropertyAdminDashboard').then(m => ({ default: m.PropertyAdminDashboard })));
+// import { UserDashboard } from './components/dashboard/UserDashboard';
+const UserDashboard = React.lazy(() => import('./components/dashboard/UserDashboard').then(m => ({ default: m.UserDashboard })));
+const StudioBroadcastView = React.lazy(() => import('./components/studio/StudioBroadcastView').then(m => ({ default: m.StudioBroadcastView })));
+const ContactPropertyAdmin = React.lazy(() => import('./components/contact/ContactPropertyAdmin').then(m => ({ default: m.ContactPropertyAdmin })));
+const PropertyStudioSupportDesk = React.lazy(() => import('./components/support/PropertyStudioSupportDesk').then(m => ({ default: m.PropertyStudioSupportDesk })));
+const PrivacyPolicyView = React.lazy(() => import('./components/legal/PrivacyPolicyView').then(m => ({ default: m.PrivacyPolicyView })));
+const TermsConditionsView = React.lazy(() => import('./components/legal/TermsConditionsView').then(m => ({ default: m.TermsConditionsView })));
+const ProfileControlPanelModal = React.lazy(() => import('./components/common/ProfileControlPanelModal').then(m => ({ default: m.ProfileControlPanelModal })));
+const WalletModal = React.lazy(() => import('./components/modals/WalletModal').then(m => ({ default: m.WalletModal })));
+const AgentOnboardModal = React.lazy(() => import('./components/modals/AgentOnboardModal').then(m => ({ default: m.AgentOnboardModal })));
+const ClaimProjectModal = React.lazy(() => import('./components/modals/ClaimProjectModal').then(m => ({ default: m.ClaimProjectModal })));
+
+const ViewSkeleton: React.FC = () => (
+  <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse space-y-6">
+    <div className="h-8 bg-slate-200/80 rounded-xl w-48 sm:w-64" />
+    <div className="h-4 bg-slate-200/60 rounded-lg w-full max-w-md" />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+      <div className="h-56 bg-slate-100 rounded-3xl border border-slate-200/60" />
+      <div className="h-56 bg-slate-100 rounded-3xl border border-slate-200/60" />
+      <div className="h-56 bg-slate-100 rounded-3xl border border-slate-200/60" />
+    </div>
+  </div>
+);
 import { Youtube, Instagram, Linkedin, Facebook, Users } from 'lucide-react';
 import { AuthRequiredCard } from './components/common/AuthRequiredCard';
 import { BrandLogo } from './components/common/BrandLogo';
@@ -53,6 +69,18 @@ const AppContent: React.FC = () => {
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [agentModalOpen, setAgentModalOpen] = useState(false);
   const [claimTarget, setClaimTarget] = useState<Property | null>(null);
+
+  // Idle prefetch: prefetch primary views during browser idle time for 0ms transitions
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      import('./components/media/MediaEngine');
+      import('./components/trends/MarketTrendsView');
+      import('./components/reviews/ReviewRatingView');
+      import('./components/requirements/PropertyRequirementView');
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
 
   // Official Support Desk state
   const [supportOpen, setSupportOpen] = useState(false);
@@ -147,6 +175,7 @@ const AppContent: React.FC = () => {
 
       {/* Main View Router */}
       <main className="flex-1 pb-8">
+        <React.Suspense fallback={<ViewSkeleton />}>
         {activeView === 'HOME' && (
           <HomeHero
             onOpenRoleModal={() => setProfileModalOpen(true)}
@@ -364,6 +393,7 @@ const AppContent: React.FC = () => {
             </div>
           )
         )}
+      </React.Suspense>
       </main>
 
       {/* Mobile navigation is integrated directly into the sticky top MobileHeader drawer */}
@@ -762,14 +792,18 @@ const AppContent: React.FC = () => {
         isOpen={supportOpen}
       />
 
-      <PropertyStudioSupportDesk
-        isOpen={supportOpen}
-        onClose={() => {
-          setSupportOpen(false);
-          setSupportContext(undefined);
-        }}
-        initialContext={supportContext}
-      />
+      {supportOpen && (
+        <React.Suspense fallback={null}>
+          <PropertyStudioSupportDesk
+            isOpen={supportOpen}
+            onClose={() => {
+              setSupportOpen(false);
+              setSupportContext(undefined);
+            }}
+            initialContext={supportContext}
+          />
+        </React.Suspense>
+      )}
 
       {/* Global Modals & Notifications */}
       <LoginModal
@@ -777,26 +811,42 @@ const AppContent: React.FC = () => {
         onClose={() => setLoginModalOpen(false)}
       />
 
-      <ProfileControlPanelModal
-        isOpen={profileModalOpen}
-        onClose={() => setProfileModalOpen(false)}
-      />
+      {profileModalOpen && (
+        <React.Suspense fallback={null}>
+          <ProfileControlPanelModal
+            isOpen={profileModalOpen}
+            onClose={() => setProfileModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
-      <WalletModal
-        isOpen={walletModalOpen}
-        onClose={() => setWalletModalOpen(false)}
-      />
+      {walletModalOpen && (
+        <React.Suspense fallback={null}>
+          <WalletModal
+            isOpen={walletModalOpen}
+            onClose={() => setWalletModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
-      <AgentOnboardModal
-        isOpen={agentModalOpen}
-        onClose={() => setAgentModalOpen(false)}
-      />
+      {agentModalOpen && (
+        <React.Suspense fallback={null}>
+          <AgentOnboardModal
+            isOpen={agentModalOpen}
+            onClose={() => setAgentModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
-      <ClaimProjectModal
-        property={claimTarget}
-        isOpen={!!claimTarget}
-        onClose={() => setClaimTarget(null)}
-      />
+      {claimTarget && (
+        <React.Suspense fallback={null}>
+          <ClaimProjectModal
+            property={claimTarget}
+            isOpen={!!claimTarget}
+            onClose={() => setClaimTarget(null)}
+          />
+        </React.Suspense>
+      )}
 
       <Toast />
     </div>

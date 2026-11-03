@@ -71,6 +71,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
 
   app.get('/api/properties', async (_req: Request, res: Response): Promise<void> => {
     try {
+      res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=60, stale-while-revalidate=300');
       const properties = await listPublicListings();
       res.json({ properties });
     } catch (err) {

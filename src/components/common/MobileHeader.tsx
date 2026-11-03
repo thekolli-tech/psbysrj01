@@ -1,3 +1,4 @@
+import { prefetchView } from '../../lib/prefetch';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
@@ -276,6 +277,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                   return (
                     <button
                       key={link.view}
+                      onTouchStart={() => prefetchView(link.view)}
                       onClick={() => {
                         setMenuOpen(false);
                         if (link.view === 'COMMUNITY' && !isLoggedIn) {

@@ -1,3 +1,4 @@
+import { prefetchView } from '../../lib/prefetch';
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { isPlatformAdmin, isPropertySeeker, isProfessionalRole } from '../../shared/policy';
@@ -163,6 +164,8 @@ export const Header: React.FC<HeaderProps> = ({
             return (
               <button
                 key={link.view}
+                onMouseEnter={() => prefetchView(link.view)}
+                onTouchStart={() => prefetchView(link.view)}
                 onClick={() => {
                   if (link.view === 'COMMUNITY' && !isLoggedIn) {
                     onOpenLoginModal();
@@ -433,7 +436,9 @@ export const Header: React.FC<HeaderProps> = ({
                   const isActive = activeView === link.view;
                   return (
                     <button
-                      key={link.view}
+                key={link.view}
+                onMouseEnter={() => prefetchView(link.view)}
+                onTouchStart={() => prefetchView(link.view)}
                       onClick={() => {
                         setMobileMenuOpen(false);
                         if (link.view === 'COMMUNITY' && !isLoggedIn) {

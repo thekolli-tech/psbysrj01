@@ -616,6 +616,7 @@ app.get('/api/me/bookmarks', requireAuth, async (req: AuthenticatedRequest, res:
 
 // Public auth configuration flags
 app.get('/api/auth/config', (_req: Request, res: Response): void => {
+  res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
   res.json({
     phoneOtpRequired: isPhoneOtpRequired()
   });
@@ -3249,6 +3250,12 @@ app.get('/api/media', async (req: AuthenticatedRequest, res: Response): Promise<
     const broadcastStatus = req.query.broadcastStatus as string | undefined;
     const includeDrafts = isSuperAdmin && req.query.includeDrafts === 'true';
 
+    if (!isSuperAdmin && !includeDrafts) {
+      res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=60, stale-while-revalidate=300');
+    } else {
+      res.setHeader('Cache-Control', 'private, no-cache');
+    }
+
     const items = await getAllMedia({
       type,
       category,
@@ -3728,6 +3735,7 @@ app.delete('/api/leads/:id', requireAdmin, async (req: Request, res: Response): 
 
 app.get('/api/conference', async (_req: Request, res: Response): Promise<void> => {
   try {
+    res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=60, stale-while-revalidate=300');
     const conference = await getConferenceDetails();
     res.json({ conference });
   } catch (err: any) {

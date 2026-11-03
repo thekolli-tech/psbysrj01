@@ -237,6 +237,8 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
                       <img
                         src={property.heroImage}
                         alt={property.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
                     ) : (

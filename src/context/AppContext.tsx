@@ -220,7 +220,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeView, setActiveView] = useState<ViewType>('HOME');
   const [deviceMode, setDeviceMode] = useState<DeviceMode>('AUTO');
 
-  const [properties, setProperties] = useState<Property[]>([]);
+  const [properties, setProperties] = useState<Property[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem('ps_properties_cache');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
 
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
 
@@ -235,7 +243,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     HNI: 2000
   });
 
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem('ps_media_cache');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
 
   const [conference, setConference] = useState<CorporateConference>(EMPTY_CONFERENCE);
@@ -246,6 +262,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshPosts = async () => {
     try {
       const res = await fetch('/api/community/posts');
+      if (res.status === 401) {
+        setCommunityPosts([]);
+        return;
+      }
       const data = await res.json();
       if (Array.isArray(data?.posts)) {
         setCommunityPosts(data.posts.filter((p: any) => p.status !== 'DELETED'));
@@ -259,6 +279,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? '/api/admin/communities/all'
         : '/api/communities';
       const res = await fetch(url);
+      if (!res.ok) return;
       const data = await res.json();
       if (data?.communities && Array.isArray(data.communities)) {
         const mapped: CommunityHub[] = data.communities.map((c: any) => ({
@@ -291,7 +312,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time EventSource (SSE) connection with automatic auto-reconnect & event dispatching
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !isLoggedIn) return;
 
     let eventSource: EventSource | null = null;
     let reconnectTimeout: NodeJS.Timeout | null = null;
@@ -377,10 +398,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       eventSource?.close();
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isLoggedIn]);
 
   // Dual-mode active short-interval polling (3s) & window focus sync to guarantee delivery across browsers
   useEffect(() => {
+    if (!isLoggedIn) return;
+
     const syncAuthoritativeFeed = async () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
@@ -428,17 +451,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.removeEventListener('focus', handleFocusSync);
       window.removeEventListener('online', handleOnline);
     };
-  }, [currentUser?.id, currentUser?.role]);
+  }, [currentUser?.id, currentUser?.role, isLoggedIn]);
 
   // Sync live dynamic content from server database on load
   useEffect(() => {
-    // 0. Communities
-    refreshCommunities();
-
-    // 1. Community Posts
-    refreshPosts();
-
-    // 2. Dynamic Media Items
+    // 1. Dynamic Media Items
     fetch('/api/media')
       .then(res => res.json())
       .then(data => {
@@ -476,6 +493,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             isLive: it.broadcast_status === 'LIVE' || it.type === 'LIVE_VIDEO' || it.type === 'LIVE_AUDIO'
           }));
           setMediaItems(mapped);
+          try {
+            sessionStorage.setItem('ps_media_cache', JSON.stringify(mapped));
+          } catch {}
         }
       })
       .catch(() => {});
@@ -483,7 +503,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetch('/api/properties')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data?.properties)) setProperties(data.properties);
+        if (Array.isArray(data?.properties)) {
+          setProperties(data.properties);
+          try {
+            sessionStorage.setItem('ps_properties_cache', JSON.stringify(data.properties));
+          } catch {}
+        }
       })
       .catch(() => {});
 
@@ -519,6 +544,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLeads([]);
       return;
     }
+    refreshPosts();
     fetch('/api/leads')
       .then(res => res.ok ? res.json() : null)
       .then(data => {

@@ -33,6 +33,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
     <img
       src={imgSrc}
       alt="Property Studio by Swamy Reddy Javidi"
+      decoding="async"
       className={`${frame} object-contain ${className}`}
       onError={() => {
         if (imgSrc !== ASSET_IMAGES.officialLogo) {
