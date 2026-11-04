@@ -259,7 +259,7 @@ const AppContent: React.FC = () => {
                 Official Secretariat & Support Desk
               </h2>
               <p className="text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
-                Connect directly with the Property Studio secretariat under the leadership of CEO Swamy Reddy Javidi. Inquire regarding project regulatory compliance, anonymous buyer submissions, or developer community spaces.
+                Connect directly with the Property Studio secretariat under the leadership of CEO Swamy Reddy Javidi. Enquire regarding project regulatory compliance, anonymous buyer submissions, or developer community spaces.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-3">
@@ -754,7 +754,7 @@ const AppContent: React.FC = () => {
             </div>
           </div>
 
-          {/* Sub-Footer Copyright & Inquiries */}
+          {/* Sub-Footer Copyright & Enquiries */}
           <div className="mt-10 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-4">
             <div className="flex items-center gap-2">
               <span>© 2026 Property Studio Media & Intelligence. All rights reserved.</span>
@@ -780,7 +780,7 @@ const AppContent: React.FC = () => {
                 Terms & Conditions
               </button>
               <span>·</span>
-              <span>Inquiries: <span className="font-mono text-slate-700">info@propertystudio.org</span></span>
+              <span>Enquiries: <span className="font-mono text-slate-700">info@propertystudio.org</span></span>
             </div>
           </div>
         </div>

@@ -404,7 +404,7 @@ export const PropertyAdminDashboard: React.FC = () => {
             <div>
               <h3 className="text-base font-bold text-slate-900">Official PMO Community Replies</h3>
               <p className="text-xs text-slate-500">
-                Answer buyer and investor technical inquiries with official verified builder authority.
+                Answer buyer and investor technical enquiries with official verified builder authority.
               </p>
             </div>
 

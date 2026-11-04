@@ -262,7 +262,7 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
             </div>
           )}
 
-          {/* TAB 2: SUBMIT INQUIRY / TICKET */}
+          {/* TAB 2: SUBMIT ENQUIRY / TICKET */}
           {activeTab === 'TICKET' && (
             <div>
               {isSubmitted ? (

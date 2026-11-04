@@ -47,7 +47,7 @@ export const AuthRequiredCard: React.FC<AuthRequiredCardProps> = ({
           subtitle: 'Interactive Investor Stream',
           description:
             'Interactive participation in live project launches, executive slide decks, live Q&A, and live polling is restricted to registered accounts.',
-          perks: ['Live attendee chat & Q&A polling', 'Dynamic slide deck broadcast', 'Direct developer investor inquiries']
+          perks: ['Live attendee chat & Q&A polling', 'Dynamic slide deck broadcast', 'Direct developer investor enquiries']
         };
       case 'DASHBOARD':
         return {

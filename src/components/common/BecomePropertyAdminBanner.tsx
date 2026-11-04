@@ -40,7 +40,7 @@ export const BecomePropertyAdminBanner: React.FC = () => {
           </button>
 
           <a
-            href="mailto:info@propertystudio.org?subject=Property%20Admin%20Inquiry"
+            href="mailto:info@propertystudio.org?subject=Property%20Admin%20Enquiry"
             className="px-4 py-3.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors"
           >
             <Mail className="w-4 h-4 text-slate-400" />

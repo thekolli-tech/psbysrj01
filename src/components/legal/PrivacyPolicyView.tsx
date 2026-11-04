@@ -130,7 +130,7 @@ export const PrivacyPolicyView: React.FC = () => {
             User Rights & Secretariat Contact
           </h2>
           <p>
-            Users have the right to access, update, and correct their personal profile information through the Profile Control Panel. For account inquiries, grievance redressal, or data privacy requests, contact our secretariat:
+            Users have the right to access, update, and correct their personal profile information through the Profile Control Panel. For account enquiries, grievance redressal, or data privacy requests, contact our secretariat:
           </p>
           <div className="p-4 bg-slate-100 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
             <div>

@@ -11,6 +11,7 @@ import {
   ArrowBigDown,
   ShieldCheck,
   Star,
+  Plus,
   PlusCircle,
   Building,
   CheckCircle2,
@@ -1790,7 +1791,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               <div className="space-y-1">
                 <h3 className="text-lg font-bold text-slate-900">Private Community Hub</h3>
                 <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
-                  Discussions, verified inquiries, and syndicate updates in this community are restricted to approved members. Submit an access request above to join the conversation.
+                  Discussions, verified enquiries, and syndicate updates in this community are restricted to approved members. Submit an access request above to join the conversation.
                 </p>
               </div>
 
@@ -2585,7 +2586,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   <ul className="text-[11px] list-disc list-inside space-y-0.5 text-blue-800">
                     <li>Keep your question short and to the point.</li>
                     <li>Check for grammar and spelling before posting.</li>
-                    <li>Start your inquiry with &quot;What&quot;, &quot;How&quot;, &quot;Why&quot;, etc.</li>
+                    <li>Start your enquiry with &quot;What&quot;, &quot;How&quot;, &quot;Why&quot;, etc.</li>
                   </ul>
                 </div>
 
@@ -2797,7 +2798,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                     maxLength={300}
                     value={postForm.title}
                     onChange={e => setPostForm({ ...postForm, title: e.target.value })}
-                    placeholder="Title your post or inquiry..."
+                    placeholder="Title your post or enquiry..."
                     className="w-full text-sm font-semibold p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500"
                   />
                 </div>

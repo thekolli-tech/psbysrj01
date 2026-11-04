@@ -384,7 +384,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                     {isUnlocked ? (
                       <button
                         onClick={() => {
-                          sendMessage(`Hello, I am contacting you regarding your verified inquiry on Property Studio for ${displayPropertyType(lead.propertyType)} in ${lead.microMarket}.`, 'user_seeker_ananya', lead.id);
+                          sendMessage(`Hello, I am contacting you regarding your verified enquiry on Property Studio for ${displayPropertyType(lead.propertyType)} in ${lead.microMarket}.`, 'user_seeker_ananya', lead.id);
                           setActiveView('CHAT');
                         }}
                         className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
@@ -417,7 +417,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
               No Buyer Leads Uploaded Yet
             </h3>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
-              All buyer leads are published dynamically with 100% encrypted data-masking. Click below to post a qualified buyer inquiry.
+              All buyer leads are published dynamically with 100% encrypted data-masking. Click below to post a qualified buyer enquiry.
             </p>
           </div>
           <button

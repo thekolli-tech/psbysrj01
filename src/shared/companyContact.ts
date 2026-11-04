@@ -8,4 +8,4 @@ export const COMPANY_CONTACT_TEL = 'tel:+919014555566';
  * It now uses the approved company number. User-owned phones are not written here.
  */
 export const COMPANY_SUPPORT_WHATSAPP =
-  'https://wa.me/919014555566?text=Hello%20Property%20Studio%2C%20I%20would%20like%20to%20inquire%20about%20a%20project%20audit.';
+  'https://wa.me/919014555566?text=Hello%20Property%20Studio%2C%20I%20would%20like%20to%20enquire%20about%20a%20project%20audit.';

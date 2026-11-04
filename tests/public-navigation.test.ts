@@ -34,7 +34,7 @@ test('public company contact', () => {
   assert.equal(COMPANY_CONTACT_TEL, 'tel:+919014555566');
   assert.equal(
     COMPANY_SUPPORT_WHATSAPP,
-    'https://wa.me/919014555566?text=Hello%20Property%20Studio%2C%20I%20would%20like%20to%20inquire%20about%20a%20project%20audit.'
+    'https://wa.me/919014555566?text=Hello%20Property%20Studio%2C%20I%20would%20like%20to%20enquire%20about%20a%20project%20audit.'
   );
 
   const app = read('src/App.tsx');

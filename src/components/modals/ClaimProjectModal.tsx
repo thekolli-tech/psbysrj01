@@ -68,7 +68,7 @@ export const ClaimProjectModal: React.FC<ClaimProjectModalProps> = ({ property, 
           <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <div>
-              <span className="font-semibold">Developer Verification Privileges:</span> Claiming unlocks verified developer badges, real-time unit inventory control, corporate conference hosting, and direct buyer inquiry routing.
+              <span className="font-semibold">Developer Verification Privileges:</span> Claiming unlocks verified developer badges, real-time unit inventory control, corporate conference hosting, and direct buyer enquiry routing.
             </div>
           </div>
 

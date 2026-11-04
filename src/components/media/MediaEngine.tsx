@@ -577,7 +577,7 @@ export const MediaEngine: React.FC<{
     if (onTriggerSupportWithContext) {
       onTriggerSupportWithContext(context);
     } else {
-      showToast(`Inquiry initiated for ${activeVideo.title}. Opening Support Desk...`);
+      showToast(`Enquiry initiated for ${activeVideo.title}. Opening Support Desk...`);
     }
   };
 

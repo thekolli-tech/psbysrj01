@@ -558,7 +558,7 @@ export const INITIAL_CONFERENCE: CorporateConference = {
     '01. Opening Remarks by Swamy Reddy Javidi: Western Corridor Macro Trends',
     '02. Project Blueprint Unveiling: 58-Storey Aerodynamic Architecture',
     '03. Financial Modeling & Projected IRR for First-Tranche Unit Holders',
-    '04. Live Q&A and Due-Diligence Inquiries from Institutional Buyers'
+    '04. Live Q&A and Due-Diligence Enquiries from Institutional Buyers'
   ],
   questions: [
     {
