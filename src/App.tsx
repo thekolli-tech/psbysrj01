@@ -8,6 +8,7 @@ import { LoginModal } from './components/common/LoginModal';
 import { HomeHero } from './components/home/HomeHero';
 import { PropertyList } from './components/properties/PropertyList';
 import { SupportDeskButton } from './components/support/SupportDeskButton';
+import { CinematicIntro } from './components/common/CinematicIntro';
 import { canAccessProfessionalSurface, isPropertySeeker } from './shared/policy';
 import { COMPANY_CONTACT_DISPLAY, COMPANY_CONTACT_TEL, COMPANY_SUPPORT_WHATSAPP } from './shared/companyContact';
 import { linkedEndUserNavigation, roleUtilityDestinations } from './shared/endUserNavigation';
@@ -69,6 +70,7 @@ const AppContent: React.FC = () => {
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [agentModalOpen, setAgentModalOpen] = useState(false);
   const [claimTarget, setClaimTarget] = useState<Property | null>(null);
+  const [replayIntro, setReplayIntro] = useState(false);
 
   // Idle prefetch: prefetch primary views during browser idle time for 0ms transitions
   React.useEffect(() => {
@@ -780,6 +782,18 @@ const AppContent: React.FC = () => {
                 Terms & Conditions
               </button>
               <span>·</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setReplayIntro(true);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-amber-700 text-slate-500 underline cursor-pointer flex items-center gap-1 font-semibold"
+                title="Watch Cinematic Intro Animation"
+              >
+                <span>🎬 Watch Intro</span>
+              </button>
+              <span>·</span>
               <span>Enquiries: <span className="font-mono text-slate-700">info@propertystudio.org</span></span>
             </div>
           </div>
@@ -847,6 +861,12 @@ const AppContent: React.FC = () => {
           />
         </React.Suspense>
       )}
+
+      {/* Cinematic Intro Animation */}
+      <CinematicIntro
+        forcePlay={replayIntro}
+        onComplete={() => setReplayIntro(false)}
+      />
 
       <Toast />
     </div>
