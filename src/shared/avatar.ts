@@ -5,6 +5,28 @@
 
 export const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='%2394a3b8'%3E%3Crect width='64' height='64' rx='16' fill='%23f1f5f9'/%3E%3Ccircle cx='32' cy='24' r='12' fill='%23cbd5e1'/%3E%3Cpath d='M16 54c0-8.837 7.163-16 16-16s16 7.163 16 16' fill='%23cbd5e1'/%3E%3C/svg%3E";
 
+export interface AnimeAvatarOption {
+  id: string;
+  name: string;
+  roleHint: string;
+  url: string;
+}
+
+export const ANIME_AVATARS: AnimeAvatarOption[] = [
+  { id: 'adventurer-alex', name: 'Alex', roleHint: 'Architect', url: 'https://api.dicebear.com/7.x/adventurer/png?seed=Alex' },
+  { id: 'lorelei-aria', name: 'Aria', roleHint: 'Executive', url: 'https://api.dicebear.com/7.x/lorelei/png?seed=Aria' },
+  { id: 'adventurer-kenji', name: 'Kenji', roleHint: 'Consultant', url: 'https://api.dicebear.com/7.x/adventurer/png?seed=Kenji' },
+  { id: 'lorelei-yuki', name: 'Yuki', roleHint: 'Strategist', url: 'https://api.dicebear.com/7.x/lorelei/png?seed=Yuki' },
+  { id: 'adventurer-haruto', name: 'Haruto', roleHint: 'Planner', url: 'https://api.dicebear.com/7.x/adventurer/png?seed=Haruto' },
+  { id: 'lorelei-sakura', name: 'Sakura', roleHint: 'Advisor', url: 'https://api.dicebear.com/7.x/lorelei/png?seed=Sakura' },
+  { id: 'adventurer-felix', name: 'Felix', roleHint: 'Analyst', url: 'https://api.dicebear.com/7.x/adventurer/png?seed=Felix' },
+  { id: 'lorelei-ren', name: 'Ren', roleHint: 'Designer', url: 'https://api.dicebear.com/7.x/lorelei/png?seed=Ren' },
+  { id: 'adventurer-leo', name: 'Leo', roleHint: 'Developer', url: 'https://api.dicebear.com/7.x/adventurer/png?seed=Leo' },
+  { id: 'lorelei-kira', name: 'Kira', roleHint: 'Realtor', url: 'https://api.dicebear.com/7.x/lorelei/png?seed=Kira' },
+  { id: 'adventurer-zane', name: 'Zane', roleHint: 'Engineer', url: 'https://api.dicebear.com/7.x/adventurer/png?seed=Zane' },
+  { id: 'lorelei-mei', name: 'Mei', roleHint: 'Specialist', url: 'https://api.dicebear.com/7.x/lorelei/png?seed=Mei' }
+];
+
 export const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2 MB
 
 export const ALLOWED_AVATAR_MIMES = [

@@ -4,6 +4,8 @@ import { isPropertySeeker, postLoginDestination } from '../../shared/policy';
 import { isPhoneOtpRequired } from '../../shared/authConfig';
 import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
+import { ANIME_AVATARS, getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
+import { prepareAvatarUpload, validateAvatarFile } from '../../lib/avatarUpload';
 import {
   LogIn,
   LogOut,
@@ -12,6 +14,7 @@ import {
   User,
   KeyRound,
   ArrowRight,
+  ArrowLeft,
   AlertCircle,
   Eye,
   EyeOff,
@@ -22,7 +25,11 @@ import {
   Smartphone,
   MapPin,
   Check,
-  Lock
+  Lock,
+  Sparkles,
+  Camera,
+  Trash2,
+  UploadCloud
 } from 'lucide-react';
 
 const DEFAULT_SIGNUP_LOCATION = 'Hyderabad, Telangana, India';
@@ -73,6 +80,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [phoneOtpInput, setPhoneOtpInput] = useState('');
   const [phoneCountdown, setPhoneCountdown] = useState(0);
+
+  // Registration Avatar Selection state (step 3 after OTP verification)
+  const [avatarStep, setAvatarStep] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(ANIME_AVATARS[0].url);
+  const [customAvatar, setCustomAvatar] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch('/api/auth/config')
@@ -249,7 +263,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleVerifyOtpAndRegister = async (e: React.FormEvent) => {
+  const handleVerifyOtpAndProceedToAvatar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting.current) return;
     setErrorMsg(null);
@@ -275,6 +289,75 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     submitting.current = true;
     setLoading(true);
     try {
+      const emailRes = await fetch('/api/auth/verify-email-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ email: emailInput.trim(), otp: otpInput.trim() })
+      });
+      const emailResult = await readApiResponse(emailRes);
+      if (!emailResult.ok || emailResult.data?.verified !== true) {
+        throw new Error(emailResult.error || 'Invalid or expired email verification code');
+      }
+
+      if (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') {
+        const phoneRes = await fetch('/api/auth/verify-phone-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ phone: phoneInput.trim(), otp: phoneOtpInput.trim() })
+        });
+        const phoneResult = await readApiResponse(phoneRes);
+        if (!phoneResult.ok || phoneResult.data?.verified !== true) {
+          throw new Error(phoneResult.error || 'Invalid or expired WhatsApp verification code');
+        }
+      }
+
+      setAvatarStep(true);
+      showToast('Email verified! Choose your profile avatar.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Verification failed. Please check the OTP code.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
+    }
+  };
+
+  const handleCustomAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setErrorMsg(null);
+
+    const check = validateAvatarFile(file);
+    if (!check.valid) {
+      setErrorMsg(check.error || 'Invalid image file');
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const dataUrl = await prepareAvatarUpload(file);
+      setCustomAvatar(dataUrl);
+      setSelectedAvatar(dataUrl);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to process selected image');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleCompleteRegistration = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (submitting.current) return;
+    setErrorMsg(null);
+
+    if (!professionInput.trim()) {
+      setErrorMsg('Please enter your profession.');
+      return;
+    }
+
+    submitting.current = true;
+    setLoading(true);
+    try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', accept: 'application/json' },
@@ -291,7 +374,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           townCity: DEFAULT_SIGNUP_LOCATION,
           location: DEFAULT_SIGNUP_LOCATION,
           otp: otpInput.trim(),
-          phoneOtp: (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') ? phoneOtpInput.trim() : undefined
+          phoneOtp: (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') ? phoneOtpInput.trim() : undefined,
+          avatar: selectedAvatar
         })
       });
 
@@ -305,8 +389,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       showToast(`Account successfully registered and verified! Welcome, ${user.name}`);
       onClose();
       setLocationInput(DEFAULT_SIGNUP_LOCATION);
+      setAvatarStep(false);
+      setCustomAvatar(null);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Verification failed. Please check the OTP code.');
+      setErrorMsg(err.message || 'Registration failed. Please try again.');
     } finally {
       submitting.current = false;
       setLoading(false);
@@ -324,10 +410,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold text-white font-display">
-                {isLoggedIn ? 'Account Session' : mode === 'LOGIN' ? 'Portal Sign In' : 'Create Account'}
+                {isLoggedIn ? 'Account Session' : mode === 'LOGIN' ? 'Portal Sign In' : avatarStep ? 'Choose Profile Avatar' : 'Create Account'}
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-400">
-                {isLoggedIn ? `Active as ${currentUser.name}` : 'Live server database authentication'}
+                {isLoggedIn ? `Active as ${currentUser.name}` : avatarStep ? 'Select 2D character avatar or upload your photo' : 'Live server database authentication'}
               </p>
             </div>
           </div>
@@ -403,26 +489,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               )}
 
               {/* Mode Switcher */}
-              <div className="flex bg-slate-100 p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => { setMode('LOGIN'); setErrorMsg(null); }}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    mode === 'LOGIN' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMode('REGISTER'); setErrorMsg(null); }}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                    mode === 'REGISTER' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  Register Account
-                </button>
-              </div>
+              {!avatarStep && (
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => { setMode('LOGIN'); setErrorMsg(null); }}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      mode === 'LOGIN' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('REGISTER'); setErrorMsg(null); }}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      mode === 'REGISTER' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Register Account
+                  </button>
+                </div>
+              )}
 
               {mode === 'LOGIN' ? (
                 <form onSubmit={handleLogin} className="space-y-3.5">
@@ -745,8 +833,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <span>{loading ? 'Sending Code...' : 'Send Email Verification Code'}</span>
                   </button>
                 </form>
-              ) : (
-                <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4">
+              ) : !avatarStep ? (
+                <form onSubmit={handleVerifyOtpAndProceedToAvatar} className="space-y-4">
                   <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-blue-900 flex items-center gap-1.5">
@@ -850,10 +938,194 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     disabled={loading || otpInput.length < 4 || (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' && phoneOtpInput.length < 4)}
                     className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>{loading ? 'Verifying...' : (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') ? 'Verify Email & Mobile to Register' : 'Verify Email & Create Account'}</span>
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>{loading ? 'Verifying OTP...' : 'Verify Code & Choose Avatar'}</span>
+                    <ArrowRight className="w-4 h-4 text-slate-300" />
                   </button>
                 </form>
+              ) : (
+                /* Step 3: Avatar Selection Screen */
+                <div className="space-y-4">
+                  {/* Verified Banner */}
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-bold text-emerald-950 leading-tight">Email Verified</p>
+                        <p className="text-[11px] text-emerald-700 truncate">{emailInput}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setAvatarStep(false); setErrorMsg(null); }}
+                      className="text-[11px] text-emerald-800 hover:underline font-bold flex items-center gap-1 shrink-0 ml-2"
+                    >
+                      <ArrowLeft className="w-3 h-3" />
+                      Back to OTP
+                    </button>
+                  </div>
+
+                  {/* Profile Preview Card */}
+                  <div className="p-3.5 bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200/80 rounded-2xl flex items-center gap-3.5">
+                    <div className="relative shrink-0">
+                      <img
+                        src={getSafeAvatar(selectedAvatar)}
+                        alt="Profile Preview"
+                        className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 bg-white shadow-sm"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                        }}
+                      />
+                      <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] font-black rounded-md shadow-xs">
+                        PREVIEW
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-bold text-slate-900 truncate">{nameInput || 'Your Name'}</h4>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-200">
+                          {roleInput.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-[11px] text-slate-600 truncate font-medium">
+                          {professionInput || 'Professional'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-amber-800 font-semibold mt-1 flex items-center gap-1 truncate">
+                        {customAvatar && selectedAvatar === customAvatar ? (
+                          <>
+                            <Camera className="w-3 h-3 text-emerald-700" />
+                            Custom photo selected
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3 text-amber-600" />
+                            {ANIME_AVATARS.find(a => a.url === selectedAvatar)?.name || 'Anime'} avatar selected
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 2D Anime Character Collection */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                        Choose a 2D Character Avatar
+                      </label>
+                      <span className="text-[10px] text-slate-400">12 stylized profiles</span>
+                    </div>
+
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {ANIME_AVATARS.map((option) => {
+                        const isSelected = selectedAvatar === option.url;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAvatar(option.url);
+                              setErrorMsg(null);
+                            }}
+                            title={`${option.name} (${option.roleHint})`}
+                            className={`relative group p-1.5 rounded-xl border text-center transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-400 shadow-sm'
+                                : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                            }`}
+                          >
+                            <img
+                              src={option.url}
+                              alt={option.name}
+                              className="w-full aspect-square rounded-lg object-cover"
+                              loading="lazy"
+                            />
+                            <div className="mt-1 text-center">
+                              <span className="text-[10px] font-bold text-slate-800 block truncate leading-tight">
+                                {option.name}
+                              </span>
+                              <span className="text-[8px] text-slate-400 block truncate leading-none mt-0.5">
+                                {option.roleHint}
+                              </span>
+                            </div>
+                            {isSelected && (
+                              <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-[9px] font-black shadow-xs">
+                                ✓
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Upload Your Photo Option */}
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5 text-slate-600" />
+                        Or Upload Your Photo
+                      </label>
+                      <span className="text-[10px] text-slate-400">JPG, PNG, WebP (Max 2MB)</span>
+                    </div>
+
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      onChange={handleCustomAvatarSelect}
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={avatarUploading || loading}
+                        className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 text-slate-800 font-bold rounded-xl border border-slate-300 flex items-center justify-center gap-2 text-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                      >
+                        <UploadCloud className="w-4 h-4 text-slate-600" />
+                        <span>{avatarUploading ? 'Processing Image...' : customAvatar ? 'Choose Different Photo' : 'Upload Your Photo'}</span>
+                      </button>
+
+                      {customAvatar && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomAvatar(null);
+                            setSelectedAvatar(ANIME_AVATARS[0].url);
+                          }}
+                          className="px-2.5 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl border border-red-200 transition-colors cursor-pointer"
+                          title="Revert to 2D anime character avatar"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAvatarStep(false)}
+                      disabled={loading}
+                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Back</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCompleteRegistration}
+                      disabled={loading || !selectedAvatar}
+                      className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>{loading ? 'Finalizing Account...' : 'Confirm & Complete Registration'}</span>
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}

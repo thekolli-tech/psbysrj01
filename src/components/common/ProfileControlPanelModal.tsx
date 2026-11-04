@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { isPropertySeeker } from '../../shared/policy';
-import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
+import { getSafeAvatar, DEFAULT_AVATAR, ANIME_AVATARS } from '../../shared/avatar';
+import { prepareAvatarUpload, validateAvatarFile } from '../../lib/avatarUpload';
 import {
   User,
   ShieldCheck,
@@ -26,7 +27,8 @@ import {
   Trash2,
   Loader2,
   Bell,
-  MessageSquare
+  MessageSquare,
+  Sparkles
 } from 'lucide-react';
 
 interface ProfileControlPanelModalProps {
@@ -136,75 +138,6 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
-  /**
-   * Downscales and compresses user-selected images client-side before upload.
-   * Keeps avatars sharp (up to 512x512) while reducing network payload and database storage.
-   * Leaves animated GIFs intact to preserve multi-frame animation.
-   */
-  const prepareAvatarUpload = (file: File): Promise<string> => {
-    if (file.type === 'image/gif') {
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read image file'));
-        reader.readAsDataURL(file);
-      });
-    }
-
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('Failed to read image file'));
-      reader.onload = () => {
-        const rawDataUrl = reader.result as string;
-        const img = new Image();
-        img.onerror = () => resolve(rawDataUrl);
-        img.onload = () => {
-          try {
-            const MAX_DIM = 512;
-            let width = img.naturalWidth || img.width;
-            let height = img.naturalHeight || img.height;
-
-            if (!width || !height) {
-              resolve(rawDataUrl);
-              return;
-            }
-
-            if (width > MAX_DIM || height > MAX_DIM) {
-              if (width > height) {
-                height = Math.round((height * MAX_DIM) / width);
-                width = MAX_DIM;
-              } else {
-                width = Math.round((width * MAX_DIM) / height);
-                height = MAX_DIM;
-              }
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              resolve(rawDataUrl);
-              return;
-            }
-
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(img, 0, 0, width, height);
-
-            const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-            const compressed = canvas.toDataURL(outputType, 0.88);
-            resolve(compressed);
-          } catch {
-            resolve(rawDataUrl);
-          }
-        };
-        img.src = rawDataUrl;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -212,14 +145,9 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
     e.target.value = '';
     setAvatarError(null);
 
-    if (file.size > 2 * 1024 * 1024) {
-      setAvatarError('Image file must be 2MB or smaller.');
-      return;
-    }
-
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
-      setAvatarError('Only JPEG, PNG, WebP, and GIF formats are allowed. SVG is disallowed for security.');
+    const check = validateAvatarFile(file);
+    if (!check.valid) {
+      setAvatarError(check.error || 'Invalid image file.');
       return;
     }
 
@@ -284,6 +212,40 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
       showToast('Profile photo removed');
     } catch (err: any) {
       setAvatarError(err.message || 'Failed to remove photo');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleSelectAnimeAvatar = async (avatarUrl: string) => {
+    if (!currentUser || avatarUploading) return;
+    setAvatarUploading(true);
+    setAvatarError(null);
+    try {
+      const res = await fetch('/api/me/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar: avatarUrl })
+      });
+      let errorMsg = '';
+      try {
+        const data = await res.json();
+        if (!res.ok) {
+          errorMsg = data?.error || 'Failed to update avatar';
+        }
+      } catch {
+        const text = await res.text().catch(() => '');
+        errorMsg = text || 'Failed to update avatar';
+      }
+
+      if (!res.ok) {
+        throw new Error(errorMsg || 'Failed to update avatar');
+      }
+
+      await refreshSession();
+      showToast('Character avatar selected!');
+    } catch (err: any) {
+      setAvatarError(err.message || 'Failed to update avatar');
     } finally {
       setAvatarUploading(false);
     }
@@ -581,6 +543,51 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                     </button>
                   )}
                   <span className="text-[10px] text-slate-400 ml-auto">JPG, PNG, WebP or GIF (Max 2MB)</span>
+                </div>
+
+                {/* 2D Anime Avatar Selection */}
+                <div className="pt-3 border-t border-slate-200/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      Choose a 2D Character Avatar
+                    </span>
+                    <span className="text-[10px] text-slate-400">12 stylized profiles</span>
+                  </div>
+                  <div className="grid grid-cols-6 sm:grid-cols-6 gap-2 pt-1">
+                    {ANIME_AVATARS.map((item) => {
+                      const isCurrent = currentUser.avatar === item.url;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleSelectAnimeAvatar(item.url)}
+                          disabled={avatarUploading}
+                          title={`${item.name} (${item.roleHint})`}
+                          className={`relative group p-1 rounded-xl transition-all border text-center cursor-pointer ${
+                            isCurrent
+                              ? 'border-amber-500 bg-amber-50 shadow-xs ring-2 ring-amber-400'
+                              : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                          }`}
+                        >
+                          <img
+                            src={item.url}
+                            alt={item.name}
+                            className="w-full aspect-square rounded-lg object-cover"
+                            loading="lazy"
+                          />
+                          <span className="text-[9px] font-bold text-slate-700 block truncate mt-0.5 leading-none">
+                            {item.name}
+                          </span>
+                          {isCurrent && (
+                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-[8px] font-bold shadow-xs">
+                              ✓
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {avatarError && (

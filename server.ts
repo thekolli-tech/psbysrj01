@@ -883,7 +883,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
 app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
   if (rejectIfRateLimited(req, res, 'register', String(req.body?.email || ''))) return;
   try {
-    const { name, email, password, role, phone, organization, otp, phoneOtp, townCity, location, city, state, profession, company, interests } = req.body;
+    const { name, email, password, role, phone, organization, otp, phoneOtp, townCity, location, city, state, profession, company, interests, avatar } = req.body;
     if (!name || !email || !password) {
       res.status(400).json({ error: 'Name, email, and password are required' });
       return;
@@ -984,12 +984,21 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       }
     }
 
+    let validatedAvatar: string | null = null;
+    if (avatar && typeof avatar === 'string' && avatar.trim()) {
+      const avatarValidation = validateAvatarUpload(avatar.trim());
+      if (avatarValidation.valid && avatarValidation.avatar) {
+        validatedAvatar = avatarValidation.avatar;
+      }
+    }
+
     let updatedNewUser = newUser;
-    if (validatedProfession || validatedCompany || validatedInterests) {
+    if (validatedProfession || validatedCompany || validatedInterests || validatedAvatar) {
       const resUpdated = await updateUserProfileFields(newUser.id, {
         profession: validatedProfession,
         company: validatedCompany,
-        interests: validatedInterests
+        interests: validatedInterests,
+        avatar: validatedAvatar
       });
       if (resUpdated) updatedNewUser = resUpdated;
     }
@@ -1023,6 +1032,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
         ...safeUser,
         townCity: updatedNewUser.town_city || resolvedTownCity,
         profession: updatedNewUser.profession || '',
+        avatar: updatedNewUser.avatar || validatedAvatar || '',
         company: updatedNewUser.company || '',
         interests: typeof updatedNewUser.interests === 'string' ? JSON.parse(updatedNewUser.interests) : (updatedNewUser.interests || []),
         isVerified: true,
