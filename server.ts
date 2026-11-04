@@ -175,7 +175,8 @@ import {
   sendReactionNotification,
   sendFollowedDiscussionNotifications,
   sendSupportTicketUserConfirmation,
-  sendSecurityAlertNotification
+  sendSecurityAlertNotification,
+  sendModerationDecisionEmailNotification
 } from './src/server/emailNotificationService.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
 import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
@@ -1013,7 +1014,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       name: newUser.name,
       email: newUser.email,
       role: safeRole
-    }).catch(err => console.warn('[Property Studio Email] Welcome email delivery failed:', err));
+    }).catch((err: any) => console.warn('[Property Studio Email] Welcome email delivery failed:', err));
 
     const { password_hash, salt, ...safeUser } = updatedNewUser;
     res.json({
@@ -1314,6 +1315,13 @@ app.post('/api/admin/users/:id/reset-password', requireAdmin, async (req: Authen
       details: { targetRole: targetUser.role }
     });
 
+    sendSecurityAlertNotification({
+      userId: targetUser.id,
+      title: 'Password Reset by Administrator',
+      message: 'Your Property Studio account password was reset by an administrator. Please sign in and update your credentials immediately.',
+      actionRequired: true
+    }).catch((err: any) => console.warn('[Property Studio Email] Admin reset-password email failed:', err));
+
     res.json({ success: true, message: `Password reset successfully for ${targetUser.email}` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1335,6 +1343,13 @@ app.patch('/api/admin/users/:id/role', requireAdmin, async (req: AuthenticatedRe
       return;
     }
 
+    sendSecurityAlertNotification({
+      userId: req.params.id,
+      title: 'Property Studio Role Updated',
+      message: `An administrator has updated your Property Studio account role to ${role}.`,
+      actionRequired: false
+    }).catch((err: any) => console.warn('[Property Studio Email] Role update email failed:', err));
+
     res.json({ success: true, user: result.user });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1350,6 +1365,22 @@ app.post('/api/admin/users/:id/suspend', requireAdmin, async (req: Authenticated
       res.status(403).json({ error: result.error });
       return;
     }
+    if (suspend) {
+      sendSecurityAlertNotification({
+        userId: req.params.id,
+        title: 'Account Suspended Notice',
+        message: 'Your Property Studio account has been suspended by an administrator. If you believe this is in error, please contact support at info@propertystudio.org.',
+        actionRequired: true
+      }).catch((err: any) => console.warn('[Property Studio Email] Suspension alert failed:', err));
+    } else {
+      sendSecurityAlertNotification({
+        userId: req.params.id,
+        title: 'Account Re-Activated — Welcome Back',
+        message: 'Your Property Studio account suspension has been lifted. Your account is now active and fully accessible.',
+        actionRequired: false
+      }).catch((err: any) => console.warn('[Property Studio Email] Account restoration email failed:', err));
+    }
+
     res.json({ success: true, message: suspend ? 'User suspended' : 'User activated' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1371,7 +1402,14 @@ app.post('/api/admin/users/:id/restrict', requireAdmin, async (req: Authenticate
         title: 'Account Restriction Notice',
         message: reason || 'Your account has been restricted by an administrator from performing protected actions.',
         actionRequired: true
-      }).catch(err => console.warn('[Property Studio Email] Restriction alert failed:', err));
+      }).catch((err: any) => console.warn('[Property Studio Email] Restriction alert failed:', err));
+    } else {
+      sendSecurityAlertNotification({
+        userId: req.params.id,
+        title: 'Account Restriction Lifted — Account Restored',
+        message: 'Your Property Studio account restrictions have been reviewed and lifted by an administrator. Full account capabilities and protected actions have been restored.',
+        actionRequired: false
+      }).catch((err: any) => console.warn('[Property Studio Email] Account restoration email failed:', err));
     }
     res.json({
       success: true,
@@ -1635,7 +1673,7 @@ app.post('/api/community/posts', requireAuth, requireUnrestricted, async (req: A
         postTitle: post.title,
         postId: post.id,
         sourceId: post.id
-      }).catch(err => console.warn('[Property Studio Email] Post mention notification failed:', err));
+      }).catch((err: any) => console.warn('[Property Studio Email] Post mention notification failed:', err));
     }
     recordActivity('posts');
     res.json({ success: true, post });
@@ -1872,7 +1910,18 @@ app.post('/api/admin/posts/:id/approve-deletion', requireAdmin, async (req: Auth
       }
     }
 
-    // Broadcast live events
+    if (post.authorId) {
+      sendModerationDecisionEmailNotification({
+        userId: post.authorId,
+        targetType: 'POST',
+        title: post.title,
+        status: 'APPROVED',
+        reason: 'Your request to delete this post was approved by Super Admin. The post has been removed from public feeds.',
+        linkUrl: '/community'
+      }).catch((err: any) => console.warn('[Property Studio Email] Deletion approval email failed:', err));
+    }
+
+    // Broadcast live events
     broadcastSseEvent('POST_DELETION_APPROVED', {
       postId: post.id,
       authorId: post.authorId
@@ -2108,7 +2157,7 @@ app.post('/api/community/posts/:id/upvote', requireAuth, requireUnrestricted, as
         actorName: req.user.name,
         postTitle: post.title,
         postId: post.id
-      }).catch(err => console.warn('[Property Studio Email] Upvote reaction notification failed:', err));
+      }).catch((err: any) => console.warn('[Property Studio Email] Upvote reaction notification failed:', err));
     }
     res.json({ success: true, ...result });
   } catch (err: any) {
@@ -2162,7 +2211,7 @@ app.post('/api/community/posts/:id/reply', requireAuth, requireUnrestricted, asy
             answerSnippet: content.slice(0, 150),
             postId: parentPost.id,
             commentId: comment.id
-          }).catch(err => console.warn('[Property Studio Email] Question reply notification failed:', err));
+          }).catch((err: any) => console.warn('[Property Studio Email] Question reply notification failed:', err));
         } else {
           sendPostCommentNotification({
             postAuthorId: parentPost.authorId,
@@ -2172,7 +2221,7 @@ app.post('/api/community/posts/:id/reply', requireAuth, requireUnrestricted, asy
             commentSnippet: content.slice(0, 150),
             postId: parentPost.id,
             commentId: comment.id
-          }).catch(err => console.warn('[Property Studio Email] Post comment notification failed:', err));
+          }).catch((err: any) => console.warn('[Property Studio Email] Post comment notification failed:', err));
         }
       }
 
@@ -2183,7 +2232,7 @@ app.post('/api/community/posts/:id/reply', requireAuth, requireUnrestricted, asy
         postTitle: parentPost.title,
         postId: parentPost.id,
         sourceId: comment.id
-      }).catch(err => console.warn('[Property Studio Email] Reply mention notification failed:', err));
+      }).catch((err: any) => console.warn('[Property Studio Email] Reply mention notification failed:', err));
 
       sendFollowedDiscussionNotifications({
         postId: parentPost.id,
@@ -2191,7 +2240,7 @@ app.post('/api/community/posts/:id/reply', requireAuth, requireUnrestricted, asy
         actorName: req.user.name,
         postTitle: parentPost.title,
         updateSnippet: content.slice(0, 150)
-      }).catch(err => console.warn('[Property Studio Email] Followed discussion notification failed:', err));
+      }).catch((err: any) => console.warn('[Property Studio Email] Followed discussion notification failed:', err));
     }
 
     res.json({ success: true, comment });
@@ -2232,7 +2281,7 @@ app.post('/api/community/posts/:id/like', requireAuth, requireUnrestricted, asyn
         actorName: req.user.name,
         postTitle: post.title,
         postId: post.id
-      }).catch(err => console.warn('[Property Studio Email] Like reaction notification failed:', err));
+      }).catch((err: any) => console.warn('[Property Studio Email] Like reaction notification failed:', err));
     }
     res.json({ success: true, ...result });
   } catch (err: any) {
@@ -2307,7 +2356,7 @@ app.post('/api/support/ticket', async (req: Request, res: Response): Promise<voi
         topic: String(topic || 'General Enquiry').trim(),
         message: String(message).trim(),
         isConfirmation: true
-      }).catch(err => console.warn('[Property Studio Email] Ticket confirmation email failed:', err));
+      }).catch((err: any) => console.warn('[Property Studio Email] Ticket confirmation email failed:', err));
     }
     res.json({ success: true, ticketId: cleanTicketId });
   } catch (err: any) {
@@ -2389,7 +2438,7 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
             replySnippet: content.slice(0, 150),
             postId: parentPost.id,
             replyId: comment.id
-          }).catch(err => console.warn('[Property Studio Email] Comment reply notification failed:', err));
+          }).catch((err: any) => console.warn('[Property Studio Email] Comment reply notification failed:', err));
         }
       } else if (!parentId && parentPost.authorId !== req.user.id) {
         if (parentPost.postType === 'QUESTION' || parentPost.topic === 'Q&A' || (parentPost.title && parentPost.title.endsWith('?'))) {
@@ -2401,7 +2450,7 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
             answerSnippet: content.slice(0, 150),
             postId: parentPost.id,
             commentId: comment.id
-          }).catch(err => console.warn('[Property Studio Email] Question reply notification failed:', err));
+          }).catch((err: any) => console.warn('[Property Studio Email] Question reply notification failed:', err));
         } else {
           sendPostCommentNotification({
             postAuthorId: parentPost.authorId,
@@ -2411,7 +2460,7 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
             commentSnippet: content.slice(0, 150),
             postId: parentPost.id,
             commentId: comment.id
-          }).catch(err => console.warn('[Property Studio Email] Post comment notification failed:', err));
+          }).catch((err: any) => console.warn('[Property Studio Email] Post comment notification failed:', err));
         }
       }
 
@@ -2422,7 +2471,7 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
         postTitle: parentPost.title,
         postId: parentPost.id,
         sourceId: comment.id
-      }).catch(err => console.warn('[Property Studio Email] Comment mention notification failed:', err));
+      }).catch((err: any) => console.warn('[Property Studio Email] Comment mention notification failed:', err));
 
       sendFollowedDiscussionNotifications({
         postId: parentPost.id,
@@ -2430,7 +2479,7 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
         actorName: req.user.name,
         postTitle: parentPost.title,
         updateSnippet: content.slice(0, 150)
-      }).catch(err => console.warn('[Property Studio Email] Followed discussion notification failed:', err));
+      }).catch((err: any) => console.warn('[Property Studio Email] Followed discussion notification failed:', err));
     }
     res.json({ success: true, comment });
   } catch (err: any) {

@@ -53,7 +53,11 @@ import {
   getProfessionalProfile,
   verifyPaymentWebhook
 } from './commerce.ts';
-import { sendRequirementNotification, sendProjectNotification } from './emailNotificationService.ts';
+import {
+  sendRequirementNotification,
+  sendProjectNotification,
+  sendModerationDecisionEmailNotification
+} from './emailNotificationService.ts';
 import { createAuditLog, createNotification } from './db.ts';
 import { broadcastSseEvent } from './events.ts';
 
@@ -164,7 +168,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         res.status(404).json({ error: 'Listing not found' });
         return;
       }
-      if (status === 'APPROVED' || status === 'REJECTED') {
+      if (status === 'APPROVED' || status === 'REJECTED' || status === 'SUSPENDED' || status === 'PAUSED') {
         const ownerId = (listing as any).ownerId || (listing as any).owner_id;
         if (ownerId) {
           sendProjectNotification({
@@ -242,6 +246,14 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         targetId: req.params.id,
         details: { status, reason: req.body?.reason || '' }
       });
+      sendModerationDecisionEmailNotification({
+        userId: req.params.id,
+        targetType: 'VERIFICATION',
+        title: `Professional Account (${profile.role || 'Member'})`,
+        status: (status === 'VERIFIED' ? 'VERIFIED' : status) as any,
+        reason: req.body?.reason,
+        linkUrl: '/dashboard'
+      }).catch((err: any) => console.warn('[Property Studio Email] Professional verification email failed:', err));
       res.json({ success: true, profile });
     } catch (err) {
       sendError(res, err);
@@ -643,6 +655,16 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
 
       broadcastSseEvent('REQUIREMENT_DELETED', { id: reqId, seekerId: req.user.id });
 
+      sendRequirementNotification({
+        seekerId: req.user.id,
+        action: 'STATUS_CHANGE',
+        requirementId: reqId,
+        propertyType: (deleted as any).propertyType || 'Property Requirement',
+        location: (deleted as any).location || 'Hyderabad',
+        budget: '',
+        notes: 'Requirement removed by member.'
+      }).catch((err: any) => console.warn('[Property Studio Email] Requirement removal email failed:', err));
+
       res.json({ success: true, message: 'Property requirement deleted successfully.', requirement: deleted });
     } catch (err: any) {
       if (err.message === 'FORBIDDEN' || err.status === 403) {
@@ -775,6 +797,17 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         targetId: review.id,
         details: { status, reason: reason || '' }
       });
+      const reviewAuthorId = (review as any).authorId || (review as any).author_id;
+      if (reviewAuthorId) {
+        sendModerationDecisionEmailNotification({
+          userId: reviewAuthorId,
+          targetType: 'REVIEW',
+          title: 'Property Review & Rating',
+          status: (status === 'APPROVED' ? 'APPROVED' : (status === 'REJECTED' ? 'REJECTED' : 'REMOVED')) as any,
+          reason,
+          linkUrl: '/reviews'
+        }).catch((err: any) => console.warn('[Property Studio Email] Review moderation email failed:', err));
+      }
       res.json({ success: true, review });
     } catch (err) {
       sendError(res, err);

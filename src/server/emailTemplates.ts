@@ -617,31 +617,39 @@ export function renderCommunityActivityEmail(params: {
 // ==============================================================================
 
 /**
- * Moderation Decision Notification (Post or Community)
+ * Moderation Decision Notification (Post, Community, Review, Verification, Membership)
  */
 export function renderModerationDecisionEmail(params: {
   recipientName: string;
-  targetType: 'POST' | 'COMMUNITY' | 'COMMENT';
+  targetType: 'POST' | 'COMMUNITY' | 'COMMENT' | 'REVIEW' | 'VERIFICATION' | 'MEMBERSHIP';
   title: string;
-  status: 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  status: 'APPROVED' | 'REJECTED' | 'SUSPENDED' | 'VERIFIED' | 'ACTIVE' | 'REMOVED';
   reason?: string;
   linkUrl?: string;
 }): EmailRenderOutput {
   const baseUrl = getBaseUrl();
-  const isApproved = params.status === 'APPROVED';
-  const typeLabel = params.targetType === 'POST' ? 'Question / Discussion' : params.targetType === 'COMMUNITY' ? 'Community Hub' : 'Comment';
+  const isApproved = params.status === 'APPROVED' || params.status === 'VERIFIED' || params.status === 'ACTIVE';
+  const typeLabel =
+    params.targetType === 'POST' ? 'Question / Discussion' :
+    params.targetType === 'COMMUNITY' ? 'Community Hub' :
+    params.targetType === 'COMMENT' ? 'Comment' :
+    params.targetType === 'REVIEW' ? 'Review & Rating' :
+    params.targetType === 'VERIFICATION' ? 'Professional Verification' :
+    params.targetType === 'MEMBERSHIP' ? 'Community Membership' : 'Content Submission';
 
   const subject = isApproved
-    ? `Approved: Your ${typeLabel} is now live on Property Studio`
+    ? `Approved: Your ${typeLabel} on Property Studio`
     : `Status Update: Your ${typeLabel} review decision`;
 
   const previewText = isApproved
-    ? `Your submission "${params.title}" has been approved by administrators.`
-    : `Important review decision regarding your submission "${params.title}".`;
+    ? `Your ${typeLabel.toLowerCase()} "${params.title}" has been approved by administrators.`
+    : `Important review decision regarding your ${typeLabel.toLowerCase()} "${params.title}".`;
 
   const badge = isApproved
-    ? { text: 'Approved & Live', bg: '#ecfdf5', color: '#047857' }
-    : { text: 'Review Notice', bg: '#fef2f2', color: '#b91c1c' };
+    ? { text: params.status === 'VERIFIED' ? 'Verified' : 'Approved & Active', bg: '#ecfdf5', color: '#047857' }
+    : params.status === 'SUSPENDED'
+      ? { text: 'Suspended', bg: '#fffbeb', color: '#b45309' }
+      : { text: 'Review Notice', bg: '#fef2f2', color: '#b91c1c' };
 
   const reasonHtml = params.reason
     ? `
@@ -655,8 +663,8 @@ export function renderModerationDecisionEmail(params: {
     <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 16px 0;">
       ${
         isApproved
-          ? `Our editorial administration has approved your ${typeLabel.toLowerCase()} <strong>"${escapeHtml(params.title)}"</strong>. It is now published live and accessible to verified members.`
-          : `Our editorial administration has reviewed your ${typeLabel.toLowerCase()} <strong>"${escapeHtml(params.title)}"</strong> and determined that it cannot be approved in its current form.`
+          ? `Our administration has approved your ${typeLabel.toLowerCase()} <strong>"${escapeHtml(params.title)}"</strong>. It is now active on Property Studio.`
+          : `Our administration has reviewed your ${typeLabel.toLowerCase()} <strong>"${escapeHtml(params.title)}"</strong> and updated its status to <strong>${escapeHtml(params.status)}</strong>.`
       }
     </p>
 
@@ -665,8 +673,8 @@ export function renderModerationDecisionEmail(params: {
     <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 16px 0;">
       ${
         isApproved
-          ? 'You can now view live engagement, attendee replies, and institutional feedback directly on the platform.'
-          : 'If you wish to update or appeal this decision, please contact the secretariat desk at info@propertystudio.org.'
+          ? 'You can now view live engagement and member activity directly on the platform.'
+          : 'If you wish to update or appeal this decision, please contact the secretariat desk at info@propertystudio.org or call +91 9014 55 55 66.'
       }
     </p>
   `;
@@ -678,17 +686,17 @@ export function renderModerationDecisionEmail(params: {
   const html = renderBaseLayout({
     previewText,
     badge,
-    title: isApproved ? 'Submission Approved & Live' : 'Moderation Review Notice',
+    title: isApproved ? `${typeLabel} Approved` : `${typeLabel} Status Update`,
     recipientName: params.recipientName,
     bodyHtml,
     ctaButton: isApproved
-      ? { text: 'View Live Content', url: targetLink }
-      : { text: 'Review Community Guidelines', url: `${baseUrl}/community` }
+      ? { text: 'View on Platform', url: targetLink }
+      : { text: 'Open Dashboard', url: `${baseUrl}/dashboard` }
   });
 
   const text = `${subject}\n\n` +
     `Hello ${params.recipientName},\n\n` +
-    `Submission: "${params.title}"\n` +
+    `${typeLabel}: "${params.title}"\n` +
     `Status: ${params.status}\n` +
     (params.reason ? `Reason: ${params.reason}\n\n` : '\n') +
     `Platform: ${baseUrl}/\n`;
@@ -789,7 +797,7 @@ export function renderRequirementEmail(params: {
  */
 export function renderProjectEmail(params: {
   recipientName: string;
-  action: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'INFO_REQUESTED';
+  action: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'INFO_REQUESTED' | 'SUSPENDED' | 'PAUSED';
   listingTitle: string;
   listingId: string;
   reason?: string;
@@ -811,6 +819,10 @@ export function renderProjectEmail(params: {
     subject = `Audit Status: "${params.listingTitle}" Review Feedback`;
     badge = { text: 'Revision Required', bg: '#fef2f2', color: '#b91c1c' };
     headline = 'Project Audit & Verification Notice';
+  } else if (params.action === 'SUSPENDED' || params.action === 'PAUSED') {
+    subject = `Venture Notice: "${params.listingTitle}" Publication ${params.action}`;
+    badge = { text: params.action, bg: '#fffbeb', color: '#b45309' };
+    headline = `Project Venture ${params.action}`;
   }
 
   const reasonHtml = params.reason

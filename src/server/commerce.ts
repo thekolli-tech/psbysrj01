@@ -800,7 +800,7 @@ export async function suspendOrRestoreCommunity(input: {
     console.warn('[Property Studio] Could not broadcast community moderation event:', err);
   }
 
-  if (creatorId && (input.status === 'APPROVED' || input.status === 'REJECTED')) {
+  if (creatorId && (input.status === 'APPROVED' || input.status === 'REJECTED' || input.status === 'SUSPENDED')) {
     try {
       const { notifyAuthorOnModerationDecision } = await import('./notifications.ts');
       await notifyAuthorOnModerationDecision({

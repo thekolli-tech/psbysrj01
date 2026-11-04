@@ -541,9 +541,9 @@ export async function sendCommunityActivityNotifications(params: {
  */
 export async function sendModerationDecisionEmailNotification(params: {
   userId: string;
-  targetType: 'POST' | 'COMMUNITY' | 'COMMENT';
+  targetType: 'POST' | 'COMMUNITY' | 'COMMENT' | 'REVIEW' | 'VERIFICATION' | 'MEMBERSHIP';
   title: string;
-  status: 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  status: 'APPROVED' | 'REJECTED' | 'SUSPENDED' | 'VERIFIED' | 'ACTIVE' | 'REMOVED';
   reason?: string;
   linkUrl?: string;
 }): Promise<DispatchNotificationResult> {
@@ -600,7 +600,7 @@ export async function sendRequirementNotification(params: {
  */
 export async function sendProjectNotification(params: {
   ownerId: string;
-  action: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'INFO_REQUESTED';
+  action: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'INFO_REQUESTED' | 'SUSPENDED' | 'PAUSED';
   listingTitle: string;
   listingId: string;
   reason?: string;
