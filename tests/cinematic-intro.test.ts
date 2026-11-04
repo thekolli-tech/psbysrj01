@@ -2,52 +2,45 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-test('CinematicIntro source file implements all user specifications', () => {
+test('CinematicIntro uses the official image without any text', () => {
   const source = fs.readFileSync('src/components/common/CinematicIntro.tsx', 'utf8');
 
-  // 1. Sophisticated dark background and ambient lighting
-  assert.match(source, /bg-\[#030712\]/);
+  // Uses the official image uploaded by user
+  assert.match(source, /property-studio-intro-official\.jpg/);
+
+  // Confirms NO text overlays are present
+  assert.doesNotMatch(source, /Swamy Reddy Javidi Presents/i);
+  assert.doesNotMatch(source, /Institutional Real Estate Intelligence/i);
+  assert.doesNotMatch(source, /Hyderabad · Telangana/i);
+  assert.doesNotMatch(source, />\s*Skip Intro\s*</i);
+
+  // Confirms cinematic animation, ambient lighting, particles, and sheen
+  assert.match(source, /cinematic-zoom/);
   assert.match(source, /ambient-glow/);
-  assert.match(source, /radial-gradient/);
-
-  // 2. Reveals existing Property Studio logo with smooth cinematic animation
-  assert.match(source, /officialLogoSquare/);
-  assert.match(source, /emblem-reveal/);
-
-  // 3. Elegant light streaks, depth, soft particles, and motion effects
   assert.match(source, /light-streak/);
-  assert.match(source, /float-particle/);
-  assert.match(source, /pulse-ring/);
   assert.match(source, /sheen-sweep/);
+  assert.match(source, /float-particle/);
 
-  // 4. Reveals PROPERTY STUDIO brand name with polished typography
-  assert.match(source, /Property Studio/);
-  assert.match(source, /Swamy Reddy Javidi Presents/i);
-  assert.match(source, /Institutional Real Estate Intelligence/i);
-  assert.match(source, /Hyderabad · Telangana/i);
-
-  // 5. Seamless transition into the homepage
+  // Seamless transition & unmount
   assert.match(source, /isExiting/);
   assert.match(source, /transition-all duration-700/);
 
-  // 6. Skip Intro option included
-  assert.match(source, /Skip Intro/);
+  // Skip options (click anywhere, keyboard, icon button)
   assert.match(source, /handleDismiss/);
 
-  // 7. Avoids replaying on every page navigation via session storage
+  // Avoids replaying on every navigation via session storage
   assert.match(source, /sessionStorage\.getItem/);
   assert.match(source, /sessionStorage\.setItem/);
 
-  // 8. Respects reduced-motion accessibility
+  // Respects reduced motion accessibility
   assert.match(source, /prefers-reduced-motion/);
 
-  // 9. Duration is ~3.8 seconds
-  assert.match(source, /3800/);
+  // Image file exists in public/brand
+  assert.ok(fs.existsSync('public/brand/property-studio-intro-official.jpg'));
 });
 
-test('App.tsx embeds CinematicIntro and provides replay capability', () => {
+test('App.tsx embeds CinematicIntro cleanly', () => {
   const appSource = fs.readFileSync('src/App.tsx', 'utf8');
   assert.match(appSource, /CinematicIntro/);
   assert.match(appSource, /replayIntro/);
-  assert.match(appSource, /Watch Intro/);
 });
