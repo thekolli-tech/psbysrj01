@@ -28,7 +28,9 @@ globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
   if (String(url) === 'https://api.resend.com/emails') {
     const body = JSON.parse(String(init?.body || '{}'));
     const code = String(body.html).match(/>(\d{6})</)?.[1] || '';
-    codes.set(String(body.to?.[0] || ''), code);
+    if (code) {
+      codes.set(String(body.to?.[0] || ''), code);
+    }
     return new Response(JSON.stringify({ id: 'email_mock_concurrent' }), { status: 200, headers: { 'content-type': 'application/json' } });
   }
   return originalFetch(url, init);

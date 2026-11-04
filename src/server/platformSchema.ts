@@ -361,6 +361,42 @@ CREATE TABLE IF NOT EXISTS studio_broadcasts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_studio_broadcasts_status ON studio_broadcasts(status, scheduled_at);
+CREATE TABLE IF NOT EXISTS user_notification_preferences (
+  user_id VARCHAR(64) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  community_replies SMALLINT DEFAULT 1,
+  mentions_reactions SMALLINT DEFAULT 1,
+  followed_discussions SMALLINT DEFAULT 1,
+  joined_community_activity SMALLINT DEFAULT 1,
+  property_requirements SMALLINT DEFAULT 1,
+  platform_announcements SMALLINT DEFAULT 1,
+  unsubscribe_token VARCHAR(128) UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_notif_prefs_token ON user_notification_preferences(unsubscribe_token);
+
+CREATE TABLE IF NOT EXISTS email_notifications (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_id VARCHAR(128) NOT NULL,
+  notification_type VARCHAR(64) NOT NULL,
+  category VARCHAR(32) NOT NULL,
+  recipient_email VARCHAR(255) NOT NULL,
+  recipient_name VARCHAR(255) NOT NULL,
+  subject VARCHAR(255) NOT NULL,
+  html_body TEXT NOT NULL,
+  text_body TEXT NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+  attempts INTEGER DEFAULT 0,
+  last_error TEXT,
+  message_id VARCHAR(128),
+  sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT uq_email_notif_user_event UNIQUE (user_id, event_id)
+);
+CREATE INDEX IF NOT EXISTS idx_email_notifications_user_id ON email_notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_notifications_status ON email_notifications(status);
 `;
 
 export const ESSENTIAL_CONFIG_SQL = `
@@ -666,6 +702,42 @@ CREATE TABLE IF NOT EXISTS media_upload_intents (
 );
 CREATE INDEX IF NOT EXISTS idx_sqlite_media_upload_intents_user ON media_upload_intents(user_id);
 CREATE INDEX IF NOT EXISTS idx_sqlite_media_upload_intents_status ON media_upload_intents(status);
+CREATE TABLE IF NOT EXISTS user_notification_preferences (
+  user_id TEXT PRIMARY KEY,
+  community_replies INTEGER DEFAULT 1,
+  mentions_reactions INTEGER DEFAULT 1,
+  followed_discussions INTEGER DEFAULT 1,
+  joined_community_activity INTEGER DEFAULT 1,
+  property_requirements INTEGER DEFAULT 1,
+  platform_announcements INTEGER DEFAULT 1,
+  unsubscribe_token TEXT UNIQUE NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sqlite_user_notif_prefs_token ON user_notification_preferences(unsubscribe_token);
+
+CREATE TABLE IF NOT EXISTS email_notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  notification_type TEXT NOT NULL,
+  category TEXT NOT NULL,
+  recipient_email TEXT NOT NULL,
+  recipient_name TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  html_body TEXT NOT NULL,
+  text_body TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  attempts INTEGER DEFAULT 0,
+  last_error TEXT,
+  message_id TEXT,
+  sent_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(user_id, event_id)
+);
+CREATE INDEX IF NOT EXISTS idx_sqlite_email_notifications_user_id ON email_notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_sqlite_email_notifications_status ON email_notifications(status);
 `;
 
 export function applySqliteAdditiveSchema(database: { exec: (sql: string) => void }): void {

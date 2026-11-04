@@ -348,6 +348,17 @@ export async function notifyAuthorOnModerationDecision(data: {
       broadcastSseEvent('NOTIFICATION_CREATED', { userId: data.authorId }, data.authorId);
       recordActivity('notifications');
     } catch {}
+    try {
+      const { sendModerationDecisionEmailNotification } = await import('./emailNotificationService.ts');
+      sendModerationDecisionEmailNotification({
+        userId: data.authorId,
+        targetType: data.targetType,
+        title: data.title,
+        status: data.status,
+        reason: data.reason,
+        linkUrl: isPost ? '/community' : '/community'
+      }).catch(err => console.warn('[Property Studio Email] Moderation decision email failed:', err));
+    } catch {}
   } catch (err: any) {
     console.warn('[Property Studio] Error in notifyAuthorOnModerationDecision:', err?.message || err);
   }

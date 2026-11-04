@@ -24,7 +24,9 @@ import {
   ShieldAlert,
   Camera,
   Trash2,
-  Loader2
+  Loader2,
+  Bell,
+  MessageSquare
 } from 'lucide-react';
 
 interface ProfileControlPanelModalProps {
@@ -50,7 +52,73 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
     setInterests(Array.isArray((currentUser as any).interests) ? (currentUser as any).interests : []);
   }, [isOpen, currentUser.townCity, currentUser.profession, (currentUser as any).company, (currentUser as any).interests]);
 
-  const [activeTab, setActiveTab] = useState<'PROFILE' | 'CHANGE_PASSWORD'>('PROFILE');
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'CHANGE_PASSWORD' | 'NOTIFICATIONS'>('PROFILE');
+  const [notifPrefs, setNotifPrefs] = useState({
+    communityReplies: true,
+    mentionsReactions: true,
+    followedDiscussions: true,
+    joinedCommunityActivity: true,
+    propertyRequirements: true,
+    platformAnnouncements: true
+  });
+  const [loadingPrefs, setLoadingPrefs] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [prefsSuccess, setPrefsSuccess] = useState<string | null>(null);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+
+  const fetchNotificationPreferences = async () => {
+    setLoadingPrefs(true);
+    setPrefsError(null);
+    try {
+      const res = await fetch('/api/notifications/preferences');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.preferences) {
+          setNotifPrefs({
+            communityReplies: data.preferences.communityReplies !== false,
+            mentionsReactions: data.preferences.mentionsReactions !== false,
+            followedDiscussions: data.preferences.followedDiscussions !== false,
+            joinedCommunityActivity: data.preferences.joinedCommunityActivity !== false,
+            propertyRequirements: data.preferences.propertyRequirements !== false,
+            platformAnnouncements: data.preferences.platformAnnouncements !== false
+          });
+        }
+      }
+    } catch (err: any) {
+      setPrefsError(err?.message || 'Failed to load preferences');
+    } finally {
+      setLoadingPrefs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'NOTIFICATIONS') {
+      fetchNotificationPreferences();
+    }
+  }, [isOpen, activeTab]);
+
+  const handleSavePreferences = async () => {
+    setSavingPrefs(true);
+    setPrefsError(null);
+    setPrefsSuccess(null);
+    try {
+      const res = await fetch('/api/notifications/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notifPrefs)
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to save preferences');
+      }
+      setPrefsSuccess('Email notification preferences saved successfully.');
+      showToast('Notification preferences updated');
+    } catch (err: any) {
+      setPrefsError(err.message || 'Error updating preferences');
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -415,6 +483,17 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
           >
             <KeyRound className="w-3.5 h-3.5 text-amber-600" />
             <span>Change Password</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('NOTIFICATIONS'); setErrorMsg(null); setSuccessMsg(null); setPrefsSuccess(null); }}
+            className={`pb-3 px-3 text-xs font-bold transition-all relative flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'NOTIFICATIONS'
+                ? 'text-slate-900 border-b-2 border-amber-600'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Bell className="w-3.5 h-3.5 text-amber-600" />
+            <span>Email Notifications</span>
           </button>
         </div>
 

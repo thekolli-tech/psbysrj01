@@ -134,8 +134,29 @@ import {
   pgCreateUploadIntentRecord,
   pgGetUploadIntentById,
   pgUpdateUploadIntentStatus,
-  pgUpdateUploadIntentStorageKey
+  pgUpdateUploadIntentStorageKey,
+  pgGetUserNotificationPreferences,
+  pgUpdateUserNotificationPreferences,
+  pgGetPreferencesByUnsubscribeToken,
+  pgRecordEmailNotification,
+  pgGetEmailNotificationByEvent,
+  pgUpdateEmailNotificationStatus,
+  pgGetPendingEmailNotifications,
+  pgGetPostFollowerUserIds,
+  pgFindUserByMention
 } from './postgresRepo.ts';
+
+import type {
+  UserNotificationPreferences,
+  DbEmailNotification,
+  CreateEmailNotificationInput
+} from './postgresRepo.ts';
+
+export type {
+  UserNotificationPreferences,
+  DbEmailNotification,
+  CreateEmailNotificationInput
+};
 
 type SqliteDatabase = import('node:sqlite').DatabaseSync;
 
@@ -5248,4 +5269,302 @@ export async function getActiveCommunityMemberIds(communityId: string): Promise<
   if (isPostgresAuthoritative()) return pgGetActiveCommunityMemberIds(communityId);
   const rows = db.prepare("SELECT user_id FROM community_members WHERE community_id = ? AND status = 'ACTIVE'").all(communityId) as { user_id: string }[];
   return rows.map(r => r.user_id);
+}
+
+
+// ==============================================================================
+// EMAIL NOTIFICATIONS & PREFERENCES DISPATCH & SQLITE
+// ==============================================================================
+
+function mapSqliteEmailNotification(row: any): DbEmailNotification {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    eventId: row.event_id,
+    notificationType: row.notification_type,
+    category: row.category,
+    recipientEmail: row.recipient_email,
+    recipientName: row.recipient_name,
+    subject: row.subject,
+    htmlBody: row.html_body,
+    textBody: row.text_body,
+    status: row.status,
+    attempts: Number(row.attempts || 0),
+    lastError: row.last_error || null,
+    messageId: row.message_id || null,
+    sentAt: row.sent_at || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function sqliteGetUserNotificationPreferences(userId: string): UserNotificationPreferences {
+  const row = db.prepare('SELECT * FROM user_notification_preferences WHERE user_id = ?').get(userId) as any;
+  if (row) {
+    return {
+      userId: row.user_id,
+      communityReplies: Boolean(row.community_replies),
+      mentionsReactions: Boolean(row.mentions_reactions),
+      followedDiscussions: Boolean(row.followed_discussions),
+      joinedCommunityActivity: Boolean(row.joined_community_activity),
+      propertyRequirements: Boolean(row.property_requirements),
+      platformAnnouncements: Boolean(row.platform_announcements),
+      unsubscribeToken: row.unsubscribe_token,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  const token = crypto.randomBytes(24).toString('hex');
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT OR IGNORE INTO user_notification_preferences
+    (user_id, community_replies, mentions_reactions, followed_discussions, joined_community_activity, property_requirements, platform_announcements, unsubscribe_token, created_at, updated_at)
+    VALUES (?, 1, 1, 1, 1, 1, 1, ?, ?, ?)
+  `).run(userId, token, now, now);
+
+  return {
+    userId,
+    communityReplies: true,
+    mentionsReactions: true,
+    followedDiscussions: true,
+    joinedCommunityActivity: true,
+    propertyRequirements: true,
+    platformAnnouncements: true,
+    unsubscribeToken: token,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function sqliteUpdateUserNotificationPreferences(
+  userId: string,
+  prefs: Partial<UserNotificationPreferences>
+): UserNotificationPreferences {
+  const current = sqliteGetUserNotificationPreferences(userId);
+  const now = new Date().toISOString();
+  const updated = {
+    communityReplies: prefs.communityReplies !== undefined ? (prefs.communityReplies ? 1 : 0) : (current.communityReplies ? 1 : 0),
+    mentionsReactions: prefs.mentionsReactions !== undefined ? (prefs.mentionsReactions ? 1 : 0) : (current.mentionsReactions ? 1 : 0),
+    followedDiscussions: prefs.followedDiscussions !== undefined ? (prefs.followedDiscussions ? 1 : 0) : (current.followedDiscussions ? 1 : 0),
+    joinedCommunityActivity: prefs.joinedCommunityActivity !== undefined ? (prefs.joinedCommunityActivity ? 1 : 0) : (current.joinedCommunityActivity ? 1 : 0),
+    propertyRequirements: prefs.propertyRequirements !== undefined ? (prefs.propertyRequirements ? 1 : 0) : (current.propertyRequirements ? 1 : 0),
+    platformAnnouncements: prefs.platformAnnouncements !== undefined ? (prefs.platformAnnouncements ? 1 : 0) : (current.platformAnnouncements ? 1 : 0),
+  };
+
+  db.prepare(`
+    UPDATE user_notification_preferences
+    SET community_replies = ?,
+        mentions_reactions = ?,
+        followed_discussions = ?,
+        joined_community_activity = ?,
+        property_requirements = ?,
+        platform_announcements = ?,
+        updated_at = ?
+    WHERE user_id = ?
+  `).run(
+    updated.communityReplies,
+    updated.mentionsReactions,
+    updated.followedDiscussions,
+    updated.joinedCommunityActivity,
+    updated.propertyRequirements,
+    updated.platformAnnouncements,
+    now,
+    userId
+  );
+
+  return sqliteGetUserNotificationPreferences(userId);
+}
+
+function sqliteGetPreferencesByUnsubscribeToken(token: string): {
+  userId: string;
+  email: string;
+  name: string;
+  preferences: UserNotificationPreferences;
+} | null {
+  const row = db.prepare(`
+    SELECT p.*, u.email, u.name
+    FROM user_notification_preferences p
+    LEFT JOIN users u ON u.id = p.user_id
+    WHERE p.unsubscribe_token = ?
+  `).get(token) as any;
+
+  if (!row) return null;
+  return {
+    userId: row.user_id,
+    email: row.email,
+    name: row.name,
+    preferences: {
+      userId: row.user_id,
+      communityReplies: Boolean(row.community_replies),
+      mentionsReactions: Boolean(row.mentions_reactions),
+      followedDiscussions: Boolean(row.followed_discussions),
+      joinedCommunityActivity: Boolean(row.joined_community_activity),
+      propertyRequirements: Boolean(row.property_requirements),
+      platformAnnouncements: Boolean(row.platform_announcements),
+      unsubscribeToken: row.unsubscribe_token,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  };
+}
+
+function sqliteRecordEmailNotification(data: CreateEmailNotificationInput): DbEmailNotification | null {
+  const existing = db.prepare('SELECT * FROM email_notifications WHERE user_id = ? AND event_id = ?').get(data.userId, data.eventId) as any;
+  if (existing) {
+    return mapSqliteEmailNotification(existing);
+  }
+
+  const id = `eml_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+  const now = new Date().toISOString();
+  try {
+    db.prepare(`
+      INSERT INTO email_notifications (
+        id, user_id, event_id, notification_type, category, recipient_email, recipient_name, subject, html_body, text_body, status, attempts, last_error, message_id, sent_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, data.userId, data.eventId, data.notificationType, data.category,
+      data.recipientEmail, data.recipientName, data.subject, data.htmlBody, data.textBody,
+      data.status || 'PENDING', data.attempts || 0, data.lastError || null, data.messageId || null, data.sentAt || null, now, now
+    );
+    return {
+      id,
+      userId: data.userId,
+      eventId: data.eventId,
+      notificationType: data.notificationType,
+      category: data.category,
+      recipientEmail: data.recipientEmail,
+      recipientName: data.recipientName,
+      subject: data.subject,
+      htmlBody: data.htmlBody,
+      textBody: data.textBody,
+      status: (data.status || 'PENDING') as any,
+      attempts: data.attempts || 0,
+      lastError: data.lastError || null,
+      messageId: data.messageId || null,
+      sentAt: data.sentAt || null,
+      createdAt: now,
+      updatedAt: now
+    };
+  } catch {
+    const checkAgain = db.prepare('SELECT * FROM email_notifications WHERE user_id = ? AND event_id = ?').get(data.userId, data.eventId) as any;
+    if (checkAgain) return mapSqliteEmailNotification(checkAgain);
+    return null;
+  }
+}
+
+function sqliteGetEmailNotificationByEvent(userId: string, eventId: string): DbEmailNotification | null {
+  const row = db.prepare('SELECT * FROM email_notifications WHERE user_id = ? AND event_id = ?').get(userId, eventId) as any;
+  return row ? mapSqliteEmailNotification(row) : null;
+}
+
+function sqliteUpdateEmailNotificationStatus(
+  id: string,
+  updates: { status: string; attempts?: number; lastError?: string | null; messageId?: string | null; sentAt?: string | null }
+): void {
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE email_notifications
+    SET status = ?,
+        attempts = COALESCE(?, attempts),
+        last_error = ?,
+        message_id = COALESCE(?, message_id),
+        sent_at = COALESCE(?, sent_at),
+        updated_at = ?
+    WHERE id = ?
+  `).run(
+    updates.status,
+    updates.attempts !== undefined ? updates.attempts : null,
+    updates.lastError || null,
+    updates.messageId || null,
+    updates.sentAt || null,
+    now,
+    id
+  );
+}
+
+function sqliteGetPendingEmailNotifications(limit = 20): DbEmailNotification[] {
+  const rows = db.prepare(`
+    SELECT * FROM email_notifications
+    WHERE (status = 'PENDING' OR status = 'FAILED') AND attempts < 5
+    ORDER BY created_at ASC
+    LIMIT ?
+  `).all(limit) as any[];
+  return rows.map(mapSqliteEmailNotification);
+}
+
+function sqliteGetPostFollowerUserIds(postId: string): string[] {
+  const rows = db.prepare('SELECT user_id FROM community_post_follows WHERE post_id = ?').all(postId) as { user_id: string }[];
+  return rows.map(r => r.user_id);
+}
+
+function sqliteFindUserByMention(mention: string): DbUser | null {
+  if (!mention) return null;
+  const clean = mention.replace(/^@/, '').trim().toLowerCase();
+  if (!clean) return null;
+  const row = db.prepare(`
+    SELECT * FROM users
+    WHERE LOWER(REPLACE(name, ' ', '')) = ?
+       OR LOWER(name) = ?
+       OR LOWER(public_id) = ?
+    LIMIT 1
+  `).get(clean, clean, clean) as any;
+  return row ? (row as DbUser) : null;
+}
+
+// Public Unified Dispatches
+export async function getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences> {
+  if (isPostgresAuthoritative()) return pgGetUserNotificationPreferences(userId);
+  return sqliteGetUserNotificationPreferences(userId);
+}
+
+export async function updateUserNotificationPreferences(
+  userId: string,
+  prefs: Partial<UserNotificationPreferences>
+): Promise<UserNotificationPreferences> {
+  if (isPostgresAuthoritative()) return pgUpdateUserNotificationPreferences(userId, prefs);
+  return sqliteUpdateUserNotificationPreferences(userId, prefs);
+}
+
+export async function getPreferencesByUnsubscribeToken(token: string): Promise<{
+  userId: string;
+  email: string;
+  name: string;
+  preferences: UserNotificationPreferences;
+} | null> {
+  if (isPostgresAuthoritative()) return pgGetPreferencesByUnsubscribeToken(token);
+  return sqliteGetPreferencesByUnsubscribeToken(token);
+}
+
+export async function recordEmailNotification(data: CreateEmailNotificationInput): Promise<DbEmailNotification | null> {
+  if (isPostgresAuthoritative()) return pgRecordEmailNotification(data);
+  return sqliteRecordEmailNotification(data);
+}
+
+export async function getEmailNotificationByEvent(userId: string, eventId: string): Promise<DbEmailNotification | null> {
+  if (isPostgresAuthoritative()) return pgGetEmailNotificationByEvent(userId, eventId);
+  return sqliteGetEmailNotificationByEvent(userId, eventId);
+}
+
+export async function updateEmailNotificationStatus(
+  id: string,
+  updates: { status: string; attempts?: number; lastError?: string | null; messageId?: string | null; sentAt?: string | null }
+): Promise<void> {
+  if (isPostgresAuthoritative()) return pgUpdateEmailNotificationStatus(id, updates);
+  return sqliteUpdateEmailNotificationStatus(id, updates);
+}
+
+export async function getPendingEmailNotifications(limit = 20): Promise<DbEmailNotification[]> {
+  if (isPostgresAuthoritative()) return pgGetPendingEmailNotifications(limit);
+  return sqliteGetPendingEmailNotifications(limit);
+}
+
+export async function getPostFollowerUserIds(postId: string): Promise<string[]> {
+  if (isPostgresAuthoritative()) return pgGetPostFollowerUserIds(postId);
+  return sqliteGetPostFollowerUserIds(postId);
+}
+
+export async function findUserByMention(mention: string): Promise<DbUser | null> {
+  if (isPostgresAuthoritative()) return pgFindUserByMention(mention);
+  return sqliteFindUserByMention(mention);
 }

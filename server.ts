@@ -129,7 +129,10 @@ import {
   createUploadIntentRecord,
   getUploadIntentById,
   updateUploadIntentStatus,
-  updateUploadIntentStorageKey
+  updateUploadIntentStorageKey,
+  getUserNotificationPreferences,
+  updateUserNotificationPreferences,
+  getPreferencesByUnsubscribeToken
 } from './src/server/db.ts';
 import { resolveAuthoritativeOtpDestination, maskEmailForDisplay, validatePasswordPolicy } from './src/server/otpPolicy.ts';
 import {
@@ -163,6 +166,17 @@ import { validateAvatarUpload } from './src/shared/avatar.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
 import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders, notifySuperAdminsOnSubmission,
   sendSupportTicketNotification, sendPasswordChangeConfirmation } from './src/server/notifications.ts';
+import {
+  sendWelcomeNotification,
+  sendQuestionReplyNotification,
+  sendPostCommentNotification,
+  sendCommentReplyNotification,
+  sendMentionNotifications,
+  sendReactionNotification,
+  sendFollowedDiscussionNotifications,
+  sendSupportTicketUserConfirmation,
+  sendSecurityAlertNotification
+} from './src/server/emailNotificationService.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
 import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
@@ -994,6 +1008,13 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       }
     }
 
+    sendWelcomeNotification({
+      userId: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      role: safeRole
+    }).catch(err => console.warn('[Property Studio Email] Welcome email delivery failed:', err));
+
     const { password_hash, salt, ...safeUser } = updatedNewUser;
     res.json({
       success: true,
@@ -1344,6 +1365,14 @@ app.post('/api/admin/users/:id/restrict', requireAdmin, async (req: Authenticate
       res.status(403).json({ error: result.error });
       return;
     }
+    if (restrict) {
+      sendSecurityAlertNotification({
+        userId: req.params.id,
+        title: 'Account Restriction Notice',
+        message: reason || 'Your account has been restricted by an administrator from performing protected actions.',
+        actionRequired: true
+      }).catch(err => console.warn('[Property Studio Email] Restriction alert failed:', err));
+    }
     res.json({
       success: true,
       message: restrict ? 'User restricted successfully' : 'User unrestricted successfully',
@@ -1598,6 +1627,16 @@ app.post('/api/community/posts', requireAuth, requireUnrestricted, async (req: A
     }
 
     broadcastSseEvent('POST_CREATED', { id: post.id, status: post.status });
+    if (post.status === 'APPROVED' || post.status === 'PUBLISHED') {
+      sendMentionNotifications({
+        content: `${post.title} ${post.content}`,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        postTitle: post.title,
+        postId: post.id,
+        sourceId: post.id
+      }).catch(err => console.warn('[Property Studio Email] Post mention notification failed:', err));
+    }
     recordActivity('posts');
     res.json({ success: true, post });
   } catch (err: any) {
@@ -2062,6 +2101,15 @@ app.post('/api/community/posts/:id/upvote', requireAuth, requireUnrestricted, as
       return;
     }
     const result = await togglePostLike(req.params.id, req.user.id);
+    if (result.liked && post.authorId !== req.user.id) {
+      sendReactionNotification({
+        postAuthorId: post.authorId,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        postTitle: post.title,
+        postId: post.id
+      }).catch(err => console.warn('[Property Studio Email] Upvote reaction notification failed:', err));
+    }
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -2102,6 +2150,50 @@ app.post('/api/community/posts/:id/reply', requireAuth, requireUnrestricted, asy
       authorRole: req.user.role,
       content
     });
+
+    if (parentPost.status === 'APPROVED' || parentPost.status === 'PUBLISHED') {
+      if (parentPost.authorId !== req.user.id) {
+        if (parentPost.postType === 'QUESTION' || parentPost.topic === 'Q&A' || (parentPost.title && parentPost.title.endsWith('?'))) {
+          sendQuestionReplyNotification({
+            questionAuthorId: parentPost.authorId,
+            actorId: req.user.id,
+            actorName: req.user.name,
+            postTitle: parentPost.title,
+            answerSnippet: content.slice(0, 150),
+            postId: parentPost.id,
+            commentId: comment.id
+          }).catch(err => console.warn('[Property Studio Email] Question reply notification failed:', err));
+        } else {
+          sendPostCommentNotification({
+            postAuthorId: parentPost.authorId,
+            actorId: req.user.id,
+            actorName: req.user.name,
+            postTitle: parentPost.title,
+            commentSnippet: content.slice(0, 150),
+            postId: parentPost.id,
+            commentId: comment.id
+          }).catch(err => console.warn('[Property Studio Email] Post comment notification failed:', err));
+        }
+      }
+
+      sendMentionNotifications({
+        content,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        postTitle: parentPost.title,
+        postId: parentPost.id,
+        sourceId: comment.id
+      }).catch(err => console.warn('[Property Studio Email] Reply mention notification failed:', err));
+
+      sendFollowedDiscussionNotifications({
+        postId: parentPost.id,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        postTitle: parentPost.title,
+        updateSnippet: content.slice(0, 150)
+      }).catch(err => console.warn('[Property Studio Email] Followed discussion notification failed:', err));
+    }
+
     res.json({ success: true, comment });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -2132,6 +2224,15 @@ app.post('/api/community/posts/:id/like', requireAuth, requireUnrestricted, asyn
     const result = await togglePostLike(req.params.id, req.user.id);
     if (post.status === 'APPROVED' || post.status === 'PUBLISHED') {
       broadcastSseEvent('LIKE_CHANGED', { postId: req.params.id, upvotes: result.upvotes });
+    }
+    if (result.liked && post.authorId !== req.user.id) {
+      sendReactionNotification({
+        postAuthorId: post.authorId,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        postTitle: post.title,
+        postId: post.id
+      }).catch(err => console.warn('[Property Studio Email] Like reaction notification failed:', err));
     }
     res.json({ success: true, ...result });
   } catch (err: any) {
@@ -2198,6 +2299,16 @@ app.post('/api/support/ticket', async (req: Request, res: Response): Promise<voi
       topic: String(topic || 'General Enquiry').trim(),
       message: String(message).trim()
     });
+    if (email && String(email).trim()) {
+      sendSupportTicketUserConfirmation({
+        ticketId: cleanTicketId,
+        name: String(name).trim(),
+        email: String(email).trim(),
+        topic: String(topic || 'General Enquiry').trim(),
+        message: String(message).trim(),
+        isConfirmation: true
+      }).catch(err => console.warn('[Property Studio Email] Ticket confirmation email failed:', err));
+    }
     res.json({ success: true, ticketId: cleanTicketId });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to submit enquiry' });
@@ -2233,8 +2344,9 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
       return;
     }
 
+    let parentComment: any = null;
     if (parentId) {
-      const parentComment = await getCommentById(parentId);
+      parentComment = await getCommentById(parentId);
       if (!parentComment) {
         res.status(404).json({ error: 'Parent comment not found' });
         return;
@@ -2264,6 +2376,61 @@ app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, 
         postId: req.params.id,
         parentId: parentId || null
       }, undefined, allowedUserIds);
+
+      // Email notifications
+      if (parentId && parentComment) {
+        if (parentComment.author_id !== req.user.id) {
+          sendCommentReplyNotification({
+            parentAuthorId: parentComment.author_id,
+            actorId: req.user.id,
+            actorName: req.user.name,
+            postTitle: parentPost.title,
+            parentSnippet: parentComment.content ? parentComment.content.slice(0, 120) : undefined,
+            replySnippet: content.slice(0, 150),
+            postId: parentPost.id,
+            replyId: comment.id
+          }).catch(err => console.warn('[Property Studio Email] Comment reply notification failed:', err));
+        }
+      } else if (!parentId && parentPost.authorId !== req.user.id) {
+        if (parentPost.postType === 'QUESTION' || parentPost.topic === 'Q&A' || (parentPost.title && parentPost.title.endsWith('?'))) {
+          sendQuestionReplyNotification({
+            questionAuthorId: parentPost.authorId,
+            actorId: req.user.id,
+            actorName: req.user.name,
+            postTitle: parentPost.title,
+            answerSnippet: content.slice(0, 150),
+            postId: parentPost.id,
+            commentId: comment.id
+          }).catch(err => console.warn('[Property Studio Email] Question reply notification failed:', err));
+        } else {
+          sendPostCommentNotification({
+            postAuthorId: parentPost.authorId,
+            actorId: req.user.id,
+            actorName: req.user.name,
+            postTitle: parentPost.title,
+            commentSnippet: content.slice(0, 150),
+            postId: parentPost.id,
+            commentId: comment.id
+          }).catch(err => console.warn('[Property Studio Email] Post comment notification failed:', err));
+        }
+      }
+
+      sendMentionNotifications({
+        content,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        postTitle: parentPost.title,
+        postId: parentPost.id,
+        sourceId: comment.id
+      }).catch(err => console.warn('[Property Studio Email] Comment mention notification failed:', err));
+
+      sendFollowedDiscussionNotifications({
+        postId: parentPost.id,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        postTitle: parentPost.title,
+        updateSnippet: content.slice(0, 150)
+      }).catch(err => console.warn('[Property Studio Email] Followed discussion notification failed:', err));
     }
     res.json({ success: true, comment });
   } catch (err: any) {
@@ -3792,6 +3959,90 @@ app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
       sqliteFallback: false,
       database: { connected: false, schemaReady: false, missingTables: [], code: 'DATABASE_STARTUP_FAILED' }
     });
+  }
+});
+
+// ==============================================================================
+// EMAIL NOTIFICATION PREFERENCES & UNSUBSCRIBE ROUTES
+// ==============================================================================
+
+app.get('/api/notifications/preferences', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const preferences = await getUserNotificationPreferences(req.user.id);
+    res.json({ success: true, preferences });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch preferences' });
+  }
+});
+
+app.put('/api/notifications/preferences', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { communityReplies, mentionsReactions, followedDiscussions, joinedCommunityActivity, propertyRequirements, platformAnnouncements } = req.body || {};
+    const updated = await updateUserNotificationPreferences(req.user.id, {
+      communityReplies,
+      mentionsReactions,
+      followedDiscussions,
+      joinedCommunityActivity,
+      propertyRequirements,
+      platformAnnouncements
+    });
+    res.json({ success: true, preferences: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update preferences' });
+  }
+});
+
+app.get('/api/notifications/unsubscribe', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const token = String(req.query?.token || '').trim();
+    if (!token) {
+      res.status(400).json({ error: 'Unsubscribe token is required.' });
+      return;
+    }
+    const record = await getPreferencesByUnsubscribeToken(token);
+    if (!record) {
+      res.status(404).json({ error: 'Invalid or expired unsubscribe token.' });
+      return;
+    }
+    res.json({
+      success: true,
+      user: { name: record.name, email: record.email },
+      preferences: record.preferences
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/notifications/unsubscribe', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, category, all } = req.body || {};
+    if (!token) {
+      res.status(400).json({ error: 'Unsubscribe token is required.' });
+      return;
+    }
+    const record = await getPreferencesByUnsubscribeToken(token);
+    if (!record) {
+      res.status(404).json({ error: 'Invalid or expired unsubscribe token.' });
+      return;
+    }
+    let updates: any = {};
+    if (all) {
+      updates = {
+        communityReplies: false,
+        mentionsReactions: false,
+        followedDiscussions: false,
+        joinedCommunityActivity: false,
+        propertyRequirements: false,
+        platformAnnouncements: false
+      };
+    } else if (category) {
+      updates[category] = false;
+    }
+    const updated = await updateUserNotificationPreferences(record.userId, updates);
+    res.json({ success: true, preferences: updated, message: 'Notification preferences updated successfully.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

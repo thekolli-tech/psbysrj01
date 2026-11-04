@@ -3864,3 +3864,281 @@ export async function pgGetActiveCommunityMemberIds(communityId: string): Promis
   const res = await queryPostgres("SELECT user_id FROM community_members WHERE community_id = $1 AND status = 'ACTIVE'", [communityId]);
   return res.rows.map(r => r.user_id);
 }
+
+
+// ==============================================================================
+export interface UserNotificationPreferences {
+  userId: string;
+  communityReplies: boolean;
+  mentionsReactions: boolean;
+  followedDiscussions: boolean;
+  joinedCommunityActivity: boolean;
+  propertyRequirements: boolean;
+  platformAnnouncements: boolean;
+  unsubscribeToken: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DbEmailNotification {
+  id: string;
+  userId: string;
+  eventId: string;
+  notificationType: string;
+  category: string;
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  htmlBody: string;
+  textBody: string;
+  status: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED_PREFERENCE';
+  attempts: number;
+  lastError: string | null;
+  messageId: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmailNotificationInput {
+  userId: string;
+  eventId: string;
+  notificationType: string;
+  category: string;
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  htmlBody: string;
+  textBody: string;
+  status?: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED_PREFERENCE';
+  attempts?: number;
+  lastError?: string | null;
+  messageId?: string | null;
+  sentAt?: string | null;
+}
+
+// EMAIL NOTIFICATION SYSTEM & PREFERENCES (POSTGRESQL)
+// ==============================================================================
+
+export async function pgGetUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences> {
+  const res = await queryPostgres('SELECT * FROM user_notification_preferences WHERE user_id = $1', [userId]);
+  if (res.rows.length > 0) {
+    const row = res.rows[0];
+    return {
+      userId: row.user_id,
+      communityReplies: Boolean(row.community_replies),
+      mentionsReactions: Boolean(row.mentions_reactions),
+      followedDiscussions: Boolean(row.followed_discussions),
+      joinedCommunityActivity: Boolean(row.joined_community_activity),
+      propertyRequirements: Boolean(row.property_requirements),
+      platformAnnouncements: Boolean(row.platform_announcements),
+      unsubscribeToken: row.unsubscribe_token,
+      createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+      updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString()
+    };
+  }
+
+  // Generate sensible defaults
+  const token = crypto.randomBytes(24).toString('hex');
+  const now = new Date().toISOString();
+  await queryPostgres(`
+    INSERT INTO user_notification_preferences
+    (user_id, community_replies, mentions_reactions, followed_discussions, joined_community_activity, property_requirements, platform_announcements, unsubscribe_token, created_at, updated_at)
+    VALUES ($1, 1, 1, 1, 1, 1, 1, $2, $3, $4)
+    ON CONFLICT (user_id) DO NOTHING
+  `, [userId, token, now, now]);
+
+  return {
+    userId,
+    communityReplies: true,
+    mentionsReactions: true,
+    followedDiscussions: true,
+    joinedCommunityActivity: true,
+    propertyRequirements: true,
+    platformAnnouncements: true,
+    unsubscribeToken: token,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+export async function pgUpdateUserNotificationPreferences(
+  userId: string,
+  prefs: Partial<UserNotificationPreferences>
+): Promise<UserNotificationPreferences> {
+  const current = await pgGetUserNotificationPreferences(userId);
+  const now = new Date().toISOString();
+  const communityReplies = prefs.communityReplies !== undefined ? (prefs.communityReplies ? 1 : 0) : (current.communityReplies ? 1 : 0);
+  const mentionsReactions = prefs.mentionsReactions !== undefined ? (prefs.mentionsReactions ? 1 : 0) : (current.mentionsReactions ? 1 : 0);
+  const followedDiscussions = prefs.followedDiscussions !== undefined ? (prefs.followedDiscussions ? 1 : 0) : (current.followedDiscussions ? 1 : 0);
+  const joinedCommunityActivity = prefs.joinedCommunityActivity !== undefined ? (prefs.joinedCommunityActivity ? 1 : 0) : (current.joinedCommunityActivity ? 1 : 0);
+  const propertyRequirements = prefs.propertyRequirements !== undefined ? (prefs.propertyRequirements ? 1 : 0) : (current.propertyRequirements ? 1 : 0);
+  const platformAnnouncements = prefs.platformAnnouncements !== undefined ? (prefs.platformAnnouncements ? 1 : 0) : (current.platformAnnouncements ? 1 : 0);
+
+  await queryPostgres(`
+    INSERT INTO user_notification_preferences (
+      user_id, community_replies, mentions_reactions, followed_discussions, joined_community_activity, property_requirements, platform_announcements, unsubscribe_token, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    ON CONFLICT (user_id) DO UPDATE SET
+      community_replies = EXCLUDED.community_replies,
+      mentions_reactions = EXCLUDED.mentions_reactions,
+      followed_discussions = EXCLUDED.followed_discussions,
+      joined_community_activity = EXCLUDED.joined_community_activity,
+      property_requirements = EXCLUDED.property_requirements,
+      platform_announcements = EXCLUDED.platform_announcements,
+      updated_at = EXCLUDED.updated_at
+  `, [
+    userId, communityReplies, mentionsReactions, followedDiscussions, joinedCommunityActivity, propertyRequirements, platformAnnouncements,
+    current.unsubscribeToken, now, now
+  ]);
+
+  return pgGetUserNotificationPreferences(userId);
+}
+
+export async function pgGetPreferencesByUnsubscribeToken(token: string): Promise<{
+  userId: string;
+  email: string;
+  name: string;
+  preferences: UserNotificationPreferences;
+} | null> {
+  const res = await queryPostgres(`
+    SELECT p.*, u.email, u.name
+    FROM user_notification_preferences p
+    LEFT JOIN users u ON u.id = p.user_id
+    WHERE p.unsubscribe_token = $1
+  `, [token]);
+
+  if (res.rows.length === 0) return null;
+  const row = res.rows[0];
+  return {
+    userId: row.user_id,
+    email: row.email,
+    name: row.name,
+    preferences: {
+      userId: row.user_id,
+      communityReplies: Boolean(row.community_replies),
+      mentionsReactions: Boolean(row.mentions_reactions),
+      followedDiscussions: Boolean(row.followed_discussions),
+      joinedCommunityActivity: Boolean(row.joined_community_activity),
+      propertyRequirements: Boolean(row.property_requirements),
+      platformAnnouncements: Boolean(row.platform_announcements),
+      unsubscribeToken: row.unsubscribe_token,
+      createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+      updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString()
+    }
+  };
+}
+
+export async function pgRecordEmailNotification(data: CreateEmailNotificationInput): Promise<DbEmailNotification | null> {
+  const existing = await queryPostgres(
+    'SELECT * FROM email_notifications WHERE user_id = $1 AND event_id = $2',
+    [data.userId, data.eventId]
+  );
+  if (existing.rows.length > 0) {
+    return mapPgEmailNotification(existing.rows[0]);
+  }
+
+  const id = `eml_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+  const now = new Date().toISOString();
+
+  await queryPostgres(`
+    INSERT INTO email_notifications (
+      id, user_id, event_id, notification_type, category, recipient_email, recipient_name, subject, html_body, text_body, status, attempts, last_error, message_id, sent_at, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+    ON CONFLICT (user_id, event_id) DO NOTHING
+  `, [
+    id, data.userId, data.eventId, data.notificationType, data.category,
+    data.recipientEmail, data.recipientName, data.subject, data.htmlBody, data.textBody,
+    data.status || 'PENDING', data.attempts || 0, data.lastError || null, data.messageId || null, data.sentAt || null, now, now
+  ]);
+
+  const after = await queryPostgres(
+    'SELECT * FROM email_notifications WHERE user_id = $1 AND event_id = $2',
+    [data.userId, data.eventId]
+  );
+  return after.rows.length > 0 ? mapPgEmailNotification(after.rows[0]) : null;
+}
+
+export async function pgGetEmailNotificationByEvent(userId: string, eventId: string): Promise<DbEmailNotification | null> {
+  const res = await queryPostgres(
+    'SELECT * FROM email_notifications WHERE user_id = $1 AND event_id = $2',
+    [userId, eventId]
+  );
+  return res.rows.length > 0 ? mapPgEmailNotification(res.rows[0]) : null;
+}
+
+export async function pgUpdateEmailNotificationStatus(
+  id: string,
+  updates: { status: string; attempts?: number; lastError?: string | null; messageId?: string | null; sentAt?: string | null }
+): Promise<void> {
+  const now = new Date().toISOString();
+  await queryPostgres(`
+    UPDATE email_notifications
+    SET status = $1,
+        attempts = COALESCE($2, attempts),
+        last_error = $3,
+        message_id = COALESCE($4, message_id),
+        sent_at = COALESCE($5, sent_at),
+        updated_at = $6
+    WHERE id = $7
+  `, [
+    updates.status,
+    updates.attempts !== undefined ? updates.attempts : null,
+    updates.lastError || null,
+    updates.messageId || null,
+    updates.sentAt || null,
+    now,
+    id
+  ]);
+}
+
+export async function pgGetPendingEmailNotifications(limit = 20): Promise<DbEmailNotification[]> {
+  const res = await queryPostgres(`
+    SELECT * FROM email_notifications
+    WHERE (status = 'PENDING' OR status = 'FAILED') AND attempts < 5
+    ORDER BY created_at ASC
+    LIMIT $1
+  `, [limit]);
+  return res.rows.map(mapPgEmailNotification);
+}
+
+export async function pgGetPostFollowerUserIds(postId: string): Promise<string[]> {
+  const res = await queryPostgres('SELECT user_id FROM community_post_follows WHERE post_id = $1', [postId]);
+  return res.rows.map(r => r.user_id);
+}
+
+export async function pgFindUserByMention(mention: string): Promise<DbUser | null> {
+  if (!mention) return null;
+  const clean = mention.replace(/^@/, '').trim().toLowerCase();
+  if (!clean) return null;
+  const res = await queryPostgres(`
+    SELECT * FROM users
+    WHERE LOWER(REPLACE(name, ' ', '')) = $1
+       OR LOWER(name) = $1
+       OR LOWER(public_id) = $1
+    LIMIT 1
+  `, [clean]);
+  return res.rows.length > 0 ? (res.rows[0] as unknown as DbUser) : null;
+}
+
+function mapPgEmailNotification(row: any): DbEmailNotification {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    eventId: row.event_id,
+    notificationType: row.notification_type,
+    category: row.category,
+    recipientEmail: row.recipient_email,
+    recipientName: row.recipient_name,
+    subject: row.subject,
+    htmlBody: row.html_body,
+    textBody: row.text_body,
+    status: row.status,
+    attempts: Number(row.attempts || 0),
+    lastError: row.last_error || null,
+    messageId: row.message_id || null,
+    sentAt: row.sent_at ? new Date(row.sent_at).toISOString() : null,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString()
+  };
+}

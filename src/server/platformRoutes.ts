@@ -53,6 +53,7 @@ import {
   getProfessionalProfile,
   verifyPaymentWebhook
 } from './commerce.ts';
+import { sendRequirementNotification, sendProjectNotification } from './emailNotificationService.ts';
 import { createAuditLog, createNotification } from './db.ts';
 import { broadcastSseEvent } from './events.ts';
 
@@ -103,6 +104,12 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         targetId: listing.id,
         details: { publicationStatus: listing.publicationStatus }
       });
+      sendProjectNotification({
+        ownerId: req.user.id,
+        action: 'SUBMITTED',
+        listingTitle: listing.title,
+        listingId: listing.id
+      }).catch((err: any) => console.warn('[Property Studio Email] Project submission email failed:', err));
       res.status(201).json({ success: true, listing });
     } catch (err) {
       sendError(res, err);
@@ -156,6 +163,18 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
       if (!listing) {
         res.status(404).json({ error: 'Listing not found' });
         return;
+      }
+      if (status === 'APPROVED' || status === 'REJECTED') {
+        const ownerId = (listing as any).ownerId || (listing as any).owner_id;
+        if (ownerId) {
+          sendProjectNotification({
+            ownerId,
+            action: status as any,
+            listingTitle: listing.title,
+            listingId: listing.id,
+            reason: req.body?.reason
+          }).catch((err: any) => console.warn('[Property Studio Email] Project decision email failed:', err));
+        }
       }
       res.json({ success: true, listing });
     } catch (err) {
@@ -576,6 +595,14 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         return;
       }
       const requirement = await createRequirement(req.user.id, input);
+      sendRequirementNotification({
+        seekerId: req.user.id,
+        action: 'SUBMITTED',
+        requirementId: requirement.id,
+        propertyType: (requirement as any).property_type || (requirement as any).propertyType || 'Property Requirement',
+        location: requirement.location,
+        budget: requirement.budget
+      }).catch((err: any) => console.warn('[Property Studio Email] Requirement submission email failed:', err));
       res.status(201).json({ success: true, requirement });
     } catch (err) {
       sendError(res, err);
@@ -603,7 +630,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         title: 'Requirement Removed',
         message: `Your property requirement for ${deleted.propertyType} in ${deleted.location || 'Hyderabad'} has been successfully removed.`,
         linkUrl: '/dashboard'
-      }).catch(err => console.warn('[Property Studio] Notification error on requirement deletion:', err));
+      }).catch((err: any) => console.warn('[Property Studio] Notification error on requirement deletion:', err));
 
       await createAuditLog({
         actorId: req.user.id,
@@ -612,7 +639,7 @@ export function registerPlatformRoutes(app: Express, guards: { requireAuth: Guar
         action: 'REQUIREMENT_DELETED',
         targetId: reqId,
         details: { propertyType: deleted.propertyType, location: deleted.location }
-      }).catch(err => console.warn('[Property Studio] Audit log error on requirement deletion:', err));
+      }).catch((err: any) => console.warn('[Property Studio] Audit log error on requirement deletion:', err));
 
       broadcastSseEvent('REQUIREMENT_DELETED', { id: reqId, seekerId: req.user.id });
 
