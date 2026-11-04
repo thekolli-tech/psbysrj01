@@ -635,7 +635,7 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">My Topics & Interests (Quora Style)</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">My Topics & Interests</label>
                     <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200/80 rounded-xl max-h-36 overflow-y-auto">
                       {[
                         'Upcoming Residential Projects',

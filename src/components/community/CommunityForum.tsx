@@ -213,7 +213,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   const [replyInput, setReplyInput] = useState<Record<string, string>>({});
   const [isAmaAnswerInput, setIsAmaAnswerInput] = useState<Record<string, boolean>>({});
 
-  // Question Form State (Quora Style)
+  // Question Form State
   const [questionForm, setQuestionForm] = useState({
     title: '',
     context: '',
@@ -223,7 +223,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   const [duplicateWarning, setDuplicateWarning] = useState<{ exists: boolean; matches: Array<{ id: string; title: string; upvotes: number }> } | null>(null);
   const duplicateCheckTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Post Form State (Reddit / Quora Style)
+  // Post Form State
   const [postForm, setPostForm] = useState({
     title: '',
     content: '',
@@ -642,7 +642,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     }
   };
 
-  // Submit Question (Quora Style Modal with Module 9 Loading State)
+  // Submit Question
   const handleQuestionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!questionForm.title.trim()) {
@@ -684,7 +684,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     }
   };
 
-  // Submit Post (Reddit & Quora Style Modal)
+  // Submit Post
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!postForm.title.trim()) {
@@ -2105,7 +2105,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                         </div>
                       )}
 
-                      {/* Reddit & Quora Style Pill Action Bar (Reference Image 4) */}
+                      {/* Community Action Bar (Reference Image 4) */}
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 text-xs">
                         <div className="flex flex-wrap items-center gap-2">
                           {/* Upvote / Downvote Pill: [ ↑ score ↓ ] */}
@@ -2574,7 +2574,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               </button>
             </div>
 
-            {/* TAB 1: QUORA STYLE ADD QUESTION */}
+            {/* TAB 1: ADD QUESTION */}
             {unifiedTab === 'QUESTION' ? (
               <form onSubmit={handleQuestionSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
                 {/* Writing Tips Banner (Quora Reference Image 1) */}
@@ -2718,7 +2718,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                 </div>
               </form>
             ) : (
-              /* TAB 2: REDDIT & QUORA STYLE CREATE POST (Reference Images 2 & 3) */
+              /* TAB 2: CREATE POST (Reference Images 2 & 3) */
               <form onSubmit={handlePostSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
                 {/* Author row with credential pill and visibility */}
                 <div className="flex items-center justify-between gap-3">
