@@ -45,6 +45,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   const [nameInput, setNameInput] = useState('');
   const [roleInput, setRoleInput] = useState<'PROPERTY_SEEKER' | 'LANDOWNER' | 'CHANNEL_PARTNER' | 'RESELLER' | 'RERA_AGENT' | 'REAL_ESTATE_MEDIA'>('PROPERTY_SEEKER');
   const [phoneInput, setPhoneInput] = useState('');
@@ -57,6 +58,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     'Legal Due Diligence & RERA'
   ]);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const submitting = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -190,6 +192,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
     if (passwordInput.length < 6) {
       setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    if (passwordInput !== confirmPasswordInput) {
+      setErrorMsg('Passwords do not match. Please ensure both passwords match.');
       return;
     }
 
@@ -646,16 +653,59 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </span>
                   </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">Choose Password</label>
-                    <input
-                      type="password"
-                      value={passwordInput}
-                      onChange={e => setPasswordInput(e.target.value)}
-                      placeholder="Minimum 6 characters"
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      required
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                        Choose Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={passwordInput}
+                          onChange={e => setPasswordInput(e.target.value)}
+                          placeholder="Minimum 6 characters"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-9"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                        Confirm Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPasswordInput}
+                          onChange={e => setConfirmPasswordInput(e.target.value)}
+                          placeholder="Re-enter your password"
+                          className={`w-full px-3 py-2 text-xs border rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 pr-9 ${
+                            confirmPasswordInput && confirmPasswordInput !== passwordInput
+                              ? 'border-red-400 focus:ring-red-400 bg-red-50/40 text-red-900'
+                              : 'border-slate-300 focus:ring-amber-500'
+                          }`}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      {confirmPasswordInput && confirmPasswordInput !== passwordInput && (
+                        <span className="text-[10px] text-red-500 mt-0.5 block font-medium">Passwords do not match</span>
+                      )}
+                    </div>
                   </div>
 
                   <p className="text-[10px] text-slate-500 text-center leading-tight">

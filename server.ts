@@ -161,7 +161,8 @@ import {
 import { getLiveStreamingConfig, initializeBroadcastStream, sanitizeBroadcastForViewer } from './src/server/liveStreamService.ts';
 import { validateAvatarUpload } from './src/shared/avatar.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
-import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders, notifySuperAdminsOnSubmission, sendPasswordChangeConfirmation } from './src/server/notifications.ts';
+import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders, notifySuperAdminsOnSubmission,
+  sendSupportTicketNotification, sendPasswordChangeConfirmation } from './src/server/notifications.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
 import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
@@ -2067,6 +2068,9 @@ app.post('/api/community/posts/:id/upvote', requireAuth, requireUnrestricted, as
   }
 });
 
+
+const recentCommentDebounceMap = new Map<string, { comment: any; time: number }>();
+
 app.post('/api/community/posts/:id/reply', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const content = String(req.body?.content || '').trim();
@@ -2173,6 +2177,30 @@ app.get('/api/community/posts/:id/comments', requireAuth, async (req: Authentica
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Support Ticket Enquiry API
+app.post('/api/support/ticket', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name, email, phone, topic, message, ticketId } = req.body || {};
+    if (!name || !message) {
+      res.status(400).json({ error: 'Name and enquiry message are required.' });
+      return;
+    }
+    const cleanTicketId = ticketId || `PS-SUP-${Date.now().toString().slice(-6)}`;
+    await sendSupportTicketNotification({
+      ticketId: cleanTicketId,
+      name: String(name).trim(),
+      email: String(email || '').trim(),
+      phone: String(phone || '').trim(),
+      topic: String(topic || 'General Enquiry').trim(),
+      message: String(message).trim()
+    });
+    res.json({ success: true, ticketId: cleanTicketId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to submit enquiry' });
   }
 });
 

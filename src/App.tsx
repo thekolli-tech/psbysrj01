@@ -435,7 +435,7 @@ const AppContent: React.FC = () => {
                 </a>
                 <div className="flex items-start gap-2 text-slate-500">
                   <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                  <span>Secretariat · Western Corridor Financial District, Hyderabad</span>
+                  <span>Secretariat · Hyderabad and beyond, scaling to Global</span>
                 </div>
               </div>
             </div>

@@ -147,6 +147,41 @@ function maskPhoneNumber(phone?: string): string {
   return clean.slice(0, 5) + ' ●●●●● ' + clean.slice(-2);
 }
 
+const HYDERABAD_LOCALITIES = [
+  'Kokapet',
+  'Financial District / Nanakramguda',
+  'Gachibowli',
+  'Puppalaguda',
+  'Manikonda',
+  'Narsingi',
+  'Manchirevula',
+  'Miyapur',
+  'Tellapur',
+  'Kollur',
+  'Tukkuguda',
+  'Other Localities'
+];
+
+const POSSESSION_OPTIONS = [
+  'Ready to Move / Ready To Construct',
+  'Within 3 Months',
+  'Within 6 Months',
+  'Within 1 Year',
+  '1 - 1.6 Years',
+  '1.7 - 2.0 Years',
+  '2 - 3 Years',
+  '3 - 4 Years',
+  'More than 5 Years'
+];
+
+const PURCHASE_TIMELINES = [
+  'Immediately',
+  '1-3 Months',
+  '4-6 Months',
+  '6-9 Months',
+  'After 1 Year'
+];
+
 export const UserDashboard: React.FC = () => {
   const { currentUser, setActiveView, walletBalance, showToast, refreshSession, properties, constructionLogs, setSelectedMedia, mediaItems } = useApp();
 
@@ -220,8 +255,13 @@ export const UserDashboard: React.FC = () => {
   const [showRequirementForm, setShowRequirementForm] = useState(false);
   const [submittingRequirement, setSubmittingRequirement] = useState(false);
   const [reqPropertyType, setReqPropertyType] = useState<string>(PROPERTY_CATEGORY_GROUPS[0].options[0]);
-  const [reqLocation, setReqLocation] = useState('');
+  const [reqLocation, setReqLocation] = useState('Kokapet');
+  const [reqCustomLocation, setReqCustomLocation] = useState('');
   const [reqBudget, setReqBudget] = useState('');
+  const [reqSize, setReqSize] = useState('');
+  const [reqSizeUnit, setReqSizeUnit] = useState<'Sq. Ft.' | 'Sq. Yards'>('Sq. Ft.');
+  const [reqPossession, setReqPossession] = useState(POSSESSION_OPTIONS[0]);
+  const [reqTimeline, setReqTimeline] = useState(PURCHASE_TIMELINES[0]);
   const [reqDetails, setReqDetails] = useState('');
   const [requirementFormError, setRequirementFormError] = useState<string | null>(null);
   const [deletingRequirement, setDeletingRequirement] = useState<RequirementRecord | null>(null);
@@ -416,14 +456,29 @@ export const UserDashboard: React.FC = () => {
     setSubmittingRequirement(true);
 
     try {
+      const locationFinal = reqLocation === 'Other Localities'
+        ? (reqCustomLocation.trim() || 'Hyderabad')
+        : reqLocation.trim();
+      const budgetClean = reqBudget.trim();
+      const budgetFinal = budgetClean.toLowerCase().includes('cr')
+        ? budgetClean
+        : `₹${budgetClean} Cr`;
+
+      const detailParts = [
+        reqSize.trim() ? `Size: ${reqSize.trim()} ${reqSizeUnit}` : '',
+        `Possession: ${reqPossession}`,
+        `Timeline: ${reqTimeline}`,
+        reqDetails.trim()
+      ].filter(Boolean);
+
       const res = await fetch('/api/requirements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           propertyType: reqPropertyType,
-          location: reqLocation.trim(),
-          budget: reqBudget.trim(),
-          details: reqDetails.trim()
+          location: locationFinal,
+          budget: budgetFinal,
+          details: detailParts.join(' | ')
         })
       });
 
@@ -431,8 +486,9 @@ export const UserDashboard: React.FC = () => {
       if (!res.ok) throw new Error(data.error || 'Failed to submit requirement');
 
       showToast('Property requirement posted successfully!');
-      setReqLocation('');
       setReqBudget('');
+      setReqSize('');
+      setReqCustomLocation('');
       setReqDetails('');
       setShowRequirementForm(false);
       fetchRequirements();
@@ -1460,7 +1516,7 @@ export const UserDashboard: React.FC = () => {
               )}
 
               <form onSubmit={handleCreateRequirement} className="space-y-4">
-                <div className="grid sm:grid-cols-3 gap-4">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {/* Property Type from Catalog */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1484,49 +1540,138 @@ export const UserDashboard: React.FC = () => {
                     </select>
                   </div>
 
-                  {/* Location */}
+                  {/* Hyderabad Localities */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Target Location / Micro-market <span className="text-red-500">*</span>
+                      Hyderabad Locality <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={reqLocation}
                       onChange={e => setReqLocation(e.target.value)}
-                      placeholder="e.g. Kokapet, Financial District, Neopolis"
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                       required
+                    >
+                      {HYDERABAD_LOCALITIES.map(loc => (
+                        <option key={loc} value={loc}>
+                          {loc}
+                        </option>
+                      ))}
+                    </select>
+                    {reqLocation === 'Other Localities' && (
+                      <input
+                        type="text"
+                        value={reqCustomLocation}
+                        onChange={e => setReqCustomLocation(e.target.value)}
+                        placeholder="Specify locality name"
+                        className="mt-1.5 w-full px-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        required
+                      />
+                    )}
+                  </div>
+
+                  {/* Budget in Crores */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Budget (in ₹ Crores) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={reqBudget}
+                        onChange={e => setReqBudget(e.target.value)}
+                        placeholder="e.g. 1.5 Cr or 2.25"
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Property Size with Unit Toggle */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-slate-700">Property Size</label>
+                      <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setReqSizeUnit('Sq. Ft.')}
+                          className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                            reqSizeUnit === 'Sq. Ft.' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          Sq. Ft.
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReqSizeUnit('Sq. Yards')}
+                          className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                            reqSizeUnit === 'Sq. Yards' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          Sq. Yards
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={reqSize}
+                      onChange={e => setReqSize(e.target.value)}
+                      placeholder={`e.g. 2400 (${reqSizeUnit})`}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
 
-                  {/* Budget */}
+                  {/* Possession */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Budget Range <span className="text-red-500">*</span>
+                      Possession <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      value={reqBudget}
-                      onChange={e => setReqBudget(e.target.value)}
-                      placeholder="e.g. ₹1.5 Cr – ₹2.5 Cr"
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    <select
+                      value={reqPossession}
+                      onChange={e => setReqPossession(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                       required
-                    />
+                    >
+                      {POSSESSION_OPTIONS.map(opt => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Purchase Timeline */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Timeline of Purchase <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={reqTimeline}
+                      onChange={e => setReqTimeline(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      required
+                    >
+                      {PURCHASE_TIMELINES.map(t => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
                 {/* Details */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Specific Requirements & Preferences <span className="text-red-500">*</span>
+                    Specific Requirements & Preferences
                   </label>
                   <textarea
                     value={reqDetails}
                     onChange={e => setReqDetails(e.target.value)}
                     rows={3}
-                    placeholder="Specify configurations (e.g. 3 BHK, 2400 sq.ft., East-facing, possession within 12 months, high floor preferred)..."
+                    placeholder="Specify configurations (e.g. East-facing, high floor, Vaastu compliant, gated society preferred)..."
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    required
                   />
                 </div>
 

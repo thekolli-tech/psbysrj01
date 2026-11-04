@@ -1366,6 +1366,42 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                     </span>
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      onOpenLoginModal?.();
+                    } else if (activeCommunity && !canAccessSelectedCommunity) {
+                      showToast('You must be an approved member of this private community to ask questions.');
+                    } else {
+                      setUnifiedTab('QUESTION');
+                      setShowModal('UNIFIED');
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>+ Ask Question in this Hub</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      onOpenLoginModal?.();
+                    } else if (activeCommunity && !canAccessSelectedCommunity) {
+                      showToast('You must be an approved member of this private community to create posts.');
+                    } else {
+                      setUnifiedTab('POST');
+                      setShowModal('UNIFIED');
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5 text-amber-400" />
+                  <span>+ Create Post</span>
+                </button>
               </div>
             </div>
 
@@ -2325,16 +2361,29 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                       : 'Be the first to ask about construction milestones, structural title clearances, or micro-market rate audits.'}
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    setUnifiedTab('QUESTION');
-                    setShowModal('UNIFIED');
-                  }}
-                  className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors inline-flex items-center gap-2 cursor-pointer"
-                >
-                  <PlusCircle className="w-4 h-4 text-amber-400" />
-                  <span>Start First Discussion</span>
-                </button>
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (questionQuery.trim()) {
+                        setQuestionForm(prev => ({
+                          ...prev,
+                          title: questionQuery.trim()
+                        }));
+                      }
+                      setUnifiedTab('QUESTION');
+                      setShowModal('UNIFIED');
+                    }}
+                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>
+                      {questionQuery.trim()
+                        ? `+ Ask "${questionQuery.trim().slice(0, 30)}${questionQuery.trim().length > 30 ? '...' : ''}" in ${activeCommunity ? activeCommunity.name : 'Community'} now!`
+                        : `+ Ask Question in ${activeCommunity ? activeCommunity.name : 'Community'}`}
+                    </span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -2568,6 +2617,30 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                         <option key={t} value={t}>{t}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                
+                {/* Forum Category Selector */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
+                    Community Forum Category
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(['General', 'Society / Project', 'Colony', 'Locality'] as const).map(cat => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setQuestionForm(prev => ({ ...prev, forumCategory: cat }))}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                          (questionForm as any).forumCategory === cat
+                            ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
                   </div>
                 </div>
 

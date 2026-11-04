@@ -338,6 +338,35 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
     }
   };
 
+  const getRoleDetails = (role: string) => {
+    switch (role) {
+      case 'SUPER_ADMIN':
+        return { label: 'Super Admin', desc: 'Global platform governance & credentials' };
+      case 'PROPERTY_ADMIN':
+        return { label: 'Property Admin', desc: 'Listing and project regulatory manager' };
+      case 'DEVELOPER':
+        return { label: 'Developer / Builder', desc: 'Primary project developer & showcase lead' };
+      case 'AGENT':
+      case 'RERA_AGENT':
+        return { label: 'RERA Agent', desc: 'Certified real estate advisory and facilitation' };
+      case 'CHANNEL_PARTNER':
+        return { label: 'Channel Partner', desc: 'Authorized mandate and distribution partner' };
+      case 'RESELLER':
+        return { label: 'Reseller', desc: 'Secondary marketplace & portfolio sales' };
+      case 'LAND_OWNER':
+      case 'LANDOWNER':
+        return { label: 'Landowner / Investor', desc: 'Joint developments & strategic parcels' };
+      case 'REAL_ESTATE_MEDIA':
+      case 'CONTENT_CREATOR':
+        return { label: 'Real Estate Media', desc: 'Ground journalism, podcasts & walkthroughs' };
+      case 'PROPERTY_SEEKER':
+      default:
+        return { label: 'Property Seeker', desc: 'Verified buyer, tenant & community investor' };
+    }
+  };
+
+  const roleInfo = getRoleDetails(currentUser.role);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] my-auto">
@@ -412,11 +441,11 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                     )}
                   </div>
 
-                  <div className="space-y-1 flex-1 min-w-0">
+                  <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                       <span className="text-sm sm:text-base font-bold text-slate-900 break-words leading-tight">{currentUser.name}</span>
                       <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-mono font-bold rounded-full bg-amber-100 text-amber-900 border border-amber-200 shrink-0">
-                        {currentUser.role.replace(/_/g, ' ')}
+                        {roleInfo.label}
                       </span>
                     </div>
                     <div className="text-xs text-slate-600 flex items-center gap-1.5 truncate">
@@ -429,6 +458,17 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                         <span>{currentUser.phone}</span>
                       </div>
                     )}
+                    <div className="pt-1.5 text-[11px] text-slate-600 space-y-1 border-t border-slate-100 mt-1">
+                      <div>
+                        <span className="font-bold text-slate-700">Role for Property Studio: </span>
+                        <span className="font-bold text-amber-800">{roleInfo.label}</span>
+                        <span className="text-slate-400 text-[10px] block sm:inline sm:ml-1">({roleInfo.desc})</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-700">Profession: </span>
+                        <span className="font-semibold text-slate-900">{currentUser.profession || profession || 'Not specified'}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -498,22 +538,30 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
                     <p className="mt-1 text-[11px] text-slate-500">Profession is a description. It does not change your account role.</p>
                   </div>
                   <div>
-                    <label htmlFor="profile-company" className="block text-xs font-bold text-slate-700 mb-1">Company / Organization</label>
+                    <label htmlFor="profile-company" className="block text-xs font-bold text-slate-700 mb-1">Current Company / Organization</label>
                     <input
                       id="profile-company"
                       value={company}
                       onChange={e => setCompany(e.target.value)}
                       maxLength={80}
-                      placeholder="e.g. Kolli Ventures / Independent"
+                      placeholder="e.g. Tata Consultancy Services, Infosys, Sadguna Properties"
                       className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">My Topics & Interests (Quora Style)</label>
-                    <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200/80 rounded-xl max-h-32 overflow-y-auto">
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200/80 rounded-xl max-h-36 overflow-y-auto">
                       {[
+                        'Upcoming Residential Projects',
+                        'Upcoming Commercial Projects',
+                        'Rental Properties',
+                        'Commercial Retail Space',
+                        'Commercial A Grade Office Space',
+                        'Just Launched Residential RERA Approved Projects',
+                        'Investment Opportunities',
+                        'Hi-Rise Gated Communities',
+                        'Home Solutions',
                         'Kokapet & Neopolis',
-                        'High-Rise Construction',
                         'Legal Due Diligence & RERA',
                         'Rental Yield & ROI',
                         'Luxury Villas & Communities',

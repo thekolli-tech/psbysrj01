@@ -157,6 +157,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [livePosts, setLivePosts] = useState<ManagedPost[]>([]);
   const [postSearch, setPostSearch] = useState('');
   const [postTopicFilter, setPostTopicFilter] = useState<string>('ALL');
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(false);
 
   // Super Admin Password Update state
@@ -1749,12 +1750,16 @@ export const SuperAdminDashboard: React.FC = () => {
               className="px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
             >
               <option value="ALL">All Roles</option>
-              <option value="SUPER_ADMIN">Super Admin</option>
-              <option value="PROPERTY_ADMIN">Property Admin</option>
-              <option value="DEVELOPER">Developer / MD</option>
-              <option value="AGENT">RERA Agent</option>
               <option value="PROPERTY_SEEKER">Property Seeker</option>
-              <option value="LAND_OWNER">Land Owner</option>
+              <option value="LAND_OWNER">Landowner / Investor</option>
+              <option value="CHANNEL_PARTNER">Channel Partner</option>
+              <option value="RESELLER">Reseller</option>
+              <option value="AGENT">RERA Agent</option>
+              <option value="CONTENT_CREATOR">Real Estate Media</option>
+              <option value="DEVELOPER">Developer / MD</option>
+              <option value="PROPERTY_ADMIN">Property Admin</option>
+              <option value="SUPER_ADMIN">Super Admin</option>
+              <option value="COMMUNITY_MODERATOR">Community Moderator</option>
             </select>
           </div>
 
@@ -1954,6 +1959,16 @@ export const SuperAdminDashboard: React.FC = () => {
                   key={p.id}
                   className="p-5 rounded-2xl border border-slate-200 hover:border-slate-300 transition-all bg-white space-y-3"
                 >
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                    <span className="text-[10px] font-mono text-slate-400">Post ID: {p.id}</span>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedPostId(expandedPostId === p.id ? null : p.id)}
+                      className="text-[11px] font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      {expandedPostId === p.id ? 'Collapse Details ▲' : 'Expand Details / Poll ▼'}
+                    </button>
+                  </div>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center font-bold text-xs">
@@ -2034,6 +2049,46 @@ export const SuperAdminDashboard: React.FC = () => {
                     <h4 className="text-sm font-bold text-slate-900 inline mt-1">{p.title}</h4>
                     <p className="text-xs text-slate-600 mt-1 leading-relaxed">{p.content}</p>
                   </div>
+
+                  {/* Expanded Post Inspection */}
+                  {expandedPostId === p.id && (
+                    <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-3 text-xs animate-in fade-in duration-150">
+                      <div className="grid sm:grid-cols-2 gap-3 pb-2 border-b border-slate-200">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Author Details</span>
+                          <span className="font-bold text-slate-900">{p.authorName}</span>
+                          <span className="text-slate-500 text-[11px] block font-mono">Role: {p.authorRole}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Thread Placement</span>
+                          <span className="font-bold text-slate-900">Topic: {p.topic}</span>
+                          {p.propertyName && <span className="text-slate-500 text-[11px] block">Project: {p.propertyName}</span>}
+                        </div>
+                      </div>
+
+                      {/* Poll Inspection if present */}
+                      {(p as any).pollOptions && (p as any).pollOptions.length > 0 && (
+                        <div className="space-y-2 pt-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 font-mono">
+                            Poll Voting Statistics:
+                          </span>
+                          <div className="space-y-1.5">
+                            {(p as any).pollOptions.map((opt: any) => {
+                              const votes = Number(opt.votes || 0);
+                              return (
+                                <div key={opt.id} className="p-2 bg-white border border-slate-200 rounded-xl flex items-center justify-between">
+                                  <span className="font-medium text-slate-800">{opt.text}</span>
+                                  <span className="font-mono font-bold text-amber-700 text-[11px] bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                    {votes} vote{votes === 1 ? '' : 's'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Replies Preview */}
                   {p.replies && p.replies.length > 0 && (
@@ -2502,11 +2557,16 @@ export const SuperAdminDashboard: React.FC = () => {
                   onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value as any })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white"
                 >
-                  <option value="AGENT">RERA Agent</option>
-                  <option value="PROPERTY_ADMIN">Property Admin</option>
-                  <option value="DEVELOPER">Developer / MD</option>
                   <option value="PROPERTY_SEEKER">Property Seeker (HNI / Buyer)</option>
-                  <option value="LAND_OWNER">Land Owner</option>
+                  <option value="LAND_OWNER">Landowner / Investor</option>
+                  <option value="CHANNEL_PARTNER">Channel Partner</option>
+                  <option value="RESELLER">Reseller</option>
+                  <option value="AGENT">RERA Agent</option>
+                  <option value="CONTENT_CREATOR">Real Estate Media</option>
+                  <option value="DEVELOPER">Developer / MD</option>
+                  <option value="PROPERTY_ADMIN">Property Admin</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
+                  <option value="COMMUNITY_MODERATOR">Community Moderator</option>
                 </select>
               </div>
               <div>

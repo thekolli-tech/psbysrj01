@@ -174,10 +174,10 @@ export const OverviewFoundation: React.FC = () => {
                   <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/60 space-y-2">
                     <div className="flex items-center gap-2 text-amber-700 font-bold text-xs">
                       <Award className="w-4 h-4 shrink-0" />
-                      <span>4. REVIEW / RATING — Performance Index & Ratings</span>
+                      <span>4. REVIEW / RATING — Project & Stakeholder Reviews and Ratings (Performance Index)</span>
                     </div>
                     <p className="text-xs text-slate-600 leading-normal">
-                      Transparent, multi-dimensional rating and review framework evaluating builders, developers, channel partners, and individual projects, emphasizing verified buyer and resident experiences.
+                      Transparent, multi-dimensional rating and review framework evaluating builders, developers, channel partners, localities, societies, and individual projects, emphasizing verified buyer and resident experiences.
                     </p>
                     <div className="pt-2 border-t border-slate-200/60 space-y-1">
                       <p className="text-[11px] text-slate-500 font-medium">
@@ -458,35 +458,90 @@ export const OverviewFoundation: React.FC = () => {
               id="section-content-core-dna"
               role="region"
               aria-labelledby="heading-core-dna"
-              className="px-5 pb-6 sm:px-6 sm:pb-8 pt-2 border-t border-slate-100 text-sm text-slate-700 leading-relaxed animate-in fade-in duration-200"
+              className="px-5 pb-6 sm:px-6 sm:pb-8 pt-2 border-t border-slate-100 text-sm text-slate-700 leading-relaxed animate-in fade-in duration-200 space-y-6"
             >
-              <p className="mb-4">
-                The institutional DNA of Property Studio is defined by six non-negotiable operational pillars:
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
-                  <span className="text-xs font-bold text-slate-900 block font-display">1. Uncompromising Trust</span>
-                  <p className="text-xs text-slate-600">Every project claim is held to objective layout and regulatory verification standards.</p>
+              {/* PROPERTY STUDIO POSITIONING — THE CORE DNA */}
+              <div className="bg-linear-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 rounded-2xl p-4 sm:p-5">
+                <div className="inline-block px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-mono font-black uppercase tracking-wider mb-2">
+                  Brand Positioning Framework
                 </div>
-                <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
-                  <span className="text-xs font-bold text-slate-900 block font-display">2. Radical Transparency</span>
-                  <p className="text-xs text-slate-600">Democratizing market data and unedited citizen discussions on project performance.</p>
+                <h4 className="text-base sm:text-lg font-black text-slate-950 font-display">
+                  PROPERTY STUDIO POSITIONING — THE CORE DNA
+                </h4>
+                <p className="text-xs text-slate-600 mt-1 max-w-2xl">
+                  Property Studio is anchored on two foundational strategic frameworks: the <strong>6 I&apos;s of PropTech Architecture</strong> and the <strong>6 R&apos;s of Institutional Trust</strong>.
+                </p>
+              </div>
+
+              {/* The 6 I's */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 font-mono font-black text-xs flex items-center justify-center">6I</span>
+                  <h5 className="text-xs font-bold font-mono uppercase tracking-wider text-amber-900">
+                    The 6 I&apos;s — Platform Architecture
+                  </h5>
                 </div>
-                <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
-                  <span className="text-xs font-bold text-slate-900 block font-display">3. Absolute Privacy</span>
-                  <p className="text-xs text-slate-600">Encrypted data masking strips phone numbers and personal metrics from unwanted broker databases.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">1. Interactive</span>
+                    <p className="text-xs text-slate-600">Dynamic walkthroughs, member Q&amp;A sessions, and participatory summits.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">2. Informative</span>
+                    <p className="text-xs text-slate-600">Verified RERA data, unedited cost schedules, and deep micro-market ground reports.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">3. Intelligent</span>
+                    <p className="text-xs text-slate-600">AI discovery algorithms, smart search filters, and comparative property telemetry.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">4. Interview</span>
+                    <p className="text-xs text-slate-600">Candid studio debriefs with founders, developers, urban planners, and residents.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">5. Intermediary</span>
+                    <p className="text-xs text-slate-600">An unbiased institutional bridge uniting seekers, landowners, and builders.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">6. All Integrated</span>
+                    <p className="text-xs text-slate-600">Search engine, video media, community forums, reviews, and network in one roof.</p>
+                  </div>
                 </div>
-                <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
-                  <span className="text-xs font-bold text-slate-900 block font-display">4. Data-Driven Decisions</span>
-                  <p className="text-xs text-slate-600">Replacing transactional marketing hype with vector blueprint audits, SWOT matrices, and true cost calculations.</p>
+              </div>
+
+              {/* The 6 R's */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-slate-900 text-amber-400 font-mono font-black text-xs flex items-center justify-center">6R</span>
+                  <h5 className="text-xs font-bold font-mono uppercase tracking-wider text-slate-900">
+                    The 6 R&apos;s — Operational Tenets
+                  </h5>
                 </div>
-                <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
-                  <span className="text-xs font-bold text-slate-900 block font-display">5. Mutual Accountability</span>
-                  <p className="text-xs text-slate-600">Certified badges for verified professionals and open question channels for developer accountability.</p>
-                </div>
-                <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
-                  <span className="text-xs font-bold text-slate-900 block font-display">6. Stakeholder Collaboration</span>
-                  <p className="text-xs text-slate-600">A cooperative PropTech arena uniting buyers, developers, landowners, and agents on equal footing.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">1. Real-time</span>
+                    <p className="text-xs text-slate-600">Live property telemetry, instant SSE alerts, and immediate secretariat response.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">2. Realistic</span>
+                    <p className="text-xs text-slate-600">Transparent on-ground pricing, unedited photos, and objective timeline tracking.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">3. Revolutionary</span>
+                    <p className="text-xs text-slate-600">Encrypted data masking shielding phone numbers and email from broker spam.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">4. Reviews</span>
+                    <p className="text-xs text-slate-600">Unfiltered resident and verified buyer testimonials on real-world livability.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">5. Rating</span>
+                    <p className="text-xs text-slate-600">Performance Index measuring build quality, compliance, and developer delivery.</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-1">
+                    <span className="text-xs font-bold text-slate-900 block font-display">6. Referral</span>
+                    <p className="text-xs text-slate-600">Organic stakeholder advocacy driven by uncompromised trust and satisfaction.</p>
+                  </div>
                 </div>
               </div>
             </div>

@@ -38,12 +38,12 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
 
   const [activeTab, setActiveTab] = useState<'CONTACT' | 'TICKET' | 'FAQ'>('CONTACT');
   const [ticketTopic, setTicketTopic] = useState<string>(
-    initialContext ? 'Video Audit Inquiry' : 'Project Regulatory Audit & TS-RERA Check'
+    initialContext ? 'Video Audit Enquiry' : 'Project Regulatory Audit & TS-RERA Check'
   );
   const [name, setName] = useState(currentUser?.name || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [email, setEmail] = useState(currentUser?.email || '');
-  const [message, setMessage] = useState(initialContext ? `Inquiry regarding: ${initialContext}` : '');
+  const [message, setMessage] = useState(initialContext ? `Enquiry regarding: ${initialContext}` : '');
   const [isMasked, setIsMasked] = useState(true);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [ticketId, setTicketId] = useState('');
@@ -51,17 +51,38 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmitTicket = (e: React.FormEvent) => {
+  const [submittingTicket, setSubmittingTicket] = useState(false);
+
+  const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !message.trim()) {
-      showToast('Please provide your name and inquiry details.');
+      showToast('Please provide your name and enquiry details.');
       return;
     }
 
     const generatedId = `PS-SUP-${Date.now().toString().slice(-6)}`;
-    setTicketId(generatedId);
-    setIsSubmitted(true);
-    showToast(`Support ticket ${generatedId} logged with Official Secretariat.`);
+    setSubmittingTicket(true);
+    try {
+      await fetch('/api/support/ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketId: generatedId,
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          topic: ticketTopic,
+          message: message.trim()
+        })
+      });
+    } catch (err) {
+      console.warn('Support ticket dispatch:', err);
+    } finally {
+      setSubmittingTicket(false);
+      setTicketId(generatedId);
+      setIsSubmitted(true);
+      showToast(`Support ticket ${generatedId} logged with Official Secretariat.`);
+    }
   };
 
   const handleResetForm = () => {
@@ -134,7 +155,7 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                 : 'hover:text-slate-900'
             }`}
           >
-            Submit Inquiry
+            Submit Enquiry
           </button>
           <button
             onClick={() => setActiveTab('FAQ')}
@@ -250,10 +271,10 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <h3 className="text-base font-extrabold text-slate-900 font-display">
-                    Support Inquiry Received
+                    Support Enquiry Received
                   </h3>
                   <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
-                    Your inquiry has been assigned ticket reference{' '}
+                    Your enquiry has been assigned ticket reference{' '}
                     <strong className="font-mono text-emerald-800">{ticketId}</strong>. Swamy Reddy Javidi’s secretariat will evaluate your parameters within 4 hours.
                   </p>
                   <div className="pt-2">
@@ -261,14 +282,14 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                       onClick={handleResetForm}
                       className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors"
                     >
-                      Submit Another Inquiry
+                      Submit Another Enquiry
                     </button>
                   </div>
                 </div>
               ) : (
                 <form onSubmit={handleSubmitTicket} className="space-y-3.5">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Inquiry Category</label>
+                    <label className="block font-bold text-slate-700 mb-1">Enquiry Category</label>
                     <select
                       value={ticketTopic}
                       onChange={e => setTicketTopic(e.target.value)}
@@ -278,7 +299,7 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                       <option>Anonymous Buyer Requirement Submission</option>
                       <option>Developer Community Space Claim</option>
                       <option>Elite Agent Verification & Badge</option>
-                      <option>Studio Broadcast Inquiry</option>
+                      <option>Studio Broadcast Enquiry</option>
                       <option>Technical / Platform Assistance</option>
                     </select>
                   </div>
@@ -319,7 +340,7 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Inquiry Details</label>
+                    <label className="block font-bold text-slate-700 mb-1">Enquiry Details</label>
                     <textarea
                       value={message}
                       onChange={e => setMessage(e.target.value)}

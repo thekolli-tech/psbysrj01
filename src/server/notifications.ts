@@ -283,6 +283,29 @@ export async function notifySuperAdminsOnSubmission(data: {
     });
 
     console.log('[Property Studio] Super Admin notification dispatched. In-app: ok. WhatsApp status:', alertResult.status);
+    const apiKey = (process.env.RESEND_API_KEY || '').trim().replace(/^["']\s*|\s*["']$/g, '');
+    if (apiKey) {
+      const from = emailFromAddress();
+      fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from,
+          to: ['info@propertystudio.org'],
+          subject: `[Property Studio Community] ${notificationTitle}: "${data.title}"`,
+          html: `<h2>${notificationTitle}</h2>
+<p><strong>Title:</strong> ${data.title}</p>
+<p><strong>Submitted by:</strong> ${data.submitterName} (${data.submitterRole})</p>
+<p><strong>Community Hub:</strong> ${data.communityName || 'General Community'}</p>
+<p><strong>Action:</strong> <a href="https://psbysrj01.vercel.app/admin?tab=MODERATION">Review and Moderate in Admin Console</a></p>`,
+          text: `${notificationTitle}\n\nTitle: ${data.title}\nBy: ${data.submitterName} (${data.submitterRole})\nReview: https://psbysrj01.vercel.app/admin?tab=MODERATION`
+        })
+      }).catch(err => console.warn('[Property Studio] Community email alert dispatch failed:', err));
+    }
+
   } catch (err: any) {
     console.warn('[Property Studio] Error in notifySuperAdminsOnSubmission:', err?.message || err);
   }
@@ -327,5 +350,44 @@ export async function notifyAuthorOnModerationDecision(data: {
     } catch {}
   } catch (err: any) {
     console.warn('[Property Studio] Error in notifyAuthorOnModerationDecision:', err?.message || err);
+  }
+}
+
+export async function sendSupportTicketNotification(ticket: {
+  ticketId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  topic: string;
+  message: string;
+}): Promise<void> {
+  const apiKey = (process.env.RESEND_API_KEY || '').trim().replace(/^["']\s*|\s*["']$/g, '');
+  if (!apiKey) return;
+  const from = emailFromAddress();
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from,
+        to: ['info@propertystudio.org'],
+        subject: `[Property Studio Support] ${ticket.ticketId}: ${ticket.topic} from ${ticket.name}`,
+        html: `<h2>New Support Enquiry Logged</h2>
+<p><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
+<p><strong>Name:</strong> ${ticket.name}</p>
+<p><strong>Email:</strong> ${ticket.email}</p>
+<p><strong>Phone:</strong> ${ticket.phone || 'Not provided'}</p>
+<p><strong>Category:</strong> ${ticket.topic}</p>
+<p><strong>Enquiry Message:</strong></p>
+<blockquote style="background:#f8f9fa;padding:12px;border-left:4px solid #d97706">${ticket.message}</blockquote>
+<p style="font-size:12px;color:#666">Submitted via Property Studio Official Secretariat</p>`,
+        text: `New Support Enquiry Logged\n\nTicket: ${ticket.ticketId}\nName: ${ticket.name}\nEmail: ${ticket.email}\nPhone: ${ticket.phone || 'N/A'}\nTopic: ${ticket.topic}\n\nMessage:\n${ticket.message}`
+      })
+    });
+  } catch (err) {
+    console.warn('[Property Studio] Support ticket email dispatch failed:', err);
   }
 }

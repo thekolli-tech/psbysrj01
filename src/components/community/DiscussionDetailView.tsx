@@ -67,6 +67,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
 
   // Engagement state for the main post
   const [userVote, setUserVote] = useState<number>(post?.userVote ?? 0);
+  const [threadRating, setThreadRating] = useState<number>(5);
   const [agreeCount, setAgreeCount] = useState<number>(post?.agreeCount ?? 0);
   const [disagreeCount, setDisagreeCount] = useState<number>(post?.disagreeCount ?? 0);
   const [isBookmarked, setIsBookmarked] = useState<boolean>(Boolean(post?.bookmarked));
@@ -94,6 +95,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
   const [topCommentText, setTopCommentText] = useState('');
   const [topCommentIsAma, setTopCommentIsAma] = useState(false);
   const [isSubmittingTopComment, setIsSubmittingTopComment] = useState(false);
+  const submittingTopRef = useRef(false);
   const [topCommentError, setTopCommentError] = useState<string | null>(null);
 
   // Inline reply composer state
@@ -447,6 +449,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
   // Top-Level Comment Submission
   const handleTopCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingTopRef.current) return;
     const trimmed = topCommentText.trim();
     if (!trimmed) return;
     if (!isLoggedIn) {
@@ -454,6 +457,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
       onOpenLoginModal?.();
       return;
     }
+    submittingTopRef.current = true;
     setIsSubmittingTopComment(true);
     setTopCommentError(null);
 
@@ -474,13 +478,17 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
       setTopCommentIsAma(false);
 
       if (data.comment) {
-        setComments(prev => [data.comment, ...prev]);
+        setComments(prev => {
+          if (prev.some(c => c.id === data.comment.id)) return prev;
+          return [data.comment, ...prev];
+        });
         setTotalComments(c => c + 1);
       }
       refreshPosts();
     } catch (err: any) {
       setTopCommentError(err.message || 'Failed to submit comment');
     } finally {
+      submittingTopRef.current = false;
       setIsSubmittingTopComment(false);
     }
   };
@@ -948,6 +956,39 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
               <span>{repostsCount}</span>
               <span className="hidden sm:inline">{isRepostingPost ? 'Reposting...' : hasReposted ? 'Reposted' : 'Repost'}</span>
             </button>
+
+            {/* 5-Star Discussion Quality Rating */}
+            <div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-amber-50/70 border border-amber-200 text-xs text-amber-900 font-semibold">
+              <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider mr-1 hidden sm:inline">Thread Quality:</span>
+              {[1, 2, 3, 4, 5].map(star => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      showToast('Please sign in to rate this discussion.');
+                      onOpenLoginModal?.();
+                      return;
+                    }
+                    setThreadRating(star);
+                    showToast(`Rated discussion ${star} out of 5 stars!`);
+                  }}
+                  title={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                  className="cursor-pointer hover:scale-110 transition-transform p-0.5"
+                >
+                  <Star
+                    className={`w-3.5 h-3.5 ${
+                      star <= threadRating
+                        ? 'fill-amber-400 text-amber-500'
+                        : 'text-slate-300 hover:text-amber-300'
+                    }`}
+                  />
+                </button>
+              ))}
+              {threadRating > 0 && (
+                <span className="text-[10px] font-mono font-bold text-amber-800 ml-1">({threadRating}.0)</span>
+              )}
+            </div>
 
             {/* Bookmark Pill */}
             <button

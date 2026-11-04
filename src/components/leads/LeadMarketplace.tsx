@@ -433,7 +433,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
       {/* Modal: Post New Buyer Lead */}
       {isPostLeadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <ShieldCheck className="w-5 h-5 text-amber-400" />
@@ -449,7 +449,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
               </button>
             </div>
 
-            <form onSubmit={handlePostLead} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handlePostLead} className="p-6 space-y-4 text-xs flex-1 overflow-y-auto">
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Buyer / Seeker Full Name</label>
                 <input
