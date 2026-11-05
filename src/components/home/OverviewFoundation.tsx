@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, Building2, User, Eye, Compass, ShieldCheck, Layers, Tv, MessageSquare, Award, Radio } from 'lucide-react';
+import { ChevronDown, Building2, User, Eye, Compass, ShieldCheck, Layers, Tv, MessageSquare, Award, Radio, Play } from 'lucide-react';
 
 export const OVERVIEW_FOUNDATION_SECTIONS = [
   {
@@ -65,7 +65,8 @@ export const OverviewFoundation: React.FC = () => {
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="lg:col-span-7 space-y-4">
         {/* Section 1: About Property Studio */}
         <div className="bg-white border border-slate-200 rounded-3xl shadow-xs overflow-hidden transition-all">
           <button
@@ -546,6 +547,38 @@ export const OverviewFoundation: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+        </div>
+
+        {/* Right 5 Cols: Architectural Video Media Facade matching Reference Screenshot */}
+        <div className="lg:col-span-5 sticky top-24 space-y-4">
+          <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200 aspect-[4/5] bg-slate-900 group">
+            <img
+              src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1000&q=80"
+              alt="About Property Studio Facade"
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="w-20 h-20 rounded-full bg-white/95 text-slate-950 flex items-center justify-center shadow-2xl group-hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer backdrop-blur-sm"
+                title="Play Platform Overview Film"
+              >
+                <Play className="w-8 h-8 fill-current ml-1 text-slate-900" />
+              </div>
+            </div>
+            <div className="absolute bottom-6 left-6 right-6 text-white space-y-1.5">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400 bg-slate-950/80 px-2.5 py-1 rounded-full border border-amber-500/30 inline-block">
+                Executive Film Tour
+              </span>
+              <h4 className="text-base font-bold leading-snug drop-shadow-md">
+                The PropTech Ecosystem Unveiled by Swamy Reddy Javidi
+              </h4>
+              <p className="text-xs text-slate-300 line-clamp-2">
+                Discover the 5-pillar conglomerate unifying property discovery, broadcast journalism, and regulatory telemetry.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </section>

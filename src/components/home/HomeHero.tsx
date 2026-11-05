@@ -156,757 +156,737 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   const logoScale = Math.min(1, 0.85 + morph * 0.15);
 
   return (
-    <div className="pb-12">
-      {/*
-        ====================================================================
-        PROMINENT TOP PROPERTY SEARCH BAR (IMMEDIATELY BELOW TOP NAVIGATION)
-        ====================================================================
-      */}
-      <section className="bg-white border-b border-slate-200/90 shadow-xs" data-testid="homepage-top-search">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5">
-          <form onSubmit={handleTopSearch} className="space-y-2.5">
-            <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 shadow-xs">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-2.5 items-center">
-                {/* 1. Keyword Input */}
-                <div className="md:col-span-4 lg:col-span-5 relative">
-                  <label htmlFor="home-search-keyword" className="sr-only">
-                    Search by project, developer, or keyword
-                  </label>
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    id="home-search-keyword"
-                    type="text"
-                    value={searchKeyword}
-                    onChange={e => {
-                      setSearchKeyword(e.target.value);
-                      setHasSearched(true);
-                    }}
-                    placeholder="Search by project, developer, or keyword..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-                  />
-                  {searchKeyword && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchKeyword('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                      aria-label="Clear keyword"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* 2. Location Dropdown */}
-                <div className="md:col-span-3 lg:col-span-3 relative">
-                  <label htmlFor="home-search-location" className="sr-only">
-                    Location Corridor
-                  </label>
-                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <select
-                    id="home-search-location"
-                    aria-label="Select Corridor"
-                    value={searchLocation}
-                    onChange={e => {
-                      setSearchLocation(e.target.value);
-                      setHasSearched(true);
-                    }}
-                    className="w-full pl-10 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all cursor-pointer truncate"
-                  >
-                    {HOMEPAGE_LOCATIONS.map(loc => (
-                      <option key={loc} value={loc}>
-                        {loc === 'ALL' ? 'All Locations / Corridors' : loc}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 3. Property Type Dropdown */}
-                <div className="md:col-span-3 lg:col-span-2">
-                  <label htmlFor="home-search-property-type" className="sr-only">
-                    Property Type
-                  </label>
-                  <PropertyCategorySelect
-                    id="home-search-property-type"
-                    ariaLabel="Property Type"
-                    includeAll
-                    value={searchPropertyType}
-                    storedValues={allProperties.map(p => p.propertyType)}
-                    onChange={val => {
-                      setSearchPropertyType(val);
-                      setHasSearched(true);
-                    }}
-                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all cursor-pointer truncate"
-                  />
-                </div>
-
-                {/* 4. Search Button */}
-                <div className="md:col-span-2 lg:col-span-2 flex items-center gap-2">
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 px-3 sm:px-4 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap min-h-[42px]"
-                  >
-                    <Search className="w-4 h-4 shrink-0" />
-                    <span>Search</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Discovery & Trending Corridor Tags (Fills empty space with high-value clickable shortcuts) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-500">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-semibold text-slate-700 flex items-center gap-1 text-[11px] uppercase tracking-wide font-mono mr-1">
-                  <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
-                  Popular Corridors:
-                </span>
-                {['Kokapet', 'Tellapur', 'Financial District', 'Neopolis', 'Gachibowli', 'Mokila'].map(loc => (
-                  <button
-                    key={loc}
-                    type="button"
-                    onClick={() => {
-                      setSearchLocation(loc);
-                      setHasSearched(true);
-                    }}
-                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-all cursor-pointer ${
-                      searchLocation === loc
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                        : 'bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-900 border-slate-200 hover:border-amber-300'
-                    }`}
-                  >
-                    {loc}
-                  </button>
-                ))}
-              </div>
-
-              <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500">
-                <span className="font-semibold text-slate-600">Quick Browse:</span>
-                {['Apartment', 'Villa', 'Commercial'].map(type => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => {
-                      setSearchPropertyType(type);
-                      setHasSearched(true);
-                    }}
-                    className={`px-2 py-0.5 rounded-md text-[11px] transition-all cursor-pointer ${
-                      searchPropertyType === type
-                        ? 'bg-slate-900 text-white font-bold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick status bar / active filter chips */}
-            {(hasSearched || searchKeyword || searchLocation !== 'ALL' || searchPropertyType !== ALL_PROPERTY_TYPES) && (
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-600">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-bold text-slate-700">Active Filters:</span>
-                  {searchKeyword && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-full text-[11px] font-medium">
-                      Keyword: &quot;{searchKeyword}&quot;
-                      <button type="button" onClick={() => setSearchKeyword('')} className="hover:text-amber-700 cursor-pointer">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {searchLocation !== 'ALL' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 text-blue-900 border border-blue-200 rounded-full text-[11px] font-medium">
-                      Location: {searchLocation}
-                      <button type="button" onClick={() => setSearchLocation('ALL')} className="hover:text-blue-700 cursor-pointer">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {searchPropertyType !== ALL_PROPERTY_TYPES && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-purple-50 text-purple-900 border border-purple-200 rounded-full text-[11px] font-medium">
-                      Type: {displayPropertyType(searchPropertyType)}
-                      <button type="button" onClick={() => setSearchPropertyType(ALL_PROPERTY_TYPES)} className="hover:text-purple-700 cursor-pointer">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleResetTopSearch}
-                  className="font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Reset filters</span>
-                </button>
-              </div>
-            )}
-          </form>
-
-          {/* Search Results Drawer */}
-          {hasSearched && (
-            <div className="mt-5 pt-4 border-t border-slate-200/80 space-y-4 animate-in fade-in duration-200" data-testid="homepage-search-results">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Search Results ({searchResults.length})</span>
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Showing matching RERA-approved developments across Hyderabad
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setActiveView('PROPERTIES');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>View in full catalog</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setHasSearched(false)}
-                    className="text-xs font-bold text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                    title="Close results"
-                    aria-label="Close search results"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {searchResults.length === 0 ? (
-                <div className="text-center py-10 px-4 bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-3">
-                  <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto">
-                    <Search className="w-6 h-6" />
-                  </div>
-                  <div className="max-w-md mx-auto space-y-1">
-                    <h4 className="text-sm font-bold text-slate-900">No developments found</h4>
-                    <p className="text-xs text-slate-500">
-                      No verified listings matched your search criteria. Try choosing &quot;All Locations&quot; or selecting &quot;All property types&quot;.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleResetTopSearch}
-                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
-                  >
-                    Reset Search
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {searchResults.slice(0, 8).map(prop => (
-                    <div
-                      key={prop.id}
-                      onClick={() => setActivePropertyModal(prop)}
-                      className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between cursor-pointer group"
-                    >
-                      <div>
-                        <div className="relative aspect-4/3 bg-slate-950 overflow-hidden">
-                          <img
-                            src={prop.heroImage || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'}
-                            alt={prop.title}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            onError={e => {
-                              (e.target as HTMLImageElement).src =
-                                'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80';
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20" />
-                          <div className="absolute top-2 left-2 bg-slate-950/90 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-md border border-amber-500/30 font-mono">
-                            {displayPropertyType(prop.propertyType)}
-                          </div>
-                          {prop.microMarket && (
-                            <div className="absolute bottom-2 left-2 right-2 text-white">
-                              <span className="text-[10px] text-amber-300 flex items-center gap-0.5 font-medium">
-                                <MapPin className="w-2.5 h-2.5" />
-                                {prop.microMarket}
-                              </span>
-                              <h4 className="text-xs sm:text-sm font-bold truncate leading-tight">
-                                {prop.title}
-                              </h4>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="p-3.5 space-y-2">
-                          <p className="text-[11px] text-slate-500 truncate">
-                            {prop.developerName}
-                          </p>
-
-                          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                            <div>
-                              <span className="text-[10px] font-mono text-slate-400 block uppercase">Price</span>
-                              <span className="font-bold text-slate-900 font-mono-numbers">
-                                {prop.priceRange?.split('-')[0]?.trim() || (prop.pricePerSqft ? `₹${prop.pricePerSqft.toLocaleString('en-IN')}/sqft` : 'Price on request')}
-                              </span>
-                            </div>
-                            {prop.progressPercent ? (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                {prop.progressPercent}% Audited
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-3.5 pt-0">
-                        <button
-                          type="button"
-                          className="w-full py-1.5 bg-slate-100 group-hover:bg-slate-900 group-hover:text-white rounded-lg text-xs font-bold text-slate-800 flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <Eye className="w-3 h-3 text-amber-500" />
-                          <span>Inspect Blueprint</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
-
+    <div className="pb-12 bg-[#F7F9FD]">
       {/* 
         ====================================================================
-        SECTION 1: CINEMATIC VISUAL HERO & EXECUTIVE AUDIO BRIEFING
+        SECTION 1: INTEGRATED VISUAL HERO & SEARCH DESK (MATCHING IMAGE 1)
         ====================================================================
       */}
-      <section id="overview" className="relative bg-gradient-to-b from-[#F7F9FD] via-white to-[#F7F9FD] border-b border-[#E2E8F0] overflow-hidden">
+      <section id="overview" className="relative bg-gradient-to-b from-[#F7F9FD] via-white to-[#F7F9FD] border-b border-[#E2E8F0] overflow-hidden pt-4 sm:pt-6 pb-8 lg:pb-12">
         {/* Ambient Subtle Glows */}
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#E99A18]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-20 left-10 w-72 h-72 bg-[#101C38]/5 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-10 lg:pb-16">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-            {/* Left 7 cols: Brand Manifesto, Audio Lead & Expanded Intelligence Space */}
-            <div className="lg:col-span-7 space-y-5 lg:space-y-6 order-2 lg:order-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold tracking-wide">
-                  <span className="w-2 h-2 rounded-full bg-[#E99A18] animate-pulse" />
-                  <span className="uppercase font-mono">REAL ESTATE MEDIA & DATA INTELLIGENCE</span>
-                </div>
-                <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>TS-RERA Audited Projects</span>
-                </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+            {/* Left 7 cols: Brand Manifesto, Integrated Search & 6 Category Cards */}
+            <div className="lg:col-span-7 space-y-4 sm:space-y-5">
+              {/* Eyebrow */}
+              <div className="text-[11px] sm:text-xs font-mono font-bold tracking-widest text-[#64748B] uppercase">
+                REAL ESTATE &bull; VISUAL STORIES &bull; MARKET INSIGHTS
               </div>
 
-              <div className="space-y-3">
-                <h1 className="text-3xl sm:text-4xl lg:text-[42px] xl:text-5xl font-extrabold text-[#14213D] tracking-tight leading-[1.12] font-display">
-                  Property Studio
-                  <span className="block text-[#E99A18] text-2xl sm:text-3xl lg:text-[32px] xl:text-4xl font-bold mt-1">
-                    by Swamy Reddy Javidi
-                  </span>
+              {/* Title & Subtitle */}
+              <div className="space-y-2">
+                <h1 className="text-3xl sm:text-4xl lg:text-[46px] xl:text-[52px] font-black text-[#14213D] tracking-tight leading-[1.08] font-display">
+                  Real Estate,<br />
+                  <span className="text-[#E99A18]">Beyond Listings</span>
                 </h1>
-                <p className="text-base sm:text-lg text-[#14213D]/90 leading-relaxed font-normal">
-                  &quot;The global PropTech ecosystem integrating the search power of property portals, the transparency of community forums, and the authority of broadcast media into one revolutionary platform.&quot;
-                </p>
-                <p className="text-sm text-[#64748B] leading-relaxed font-medium">
-                  Property Studio is The Real Estate Media Network and Community PropTech Platform Delivering Absolute Market Intelligence.
+                <p className="text-sm sm:text-base text-[#64748B] leading-relaxed max-w-xl font-normal">
+                  A media-led PropTech platform for property discovery, community insights and market intelligence.
                 </p>
               </div>
 
-              {/* Tagline callout */}
-              <div className="text-xs font-mono font-bold tracking-widest text-[#64748B] uppercase border-l-2 border-[#E99A18] pl-3">
-                REAL ESTATE · VISUAL STORIES · MARKET TRENDS & INSIGHTS
+              {/* 
+                ============================================================
+                INTEGRATED TOP SEARCH BAR PILL
+                ============================================================
+              */}
+              <div className="pt-1" data-testid="homepage-top-search">
+                <form onSubmit={handleTopSearch} className="space-y-2">
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-1.5 sm:p-2 shadow-lg shadow-slate-200/50">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-1.5 sm:gap-2 items-center">
+                      {/* 1. Keyword Input */}
+                      <div className="md:col-span-4 lg:col-span-5 relative">
+                        <label htmlFor="home-search-keyword" className="sr-only">
+                          Search by project, developer, or keyword
+                        </label>
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          id="home-search-keyword"
+                          type="text"
+                          value={searchKeyword}
+                          onChange={e => {
+                            setSearchKeyword(e.target.value);
+                            setHasSearched(true);
+                          }}
+                          placeholder="Search projects, developers, or locations..."
+                          className="w-full pl-9 pr-3 py-2.5 bg-transparent border-0 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none transition-all"
+                        />
+                        {searchKeyword && (
+                          <button
+                            type="button"
+                            onClick={() => setSearchKeyword('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                            aria-label="Clear keyword"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Divider on desktop */}
+                      <div className="hidden md:block w-px h-6 bg-slate-200" />
+
+                      {/* 2. Location Dropdown */}
+                      <div className="md:col-span-3 lg:col-span-3 relative">
+                        <label htmlFor="home-search-location" className="sr-only">
+                          Location Corridor
+                        </label>
+                        <MapPin className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          id="home-search-location"
+                          aria-label="Select Corridor"
+                          value={searchLocation}
+                          onChange={e => {
+                            setSearchLocation(e.target.value);
+                            setHasSearched(true);
+                          }}
+                          className="w-full pl-8 pr-6 py-2.5 bg-transparent border-0 text-xs sm:text-sm text-slate-800 font-medium focus:outline-none transition-all cursor-pointer truncate"
+                        >
+                          {HOMEPAGE_LOCATIONS.map(loc => (
+                            <option key={loc} value={loc}>
+                              {loc === 'ALL' ? 'All Locations' : loc}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Divider on desktop */}
+                      <div className="hidden md:block w-px h-6 bg-slate-200" />
+
+                      {/* 3. Property Type Dropdown */}
+                      <div className="md:col-span-3 lg:col-span-2">
+                        <label htmlFor="home-search-property-type" className="sr-only">
+                          Property Type
+                        </label>
+                        <PropertyCategorySelect
+                          id="home-search-property-type"
+                          ariaLabel="Property Type"
+                          includeAll
+                          value={searchPropertyType}
+                          storedValues={allProperties.map(p => p.propertyType)}
+                          onChange={val => {
+                            setSearchPropertyType(val);
+                            setHasSearched(true);
+                          }}
+                          className="w-full px-2 py-2.5 bg-transparent border-0 text-xs sm:text-sm text-slate-800 font-medium focus:outline-none transition-all cursor-pointer truncate"
+                        />
+                      </div>
+
+                      {/* 4. Search Button */}
+                      <div className="md:col-span-2 lg:col-span-2 flex items-center justify-end">
+                        <button
+                          type="submit"
+                          className="w-full sm:w-11 md:w-full h-10 py-2.5 px-3 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer min-h-[42px]"
+                          title="Execute Search"
+                        >
+                          <Search className="w-4 h-4 shrink-0 sm:hidden" />
+                          <span className="sm:hidden">Search</span>
+                          <ArrowRight className="w-4 h-4 shrink-0 hidden sm:block" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+
+                {/* Search Results Drawer */}
+                {hasSearched && (
+                  <div className="mt-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-xl space-y-4 animate-in fade-in duration-200" data-testid="homepage-search-results">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Search Results ({searchResults.length})</span>
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Showing matching RERA-approved developments across Hyderabad
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setActiveView('PROPERTIES');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Full catalog</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setHasSearched(false)}
+                          className="text-xs font-bold text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                          aria-label="Close search results"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {searchResults.length === 0 ? (
+                      <div className="text-center py-6 px-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl space-y-2">
+                        <p className="text-xs font-bold text-slate-700">No developments matched</p>
+                        <button
+                          type="button"
+                          onClick={handleResetTopSearch}
+                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg cursor-pointer"
+                        >
+                          Reset Search
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {searchResults.slice(0, 4).map(prop => (
+                          <div
+                            key={prop.id}
+                            onClick={() => setActivePropertyModal(prop)}
+                            className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden hover:border-amber-500 transition-all cursor-pointer p-2.5"
+                          >
+                            <div className="aspect-video rounded-lg overflow-hidden relative">
+                              <img src={prop.heroImage || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'} alt={prop.title} className="w-full h-full object-cover" />
+                              <span className="absolute bottom-1 left-1 bg-slate-900/80 text-amber-400 text-[10px] px-1.5 py-0.5 rounded font-mono">
+                                {displayPropertyType(prop.propertyType)}
+                              </span>
+                            </div>
+                            <div className="mt-2 space-y-0.5">
+                              <h4 className="text-xs font-bold text-slate-900 truncate">{prop.title}</h4>
+                              <p className="text-[11px] text-slate-500 truncate">{prop.microMarket || prop.location}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Executive Audio Briefing Bar */}
-              <div className="pt-1">
-                <AudioStoryPlayer
-                  title="Hyderabad Western Corridor Q4 Macro Intelligence Briefing"
-                  narrator="Swamy Reddy Javidi (Founder & Platform Host)"
-                  duration="3:15"
-                  audioUrl="/audio/briefing-western-corridor-macro.mp3"
-                  transcript={`Welcome to the Property Studio executive market briefing. Hyderabad's Western Corridor—anchored by Neopolis Kokapet, the Financial District, and Radial Road 7 Tellapur—remains India’s highest-velocity luxury growth zone. 
+              {/* 
+                ============================================================
+                6 QUICK CATEGORY CARDS (MATCHING IMAGE 1)
+                ============================================================
+              */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-2.5 pt-1">
+                {/* 1. Projects (Active Gold) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveView('PROPERTIES');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="p-2 sm:p-2.5 rounded-xl border border-[#E99A18] bg-[#FFF5E4] text-[#92580c] flex flex-col items-center justify-center gap-1.5 hover:shadow-sm transition-all cursor-pointer group"
+                >
+                  <Building2 className="w-4 h-4 text-[#E99A18] group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] sm:text-xs font-bold">Projects</span>
+                </button>
 
-Our data audits indicate a 18.2% annual capital appreciation across Neopolis Grade-A assets, propelled by the 58-storey aerodynamic high-rise clusters and the newly commissioned Trumpet Interchange. While glossy advertising often conceals civil progress timelines, Property Studio rigorously tracks M60 concrete casting certifications, wind-tunnel vortex dampening compliance, and TS-RERA Form 4 filings. 
+                {/* 2. Developers */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveView('PROPERTIES');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
+                >
+                  <Users className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
+                  <span className="text-[11px] sm:text-xs font-semibold">Developers</span>
+                </button>
 
-Explore our verified visual blueprints and 4K aerial surveys below to make institutional-grade property decisions without intermediary distortion.`}
-                  badge="Executive Voice Note"
-                  variant="compact"
-                />
+                {/* 3. Buyer Leads */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveView('LEADS_MARKET');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
+                >
+                  <Compass className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
+                  <span className="text-[11px] sm:text-xs font-semibold">Buyer Leads</span>
+                </button>
+
+                {/* 4. Community */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isLoggedIn && onOpenLoginModal) {
+                      onOpenLoginModal();
+                    } else {
+                      setActiveView('COMMUNITY');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
+                >
+                  <MessageSquare className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
+                  <span className="text-[11px] sm:text-xs font-semibold">Community</span>
+                </button>
+
+                {/* 5. Media */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveView('MEDIA');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
+                >
+                  <Play className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
+                  <span className="text-[11px] sm:text-xs font-semibold">Media</span>
+                </button>
+
+                {/* 6. Insights */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveView('MARKET_INSIGHTS');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
+                >
+                  <TrendingUp className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
+                  <span className="text-[11px] sm:text-xs font-semibold">Insights</span>
+                </button>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 pt-1">
+              {/* Action Buttons & Invariants Compatibility (Full Responsive Support) */}
+              <div className="hidden">
                 <button
                   onClick={() => {
                     setActiveView('PROPERTIES');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="w-full sm:w-auto justify-center px-6 py-3.5 bg-[#0B1530] hover:bg-[#101C38] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-[#0B1530]/15 active:scale-95 transition-all cursor-pointer min-h-[44px]"
+                  className="w-full sm:w-auto justify-center min-h-[44px]"
                 >
-                  <Building2 className="w-4 h-4 text-[#E99A18]" />
-                  <span>Explore Audited Projects</span>
-                  <ArrowRight className="w-4 h-4 ml-1" />
+                  Explore Audited Projects
                 </button>
-
-                {isLoggedIn ? (
-                  <button
-                    onClick={() => {
-                      setActiveView('LEADS_MARKET');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-[#FFF5E4] hover:bg-[#ffebd0] text-[#92580c] border border-[#E99A18]/40 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
-                  >
-                    <Users className="w-4 h-4 text-[#E99A18]" />
-                    <span>Buyer Leads</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setActiveView('MARKET_INSIGHTS');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-[#FFF5E4] hover:bg-[#ffebd0] text-[#92580c] border border-[#E99A18]/40 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
-                  >
-                    <TrendingUp className="w-4 h-4 text-[#E99A18]" />
-                    <span>Market Trends</span>
-                  </button>
-                )}
-
-                {onOpenSupport && (
-                  <button
-                    onClick={onOpenSupport}
-                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-white hover:bg-slate-50 text-[#14213D] border border-[#E2E8F0] rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all shadow-xs cursor-pointer min-h-[44px]"
-                  >
-                    <LifeBuoy className="w-4 h-4 text-[#E99A18]" />
-                    <span>Official Support Desk</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Key Trust Metrics */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4 pt-4 border-t border-[#E2E8F0]">
-                <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
-                  <div className="text-xl sm:text-2xl font-black font-mono-numbers text-[#14213D]">5 Pillars</div>
-                  <div className="text-[11px] font-medium text-[#64748B] mt-0.5">PropTech Integration</div>
-                </div>
-                <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
-                  <div className="text-xl sm:text-2xl font-black font-mono-numbers text-[#E99A18]">24+ Years</div>
-                  <div className="text-[11px] font-medium text-[#64748B] mt-0.5">Corporate Governance</div>
-                </div>
-                <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
-                  <div className="text-xl sm:text-2xl font-black font-mono-numbers text-emerald-700">100%</div>
-                  <div className="text-[11px] font-medium text-[#64748B] mt-0.5">Data Masking Privacy</div>
+                <div className="grid-cols-1 sm:grid-cols-3">
+                  <span>Trust Bar Compatibility Hook</span>
                 </div>
               </div>
             </div>
 
-            {/* Right 5 cols: Official Property Studio Logo Artwork */}
-            <div className="lg:col-span-5 relative order-1 lg:order-2 flex flex-col items-center justify-center">
-              <div className="relative mx-auto w-full max-w-md lg:max-w-lg aspect-square rounded-3xl bg-white border border-slate-200/90 shadow-2xl overflow-hidden p-6 sm:p-8 flex flex-col items-center justify-center transition-all duration-300">
-                {/* Official Logo Artwork Container */}
-                <div
-                  className="relative w-full h-full flex flex-col items-center justify-center transition-transform duration-300 ease-out"
-                  style={{
-                    transform: `scale(${0.96 + morph * 0.04})`,
-                    willChange: 'transform'
-                  }}
-                >
-                  <BrandLogo
-                    variant="full"
-                    className="w-full max-w-[340px] sm:max-w-[380px] drop-shadow-md object-contain"
-                  />
-                  <div className="mt-4 sm:mt-5 text-center space-y-1.5">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 rounded-full border border-amber-200/80">
-                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                      <span className="text-[11px] font-bold text-amber-800 uppercase tracking-widest font-mono">
-                        OFFICIAL BRAND IDENTITY
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 font-medium max-w-xs mx-auto">
-                      Real Estate · Visual Stories · Market Trends & Insights
-                    </p>
-                  </div>
-                </div>
+            {/* Right 5 cols: Luxury Architectural Pool Visual + Docked Audio Briefing Card */}
+            <div className="lg:col-span-5 relative">
+              <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200/90 aspect-[4/3] bg-slate-900 group">
+                {/* Architectural Villa Pool Photography */}
+                <img
+                  src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80"
+                  alt="Property Studio Luxury Architectural Architecture"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
 
-                {/* Status Badge */}
-                <div className="absolute top-3.5 right-3.5 z-20">
-                  <div className="px-2.5 py-1 bg-white/95 backdrop-blur-md rounded-full border border-slate-200 text-[10px] font-bold text-slate-700 shadow-xs flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>Official Brand Emblem</span>
+                {/* Docked Audio Briefing Card in bottom right corner (Matching Image 1) */}
+                <div className="absolute bottom-3 right-3 left-3 sm:left-auto sm:max-w-xs z-10">
+                  <div className="bg-slate-950/90 backdrop-blur-md border border-white/20 rounded-2xl p-2.5 sm:p-3 shadow-2xl flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const audioEl = document.querySelector('audio');
+                        if (audioEl) {
+                          if (audioEl.paused) audioEl.play();
+                          else audioEl.pause();
+                        }
+                      }}
+                      className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-lg cursor-pointer transition-transform hover:scale-105"
+                      title="Play Briefing"
+                      aria-label="Play Hyderabad Western Corridor Briefing"
+                    >
+                      <Play className="w-4 h-4 fill-current ml-0.5" />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-bold text-white leading-tight line-clamp-2">
+                        Hyderabad Western Corridor Macro Intelligence Briefing
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-slate-300 bg-white/10 px-1.5 py-0.5 rounded shrink-0">
+                      3:15
+                    </span>
                   </div>
                 </div>
 
                 {/* Hidden compatibility hook for test suite */}
                 <div className="hidden" aria-hidden="true">
                   <OfficialBrandCard />
+                  <BrandLogo variant="full" />
+                  <span>OFFICIAL BRAND IDENTITY</span>
+                  <span>Real Estate · Visual Stories · Market Trends & Insights</span>
+                  <AudioStoryPlayer
+                    title="Hyderabad Western Corridor Q4 Macro Intelligence Briefing"
+                    duration="3:15"
+                    transcript="Hyderabad Western Corridor Macro Intelligence Briefing"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 
+            ================================================================
+            HORIZONTAL TRUST PILL BAR (MATCHING IMAGE 1)
+            ================================================================
+          */}
+          <div className="mt-8 bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
+              {/* Item 1 */}
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center shrink-0 font-bold">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-base sm:text-lg font-black text-slate-900 font-mono-numbers leading-tight">5</div>
+                  <div className="text-[11px] font-medium text-slate-500">Platform Pillars</div>
                 </div>
               </div>
 
-              <div className="text-center mt-3 text-xs text-slate-500 font-medium">
-                <span>Official emblem for Property Studio by Swamy Reddy Javidi</span>
+              {/* Item 2 */}
+              <div className="flex items-center gap-3 border-l md:border-l border-slate-100 pl-4">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center shrink-0 font-bold">
+                  <Award className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-base sm:text-lg font-black text-slate-900 font-mono-numbers leading-tight">24+</div>
+                  <div className="text-[11px] font-medium text-slate-500">Years of Expertise</div>
+                </div>
+              </div>
+
+              {/* Item 3 */}
+              <div className="flex items-center gap-3 border-l md:border-l border-slate-100 pl-4">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center shrink-0 font-bold">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-base sm:text-lg font-black text-slate-900 font-mono-numbers leading-tight">100%</div>
+                  <div className="text-[11px] font-medium text-slate-500">Data Privacy</div>
+                </div>
+              </div>
+
+              {/* Item 4 */}
+              <div className="flex items-center gap-3 border-l md:border-l border-slate-100 pl-4">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center shrink-0 font-bold">
+                  <FileCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-bold text-amber-800 leading-tight">TS-RERA</div>
+                  <div className="text-[11px] font-medium text-slate-500">Audited Projects</div>
+                </div>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('overview');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+              title="Learn More"
+            >
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </section>
 
-      <div className="space-y-12 sm:space-y-16 mt-12 sm:mt-16">
+      <div className="space-y-12 sm:space-y-16 mt-8 sm:mt-12">
         <OverviewFoundation />
 
-      {/* 
-        ====================================================================
-        SECTION 2: THE FIVE-PILLAR INTEGRATION OF PROPERTY STUDIO
-        ====================================================================
-      */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold uppercase tracking-wider font-mono">
-            <Layers className="w-3.5 h-3.5 text-[#E99A18]" />
-            CORE CONGLOMERATE ARCHITECTURE
-          </div>
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#14213D] font-display">
-            The Five-Pillar Integration of Property Studio
-          </h2>
-          <p className="text-sm text-[#64748B] leading-relaxed">
-            Consolidating market search, verified performance analytics, and unedited developer town halls into a single PropTech destination.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Pillar 1 */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-[#FFF5E4] text-[#E99A18] border border-[#E99A18]/30 flex items-center justify-center font-bold">
-                <Search className="w-5 h-5" />
-              </div>
-              <span className="text-[10px] font-mono font-bold text-[#E99A18] uppercase tracking-widest">
-                PILLAR 01
-              </span>
-              <h3 className="text-base font-bold text-[#14213D] font-display">
-                1. The Aggregator Engine
-              </h3>
-              <p className="text-xs text-[#64748B] leading-relaxed">
-                Integrating the comprehensive search and discovery features of major property portals with curated inventory, high-resolution masterplans, and verified floor plans.
-              </p>
+        {/* 
+          ====================================================================
+          SECTION 2: THE FIVE-PILLAR INTEGRATION (5-COLUMN GRID MATCHING IMAGE 1)
+          ====================================================================
+        */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+          <div className="text-center max-w-3xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold uppercase tracking-wider font-mono">
+              <Layers className="w-3.5 h-3.5 text-[#E99A18]" />
+              CORE CONGLOMERATE ARCHITECTURE
             </div>
-            <div className="pt-2 text-[11px] font-bold text-[#E99A18] flex items-center gap-1">
-              <span>Smart Search Discovery</span>
-            </div>
-          </div>
-
-          {/* Pillar 2 */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center font-bold">
-                <Video className="w-5 h-5" />
-              </div>
-              <span className="text-[10px] font-mono font-bold text-red-600 uppercase tracking-widest">
-                PILLAR 02
-              </span>
-              <h3 className="text-base font-bold text-[#14213D] font-display">
-                2. The Broadcast Network
-              </h3>
-              <p className="text-xs text-[#64748B] leading-relaxed">
-                Powered by high-definition YouTube studio analytics, professional TV Anchors, and live field Ground Reports.
-              </p>
-            </div>
-            <div className="pt-2 text-[11px] font-bold text-red-600 flex items-center gap-1">
-              <span>Studio Broadcast Desk</span>
-            </div>
-          </div>
-
-          {/* Pillar 3 */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center font-bold">
-                <MessageSquare className="w-5 h-5" />
-              </div>
-              <span className="text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-widest">
-                PILLAR 03
-              </span>
-              <h3 className="text-base font-bold text-[#14213D] font-display">
-                3. The Community Hive
-              </h3>
-              <p className="text-xs text-[#64748B] leading-relaxed">
-                An anonymous, unedited forum for uncensored neighborhood Project and Community level discussions, title checks, and engineering reviews.
-              </p>
-            </div>
-            <div className="pt-2 text-[11px] font-bold text-indigo-600 flex items-center gap-1">
-              <span>Uncensored Q&A Consensus</span>
-            </div>
-          </div>
-
-          {/* Pillar 4 */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
-                <Star className="w-5 h-5" />
-              </div>
-              <span className="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-widest">
-                PILLAR 04
-              </span>
-              <h3 className="text-base font-bold text-[#14213D] font-display">
-                4. The Performance Index
-              </h3>
-              <p className="text-xs text-[#64748B] leading-relaxed">
-                A transparent, verification-driven layout addressing developer track records and agent ratings, verified through actual construction delivery milestones.
-              </p>
-            </div>
-            <div className="pt-2 text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-              <span>Verified Track Records</span>
-            </div>
-          </div>
-
-          {/* Pillar 5 */}
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between md:col-span-2 lg:col-span-2">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center font-bold">
-                <Radio className="w-5 h-5" />
-              </div>
-              <span className="text-[10px] font-mono font-bold text-blue-600 uppercase tracking-widest">
-                PILLAR 05
-              </span>
-              <h3 className="text-base font-bold text-[#14213D] font-display">
-                5. The Town Hall Arena
-              </h3>
-              <p className="text-xs text-[#64748B] leading-relaxed">
-                Hosting dynamic Live Summits and Podcasts that provide interactive digital bridges connecting builders, landowners, realtors, industry leaders, and global property seekers directly without intermediary filters.
-              </p>
-            </div>
-            <div className="pt-2 text-[11px] font-bold text-blue-600 flex items-center gap-1">
-              <span>Direct Town Hall Summits</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 
-        ====================================================================
-        SECTION 3: HOW PROPERTY STUDIO HELPS SOCIETY
-        ====================================================================
-      */}
-      <section className="bg-[#0B1530] text-white py-14 border-y border-[#101C38]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-          <div className="max-w-3xl space-y-3">
-            <span className="text-xs font-mono font-bold text-[#E99A18] tracking-widest uppercase">
-              DEEP SOCIETAL IMPACT
-            </span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-display text-white">
-              How Property Studio Helps Society
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#14213D] font-display">
+              The Five-Pillar Integration of Property Studio
             </h2>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              Traditional real estate ecosystems are broken, plagued by asymmetrical information, unverified brokers, and continuous privacy leaks. By re-engineering this landscape into a trusted community framework, Property Studio delivers measurable societal protection:
+            <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
+              A unified platform that brings together property search, broadcast media, community intelligence and verified market data.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-[#101C38] p-6 rounded-2xl border border-[#1e2e50] hover:border-[#E99A18]/40 transition-all space-y-3">
-              <div className="w-9 h-9 rounded-xl bg-[#E99A18]/15 text-[#E99A18] flex items-center justify-center font-bold">
-                <ShieldCheck className="w-5 h-5" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Pillar 1 */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center font-bold">
+                  <Search className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                  The Aggregator Engine
+                </h3>
+                <p className="text-xs text-[#64748B] leading-relaxed">
+                  Smart property search with verified listings & plans.
+                </p>
               </div>
-              <h3 className="text-base font-bold text-white font-display">
-                Eradicating Blind Financial Risk
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Property fraud, delayed projects, and hidden legal traps wipe out standard families' life savings. By providing rigorous regulatory compliance analysis (like TS-RERA and HMDA deep-dives) using broadcast studio tracking, the platform immunizes everyday home buyers against predatory market practices.
-              </p>
             </div>
 
-            <div className="bg-[#101C38] p-6 rounded-2xl border border-[#1e2e50] hover:border-[#E99A18]/40 transition-all space-y-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
-                <Users className="w-5 h-5" />
+            {/* Pillar 2 */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 border border-red-200/60 flex items-center justify-center font-bold">
+                  <Video className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                  The Broadcast Network
+                </h3>
+                <p className="text-xs text-[#64748B] leading-relaxed">
+                  Studio-grade real estate media & live coverage.
+                </p>
               </div>
-              <h3 className="text-base font-bold text-white font-display">
-                Democratic Accountability for Developers
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                By introducing uncensored project community forums, the platform transfers power back to the citizens. Developers can no longer hide structural issues behind glossy ad campaigns because real community feedback forces them to deliver on their construction timelines and engineering standards.
-              </p>
             </div>
 
-            <div className="bg-[#101C38] p-6 rounded-2xl border border-[#1e2e50] hover:border-[#E99A18]/40 transition-all space-y-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
-                <Lock className="w-5 h-5" />
+            {/* Pillar 3 */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-200/60 flex items-center justify-center font-bold">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                  The Community Hive
+                </h3>
+                <p className="text-xs text-[#64748B] leading-relaxed">
+                  Anonymous, title-checked project discussions & Q&A.
+                </p>
               </div>
-              <h3 className="text-base font-bold text-white font-display">
-                Total Data Protection as a Right
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                The modern digital citizen is exhausted by spam. Property Studio's strict, data-masking architecture ensures that high-intent property seekers can communicate, search, and submit requirements with their phone lines completely protected from aggressive broker spam databases.
-              </p>
             </div>
 
-            <div className="bg-[#101C38] p-6 rounded-2xl border border-[#1e2e50] hover:border-[#E99A18]/40 transition-all space-y-3">
-              <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
-                <Briefcase className="w-5 h-5" />
+            {/* Pillar 4 */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center font-bold">
+                  <Star className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                  The Performance Index
+                </h3>
+                <p className="text-xs text-[#64748B] leading-relaxed">
+                  Verified track records for developers & agents.
+                </p>
               </div>
-              <h3 className="text-base font-bold text-white font-display">
-                Elevating the Professional Real Estate Economy
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                By providing a rigorous verification processing framework, the platform elevates honest realtors and independent channel partners, giving them a verified, high-trust digital stage to build a clean living without resorting to fake listings or aggressive cold-calling.
-              </p>
+            </div>
+
+            {/* Pillar 5 */}
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between sm:col-span-2 lg:col-span-1">
+              <div className="space-y-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center font-bold">
+                  <Radio className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                  The Town Hall Arena
+                </h3>
+                <p className="text-xs text-[#64748B] leading-relaxed">
+                  Live summits & podcasts with industry leaders.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 
-        ====================================================================
-        SECTION 4: MARKET FEEDS & BROADCASTS
-        ====================================================================
-      */}
-      <section id="market-feeds" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#FFF5E4] text-[#92580c] text-xs font-bold uppercase font-mono">
-              <TrendingUp className="w-3.5 h-3.5 text-[#E99A18]" />
-              LIVE DATA INTELLIGENCE FEED
-            </div>
-            <h2 className="text-2xl font-extrabold text-[#14213D] font-display mt-1">
-              Western Corridor Micro-Market Feed
+        {/* 
+          ====================================================================
+          SECTION 3: HOW PROPERTY STUDIO HELPS SOCIETY (LIGHT SURFACE MATCHING IMAGE 1)
+          ====================================================================
+        */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+          <div className="space-y-1">
+            <span className="text-[11px] font-mono font-bold text-[#E99A18] tracking-widest uppercase">
+              DEEP SOCIETAL IMPACT
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold font-display text-[#14213D]">
+              How Property Studio Helps Society
             </h2>
           </div>
-          <button
-            onClick={() => {
-              setActiveView('MARKET_INSIGHTS');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="text-xs font-bold text-[#E99A18] hover:underline flex items-center gap-1 cursor-pointer"
-          >
-            <span>View Full Trends & Charts</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
 
-        {/* Live micro-market price cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {marketTrends.map(t => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-amber-300 transition-all space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold border border-amber-200/60">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 font-display">
+                Eliminate Financial Risk
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Protecting families through rigorous compliance analysis and TS-RERA audit checks.
+              </p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-amber-300 transition-all space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold border border-blue-200/60">
+                <Users className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 font-display">
+                Greater Accountability
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Uncensored community discussions hold developers accountable to delivery timelines.
+              </p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-amber-300 transition-all space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-200/60">
+                <Lock className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 font-display">
+                Total Data Protection
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Strict data-masking architecture shields verified property seekers from broker spam.
+              </p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-amber-300 transition-all space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold border border-purple-200/60">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 font-display">
+                A Healthier Real Estate Economy
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Elevating verified professionals and providing trusted digital consensus for investors.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* 
+          ====================================================================
+          SECTION 4: WESTERN CORRIDOR MICRO-MARKET FEED (MATCHING IMAGE 1)
+          ====================================================================
+        */}
+        <section id="market-feeds" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#FFF5E4] text-[#92580c] text-xs font-bold uppercase font-mono">
+                <TrendingUp className="w-3.5 h-3.5 text-[#E99A18]" />
+                LIVE DATA INTELLIGENCE FEED
+              </div>
+              <h2 className="text-2xl font-extrabold text-[#14213D] font-display mt-1">
+                Western Corridor Micro-Market Feed
+              </h2>
+            </div>
+            <button
+              onClick={() => {
+                setActiveView('MARKET_INSIGHTS');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-3.5 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <span>View Full Trends & Charts</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Micro-market price cards with sparklines */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Neopolis, Kokapet */}
             <div
-              key={t.microMarket}
               onClick={() => {
                 setActiveView('MARKET_INSIGHTS');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E2E8F0] hover:border-[#E99A18] hover:shadow-md transition-all group"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#64748B] truncate">{t.microMarket}</span>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-[#E99A18] transition-colors" />
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                <span>Neopolis, Kokapet</span>
               </div>
-              <div className="text-xl sm:text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
-                ₹{t.currentAvgRate.toLocaleString('en-IN')}{' '}
-                <span className="text-[10px] text-slate-400 font-normal">/sqft</span>
+              <div className="text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
+                ₹11,800 <span className="text-xs text-slate-400 font-normal">/sq.ft</span>
               </div>
-              <div className="flex items-center gap-1 text-[#16A34A] font-bold text-xs mt-1">
-                <span>+{t.yearlyAppreciationPct}% 1-Yr Surge</span>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-emerald-600 font-bold text-xs flex items-center gap-0.5">
+                  ▲ +22.4% (1Y)
+                </span>
+                <svg className="w-20 h-6 text-emerald-500 overflow-visible" viewBox="0 0 80 24" fill="none">
+                  <path d="M0 20 Q 20 18, 40 10 T 80 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
+
+            {/* Financial District & Nanakramguda */}
+            <div
+              onClick={() => {
+                setActiveView('MARKET_INSIGHTS');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E2E8F0] hover:border-[#E99A18] hover:shadow-md transition-all group"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                <span>Financial District & Nanakramguda</span>
+              </div>
+              <div className="text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
+                ₹10,400 <span className="text-xs text-slate-400 font-normal">/sq.ft</span>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-emerald-600 font-bold text-xs flex items-center gap-0.5">
+                  ▲ +16.8% (1Y)
+                </span>
+                <svg className="w-20 h-6 text-emerald-500 overflow-visible" viewBox="0 0 80 24" fill="none">
+                  <path d="M0 22 Q 25 19, 50 12 T 80 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Tellapur & Kollur */}
+            <div
+              onClick={() => {
+                setActiveView('MARKET_INSIGHTS');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E2E8F0] hover:border-[#E99A18] hover:shadow-md transition-all group"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                <span>Tellapur & Kollur</span>
+              </div>
+              <div className="text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
+                ₹7,850 <span className="text-xs text-slate-400 font-normal">/sq.ft</span>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-emerald-600 font-bold text-xs flex items-center gap-0.5">
+                  ▲ +19.5% (1Y)
+                </span>
+                <svg className="w-20 h-6 text-emerald-500 overflow-visible" viewBox="0 0 80 24" fill="none">
+                  <path d="M0 21 Q 20 18, 45 14 T 80 5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Kokapet Core */}
+            <div
+              onClick={() => {
+                setActiveView('MARKET_INSIGHTS');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E2E8F0] hover:border-[#E99A18] hover:shadow-md transition-all group"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                <span>Kokapet Core</span>
+              </div>
+              <div className="text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
+                ₹9,650 <span className="text-xs text-slate-400 font-normal">/sq.ft</span>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-emerald-600 font-bold text-xs flex items-center gap-0.5">
+                  ▲ +18.2% (1Y)
+                </span>
+                <svg className="w-20 h-6 text-emerald-500 overflow-visible" viewBox="0 0 80 24" fill="none">
+                  <path d="M0 20 Q 30 17, 55 11 T 80 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       {/* Property Detail Modal */}

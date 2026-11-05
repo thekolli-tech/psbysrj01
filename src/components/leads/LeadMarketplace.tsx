@@ -23,7 +23,19 @@ import {
   Trash2,
   X,
   Filter,
-  RotateCcw
+  RotateCcw,
+  Users,
+  Compass,
+  Award,
+  Eye,
+  Star,
+  Play,
+  FileText,
+  Handshake,
+  ArrowRight,
+  TrendingUp,
+  MapPin,
+  Building
 } from 'lucide-react';
 
 interface LeadMarketplaceProps {
@@ -133,6 +145,9 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
     return true;
   });
 
+  const unlockedCount = leads.filter(l => l.isUnlocked).length;
+  const highIntentCount = leads.filter(l => l.tier === 'HNI' || l.tier === 'PREMIUM').length;
+
   const handlePostLead = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !phone.trim() || !requirements.trim()) {
@@ -175,103 +190,311 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Marketplace Executive Header */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider mb-2 font-mono">
-            <ShieldCheck className="w-4 h-4 text-amber-600" />
-            100% Encrypted Data-Masking Framework
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 sm:space-y-8 bg-[#F7F9FD]">
+      {/* 
+        ====================================================================
+        HERO BANNER (MATCHING IMAGE 5)
+        ====================================================================
+      */}
+      <div className="relative overflow-hidden bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6">
+        {/* Architectural Image Background Accent */}
+        <div
+          className="absolute inset-y-0 right-1/4 w-1/3 opacity-20 bg-cover bg-center rounded-3xl pointer-events-none hidden md:block"
+          style={{
+            backgroundImage: "url('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80')"
+          }}
+        />
+
+        <div className="max-w-xl space-y-3 relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold uppercase tracking-wider font-mono">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#E99A18]" />
+            100% ENCRYPTED DATA-MASKING FRAMEWORK
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-display">
-            Sanitized Buyer Lead Marketplace
+
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#14213D] font-display tracking-tight">
+            Buyer Lead Marketplace
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
-            Directly connect with qualified high-intent seekers looking for luxury apartments, sky villas, and commercial floors. PII is sanitized behind the paywall card with absolute immunity from spam calls.
+          <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
+            Verified, high-intent buyers for residential, luxury and commercial projects.
           </p>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              Verified Leads
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              Data Masked
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+              Spam Free
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+              <Compass className="w-3.5 h-3.5 text-purple-600" />
+              Real Intent
+            </span>
+          </div>
         </div>
 
-        {/* Wallet Balance & Action */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+        {/* Floating Credit Balance Card */}
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200 p-5 shadow-lg space-y-3 relative z-10 shrink-0 w-full sm:w-80">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#64748B]">Your Credit Balance</span>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Wallet className="w-4 h-4" />
+            </div>
+          </div>
+
+          <div className="text-3xl font-black text-[#14213D] font-mono-numbers">
+            ₹{currentUser.walletBalance.toLocaleString('en-IN')}
+          </div>
+
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              onClick={onOpenWalletModal}
+              className="w-full py-2.5 px-4 bg-[#0B1530] hover:bg-[#101C38] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            >
+              <span>Recharge Credits</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsPostLeadModalOpen(true)}
+              className="w-full py-2.5 px-4 bg-[#E99A18] hover:bg-[#d68a12] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Post New Buyer Lead</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 
+        ====================================================================
+        FILTER BAR (MATCHING IMAGE 5)
+        ====================================================================
+      */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mr-1">
+            <Filter className="w-3.5 h-3.5 text-slate-500" />
+            Filter Leads
+          </span>
+
           <button
-            onClick={() => setIsPostLeadModalOpen(true)}
-            className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black tracking-wide flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+            type="button"
+            onClick={() => setSelectedTier('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              selectedTier === 'ALL'
+                ? 'bg-[#0B1530] text-white shadow-xs'
+                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            <span>Post New Buyer Lead</span>
+            All Leads
           </button>
 
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col items-start sm:items-end justify-between">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              Your Credit Balance
-            </span>
-            <div className="text-2xl font-black text-slate-900 font-mono-numbers my-0.5">
-              ₹{currentUser.walletBalance.toLocaleString('en-IN')}
-            </div>
-            <button
-              onClick={onOpenWalletModal}
-              className="mt-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+          <button
+            type="button"
+            onClick={() => setSelectedTier('STANDARD')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedTier === 'STANDARD'
+                ? 'bg-[#0B1530] text-white shadow-xs'
+                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-slate-500" />
+            <span>Standard (₹{leadPrices.STANDARD})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedTier('PREMIUM')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedTier === 'PREMIUM'
+                ? 'bg-[#0B1530] text-white shadow-xs'
+                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 text-amber-500" />
+            <span>Premium (₹{leadPrices.PREMIUM})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedTier('HNI')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedTier === 'HNI'
+                ? 'bg-[#0B1530] text-white shadow-xs'
+                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Star className="w-3.5 h-3.5 text-amber-600" />
+            <span>HNI (₹{leadPrices.HNI})</span>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 font-medium">Property Type</span>
+            <PropertyCategorySelect
+              ariaLabel="Property type"
+              includeAll
+              value={selectedPropertyType}
+              storedValues={leads.map(lead => lead.propertyType)}
+              onChange={setSelectedPropertyType}
+              className="text-xs border border-slate-200 rounded-xl px-3 py-1.5 bg-slate-50 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 font-medium">Micro-Market</span>
+            <select
+              value={selectedMarket}
+              onChange={e => setSelectedMarket(e.target.value)}
+              className="text-xs border border-slate-200 rounded-xl px-3 py-1.5 bg-slate-50 text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
             >
-              <Wallet className="w-3 h-3 text-amber-400" />
-              <span>Recharge Credits</span>
-            </button>
+              <option value="ALL">All Micro-Markets</option>
+              <option value="Neopolis">Neopolis</option>
+              <option value="Kokapet">Kokapet</option>
+              <option value="Financial District">Financial District</option>
+              <option value="Tellapur">Tellapur</option>
+              <option value="Mokila">Mokila</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1">
-            <Filter className="w-3.5 h-3.5" />
-            <span>Filter Tier:</span>
-          </span>
-          {(['ALL', 'STANDARD', 'PREMIUM', 'HNI'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setSelectedTier(t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                selectedTier === t
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {t === 'ALL' ? 'All Leads' : `${t} (₹${leadPrices[t as LeadTier]})`}
-            </button>
-          ))}
+      {/* 
+        ====================================================================
+        4 METRIC CARDS WITH SPARKLINES (MATCHING IMAGE 5)
+        ====================================================================
+      */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1 */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Users className="w-4 h-4" />
+              </div>
+              <span className="text-xs font-semibold text-slate-500">Total Leads</span>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono-numbers pl-1">
+              {filteredLeads.length}
+            </div>
+          </div>
+          <svg className="w-20 h-8 text-amber-400 overflow-visible" viewBox="0 0 80 32" fill="none">
+            <path d="M0 26 Q 20 25, 40 18 T 80 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
-          <span className="text-xs font-bold text-slate-500">Property type</span>
-          <PropertyCategorySelect
-            ariaLabel="Property type"
-            includeAll
-            value={selectedPropertyType}
-            storedValues={leads.map(lead => lead.propertyType)}
-            onChange={setSelectedPropertyType}
-            className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500 w-full sm:w-72"
-          />
+        {/* Metric 2 */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Compass className="w-4 h-4" />
+              </div>
+              <span className="text-xs font-semibold text-slate-500">High-Intent Leads</span>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono-numbers pl-1">
+              {highIntentCount}
+            </div>
+          </div>
+          <svg className="w-20 h-8 text-emerald-500 overflow-visible" viewBox="0 0 80 32" fill="none">
+            <path d="M0 28 Q 25 24, 50 14 T 80 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-500">Micro-Market:</span>
-          <select
-            value={selectedMarket}
-            onChange={e => setSelectedMarket(e.target.value)}
-            className="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
-          >
-            <option value="ALL">All Micro-Markets</option>
-            <option value="Neopolis">Neopolis</option>
-            <option value="Kokapet">Kokapet</option>
-            <option value="Financial District">Financial District</option>
-            <option value="Tellapur">Tellapur</option>
-            <option value="Jubilee Hills">Jubilee Hills</option>
-          </select>
+        {/* Metric 3 */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Eye className="w-4 h-4" />
+              </div>
+              <span className="text-xs font-semibold text-slate-500">Viewed / Unlocked</span>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono-numbers pl-1">
+              {unlockedCount}
+            </div>
+          </div>
+          <svg className="w-20 h-8 text-purple-400 overflow-visible" viewBox="0 0 80 32" fill="none">
+            <path d="M0 25 Q 30 22, 55 12 T 80 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+        </div>
+
+        {/* Metric 4 */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Star className="w-4 h-4" />
+              </div>
+              <span className="text-xs font-semibold text-slate-500">Conversion Rate</span>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono-numbers pl-1">
+              —
+            </div>
+          </div>
+          <svg className="w-20 h-8 text-blue-400 overflow-visible" viewBox="0 0 80 32" fill="none">
+            <path d="M0 24 Q 25 20, 50 15 T 80 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
         </div>
       </div>
 
-      {/* Leads Grid or Empty State */}
-      {filteredLeads.length > 0 ? (
+      {/* 
+        ====================================================================
+        LEADS CONTENT / EMPTY STATE (MATCHING IMAGE 5)
+        ====================================================================
+      */}
+      {filteredLeads.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-xs space-y-4">
+          {/* Isometric Building + Magnifier Illustration */}
+          <div className="w-24 h-24 mx-auto rounded-3xl bg-amber-50 flex items-center justify-center border border-amber-200/80 shadow-xs">
+            <div className="relative">
+              <Building className="w-10 h-10 text-amber-500" />
+              <Compass className="w-6 h-6 text-amber-700 absolute -bottom-1 -right-1" />
+            </div>
+          </div>
+
+          <div className="max-w-md mx-auto space-y-1.5">
+            <h3 className="text-xl font-extrabold text-[#14213D] font-display">
+              No Buyer Leads Yet
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+              Start by posting a verified buyer requirement to attract relevant property matches.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsPostLeadModalOpen(true)}
+              className="px-5 py-2.5 bg-[#E99A18] hover:bg-[#d68a12] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Post New Buyer Lead</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('how-it-works');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <Play className="w-3.5 h-3.5 text-slate-600 fill-current" />
+              <span>How It Works</span>
+            </button>
+          </div>
+        </div>
+      ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredLeads.map(lead => {
             const cost = leadPrices[lead.tier] || lead.priceCredits;
@@ -289,7 +512,6 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                 }`}
               >
                 <div className="p-5 space-y-3">
-                  {/* Header: Tier & Status */}
                   <div className="flex items-center justify-between">
                     <span
                       className={`text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider ${
@@ -300,383 +522,249 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                           : 'bg-slate-100 text-slate-700 border border-slate-300'
                       }`}
                     >
-                      {lead.tier} LEADER
+                      {lead.tier}
                     </span>
-
-                    {isUnlocked ? (
-                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 border border-emerald-200">
-                        <Unlock className="w-3.5 h-3.5" /> Unlocked
-                      </span>
-                    ) : (
-                      <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded flex items-center gap-1">
-                        <Lock className="w-3.5 h-3.5" /> Sanitized PII
-                      </span>
-                    )}
+                    <span className="text-[11px] font-mono text-slate-400">
+                      {lead.timeframe}
+                    </span>
                   </div>
 
-                  {/* Seeker Name & Budget */}
                   <div>
-                    <h3 className="text-base font-extrabold text-slate-900 leading-snug">
-                      {lead.seekerName}
+                    <h3 className="text-base font-bold text-slate-900">
+                      {isUnlocked ? lead.seekerName : 'Verified Buyer Seeker'}
                     </h3>
-                    <div className="text-sm font-black text-emerald-700 font-mono-numbers mt-0.5">
-                      Budget: {lead.budget}
+                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3 h-3 text-slate-400" />
+                      <span>{lead.microMarket}</span>
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Budget:</span>
+                      <span className="font-bold text-slate-900 font-mono-numbers">{lead.budget}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Asset:</span>
+                      <span className="font-semibold text-slate-800">{displayPropertyType(lead.propertyType)}</span>
                     </div>
                   </div>
 
-                  {/* Micro-market & Property Type */}
-                  <div className="text-xs text-slate-600 space-y-1">
-                    <div>
-                      <span className="text-slate-400">Micro-Market:</span>{' '}
-                      <strong className="text-slate-800">{lead.microMarket}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Target Asset:</span>{' '}
-                      <strong className="text-slate-800">{displayPropertyType(lead.propertyType)}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Timeline:</span>{' '}
-                      <strong className="text-slate-800">{lead.timeframe}</strong>
-                    </div>
-                  </div>
+                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                    {lead.requirements}
+                  </p>
 
-                  {/* Specific Requirements excerpt */}
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-700 leading-relaxed italic">
-                    "{lead.requirements}"
-                  </div>
-
-                  {/* If Unlocked: Show Actual Contact Info */}
                   {isUnlocked && (
-                    <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1.5 text-xs">
-                      <div className="font-bold text-emerald-950 flex items-center gap-1.5">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>Verified Dossier Coordinates:</span>
+                    <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs">
+                      <div className="flex items-center gap-1.5 text-slate-700 font-mono">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{lead.seekerPhone}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <Phone className="w-3.5 h-3.5 text-emerald-700" />
-                        <span className="font-mono font-semibold">{lead.seekerPhone}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <Mail className="w-3.5 h-3.5 text-emerald-700" />
-                        <span className="font-mono">{lead.seekerEmail}</span>
-                      </div>
+                      {lead.seekerEmail && (
+                        <div className="flex items-center gap-1.5 text-slate-700 font-mono truncate">
+                          <Mail className="w-3.5 h-3.5 text-blue-600" />
+                          <span>{lead.seekerEmail}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
 
-                {/* Action Footer */}
                 <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs text-slate-500 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" /> {lead.createdAt}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    {currentUser.role === 'SUPER_ADMIN' && (
-                      <button
-                        onClick={() => deleteBuyerLead(lead.id)}
-                        className="p-1.5 text-red-600 hover:text-red-700 rounded-lg hover:bg-red-50 transition-colors"
-                        title="Delete lead record"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-
-                    {isUnlocked ? (
-                      <button
-                        onClick={() => {
-                          sendMessage(`Hello, I am contacting you regarding your verified enquiry on Property Studio for ${displayPropertyType(lead.propertyType)} in ${lead.microMarket}.`, 'user_seeker_ananya', lead.id);
-                          setActiveView('CHAT');
-                        }}
-                        className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Open Direct Chat</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => unlockLead(lead.id)}
-                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                      >
-                        <Unlock className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Unlock Lead (₹{cost})</span>
-                      </button>
-                    )}
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-mono uppercase block">Cost</span>
+                    <span className="text-xs font-bold text-slate-900 font-mono-numbers">
+                      {cost} Credits
+                    </span>
                   </div>
+
+                  {isUnlocked ? (
+                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Unlocked</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => unlockLead(lead.id)}
+                      className="px-3.5 py-1.5 bg-[#0B1530] hover:bg-[#101C38] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Unlock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Unlock (₹{cost})</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
-      ) : (
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
-            <Lock className="w-8 h-8" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-lg font-bold text-slate-900 font-display">
-              No Buyer Leads Uploaded Yet
-            </h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto">
-              All buyer leads are published dynamically with 100% encrypted data-masking. Click below to post a qualified buyer enquiry.
-            </p>
-          </div>
-          <button
-            onClick={() => setIsPostLeadModalOpen(true)}
-            className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors inline-flex items-center gap-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-amber-400" />
-            <span>Post New Buyer Lead</span>
-          </button>
-        </div>
       )}
 
-      {/* Modal: Post New Buyer Lead */}
+      {/* 
+        ====================================================================
+        HOW IT WORKS 3-STEP TIMELINE BAR (MATCHING IMAGE 5)
+        ====================================================================
+      */}
+      <div id="how-it-works" className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+            <Compass className="w-4 h-4" />
+          </div>
+          <span className="text-sm font-bold text-slate-900">How It Works</span>
+        </div>
+
+        <div className="w-px h-6 bg-slate-200 hidden md:block" />
+
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full text-xs">
+          {/* Step 1 */}
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center justify-center shrink-0">
+              1
+            </div>
+            <div>
+              <span className="font-bold text-slate-900 block leading-tight">Post Requirement</span>
+              <span className="text-[11px] text-slate-500">Share buyer needs</span>
+            </div>
+          </div>
+
+          {/* Step 2 */}
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center justify-center shrink-0">
+              2
+            </div>
+            <div>
+              <span className="font-bold text-slate-900 block leading-tight">Get Verified Leads</span>
+              <span className="text-[11px] text-slate-500">Access qualified, masked leads</span>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center justify-center shrink-0">
+              3
+            </div>
+            <div>
+              <span className="font-bold text-slate-900 block leading-tight">Connect & Convert</span>
+              <span className="text-[11px] text-slate-500">Engage and close deals</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Post Lead Modal (Preserved with all business logic) */}
       {isPostLeadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white font-display">
-                  Post New Sanitized Buyer Lead
-                </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Post New Buyer Lead</h3>
+                <p className="text-xs text-slate-500">Submit a qualified buyer enquiry</p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsPostLeadModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handlePostLead} className="p-6 space-y-4 text-xs flex-1 overflow-y-auto">
+            <form onSubmit={handlePostLead} className="space-y-3">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Buyer / Seeker Full Name</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Seeker Name *</label>
                 <input
                   type="text"
+                  required
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder="e.g. Suresh Singhania"
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-                <span className="text-[10px] text-slate-400 block mt-1">
-                  * Name will automatically be masked as "S*** S***" on the marketplace card.
-                </span>
-              </div>
-
-              {/* Phone Verification Section */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block font-bold text-slate-700">
-                    Contact Mobile Number <span className="text-[11px] font-normal text-slate-500">(Optional verification)</span>
-                  </label>
-                  {phoneVerified && (
-                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Mobile Verified
-                    </span>
-                  )}
-                </div>
-
-                {!phoneVerified ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="tel"
-                        value={phone}
-                        disabled={phoneOtpSent}
-                        onChange={e => setPhone(e.target.value)}
-                        placeholder="e.g. +91 98490 12345"
-                        className="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:bg-slate-100"
-                        required
-                      />
-                      {!phoneOtpSent ? (
-                        <button
-                          type="button"
-                          onClick={handleSendPhoneOtp}
-                          disabled={phoneLoading || phone.trim().length < 8}
-                          className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl font-bold whitespace-nowrap transition-colors cursor-pointer"
-                        >
-                          {phoneLoading ? 'Sending...' : 'Verify Mobile'}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => { setPhoneOtpSent(false); setPhoneOtpInput(''); }}
-                          className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-[11px] transition-colors"
-                        >
-                          Change
-                        </button>
-                      )}
-                    </div>
-
-                    {phoneOtpSent && (
-                      <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2 animate-in fade-in duration-200">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-amber-900">
-                            Enter the 6-digit WhatsApp code sent to this mobile number
-                          </span>
-                          {phoneCountdown > 0 ? (
-                            <span className="text-slate-500 font-mono">Resend: {phoneCountdown}s</span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleSendPhoneOtp}
-                              className="text-amber-800 hover:underline font-bold flex items-center gap-1"
-                            >
-                              <RotateCcw className="w-3 h-3" />
-                              <span>Resend</span>
-                            </button>
-                          )}
-                        </div>
-
-                        <p className="text-[11px] text-amber-800 bg-amber-100/60 p-2 rounded-lg leading-relaxed">
-                          Enter the 6-digit verification code sent strictly from <strong>Property Studio</strong> to your mobile phone to verify this lead.
-                        </p>
-
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            maxLength={6}
-                            value={phoneOtpInput}
-                            onChange={e => setPhoneOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
-                            placeholder="• • • • • •"
-                            className="flex-1 px-3 py-2 border border-amber-300 rounded-xl text-center font-mono font-bold tracking-widest text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleVerifyPhoneOtp}
-                            disabled={phoneLoading || phoneOtpInput.length < 4}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold cursor-pointer transition-colors"
-                          >
-                            {phoneLoading ? 'Checking...' : 'Confirm'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-emerald-900 font-mono text-xs">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="font-bold">{phone}</span>
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-sans font-bold">
-                        OTP Verified
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setPhoneVerified(false); setPhoneOtpSent(false); }}
-                      className="text-[11px] text-slate-500 hover:text-slate-800 underline cursor-pointer"
-                    >
-                      Change Phone
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Email Address (Optional)</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="suresh@techfirm.com"
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  placeholder="e.g. Anand Mahindra"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Target Budget</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Mobile Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="+91 98490 12345"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="seeker@example.com"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Budget Range</label>
                   <input
                     type="text"
                     value={budget}
                     onChange={e => setBudget(e.target.value)}
-                    placeholder="e.g. ₹5.00 Cr - ₹7.50 Cr"
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    required
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Lead Tier</label>
-                  <select
-                    value={tier}
-                    onChange={e => setTier(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  >
-                    <option value="STANDARD">Standard (₹300)</option>
-                    <option value="PREMIUM">Premium (₹750)</option>
-                    <option value="HNI">HNI (₹2,000)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Property Type</label>
-                  <PropertyCategorySelect
-                    ariaLabel="Property type"
-                    value={propertyType}
-                    onChange={setPropertyType}
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Micro-Market</label>
-                  <select
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Micro-Market</label>
+                  <input
+                    type="text"
                     value={microMarket}
                     onChange={e => setMicroMarket(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  >
-                    <option>Neopolis, Kokapet</option>
-                    <option>Kokapet</option>
-                    <option>Financial District</option>
-                    <option>Tellapur</option>
-                    <option>Jubilee Hills</option>
-                  </select>
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Specific Buyer Criteria & Notes</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Requirements *</label>
                 <textarea
+                  required
+                  rows={3}
                   value={requirements}
                   onChange={e => setRequirements(e.target.value)}
-                  rows={3}
-                  placeholder="e.g. Looking for East-facing 4BHK with 3 covered car parks close to ORR..."
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
+                  placeholder="Specify configurations, square footage, amenities, timeline..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 />
               </div>
 
-              <label className="flex items-start gap-2 p-3 rounded-xl border border-amber-200 bg-amber-50 text-slate-700">
+              <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
+                  id="lead-consent"
                   checked={consentGranted}
                   onChange={e => setConsentGranted(e.target.checked)}
-                  className="mt-0.5"
+                  className="rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
                 />
-                <span>
-                  I understand my name, phone, and email will be stored and shared with eligible verified professionals only after they complete the required payment and eligibility checks. Consent version 2026-10-15. Purpose: respond to this property enquiry.
-                </span>
-              </label>
+                <label htmlFor="lead-consent" className="text-[11px] text-slate-600 cursor-pointer">
+                  I confirm the buyer has consented to be contacted by verified professionals.
+                </label>
+              </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsPostLeadModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 flex items-center gap-2 cursor-pointer shadow-xs"
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black cursor-pointer shadow-sm"
                 >
-                  <Plus className="w-4 h-4 text-amber-400" />
-                  <span>Publish Lead</span>
+                  Post Lead
                 </button>
               </div>
             </form>

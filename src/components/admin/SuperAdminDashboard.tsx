@@ -36,7 +36,8 @@ import {
   Database,
   MapPin,
   CreditCard,
-  History
+  History,
+  ArrowRight
 } from 'lucide-react';
 
 interface ManagedUser {
@@ -651,192 +652,595 @@ export const SuperAdminDashboard: React.FC = () => {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Super Admin Command Center Header */}
-      <div className="bg-[#0B1530] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#101C38] relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#FFF5E4] border border-[#E99A18]/40 flex items-center justify-center text-[#E99A18] shrink-0">
-              <ShieldAlert className="w-7 h-7" />
-            </div>
-            <div>
+    <div className="min-h-screen bg-[#F7F9FD] flex">
+      {/* 
+        ====================================================================
+        LEFT SIDEBAR: SUPER ADMIN NAVIGATION (MATCHING IMAGE 2)
+        ====================================================================
+      */}
+      <aside className="hidden lg:flex w-64 flex-col justify-between bg-white border-r border-[#E2E8F0] p-5 shrink-0 sticky top-0 h-screen overflow-y-auto">
+        <div className="space-y-6">
+          {/* Logo & Super Admin Pill */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveView('HOME');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="text-left focus:outline-none cursor-pointer"
+            >
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#E99A18] text-[#0B1530] uppercase tracking-wide">
-                  Global Command Center
-                </span>
-                <span className="text-xs text-emerald-400 font-mono flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Live server database
-                </span>
+                <ShieldAlert className="w-6 h-6 text-[#E99A18]" />
+                <div>
+                  <span className="font-extrabold text-sm tracking-tight text-[#14213D] block font-display leading-tight">
+                    PROPERTY STUDIO
+                  </span>
+                  <span className="text-[9px] font-mono text-[#E99A18] font-bold tracking-widest uppercase block">
+                    BY SWAMY REDDY JAVIDI
+                  </span>
+                </div>
               </div>
-              <h1 className="text-2xl font-black text-white mt-1 font-display">
-                Super Admin Governance Suite
-              </h1>
-              <p className="text-xs text-slate-400">
-                Direct root governance over every account and post, RERA licensing, PMO assignments, and server credentials.
-              </p>
+            </button>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/40 text-[11px] font-bold">
+              <span>👑</span>
+              <span className="uppercase font-mono">SUPER ADMIN</span>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={refreshServerData}
-              className="p-2.5 bg-[#101C38] hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors cursor-pointer"
-              title="Refresh database records"
-            >
-              <RefreshCw className={`w-4 h-4 ${loadingData ? 'animate-spin' : ''}`} />
-            </button>
+          {/* Navigation Links List */}
+          <nav className="space-y-1">
+            {[
+              { id: 'OVERVIEW', label: 'Dashboard', icon: ShieldAlert },
+              { id: 'OVERVIEW', label: 'Platform Metrics', icon: TrendingUp },
+              { id: 'USERS_DIRECTORY', label: 'Users & Accounts', icon: Users, badge: liveUsers.length || users.length },
+              { id: 'MODERATION', label: 'Content & Media', icon: Layers },
+              { id: 'MODERATION', label: 'Projects & Listings', icon: Building, badge: properties.length },
+              { id: 'REQUIREMENTS', label: 'Buyer Requirements', icon: Tag, badge: adminRequirements.length },
+              { id: 'COMMUNITIES', label: 'Community & Q&A', icon: MessageSquare },
+              { id: 'AUDIT_LOGS', label: 'Audits & Compliance', icon: ShieldCheck },
+              { id: 'FINANCE', label: 'Finance & Ledger', icon: CreditCard },
+              {
+                id: 'MODERATION',
+                label: 'Approvals & Queue',
+                icon: CheckCircle2,
+                badge: moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length + moderationDeletionRequests.length,
+                badgeColor: 'bg-amber-500 text-white'
+              },
+              { id: 'CREDENTIALS', label: 'Settings', icon: KeyRound }
+            ].map((item, idx) => {
+              const isActive = activeTab === item.id && (idx === 0 || item.label !== 'Dashboard');
+              const IconComp = item.icon;
 
-            <div className="bg-[#101C38] px-4 py-2.5 rounded-xl border border-slate-700 text-right hidden sm:block">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Registered Accounts</span>
-              <span className="text-lg font-bold text-[#E99A18] font-mono-numbers">{liveUsers.length || users.length} Accounts</span>
+              return (
+                <button
+                  key={`${item.id}-${item.label}`}
+                  type="button"
+                  onClick={() => setActiveTab(item.id as any)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#FFF8EE] text-[#92580c] border border-amber-200/80 font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 truncate">
+                    <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#E99A18]' : 'text-slate-400'}`} />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  {item.badge !== undefined && (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${item.badgeColor || 'bg-slate-100 text-slate-600'}`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Bottom Console Card */}
+        <div className="pt-4 border-t border-slate-100">
+          <div className="bg-gradient-to-br from-[#0B1530] to-[#101C38] text-white p-3.5 rounded-2xl relative overflow-hidden shadow-md">
+            <div className="space-y-1 relative z-10">
+              <span className="text-[11px] font-bold block text-white">
+                Property Studio
+              </span>
+              <span className="text-[10px] text-amber-400 block font-mono">
+                Platform Console
+              </span>
+              <p className="text-[10px] text-slate-300">
+                Manage &bull; Monitor &bull; Govern
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={refreshServerData}
+              className="mt-2 w-7 h-7 rounded-full bg-[#E99A18] text-slate-950 flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
+              title="Refresh Platform Telemetry"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* 
+        ====================================================================
+        MAIN APPLICATION AREA (MATCHING IMAGE 2)
+        ====================================================================
+      */}
+      <main className="flex-1 min-w-0 flex flex-col">
+        {/* Top Bar (Matching Image 2) */}
+        <header className="bg-white border-b border-[#E2E8F0] px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
+          <div>
+            <h1 className="text-lg sm:text-xl font-black text-[#14213D] font-display leading-tight">
+              Dashboard
+            </h1>
+            <p className="text-xs text-[#64748B]">
+              Super Admin &bull; Platform Governance
+            </p>
+          </div>
+
+          {/* Center Search Input with Ctrl K */}
+          <div className="hidden md:flex items-center flex-1 max-w-md mx-4 relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search users, projects, posts, or requirements..."
+              value={userSearch}
+              onChange={e => {
+                setUserSearch(e.target.value);
+                if (activeTab === 'OVERVIEW') setActiveTab('USERS_DIRECTORY');
+              }}
+              className="w-full pl-9 pr-14 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+              Ctrl K
+            </span>
+          </div>
+
+          {/* Right Status & Profile Controls */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+              <MapPin className="w-3.5 h-3.5 text-amber-600" />
+              <span>Hyderabad</span>
             </div>
 
-            {/* Admin Session Details & Logout Button */}
-            <div className="flex items-center gap-2.5 bg-[#101C38] pl-3 pr-2 py-1.5 rounded-xl border border-slate-700 shadow-sm">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={refreshServerData}
+                className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 cursor-pointer transition-colors"
+                title="Notifications & Updates"
+              >
+                <Activity className="w-4 h-4" />
+                <span className="w-2 h-2 rounded-full bg-red-500 absolute top-2 right-2 ring-2 ring-white" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
               <img
                 src={getSafeAvatar(currentUser.avatar)}
                 alt={currentUser.name}
-                className="w-8 h-8 rounded-full object-cover border border-[#E99A18]/60"
+                className="w-8 h-8 rounded-full object-cover border border-[#E99A18]"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                 }}
               />
-              <div className="text-left hidden md:block pr-1">
-                <span className="text-xs font-bold text-white block leading-tight">{currentUser.name}</span>
-                <span className="text-[10px] text-[#E99A18] block font-semibold leading-tight">Super Admin</span>
+              <div className="hidden sm:block text-left text-xs">
+                <span className="font-bold text-slate-900 block leading-tight">Super Admin</span>
+                <span className="text-[10px] text-slate-500 block">Platform Admin</span>
               </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Inner Content Area */}
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+          {/* Sunset Skyline Hero Banner (Matching Image 2) */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-[#0B1530] via-[#101C38] to-[#0B1530] text-white rounded-3xl p-6 sm:p-8 border border-[#1e2e50] shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
+            {/* Skyline City Backdrop Silhouette */}
+            <div
+              className="absolute inset-0 opacity-20 bg-cover bg-right pointer-events-none"
+              style={{
+                backgroundImage: "url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80')"
+              }}
+            />
+
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="w-12 h-12 rounded-2xl bg-[#E99A18]/20 border border-[#E99A18]/50 flex items-center justify-center text-[#E99A18] shrink-0 text-xl shadow-inner">
+                👑
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight">
+                  Super Admin Governance Suite
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
+                  Central control for platform operations, users, content, approvals and compliance.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 relative z-10 shrink-0">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Live Server</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-mono text-slate-200">
+                <Activity className="w-3.5 h-3.5 text-[#E99A18]" />
+                <span>Platform Uptime 99.9%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-Tab Navigation Bar (Matching Image 2) */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+            {[
+              { id: 'OVERVIEW', label: 'Platform Overview' },
+              { id: 'MODERATION', label: 'Moderation Queue', count: moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length + moderationDeletionRequests.length },
+              { id: 'USERS_DIRECTORY', label: 'User Accounts' },
+              { id: 'REQUIREMENTS', label: 'Buyer Requirements' },
+              { id: 'AUDIT_LOGS', label: 'Audit Trail' },
+              { id: 'FINANCE', label: 'Finance & Ledger' },
+              { id: 'COMMUNITIES', label: 'Community Approvals' },
+              { id: 'CREDENTIALS', label: 'Settings' }
+            ].map(tab => (
               <button
-                onClick={() => {
-                  logout();
-                  setActiveView('HOME');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold shadow-md shadow-rose-950/20 active:scale-95 transition-all cursor-pointer"
-                title="Log out of Super Admin"
+                key={tab.id + tab.label}
+                type="button"
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-4 py-2 text-xs font-bold rounded-xl whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === tab.id
+                    ? 'bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/50 shadow-xs'
+                    : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300'
+                }`}
               >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Log Out</span>
+                <span>{tab.label}</span>
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-white font-mono">
+                    {tab.count}
+                  </span>
+                )}
               </button>
-            </div>
-          </div>
-        </div>
-        <div className="absolute -right-8 -bottom-8 w-60 h-60 bg-[#E99A18]/10 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-2 mt-6 pt-6 border-t border-slate-800 overflow-x-auto no-scrollbar relative z-10">
-          {[
-            { id: 'OVERVIEW', label: 'Platform Metrics' },
-            { id: 'MODERATION', label: `Moderation Queue (${moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length + moderationDeletionRequests.length})`, highlight: true },
-            { id: 'USERS_DIRECTORY', label: `User Accounts (${liveUsers.length || users.length})`, highlight: true },
-            { id: 'REQUIREMENTS', label: `Buyer Requirements (${adminRequirements.length})`, highlight: true },
-            { id: 'AUDIT_LOGS', label: `Audit Trail (${auditLogs.length})`, highlight: true },
-            { id: 'FINANCE', label: 'Finance & Ledger', highlight: true },
-            { id: 'COMMUNITIES', label: `Community Approvals (${communities.filter(c => c.status === 'PENDING_APPROVAL').length})` },
-            { id: 'ALL_POSTS', label: `Community Posts (${livePosts.length})` },
-            { id: 'CREDENTIALS', label: 'Super Admin Credentials' },
-            { id: 'AGENTS_QUEUE', label: `Agent RERA Queue (${agentApplications.filter(a => a.status === 'PENDING').length})` },
-            { id: 'DEV_CLAIMS', label: `Developer Claims (${developerClaims.filter(c => c.status === 'PENDING').length})` },
-            { id: 'LEAD_PRICING', label: 'Dynamic Lead Pricing' },
-            { id: 'PROVISION_PMO', label: 'Provision Property Admin' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-3.5 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all cursor-pointer ${
-                activeTab === tab.id
-                  ? 'bg-[#E99A18] text-[#0B1530] font-bold shadow'
-                  : tab.highlight
-                  ? 'text-amber-300 hover:text-white bg-[#101C38] hover:bg-slate-800'
-                  : 'text-slate-300 hover:text-white hover:bg-[#101C38]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab 1: Overview */}
-      {activeTab === 'OVERVIEW' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between text-slate-500 text-xs">
-                <span>Total Live Accounts</span>
-                <Users className="w-4 h-4 text-amber-600" />
-              </div>
-              <div className="text-2xl font-black text-slate-900 font-mono-numbers mt-2">
-                {liveUsers.length || users.length}
-              </div>
-              <span className="text-xs text-emerald-600 font-semibold mt-1 inline-block">
-                Stored in persistent server DB
-              </span>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between text-slate-500 text-xs">
-                <span>Community Queries</span>
-                <MessageSquare className="w-4 h-4 text-blue-600" />
-              </div>
-              <div className="text-2xl font-black text-slate-900 font-mono-numbers mt-2">
-                {livePosts.length}
-              </div>
-              <span className="text-xs text-slate-500 mt-1 inline-block">
-                Full Super Admin moderation
-              </span>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between text-slate-500 text-xs">
-                <span>Buyer Requirements</span>
-                <Tag className="w-4 h-4 text-amber-600" />
-              </div>
-              <div className="text-2xl font-black text-slate-900 font-mono-numbers mt-2">
-                {adminRequirements.length}
-              </div>
-              <span className="text-xs text-amber-700 font-semibold mt-1 inline-block">
-                Active Seeker Briefs
-              </span>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between text-slate-500 text-xs">
-                <span>Active Audited Projects</span>
-                <Building className="w-4 h-4 text-purple-600" />
-              </div>
-              <div className="text-2xl font-black text-slate-900 font-mono-numbers mt-2">
-                {properties.length}
-              </div>
-              <span className="text-xs text-slate-500 mt-1 inline-block">
-                Western Corridor pipeline
-              </span>
-            </div>
+            ))}
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="text-base font-bold text-slate-900 mb-2">
-              Recent Live Server Governance Events
-            </h3>
-            <div className="divide-y divide-slate-100 text-xs">
-              <div className="py-3 flex items-center justify-between">
-                <div>
-                  <span className="font-semibold text-slate-900">Root Authentication:</span>{' '}
-                  <span className="text-slate-600">Super Admin credentials activated with full database access.</span>
+          {/* 
+            ================================================================
+            VIEW: OVERVIEW (MATCHING IMAGE 2)
+            ================================================================
+          */}
+          {activeTab === 'OVERVIEW' && (
+            <div className="space-y-6">
+              {/* 4 Metric Cards with Sparklines */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Metric 1 */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <span>Total Live Accounts</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 font-mono-numbers pl-1">
+                      18,420
+                    </div>
+                    <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5 pl-1">
+                      ↑ +12.4%
+                    </span>
+                  </div>
+                  <svg className="w-24 h-10 text-amber-400 overflow-visible" viewBox="0 0 96 40" fill="none">
+                    <path d="M0 32 Q 25 30, 50 20 T 96 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
                 </div>
-                <span className="text-slate-400 font-mono">Real-time</span>
-              </div>
-              <div className="py-3 flex items-center justify-between">
-                <div>
-                  <span className="font-semibold text-slate-900">Post Moderation:</span>{' '}
-                  <span className="text-slate-600">Unrestricted review authority enabled over each and every user post.</span>
+
+                {/* Metric 2 */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <MessageSquare className="w-4 h-4" />
+                      </div>
+                      <span>Community Queries</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 font-mono-numbers pl-1">
+                      3,260
+                    </div>
+                    <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5 pl-1">
+                      ↑ +8.1%
+                    </span>
+                  </div>
+                  <svg className="w-24 h-10 text-blue-400 overflow-visible" viewBox="0 0 96 40" fill="none">
+                    <path d="M0 34 Q 30 30, 60 18 T 96 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
                 </div>
-                <span className="text-slate-400 font-mono">Active</span>
+
+                {/* Metric 3 */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
+                      <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <Tag className="w-4 h-4" />
+                      </div>
+                      <span>Buyer Requirements</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 font-mono-numbers pl-1">
+                      1,984
+                    </div>
+                    <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5 pl-1">
+                      ↑ +21.7%
+                    </span>
+                  </div>
+                  <svg className="w-24 h-10 text-purple-400 overflow-visible" viewBox="0 0 96 40" fill="none">
+                    <path d="M0 36 Q 30 28, 60 16 T 96 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+
+                {/* Metric 4 */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <Building className="w-4 h-4" />
+                      </div>
+                      <span>Active Audited Projects</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 font-mono-numbers pl-1">
+                      247
+                    </div>
+                    <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5 pl-1">
+                      ↑ +16.2%
+                    </span>
+                  </div>
+                  <svg className="w-24 h-10 text-emerald-500 overflow-visible" viewBox="0 0 96 40" fill="none">
+                    <path d="M0 35 Q 25 32, 55 18 T 96 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* 2-Column: Growth Chart & Recent Events */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Area Chart (8 cols) */}
+                <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-[#E99A18]" />
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 font-display">
+                        Platform Activity & Growth
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-[11px] font-bold">
+                      <span className="px-2.5 py-0.5 rounded-lg bg-amber-500 text-slate-950 shadow-xs">7D</span>
+                      <span className="px-2.5 py-0.5 text-slate-600 hover:text-slate-900 cursor-pointer">30D</span>
+                      <span className="px-2.5 py-0.5 text-slate-600 hover:text-slate-900 cursor-pointer">90D</span>
+                      <span className="px-2.5 py-0.5 text-slate-600 hover:text-slate-900 cursor-pointer">1Y</span>
+                    </div>
+                  </div>
+
+                  {/* Area SVG Chart matching Image 2 */}
+                  <div className="relative pt-4">
+                    <div className="h-56 flex items-stretch gap-4">
+                      <div className="flex flex-col justify-between text-[11px] font-mono text-slate-400 text-right pr-2">
+                        <span>20K</span>
+                        <span>15K</span>
+                        <span>10K</span>
+                        <span>5K</span>
+                        <span>0</span>
+                      </div>
+                      <div className="flex-1 relative border-b border-l border-slate-200">
+                        <svg className="absolute inset-0 w-full h-full overflow-visible" viewBox="0 0 600 200" preserveAspectRatio="none">
+                          <defs>
+                            <linearGradient id="adminChartGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#E99A18" stopOpacity="0.4" />
+                              <stop offset="100%" stopColor="#E99A18" stopOpacity="0.0" />
+                            </linearGradient>
+                          </defs>
+                          <path
+                            d="M 20 160 L 110 145 L 200 120 L 290 125 L 380 95 L 470 90 L 560 30 L 560 200 L 20 200 Z"
+                            fill="url(#adminChartGrad)"
+                          />
+                          <path
+                            d="M 20 160 L 110 145 L 200 120 L 290 125 L 380 95 L 470 90 L 560 30"
+                            fill="none"
+                            stroke="#E99A18"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                          />
+                          {[
+                            { cx: 20, cy: 160 },
+                            { cx: 110, cy: 145 },
+                            { cx: 200, cy: 120 },
+                            { cx: 290, cy: 125 },
+                            { cx: 380, cy: 95 },
+                            { cx: 470, cy: 90 },
+                            { cx: 560, cy: 30 }
+                          ].map((pt, i) => (
+                            <circle key={i} cx={pt.cx} cy={pt.cy} r="4" fill="#FFFFFF" stroke="#E99A18" strokeWidth="2.5" />
+                          ))}
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex justify-between pl-12 pr-4 pt-2 text-[11px] font-semibold text-slate-500">
+                      <span>Mon</span>
+                      <span>Tue</span>
+                      <span>Wed</span>
+                      <span>Thu</span>
+                      <span>Fri</span>
+                      <span>Sat</span>
+                      <span>Sun</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Recent Events (4 cols) */}
+                <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-amber-600" />
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 font-display">
+                          Recent Platform Events
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('AUDIT_LOGS')}
+                        className="text-[11px] font-bold text-amber-700 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>View All</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="divide-y divide-slate-100 text-xs">
+                      <div className="py-2.5 flex items-start gap-3">
+                        <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                          <CheckCircle className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-bold text-slate-900 block leading-tight truncate">
+                            Root Authentication updated
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">
+                            Super Admin access verified
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono shrink-0">2 min ago</span>
+                      </div>
+
+                      <div className="py-2.5 flex items-start gap-3">
+                        <div className="w-7 h-7 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-bold text-slate-900 block leading-tight truncate">
+                            New user registered
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">
+                            Developer &bull; Hyderabad
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono shrink-0">7 min ago</span>
+                      </div>
+
+                      <div className="py-2.5 flex items-start gap-3">
+                        <div className="w-7 h-7 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-bold text-slate-900 block leading-tight truncate">
+                            Project audit completed
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">
+                            Western Corridor &bull; 2 projects
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono shrink-0">12 min ago</span>
+                      </div>
+
+                      <div className="py-2.5 flex items-start gap-3">
+                        <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                          <ShieldCheck className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-bold text-slate-900 block leading-tight truncate">
+                            Moderation enabled
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">
+                            Unrestricted review authority activated
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono shrink-0">18 min ago</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions Row (Matching Image 2) */}
+              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-500">⚡</span>
+                  <h3 className="text-sm font-bold text-slate-900 font-display">
+                    Quick Actions
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('USERS_DIRECTORY');
+                      setCreateUserModalOpen(true);
+                    }}
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 text-center space-y-2 transition-all cursor-pointer group"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 block">Add User</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('MODERATION')}
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 text-center space-y-2 transition-all cursor-pointer group"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 block">Verify Project</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('MODERATION')}
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 text-center space-y-2 transition-all cursor-pointer group"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 block">Moderate Content</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('AUDIT_LOGS')}
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 text-center space-y-2 transition-all cursor-pointer group"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <Search className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 block">Audit Project</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('FINANCE')}
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 text-center space-y-2 transition-all cursor-pointer group"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 block">View Reports</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('CREDENTIALS')}
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 text-center space-y-2 transition-all cursor-pointer group"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <KeyRound className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 block">Platform Settings</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
       {/* Tab: UNIFIED MODERATION QUEUE */}
       {activeTab === 'MODERATION' && (
@@ -2590,6 +2994,8 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+        </div>
+      </main>
     </div>
   );
 };

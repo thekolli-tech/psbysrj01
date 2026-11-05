@@ -7,7 +7,6 @@ coverage/
 *.log
 .env*
 !.env.example
-data/*.db
-data/backups/
+data/
 .credentials/
 .vercel
