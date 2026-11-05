@@ -292,7 +292,7 @@ const AppContent: React.FC = () => {
         )}
 
         {activeView === 'CONTACT' && (
-          <ContactPropertyAdmin />
+          <ContactPropertyAdmin onOpenSupport={() => setSupportOpen(true)} />
         )}
 
         {activeView === 'PRIVACY' && (

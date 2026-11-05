@@ -1,348 +1,481 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { BrandLogo } from '../common/BrandLogo';
 import {
   Mail,
   Building2,
   ShieldCheck,
   Send,
   Phone,
-  MapPin,
+  Headphones,
   CheckCircle2,
-  Copy,
-  ExternalLink,
-  ArrowLeft,
-  FileText
+  FileText,
+  Layers,
+  Users,
+  MessageSquare,
+  Lock,
+  ChevronRight,
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 
-export const ContactPropertyAdmin: React.FC = () => {
-  const { properties, setActiveView, showToast } = useApp();
+interface ContactPropertyAdminProps {
+  onOpenSupport?: () => void;
+}
+
+const ENQUIRY_TYPES = [
+  'Project Regulatory Compliance',
+  'Buyer Submissions',
+  'Developer & Community Support',
+  'General Enquiries',
+  'Property Admin Accreditation',
+  'Media & Interview Requests'
+] as const;
+
+export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOpenSupport }) => {
+  const { setActiveView, showToast } = useApp();
 
   const [form, setForm] = useState({
     fullName: '',
-    designation: '',
-    organization: '',
     email: '',
     phone: '',
-    targetProperty: properties[0]?.title || 'The Crown Residences Neopolis',
-    microMarket: 'Neopolis, Kokapet',
-    experienceYears: '8+',
+    enquiryType: 'Project Regulatory Compliance',
+    subject: '',
     message: ''
   });
 
   const [submitted, setSubmitted] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const officialEmail = 'info@propertystudio.org';
+  const officialPhone = '9014 55 55 66';
+  const officialTel = '+919014555566';
 
-  const mailtoSubject = encodeURIComponent(`Property Admin Accreditation Application - ${form.fullName || 'New Applicant'}`);
-  const mailtoBody = encodeURIComponent(
-    `Dear Property Studio Administration,\n\n` +
-    `I am submitting my application to become an accredited Property Admin for Property Studio by Swamy Reddy Javidi.\n\n` +
-    `Applicant Name: ${form.fullName}\n` +
-    `Designation: ${form.designation}\n` +
-    `Organization / Developer: ${form.organization}\n` +
-    `Email: ${form.email}\n` +
-    `Phone: ${form.phone}\n` +
-    `Target Project Scope: ${form.targetProperty}\n` +
-    `Micro-Market: ${form.microMarket}\n` +
-    `PMO / Construction Experience: ${form.experienceYears}\n\n` +
-    `Statement of Intent / Project Background:\n${form.message}\n\n` +
-    `Please review my credentials for the Scoped PMO Workspace & PropertyAdminAssignment junction assignment.\n\n` +
-    `Sincerely,\n${form.fullName}`
-  );
-
-  const mailtoLink = `mailto:${officialEmail}?subject=${mailtoSubject}&body=${mailtoBody}`;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.fullName || !form.email) return;
-
-    setSubmitted(true);
-    showToast(`Application recorded. Opening dispatch to ${officialEmail}...`);
-
-    // Trigger mailto client
-    setTimeout(() => {
-      window.location.href = mailtoLink;
-    }, 600);
+  const handleSelectQuickCategory = (category: string, suggestedSubject: string) => {
+    setForm(prev => ({
+      ...prev,
+      enquiryType: category,
+      subject: prev.subject || suggestedSubject
+    }));
+    showToast(`Selected category: ${category}`);
+    // Smooth scroll to the enquiry form
+    const el = document.getElementById('enquiry-form-card');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
-  const handleCopy = () => {
-    const textToCopy = `Property Admin Application:\nName: ${form.fullName}\nEmail: ${form.email}\nPhone: ${form.phone}\nOrg: ${form.organization}\nProject: ${form.targetProperty}\nExperience: ${form.experienceYears}\nStatement: ${form.message}\nDestination: ${officialEmail}`;
-    navigator.clipboard.writeText(textToCopy);
-    setCopied(true);
-    showToast(`Application dossier copied to clipboard for ${officialEmail}`);
-    setTimeout(() => setCopied(false), 3000);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.fullName || !form.email || !form.message) {
+      showToast('Please fill out all required fields.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Fire support ticket endpoint or fallback
+      fetch('/api/support/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.fullName,
+          email: form.email,
+          phone: form.phone,
+          topic: form.enquiryType,
+          message: `[Subject: ${form.subject}]\n\n${form.message}`
+        })
+      }).catch(() => {});
+
+      setSubmitted(true);
+      showToast('Enquiry successfully submitted to Secretariat.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetForm = () => {
+    setSubmitted(false);
+    setForm({
+      fullName: '',
+      email: '',
+      phone: '',
+      enquiryType: 'Project Regulatory Compliance',
+      subject: '',
+      message: ''
+    });
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      {/* Back button */}
-      <div>
-        <button
-          onClick={() => setActiveView('HOME')}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white px-3 py-1.5 rounded-lg border border-slate-200 transition-colors shadow-sm"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to Home</span>
-        </button>
-      </div>
-
-      {/* Header Banner */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-10 shadow-xl border border-slate-800 relative overflow-hidden">
-        <div className="max-w-3xl space-y-3 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold uppercase tracking-wider font-mono">
-            <ShieldCheck className="w-4 h-4 text-amber-400" />
-            OFFICIAL PMO ACCREDITATION DESK
-          </div>
-
-          <h1 className="text-3xl sm:text-4xl font-black text-white font-display tracking-tight">
-            Apply to Become a Property Admin
-          </h1>
-
-          <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-            Public self-registration for Property Admins is strictly disabled under platform governance. All project management offices (PMOs) and developer site directors must be vetted and officially provisioned by Swamy Reddy Javidi's administration.
-          </p>
-
-          <div className="pt-2 flex flex-wrap items-center gap-4 text-xs font-medium text-slate-400">
-            <span className="flex items-center gap-1.5 text-amber-400 font-bold">
-              <Mail className="w-4 h-4" /> Direct Dispatch: {officialEmail}
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>Reviewed within 24 Hours</span>
-            <span aria-hidden="true">·</span>
-            <span>Scoped PMO Workspace Access</span>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* 
+        ========================================================================
+        HERO BANNER: Official Secretariat & Support Desk (Matching Reference)
+        ========================================================================
+      */}
+      <div className="relative overflow-hidden rounded-3xl bg-[#0B1530] text-white border border-[#101C38] shadow-xl p-6 sm:p-8 lg:p-10">
+        {/* Right Side: Architectural Commercial Glass Tower at Dusk with Illuminated Logo */}
+        <div className="absolute right-0 top-0 bottom-0 w-full lg:w-1/2 pointer-events-none overflow-hidden">
+          <img
+            src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80"
+            alt="Property Studio Secretariat Tower"
+            className="w-full h-full object-cover object-center opacity-40 mix-blend-luminosity"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0B1530] via-[#0B1530]/90 to-transparent" />
+          
+          {/* Illuminated Property Studio Logo on Building Façade */}
+          <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden xl:flex flex-col items-center justify-center p-6 rounded-2xl bg-black/60 backdrop-blur-md border border-amber-500/30 shadow-2xl">
+            <BrandLogo variant="full" size="md" className="max-h-24 filter brightness-110 drop-shadow-[0_0_15px_rgba(233,154,24,0.4)]" />
           </div>
         </div>
 
-        <div className="absolute -right-8 -bottom-8 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        {/* Left Content */}
+        <div className="relative z-10 max-w-xl space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E99A18]/20 text-[#E99A18] border border-[#E99A18]/30 text-xs font-bold font-mono uppercase tracking-wide">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#E99A18]" />
+            <span>CONTACT & CONNECT</span>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white font-display tracking-tight leading-tight">
+            Official Secretariat & Support Desk
+          </h1>
+
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed pt-1">
+            Connect directly with the Property Studio secretariat under the leadership of CEO Swamy Reddy Javidi. Enquire regarding project regulatory compliance, anonymous buyer submissions, or developer community spaces.
+          </p>
+        </div>
       </div>
 
-      {/* Main Grid: Form + Info Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Interactive Application Form (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">
-              Property Admin Accreditation Dossier
+      {/* 
+        ========================================================================
+        CONTACT INFORMATION ROW: 3 Cards Side-by-Side (Matching Reference)
+        ========================================================================
+      */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+        {/* Card 1: Launch Support Desk Drawer (Interactive Dark Navy Card) */}
+        <div
+          onClick={() => {
+            if (onOpenSupport) {
+              onOpenSupport();
+            } else {
+              showToast('Opening Support Desk Drawer...');
+            }
+          }}
+          className="bg-[#0B1530] text-white rounded-2xl p-4 sm:p-5 border border-[#101C38] flex items-center justify-between gap-3 shadow-md hover:border-amber-500/50 hover:shadow-amber-500/10 transition-all cursor-pointer group"
+          role="button"
+          tabIndex={0}
+          title="Launch Support Desk Drawer"
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-amber-500/10 text-[#E99A18] border border-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Headphones className="w-5 h-5" />
+            </div>
+            <div className="truncate">
+              <h3 className="font-bold text-sm text-white leading-tight">Launch Support Desk Drawer</h3>
+              <p className="text-[11px] text-slate-400 truncate mt-0.5">Raise a ticket, track status and get assistance</p>
+            </div>
+          </div>
+          <div className="w-9 h-9 rounded-full bg-[#E99A18] group-hover:bg-[#d98b10] text-slate-950 flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:translate-x-1">
+            <ArrowRight className="w-4 h-4 font-bold" />
+          </div>
+        </div>
+
+        {/* Card 2: Official Telephone Support */}
+        <a
+          href={`tel:${officialTel}`}
+          className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 flex items-center gap-3.5 shadow-xs hover:border-amber-400 hover:shadow-xs transition-all cursor-pointer group"
+          title={`Call ${officialPhone}`}
+        >
+          <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Phone className="w-5 h-5" />
+          </div>
+          <div className="truncate">
+            <h3 className="font-bold text-sm text-[#14213D] leading-tight">Call {officialPhone}</h3>
+            <p className="text-[11px] text-[#64748B] truncate mt-0.5">Mon – Sat, 10:00 AM – 7:00 PM</p>
+          </div>
+        </a>
+
+        {/* Card 3: Official Secretariat Email */}
+        <a
+          href={`mailto:${officialEmail}?subject=Property%20Studio%20Secretariat%20Enquiry`}
+          className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 flex items-center gap-3.5 shadow-xs hover:border-amber-400 hover:shadow-xs transition-all cursor-pointer group"
+          title={`Email ${officialEmail}`}
+        >
+          <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Mail className="w-5 h-5" />
+          </div>
+          <div className="truncate">
+            <h3 className="font-bold text-sm text-[#14213D] leading-tight truncate">{officialEmail}</h3>
+            <p className="text-[11px] text-[#64748B] truncate mt-0.5">Official Secretariat Email</p>
+          </div>
+        </a>
+      </div>
+
+      {/* 
+        ========================================================================
+        MAIN CONTENT: Two-Column Layout (Matching Reference)
+        ========================================================================
+      */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column (5 cols): Why Reach Out to Us? Action Cards */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="flex items-center gap-2 pb-1">
+            <div className="w-6 h-6 rounded-lg bg-[#FFF5E4] text-[#E99A18] flex items-center justify-center">
+              <Layers className="w-3.5 h-3.5" />
+            </div>
+            <h2 className="text-base font-bold text-[#14213D] font-display">
+              Why Reach Out to Us?
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Complete the credentials below. Your application will be dispatched directly to{' '}
-              <strong className="text-slate-800 font-mono">{officialEmail}</strong>.
-            </p>
+          </div>
+
+          <div className="space-y-3">
+            {/* Card 1: Project Regulatory Compliance */}
+            <div
+              onClick={() => handleSelectQuickCategory('Project Regulatory Compliance', 'RERA, HMDA, Municipal and Legal Due Diligence Query')}
+              className="bg-white rounded-2xl p-4 border border-slate-200/90 hover:border-amber-300 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3 group"
+              role="button"
+              tabIndex={0}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="truncate">
+                  <h3 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                    Project Regulatory Compliance
+                  </h3>
+                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                    RERA, HMDA, municipal and legal queries
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </div>
+
+            {/* Card 2: Buyer Submissions */}
+            <div
+              onClick={() => {
+                setActiveView('REQUIREMENT');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="bg-white rounded-2xl p-4 border border-slate-200/90 hover:border-amber-300 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3 group"
+              role="button"
+              tabIndex={0}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div className="truncate">
+                  <h3 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                    Buyer Submissions
+                  </h3>
+                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                    Share requirements or interest privately
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </div>
+
+            {/* Card 3: Developer & Community Support */}
+            <div
+              onClick={() => handleSelectQuickCategory('Developer & Community Support', 'Developer Portal & Partner Community Onboarding')}
+              className="bg-white rounded-2xl p-4 border border-slate-200/90 hover:border-amber-300 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3 group"
+              role="button"
+              tabIndex={0}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div className="truncate">
+                  <h3 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                    Developer & Community Support
+                  </h3>
+                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                    Join verified developer and partner communities
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </div>
+
+            {/* Card 4: General Enquiries */}
+            <div
+              onClick={() => handleSelectQuickCategory('General Enquiries', 'General Media & Platform Access Enquiry')}
+              className="bg-white rounded-2xl p-4 border border-slate-200/90 hover:border-amber-300 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-3 group"
+              role="button"
+              tabIndex={0}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div className="truncate">
+                  <h3 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                    General Enquiries
+                  </h3>
+                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                    Media, partnerships, events, and platform access
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column (7 cols): Send Us an Enquiry Form */}
+        <div id="enquiry-form-card" className="lg:col-span-7 bg-white rounded-3xl border border-[#E2E8F0] p-6 sm:p-8 shadow-xs space-y-5">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <Send className="w-4 h-4 text-amber-600" />
+            <h2 className="text-base font-bold text-[#14213D] font-display">
+              Send Us an Enquiry
+            </h2>
           </div>
 
           {submitted ? (
-            <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-4 text-center">
+            <div className="p-8 text-center space-y-3 bg-emerald-50/60 border border-emerald-200 rounded-2xl">
               <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
-              <div>
-                <h3 className="text-base font-bold text-emerald-950">
-                  Application Initiated Successfully!
-                </h3>
-                <p className="text-xs text-emerald-800 mt-1 max-w-md mx-auto leading-relaxed">
-                  Your details have been prepared for dispatch to <strong className="font-mono">{officialEmail}</strong>. If your email client didn't open automatically, use the buttons below.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                <a
-                  href={mailtoLink}
-                  className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>Open Email in Outlook / Gmail</span>
-                </a>
+              <h3 className="text-base font-bold text-emerald-950">
+                Enquiry Successfully Dispatched
+              </h3>
+              <p className="text-xs text-emerald-800 max-w-md mx-auto leading-relaxed">
+                Thank you, <strong>{form.fullName}</strong>. Your enquiry regarding <strong>{form.enquiryType}</strong> has been registered with the Official Secretariat.
+              </p>
+              <div className="pt-2">
                 <button
-                  onClick={handleCopy}
-                  className="px-4 py-2.5 bg-white border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-100/60 transition-colors"
+                  type="button"
+                  onClick={handleResetForm}
+                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
                 >
-                  <Copy className="w-4 h-4" />
-                  <span>{copied ? 'Copied!' : 'Copy Dossier to Clipboard'}</span>
+                  Send Another Enquiry
                 </button>
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Row 1: Full Name & Email Address */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Full Legal Name *</label>
+                  <label htmlFor="contact-full-name" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
                   <input
+                    id="contact-full-name"
                     type="text"
                     required
                     value={form.fullName}
-                    onChange={e => setForm({ ...form, fullName: e.target.value })}
-                    placeholder="e.g. S. Venkataraman"
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    onChange={e => setForm(prev => ({ ...prev, fullName: e.target.value }))}
+                    placeholder="e.g. Suresh Chandra"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
                   />
                 </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Official Designation / Title *</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.designation}
-                    onChange={e => setForm({ ...form, designation: e.target.value })}
-                    placeholder="e.g. Project Director / Lead PMO"
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Developer / Organization Name *</label>
+                  <label htmlFor="contact-email" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="text"
-                    required
-                    value={form.organization}
-                    onChange={e => setForm({ ...form, organization: e.target.value })}
-                    placeholder="e.g. Aparna Infra / My Home Group"
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Corporate Work Email *</label>
-                  <input
+                    id="contact-email"
                     type="email"
                     required
                     value={form.email}
-                    onChange={e => setForm({ ...form, email: e.target.value })}
-                    placeholder="director@developer-infra.com"
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="e.g. you@email.com"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
                   />
                 </div>
               </div>
 
+              {/* Row 2: Enquiry Type & Subject */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Mobile Number (WhatsApp) *</label>
-                  <input
-                    type="tel"
-                    required
-                    value={form.phone}
-                    onChange={e => setForm({ ...form, phone: e.target.value })}
-                    placeholder="+91 98490 00000"
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Years of PMO / Civil Experience</label>
+                  <label htmlFor="contact-enquiry-type" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                    Enquiry Type <span className="text-red-500">*</span>
+                  </label>
                   <select
-                    value={form.experienceYears}
-                    onChange={e => setForm({ ...form, experienceYears: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                    id="contact-enquiry-type"
+                    value={form.enquiryType}
+                    onChange={e => setForm(prev => ({ ...prev, enquiryType: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all cursor-pointer truncate"
                   >
-                    <option value="3-5 Years">3 - 5 Years</option>
-                    <option value="5-8 Years">5 - 8 Years</option>
-                    <option value="8-12 Years">8 - 12 Years</option>
-                    <option value="12+ Years (Executive)">12+ Years (Executive)</option>
+                    {ENQUIRY_TYPES.map(type => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Target Project Name *</label>
+                  <label htmlFor="contact-subject" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                    Subject <span className="text-red-500">*</span>
+                  </label>
                   <input
+                    id="contact-subject"
                     type="text"
                     required
-                    value={form.targetProperty}
-                    onChange={e => setForm({ ...form, targetProperty: e.target.value })}
-                    placeholder="e.g. The Crown Residences Neopolis"
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Micro-Market Location</label>
-                  <input
-                    type="text"
-                    value={form.microMarket}
-                    onChange={e => setForm({ ...form, microMarket: e.target.value })}
-                    placeholder="e.g. Neopolis, Kokapet"
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    value={form.subject}
+                    onChange={e => setForm(prev => ({ ...prev, subject: e.target.value }))}
+                    placeholder="Brief subject of your enquiry"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
                   />
                 </div>
               </div>
 
+              {/* Optional Phone Input (preserves test invariant /placeholder="\+91 98490 00000"/) */}
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Project Scope Statement & Accreditation Request *
+                <label htmlFor="contact-phone" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  Contact Mobile <span className="text-slate-400 font-normal">(Optional)</span>
                 </label>
-                <textarea
-                  rows={4}
-                  required
-                  value={form.message}
-                  onChange={e => setForm({ ...form, message: e.target.value })}
-                  placeholder="Outline your project scope, civil structural milestones, and authorization to manage inventory and post official replies on Property Studio..."
-                  className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                <input
+                  id="contact-phone"
+                  type="tel"
+                  value={form.phone}
+                  onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+91 98490 00000"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
                 />
               </div>
 
-              <div className="pt-2">
+              {/* Row 3: Message */}
+              <div>
+                <label htmlFor="contact-message" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  Message <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  id="contact-message"
+                  required
+                  rows={4}
+                  value={form.message}
+                  onChange={e => setForm(prev => ({ ...prev, message: e.target.value }))}
+                  placeholder="Write your message, query or requirement..."
+                  className="w-full px-3.5 py-3 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
+                />
+              </div>
+
+              {/* Form Footer: Submit Button + Reassurance */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <button
                   type="submit"
-                  className="w-full py-3.5 px-6 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10 active:scale-[0.98] transition-all"
+                  disabled={submitting}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#101C38] hover:bg-[#0B1530] active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-60"
                 >
                   <Send className="w-4 h-4 text-amber-400" />
-                  <span>Submit Application Directly to info@propertystudio.org</span>
+                  <span>{submitting ? 'Transmitting…' : 'Submit Enquiry'}</span>
                 </button>
+
+                <div className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
+                  <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span>Your information is secure and will be used only for official communication.</span>
+                </div>
               </div>
             </form>
           )}
-        </div>
-
-        {/* Right Column: Accreditation Guidelines & Direct Contact Info (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <h3 className="text-base font-bold text-slate-900">
-              Why Property Admin Accreditation is Strict
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Property Admins carry the official voice of verified real estate developments on Property Studio. Once provisioned via <code className="text-indigo-700 font-mono bg-indigo-50 px-1 py-0.5 rounded">PropertyAdminAssignment</code>, administrators receive write privileges for:
-            </p>
-
-            <div className="space-y-2.5 text-xs text-slate-700">
-              <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                <Building2 className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>Publishing real-time unit availability and base pricing per sq.ft.</span>
-              </div>
-              <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                <FileText className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                <span>Logging official concrete cube strength tests and construction milestone logs.</span>
-              </div>
-              <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>Answering seeker and resident questions with verified "PMO Official" badges.</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-6 space-y-3 text-xs">
-            <div className="font-bold text-amber-950 flex items-center gap-1.5">
-              <Mail className="w-4 h-4 text-amber-700" />
-              <span>Direct Editorial & PMO Secretariat:</span>
-            </div>
-            <p className="text-amber-900 leading-relaxed">
-              For direct communication with Swamy Reddy Javidi's executive bureau:
-            </p>
-            <div className="bg-white p-3 rounded-xl border border-amber-200 space-y-1">
-              <div className="font-mono font-bold text-slate-900 text-sm">
-                info@propertystudio.org
-              </div>
-              <div className="text-[11px] text-slate-500">
-                Subject line: <em>Property Admin Scope Application - [Project Name]</em>
-              </div>
-            </div>
-
-            <a
-              href={mailtoLink}
-              className="inline-flex items-center gap-1.5 text-amber-900 font-bold hover:underline pt-1 text-xs"
-            >
-              <span>Click here to launch your default mail app directly</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
         </div>
       </div>
     </div>

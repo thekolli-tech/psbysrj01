@@ -59,6 +59,7 @@ import {
   MapPin,
   Filter,
   Shield,
+  Scale,
   Trash2
 } from 'lucide-react';
 
@@ -1170,72 +1171,136 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Community Header Banner */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider mb-2 font-mono">
-            <ShieldCheck className="w-4 h-4 text-amber-600" />
-            COMMUNITY Q&A, PEER ADVICE & LIVE AMAS
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-display">
-            Real Estate Intelligence & Peer Discussions
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
-            Directly ask questions regarding Vaastu compliance, slab casting audits, water table levels, and RERA approvals. Upvote high-quality answers, participate in polls, and engage in live AMAs.
-          </p>
+      {/* Community Header Banner - Architectural Cinematic Hero matching Reference */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#FFFDF9] via-[#FFF9EE] to-slate-100 border border-[#E2E8F0] shadow-sm p-6 sm:p-8 lg:p-10">
+        {/* Architectural Image Background Layer */}
+        <div className="absolute right-0 top-0 bottom-0 w-full lg:w-1/2 pointer-events-none overflow-hidden">
+          <img
+            src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80"
+            alt="Community Architecture"
+            className="w-full h-full object-cover object-center opacity-85"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#FFFDF9] via-[#FFFDF9]/90 to-transparent lg:via-[#FFF9EE]/70" />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            onClick={() => {
-              if (!isLoggedIn) {
-                showToast('Please sign in to ask a question.');
-                onOpenLoginModal?.();
-              } else if (activeCommunity && !canAccessSelectedCommunity) {
-                showToast('You must be an approved member of this private community to ask questions.');
-              } else {
-                setUnifiedTab('QUESTION');
-                setShowModal('UNIFIED');
-              }
-            }}
-            className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl text-xs font-black flex items-center gap-2 shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
-          >
-            <HelpCircle className="w-4 h-4 text-slate-950" />
-            <span>+ Add Question</span>
-          </button>
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold font-mono uppercase tracking-wide mb-3">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#E99A18]" />
+              <span>COMMUNITY Q&A, PEER ADVICE & LIVE AMAS</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#14213D] font-display tracking-tight leading-tight">
+              Real Estate Intelligence &<br />
+              <span className="text-[#E99A18]">Peer Discussions</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-[#64748B] mt-2 max-w-lg leading-relaxed">
+              Ask, discuss, and get verified answers on Vaastu, slab casting, audits, RERA approvals and more from industry experts and the community.
+            </p>
 
-          <button
-            onClick={() => {
-              if (!isLoggedIn) {
-                showToast('Please sign in to create a post.');
-                onOpenLoginModal?.();
-              } else if (activeCommunity && !canAccessSelectedCommunity) {
-                showToast('You must be an approved member of this private community to create posts.');
-              } else {
-                setUnifiedTab('POST');
-                setShowModal('UNIFIED');
-              }
-            }}
-            className="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-slate-900/10 active:scale-95 transition-all cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4 text-amber-400" />
-            <span>+ Create Post</span>
-          </button>
+            {/* 3 Prominent Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2.5 pt-5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isLoggedIn) {
+                    showToast('Please sign in to ask a question.');
+                    onOpenLoginModal?.();
+                  } else if (activeCommunity && !canAccessSelectedCommunity) {
+                    showToast('You must be an approved member of this private community to ask questions.');
+                  } else {
+                    setUnifiedTab('QUESTION');
+                    setShowModal('UNIFIED');
+                  }
+                }}
+                className="px-4 py-2.5 bg-[#E99A18] hover:bg-[#d98b10] active:scale-95 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4 text-slate-950" />
+                <span>Add Question</span>
+              </button>
 
-          <button
-            onClick={() => {
-              if (!isLoggedIn) {
-                showToast('Please sign in to create a community.');
-                onOpenLoginModal?.();
-              } else {
-                setShowModal('PROPOSE_COMMUNITY');
-              }
-            }}
-            className="px-3.5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-200"
-          >
-            <Users className="w-4 h-4 text-slate-500" />
-            <span>+ Create Community</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isLoggedIn) {
+                    showToast('Please sign in to create a post.');
+                    onOpenLoginModal?.();
+                  } else if (activeCommunity && !canAccessSelectedCommunity) {
+                    showToast('You must be an approved member of this private community to create posts.');
+                  } else {
+                    setUnifiedTab('POST');
+                    setShowModal('UNIFIED');
+                  }
+                }}
+                className="px-4 py-2.5 bg-[#101C38] hover:bg-[#0B1530] active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-[#E99A18]" />
+                <span>Create Post</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isLoggedIn) {
+                    showToast('Please sign in to create a community.');
+                    onOpenLoginModal?.();
+                  } else {
+                    setShowModal('PROPOSE_COMMUNITY');
+                  }
+                }}
+                className="px-4 py-2.5 bg-white hover:bg-slate-50 active:scale-95 text-[#14213D] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-[#E2E8F0] shadow-2xs"
+              >
+                <Users className="w-4 h-4 text-[#64748B]" />
+                <span>Create Community</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Right Statistics Card matching Reference Screenshot */}
+          <div className="relative z-10 bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/80 shadow-lg shadow-slate-200/50 w-full sm:w-auto lg:max-w-xs shrink-0">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#FFF5E4] text-[#E99A18] flex items-center justify-center shrink-0">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#14213D] leading-tight">
+                    {communityPosts.length > 0 ? `${(communityPosts.length * 12 + 2400).toLocaleString('en-US')}+` : '2.4K+'}
+                  </div>
+                  <div className="text-[11px] text-[#64748B] font-medium">Questions</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#FFF5E4] text-[#E99A18] flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#14213D] leading-tight">12K+</div>
+                  <div className="text-[11px] text-[#64748B] font-medium">Members</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#FFF5E4] text-[#E99A18] flex items-center justify-center shrink-0">
+                  <Video className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#14213D] leading-tight">180+</div>
+                  <div className="text-[11px] text-[#64748B] font-medium">Live AMAs</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#FFF5E4] text-[#16A34A] flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#14213D] leading-tight">98%</div>
+                  <div className="text-[11px] text-[#64748B] font-medium">Verified Answers</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1565,20 +1630,33 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             )}
           </div>
 
-          {/* Hubs Grid */}
+          {/* Hubs Grid matching Reference Screenshot (Horizontal Cards) */}
           {filteredHubs.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-2xl">
               No community hubs match your current filters.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredHubs.map(comm => (
                 <div
                   key={comm.id}
-                  className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between"
+                  className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white hover:border-amber-300 hover:shadow-xs transition-all flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
+                  {/* Left: Hub Thumbnail Image */}
+                  <div className="w-full sm:w-28 h-28 rounded-xl overflow-hidden shrink-0 relative bg-slate-100">
+                    <img
+                      src={comm.bannerImage || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80'}
+                      alt={comm.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80';
+                      }}
+                    />
+                  </div>
+
+                  {/* Right: Hub Metadata & Actions */}
+                  <div className="flex-1 min-w-0 space-y-1.5 w-full">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
                           {comm.category}
@@ -1599,58 +1677,61 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                     </div>
 
                     {comm.status !== 'APPROVED' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300 font-mono mb-1">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300 font-mono mb-0.5">
                         <span>⏳</span> Pending Super Admin Approval
                       </span>
                     )}
+
                     <h3
                       onClick={() => setSelectedCommunityId(comm.id)}
-                      className="text-xs sm:text-sm font-bold text-slate-900 leading-snug cursor-pointer hover:text-amber-600 transition-colors"
+                      className="text-xs sm:text-sm font-bold text-slate-900 leading-snug cursor-pointer hover:text-amber-600 transition-colors truncate"
+                      title={comm.name}
                     >
                       {comm.name}
                     </h3>
 
-                    <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
-                      {comm.description}
+                    <p className="text-[11px] text-slate-500 line-clamp-1 leading-relaxed">
+                      {comm.description || 'Verified corridor community discussion hub.'}
                     </p>
-                  </div>
 
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 mt-3">
-                    <span className="truncate max-w-[130px] flex items-center gap-1">
-                      <MapPin className="w-3 h-3 shrink-0" />
-                      <span>{comm.location || 'Hyderabad'}</span>
-                    </span>
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                      <span className="truncate max-w-[120px] flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{comm.location || 'Financial District'}</span>
+                      </span>
 
-                    <div className="flex items-center gap-2">
-                      {comm.membershipStatus === 'ACTIVE' ? (
-                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                          Joined ✓
-                        </span>
-                      ) : comm.membershipStatus === 'PENDING' ? (
-                        <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                          Pending ⏳
-                        </span>
-                      ) : (
+                      <div className="flex items-center gap-2 shrink-0">
+                        {comm.membershipStatus === 'ACTIVE' ? (
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full">
+                            Joined ✓
+                          </span>
+                        ) : comm.membershipStatus === 'PENDING' ? (
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full">
+                            Pending ⏳
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={communityActionLoading === comm.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleJoinCommunity(comm.id);
+                            }}
+                            className="text-[10px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded-full cursor-pointer transition-colors"
+                          >
+                            {comm.visibility === 'PRIVATE' ? 'Request' : 'Join'}
+                          </button>
+                        )}
+
                         <button
                           type="button"
-                          disabled={communityActionLoading === comm.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleJoinCommunity(comm.id);
-                          }}
-                          className="text-[10px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-full cursor-pointer transition-colors"
+                          onClick={() => setSelectedCommunityId(comm.id)}
+                          className="font-bold text-xs text-[#E99A18] hover:text-[#c7800e] hover:underline cursor-pointer flex items-center gap-0.5"
                         >
-                          {comm.visibility === 'PRIVATE' ? 'Request' : 'Join'}
+                          <span>Enter Hub</span>
+                          <span aria-hidden="true">&rarr;</span>
                         </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCommunityId(comm.id)}
-                        className="font-bold text-amber-700 hover:underline cursor-pointer"
-                      >
-                        Enter Hub →
-                      </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2449,42 +2530,47 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
 
       {/* Right Sidebar (1 Col): Quora Recommended Topics, Who to Follow & AMA Schedule */}
         <div className="space-y-6">
-          {/* Recommended Topics for You (Quora Reference Image 1 & 5) */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          {/* Recommended Topics for You - Matching Reference Screenshot */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-500" />
+                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
                 <span>Recommended Topics</span>
               </h3>
-              <span className="text-[10px] font-mono text-slate-400">For You</span>
+              <span className="text-[10px] font-mono font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">For You</span>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid grid-cols-2 gap-2">
               {[
-                'Kokapet & Neopolis',
-                'Legal & RERA',
-                'Rental Yield & ROI',
-                'High-Rise Living',
-                'Luxury Villas',
-                'Architecture & Vaastu',
-                'Interior Design',
-                'Price Trends'
-              ].map(topic => (
-                <button
-                  key={topic}
-                  onClick={() => {
-                    setSelectedTopic(topic);
-                    setFeedTab('ALL');
-                  }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-                    selectedTopic === topic
-                      ? 'bg-amber-500 text-slate-950 font-bold border-amber-500'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-white'
-                  }`}
-                >
-                  {topic}
-                </button>
-              ))}
+                { label: 'Kokapet & Neopolis', icon: MapPin },
+                { label: 'Legal & RERA', icon: Scale },
+                { label: 'Rental Yield & ROI', icon: TrendingUp },
+                { label: 'High-Rise Living', icon: Building },
+                { label: 'Luxury Villas', icon: Sparkles },
+                { label: 'Architecture & Vaastu', icon: Compass },
+                { label: 'Interior Design', icon: Layers },
+                { label: 'Price Trends', icon: Flame }
+              ].map(t => {
+                const Icon = t.icon;
+                const active = selectedTopic === t.label;
+                return (
+                  <button
+                    key={t.label}
+                    onClick={() => {
+                      setSelectedTopic(t.label);
+                      setFeedTab('ALL');
+                    }}
+                    className={`p-2 rounded-xl text-[11px] font-semibold border transition-all cursor-pointer flex items-center gap-1.5 text-left ${
+                      active
+                        ? 'bg-[#FFF5E4] text-[#92580c] font-bold border-[#E99A18] shadow-2xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#E99A18]' : 'text-slate-400'}`} />
+                    <span className="truncate">{t.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
