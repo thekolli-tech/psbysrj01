@@ -197,14 +197,14 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
               */}
               <div className="pt-1" data-testid="homepage-top-search">
                 <form onSubmit={handleTopSearch} className="space-y-2">
-                  <div className="bg-white border border-slate-200/90 rounded-2xl p-1.5 sm:p-2 shadow-lg shadow-slate-200/50">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-1.5 sm:gap-2 items-center">
+                  <div className="bg-white border border-[#E8E4D8] rounded-2xl p-2 sm:p-2.5 shadow-lg shadow-slate-900/5 hover:shadow-xl hover:border-[#B49029]/50 transition-all duration-300 focus-within:ring-2 focus-within:ring-[#B49029]/30 focus-within:border-[#B49029]">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-3 items-center">
                       {/* 1. Keyword Input */}
-                      <div className="md:col-span-4 lg:col-span-5 relative">
+                      <div className="md:col-span-4 lg:col-span-5 relative border-b md:border-b-0 md:border-r border-[#E8E4D8] pb-1.5 md:pb-0 md:pr-2">
                         <label htmlFor="home-search-keyword" className="sr-only">
                           Search by project, developer, or keyword
                         </label>
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <Search className="w-4 h-4 text-[#B49029] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-300 group-focus-within:scale-110" />
                         <input
                           id="home-search-keyword"
                           type="text"
@@ -214,13 +214,13 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                             setHasSearched(true);
                           }}
                           placeholder="Search projects, developers, or locations..."
-                          className="w-full pl-9 pr-3 py-2.5 bg-transparent border-0 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none transition-all"
+                          className="w-full pl-9 pr-3 py-2 bg-transparent border-0 text-xs sm:text-sm text-[#030508] placeholder:text-[#64748B] focus:outline-none transition-all font-medium"
                         />
                         {searchKeyword && (
                           <button
                             type="button"
                             onClick={() => setSearchKeyword('')}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-1"
                             aria-label="Clear keyword"
                           >
                             <X className="w-3.5 h-3.5" />
@@ -228,15 +228,12 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                         )}
                       </div>
 
-                      {/* Divider on desktop */}
-                      <div className="hidden md:block w-px h-6 bg-slate-200" />
-
                       {/* 2. Location Dropdown */}
-                      <div className="md:col-span-3 lg:col-span-3 relative">
+                      <div className="md:col-span-3 lg:col-span-3 relative border-b md:border-b-0 md:border-r border-[#E8E4D8] pb-1.5 md:pb-0 md:px-2">
                         <label htmlFor="home-search-location" className="sr-only">
                           Location Corridor
                         </label>
-                        <MapPin className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <MapPin className="w-4 h-4 text-[#B49029] absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <select
                           id="home-search-location"
                           aria-label="Select Corridor"
@@ -245,7 +242,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                             setSearchLocation(e.target.value);
                             setHasSearched(true);
                           }}
-                          className="w-full pl-8 pr-6 py-2.5 bg-transparent border-0 text-xs sm:text-sm text-slate-800 font-medium focus:outline-none transition-all cursor-pointer truncate"
+                          className="w-full pl-7 pr-6 py-2 bg-transparent border-0 text-xs sm:text-sm text-[#030508] font-medium focus:outline-none transition-all cursor-pointer truncate"
                         >
                           {HOMEPAGE_LOCATIONS.map(loc => (
                             <option key={loc} value={loc}>
@@ -255,11 +252,8 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                         </select>
                       </div>
 
-                      {/* Divider on desktop */}
-                      <div className="hidden md:block w-px h-6 bg-slate-200" />
-
                       {/* 3. Property Type Dropdown */}
-                      <div className="md:col-span-3 lg:col-span-2">
+                      <div className="md:col-span-3 lg:col-span-2 md:px-1">
                         <label htmlFor="home-search-property-type" className="sr-only">
                           Property Type
                         </label>
@@ -273,20 +267,20 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                             setSearchPropertyType(val);
                             setHasSearched(true);
                           }}
-                          className="w-full px-2 py-2.5 bg-transparent border-0 text-xs sm:text-sm text-slate-800 font-medium focus:outline-none transition-all cursor-pointer truncate"
+                          className="w-full px-2 py-2 bg-transparent border-0 text-xs sm:text-sm text-[#030508] font-medium focus:outline-none transition-all cursor-pointer truncate"
                         />
                       </div>
 
-                      {/* 4. Search Button */}
+                      {/* 4. Search Button with neat animations */}
                       <div className="md:col-span-2 lg:col-span-2 flex items-center justify-end">
                         <button
                           type="submit"
-                          className="w-full sm:w-11 md:w-full h-10 py-2.5 px-3 bg-[#B49029] hover:bg-[#A99137] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer min-h-[42px]"
+                          className="w-full h-10 py-2 px-3.5 bg-gradient-to-r from-[#B49029] to-[#A99137] hover:from-[#A99137] hover:to-[#B49029] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all duration-300 shadow-md shadow-[#B49029]/25 hover:shadow-lg hover:shadow-[#B49029]/40 hover:scale-[1.02] flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px] group"
                           title="Execute Search"
                         >
-                          <Search className="w-4 h-4 shrink-0 sm:hidden" />
-                          <span className="sm:hidden">Search</span>
-                          <ArrowRight className="w-4 h-4 shrink-0 hidden sm:block" />
+                          <Search className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                          <span className="font-bold tracking-wide">Search</span>
+                          <ArrowRight className="w-3.5 h-3.5 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
                         </button>
                       </div>
                     </div>
@@ -366,10 +360,10 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
 
               {/* 
                 ============================================================
-                6 QUICK CATEGORY CARDS (MATCHING IMAGE 1)
+                5 QUICK CATEGORY CARDS (PROJECTS, DEVELOPERS, COMMUNITY, MEDIA, INSIGHTS)
                 ============================================================
               */}
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-2.5 pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 pt-1">
                 {/* 1. Projects (Active Gold) */}
                 <button
                   type="button"
@@ -390,26 +384,13 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                     setActiveView('PROPERTIES');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
+                  className="p-2 sm:p-2.5 rounded-xl border border-[#E8E4D8] bg-white text-[#030508] flex flex-col items-center justify-center gap-1.5 hover:border-[#B49029] hover:bg-[#FCFBF3]/50 transition-all cursor-pointer group shadow-xs"
                 >
-                  <Users className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
+                  <Users className="w-4 h-4 text-[#64748B] group-hover:text-[#B49029] transition-colors" />
                   <span className="text-[11px] sm:text-xs font-semibold">Developers</span>
                 </button>
 
-                {/* 3. Buyer Leads */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveView('LEADS_MARKET');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
-                >
-                  <Compass className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
-                  <span className="text-[11px] sm:text-xs font-semibold">Buyer Leads</span>
-                </button>
-
-                {/* 4. Community */}
+                {/* 3. Community */}
                 <button
                   type="button"
                   onClick={() => {
@@ -420,35 +401,35 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                   }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
+                  className="p-2 sm:p-2.5 rounded-xl border border-[#E8E4D8] bg-white text-[#030508] flex flex-col items-center justify-center gap-1.5 hover:border-[#B49029] hover:bg-[#FCFBF3]/50 transition-all cursor-pointer group shadow-xs"
                 >
-                  <MessageSquare className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
+                  <MessageSquare className="w-4 h-4 text-[#64748B] group-hover:text-[#B49029] transition-colors" />
                   <span className="text-[11px] sm:text-xs font-semibold">Community</span>
                 </button>
 
-                {/* 5. Media */}
+                {/* 4. Media */}
                 <button
                   type="button"
                   onClick={() => {
                     setActiveView('MEDIA');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
+                  className="p-2 sm:p-2.5 rounded-xl border border-[#E8E4D8] bg-white text-[#030508] flex flex-col items-center justify-center gap-1.5 hover:border-[#B49029] hover:bg-[#FCFBF3]/50 transition-all cursor-pointer group shadow-xs"
                 >
-                  <Play className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
+                  <Play className="w-4 h-4 text-[#64748B] group-hover:text-[#B49029] transition-colors" />
                   <span className="text-[11px] sm:text-xs font-semibold">Media</span>
                 </button>
 
-                {/* 6. Insights */}
+                {/* 5. Insights */}
                 <button
                   type="button"
                   onClick={() => {
                     setActiveView('MARKET_INSIGHTS');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 flex flex-col items-center justify-center gap-1.5 hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group shadow-xs"
+                  className="p-2 sm:p-2.5 rounded-xl border border-[#E8E4D8] bg-white text-[#030508] flex flex-col items-center justify-center gap-1.5 hover:border-[#B49029] hover:bg-[#FCFBF3]/50 transition-all cursor-pointer group shadow-xs"
                 >
-                  <TrendingUp className="w-4 h-4 text-slate-500 group-hover:text-amber-600 transition-colors" />
+                  <TrendingUp className="w-4 h-4 text-[#64748B] group-hover:text-[#B49029] transition-colors" />
                   <span className="text-[11px] sm:text-xs font-semibold">Insights</span>
                 </button>
               </div>
@@ -487,34 +468,6 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                   Real Estate · Visual Stories · Market Trends & Insights
                 </p>
 
-                {/* Docked Audio Briefing Card */}
-                <div className="w-full mt-6 bg-slate-900 text-white rounded-2xl p-3 shadow-md flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const audioEl = document.querySelector('audio');
-                      if (audioEl) {
-                        if (audioEl.paused) audioEl.play();
-                        else audioEl.pause();
-                      }
-                    }}
-                    className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-lg cursor-pointer transition-transform hover:scale-105"
-                    title="Play Briefing"
-                    aria-label="Play Hyderabad Western Corridor Briefing"
-                  >
-                    <Play className="w-4 h-4 fill-current ml-0.5" />
-                  </button>
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="text-[11px] font-bold text-white leading-tight line-clamp-1">
-                      Hyderabad Western Corridor Macro Intelligence
-                    </p>
-                    <p className="text-[10px] text-slate-400">Official Audio Market Briefing</p>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold text-slate-300 bg-white/10 px-1.5 py-0.5 rounded shrink-0">
-                    3:15
-                  </span>
-                </div>
-
                 {/* Compatibility references for test suites */}
                 <div className="hidden" aria-hidden="true">
                   <OfficialBrandCard />
@@ -533,8 +486,8 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             HORIZONTAL TRUST PILL BAR (MATCHING IMAGE 1)
             ================================================================
           */}
-          <div className="mt-8 bg-white border border-[#E8E4D8] rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
+          <div className="mt-8 bg-white border border-[#E8E4D8] rounded-2xl p-4 sm:p-5 shadow-xs">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
               {/* Item 1 */}
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0 font-bold">
@@ -547,7 +500,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
               </div>
 
               {/* Item 2 */}
-              <div className="flex items-center gap-3 border-l md:border-l border-slate-100 pl-4">
+              <div className="flex items-center gap-3 border-l border-slate-100 pl-4">
                 <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0 font-bold">
                   <Award className="w-4 h-4" />
                 </div>
@@ -558,7 +511,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
               </div>
 
               {/* Item 3 */}
-              <div className="flex items-center gap-3 border-l md:border-l border-slate-100 pl-4">
+              <div className="flex items-center gap-3 border-l border-slate-100 pl-4">
                 <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center shrink-0 font-bold">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
@@ -569,7 +522,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
               </div>
 
               {/* Item 4 */}
-              <div className="flex items-center gap-3 border-l md:border-l border-slate-100 pl-4">
+              <div className="flex items-center gap-3 border-l border-slate-100 pl-4">
                 <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0 font-bold">
                   <FileCheck className="w-4 h-4" />
                 </div>
@@ -579,18 +532,6 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 </div>
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const el = document.getElementById('overview');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#FCFBF3] text-slate-700 hover:text-[#B49029] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
-              title="Learn More"
-            >
-              <ArrowRight className="w-4 h-4" />
-            </button>
           </div>
         </div>
       </section>
