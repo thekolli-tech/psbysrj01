@@ -24,7 +24,9 @@ import {
   Handshake,
   TrendingUp,
   Award,
-  Video
+  Video,
+  MapPin,
+  Search
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -78,6 +80,12 @@ export const Header: React.FC<HeaderProps> = ({
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedCity, setSelectedCity] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ps_selected_city') || 'Hyderabad';
+    }
+    return 'Hyderabad';
+  });
 
   const navLinks = linkedEndUserNavigation();
   const utilityLinks = roleUtilityDestinations(currentUser.role, isLoggedIn);
@@ -119,7 +127,33 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+          {/* City Option beside Secretariat */}
+          <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 rounded-md bg-slate-800/90 border border-slate-700/80 text-[11px]">
+            <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+            <span className="text-slate-400 font-medium hidden xs:inline">City:</span>
+            <select
+              value={selectedCity}
+              onChange={(e) => {
+                const newCity = e.target.value;
+                setSelectedCity(newCity);
+                try {
+                  localStorage.setItem('ps_selected_city', newCity);
+                } catch {}
+              }}
+              className="bg-transparent text-amber-400 font-bold text-[11px] focus:outline-none cursor-pointer"
+              aria-label="Select City"
+            >
+              <option value="Hyderabad" className="bg-slate-900 text-white">Hyderabad</option>
+              <option value="Bengaluru" className="bg-slate-900 text-white">Bengaluru</option>
+              <option value="Mumbai" className="bg-slate-900 text-white">Mumbai</option>
+              <option value="Chennai" className="bg-slate-900 text-white">Chennai</option>
+              <option value="Delhi-NCR" className="bg-slate-900 text-white">Delhi-NCR</option>
+              <option value="Pune" className="bg-slate-900 text-white">Pune</option>
+              <option value="Amaravati" className="bg-slate-900 text-white">Amaravati</option>
+            </select>
+          </div>
+
           <div className="text-[11px] font-mono text-slate-400 hidden md:block">
             Secretariat: <span className="text-slate-200 font-semibold">info@propertystudio.org</span>
           </div>
@@ -188,6 +222,28 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 3: Actions & Controls (Right) */}
         <div className="flex items-center gap-1.5 xl:gap-2.5 shrink-0 ml-auto">
+          {/* Search option visible at Top */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveView('HOME');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              setTimeout(() => {
+                const el = document.querySelector('input[placeholder*="Search by project"]') as HTMLInputElement;
+                if (el) {
+                  el.focus();
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }, 120);
+            }}
+            className="inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 transition-all cursor-pointer shrink-0 shadow-2xs group"
+            title="Search projects, developers, localities"
+            aria-label="Search"
+          >
+            <Search className="w-3.5 h-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline font-bold">Search</span>
+          </button>
+
           {utilityLinks.includes('LEADS_MARKET') && (
             <button
               onClick={() => {
@@ -392,7 +448,27 @@ export const Header: React.FC<HeaderProps> = ({
           id="mobile-navigation-drawer"
           className="xl:hidden border-t border-slate-200 bg-white shadow-2xl px-4 py-5 animate-in slide-in-from-top-2 duration-200 max-h-[calc(100vh-120px)] overflow-y-auto"
         >
-          <div className="space-y-5">
+          <div className="space-y-4">
+            {/* Search Option at Top of Mobile Drawer */}
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setActiveView('HOME');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setTimeout(() => {
+                  const el = document.querySelector('input[placeholder*="Search by project"]') as HTMLInputElement;
+                  if (el) {
+                    el.focus();
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }, 150);
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-xs text-slate-600 font-medium text-left cursor-pointer transition-all"
+            >
+              <Search className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Search projects, developers, localities...</span>
+            </button>
             {isLoggedIn && currentUser && (
               <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
                 <div className="flex items-center gap-2.5">

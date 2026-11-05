@@ -36,11 +36,13 @@ import {
   ExternalLink,
   Film,
   Sliders,
-  AlertTriangle
+  AlertTriangle,
+  Reply
 } from 'lucide-react';
 
 interface Comment {
   id: string;
+  parentId?: string | null;
   authorName: string;
   authorRole: string;
   authorAvatar: string;
@@ -107,6 +109,8 @@ export const MediaEngine: React.FC<{
   });
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentInput, setCommentInput] = useState('');
+  const [replyingCommentId, setReplyingCommentId] = useState<string | null>(null);
+  const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
 
   // Post / Broadcast Creation Modal State
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -182,6 +186,7 @@ export const MediaEngine: React.FC<{
             setComments(
               data.comments.map((c: any) => ({
                 id: c.id,
+                parentId: c.parent_id || null,
                 authorName: c.author_name,
                 authorRole: (c.author_role || '').replace('_', ' '),
                 authorAvatar: c.author_avatar || '',
@@ -525,31 +530,93 @@ export const MediaEngine: React.FC<{
       return;
     }
 
+    const text = commentInput.trim();
+    const tempId = `mcomm_${Date.now()}`;
+    const newComment: Comment = {
+      id: tempId,
+      parentId: null,
+      authorName: currentUser.name || 'Member',
+      authorRole: (currentUser.role || '').replace('_', ' '),
+      authorAvatar: currentUser.avatar || '',
+      text,
+      timestamp: 'Just now',
+      likes: 0
+    };
+
+    // Optimistic instant feedback
+    setComments(prev => [newComment, ...prev]);
+    setEngagement(prev => ({ ...prev, commentsCount: prev.commentsCount + 1 }));
+    setCommentInput('');
+    showToast('Your comment has been posted!');
+
     try {
       const res = await fetch(`/api/media/${activeVideo.id}/comment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: commentInput.trim() })
+        body: JSON.stringify({ text })
       });
       if (res.ok) {
         const data = await res.json();
         const c = data.comment;
-        const newComment: Comment = {
-          id: c.id,
-          authorName: c.author_name,
-          authorRole: (c.author_role || '').replace('_', ' '),
-          authorAvatar: c.author_avatar || '',
-          text: c.text,
-          timestamp: 'Just now',
-          likes: 0
-        };
-        setComments(prev => [newComment, ...prev]);
-        setEngagement(prev => ({ ...prev, commentsCount: prev.commentsCount + 1 }));
-        setCommentInput('');
-        showToast('Your comment has been posted!');
+        if (c?.id) {
+          setComments(prev => prev.map(item => item.id === tempId ? { ...item, id: c.id } : item));
+        }
       }
     } catch {
+      setComments(prev => prev.filter(item => item.id !== tempId));
+      setEngagement(prev => ({ ...prev, commentsCount: Math.max(0, prev.commentsCount - 1) }));
+      setCommentInput(text);
       showToast('Network error posting comment');
+    }
+  };
+
+  const handleReplySubmit = async (parentCommentId: string) => {
+    if (!activeVideo) return;
+    const text = (replyInputs[parentCommentId] || '').trim();
+    if (!text) return;
+
+    if (!isLoggedIn) {
+      showToast('Please sign in to reply.');
+      onOpenLoginModal?.();
+      return;
+    }
+
+    const tempReplyId = `mcomm_reply_${Date.now()}`;
+    const optimisticReply: Comment = {
+      id: tempReplyId,
+      parentId: parentCommentId,
+      authorName: currentUser.name || 'Member',
+      authorRole: (currentUser.role || '').replace('_', ' '),
+      authorAvatar: currentUser.avatar || '',
+      text,
+      timestamp: 'Just now',
+      likes: 0
+    };
+
+    setComments(prev => [...prev, optimisticReply]);
+    setEngagement(prev => ({ ...prev, commentsCount: prev.commentsCount + 1 }));
+    setReplyInputs(prev => ({ ...prev, [parentCommentId]: '' }));
+    setReplyingCommentId(null);
+    showToast('Reply posted to conversation!');
+
+    try {
+      const res = await fetch(`/api/media/${activeVideo.id}/comment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, parentId: parentCommentId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const c = data.comment;
+        if (c?.id) {
+          setComments(prev => prev.map(item => item.id === tempReplyId ? { ...item, id: c.id } : item));
+        }
+      }
+    } catch {
+      setComments(prev => prev.filter(item => item.id !== tempReplyId));
+      setEngagement(prev => ({ ...prev, commentsCount: Math.max(0, prev.commentsCount - 1) }));
+      setReplyInputs(prev => ({ ...prev, [parentCommentId]: text }));
+      showToast('Network error posting reply');
     }
   };
 
@@ -852,15 +919,108 @@ export const MediaEngine: React.FC<{
             </form>
 
             <div className="space-y-3 pt-2">
-              {comments.map(c => (
-                <div key={c.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-900">{c.authorName}</span>
-                    <span className="text-[10px] text-slate-400">{c.timestamp}</span>
+              {comments.filter(c => !c.parentId).map(c => {
+                const replies = comments.filter(r => r.parentId === c.id);
+                const isReplying = replyingCommentId === c.id;
+                return (
+                  <div key={c.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">{c.authorName}</span>
+                        {c.authorRole && (
+                          <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-700">
+                            {c.authorRole}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400">{c.timestamp}</span>
+                    </div>
+                    <p className="text-xs text-slate-700 leading-relaxed">{c.text}</p>
+
+                    {/* Reply Action */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isLoggedIn) {
+                            onOpenLoginModal?.();
+                            return;
+                          }
+                          setReplyingCommentId(isReplying ? null : c.id);
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 hover:text-amber-800 transition-colors cursor-pointer"
+                      >
+                        <Reply className="w-3 h-3" />
+                        <span>Reply</span>
+                      </button>
+                      {replies.length > 0 && (
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          · {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Inline Reply Box */}
+                    {isReplying && (
+                      <div className="pt-2 pl-3 border-l-2 border-amber-300 space-y-2 animate-in fade-in">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={replyInputs[c.id] || ''}
+                            onChange={e => setReplyInputs(prev => ({ ...prev, [c.id]: e.target.value }))}
+                            placeholder={`Reply to @${c.authorName}...`}
+                            className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                            autoFocus
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleReplySubmit(c.id);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleReplySubmit(c.id)}
+                            disabled={!(replyInputs[c.id] || '').trim()}
+                            className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            Reply
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReplyingCommentId(null)}
+                            className="px-2 py-1.5 text-xs text-slate-500 hover:text-slate-800 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Nested Replies */}
+                    {replies.length > 0 && (
+                      <div className="mt-2 pt-2 pl-3 border-l-2 border-slate-200 space-y-2">
+                        {replies.map(r => (
+                          <div key={r.id} className="p-2.5 bg-white rounded-lg border border-slate-100 shadow-2xs space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-900">{r.authorName}</span>
+                                {r.authorRole && (
+                                  <span className="text-[9px] font-mono font-semibold px-1 py-0.5 rounded bg-slate-100 text-slate-600">
+                                    {r.authorRole}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-400">{r.timestamp}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed">{r.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-600">{c.text}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

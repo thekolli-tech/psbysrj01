@@ -571,6 +571,7 @@ export interface DbStudioBroadcast {
 export interface DbMediaComment {
   id: string;
   media_id: string;
+  parent_id?: string | null;
   user_id: string;
   author_name: string;
   author_role?: string;
@@ -1625,6 +1626,7 @@ export async function setMediaReaction(mediaId: string, userId: string, reaction
 
 export async function addMediaComment(comment: {
   mediaId: string;
+  parentId?: string | null;
   userId: string;
   authorName: string;
   authorRole?: string;
@@ -3432,7 +3434,7 @@ function sqliteCreatePost(post: {
   const pollOptionsStr = post.pollOptions ? JSON.stringify(post.pollOptions) : null;
   const pollVotesStr = post.pollOptions ? JSON.stringify({}) : null;
 
-  const initialStatus = (post.authorRole === 'SUPER_ADMIN' || post.authorRole === 'DEVELOPER')
+  const initialStatus = (post.authorRole === 'SUPER_ADMIN' || post.authorRole === 'DEVELOPER' || post.postType === 'QUESTION')
     ? 'APPROVED'
     : 'PENDING_APPROVAL';
 
@@ -4958,6 +4960,7 @@ function sqliteSetMediaReaction(mediaId: string, userId: string, reactionType = 
 
 function sqliteAddMediaComment(comment: {
   mediaId: string;
+  parentId?: string | null;
   userId: string;
   authorName: string;
   authorRole?: string;
@@ -4967,11 +4970,12 @@ function sqliteAddMediaComment(comment: {
   const id = `mcomm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
   db.prepare(`
-    INSERT INTO media_comments (id, media_id, user_id, author_name, author_role, author_avatar, text, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO media_comments (id, media_id, parent_id, user_id, author_name, author_role, author_avatar, text, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     comment.mediaId,
+    comment.parentId || null,
     comment.userId,
     comment.authorName,
     comment.authorRole || 'PROPERTY_SEEKER',
@@ -4982,6 +4986,7 @@ function sqliteAddMediaComment(comment: {
   return {
     id,
     media_id: comment.mediaId,
+    parent_id: comment.parentId || null,
     user_id: comment.userId,
     author_name: comment.authorName,
     author_role: comment.authorRole,

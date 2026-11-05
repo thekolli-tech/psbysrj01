@@ -447,6 +447,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
   };
 
   // Top-Level Comment Submission
+  // Top-Level Comment Submission (Ultra-Fast Optimistic UI)
   const handleTopCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submittingTopRef.current) return;
@@ -457,10 +458,35 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
       onOpenLoginModal?.();
       return;
     }
-    submittingTopRef.current = true;
-    setIsSubmittingTopComment(true);
-    setTopCommentError(null);
 
+    const tempId = `temp_comm_${Date.now()}`;
+    const optimisticComment: CommentItem = {
+      id: tempId,
+      postId,
+      parentId: null,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      authorRole: currentUser.role,
+      authorAvatar: currentUser.avatar || null,
+      content: trimmed,
+      likesCount: 0,
+      userLiked: false,
+      isAmaAnswer: Boolean(topCommentIsAma),
+      isDeleted: false,
+      replies: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Instant UI update (0ms perceived latency)
+    setComments(prev => [optimisticComment, ...prev]);
+    setTotalComments(c => c + 1);
+    setTopCommentText('');
+    setTopCommentIsAma(false);
+    showToast(topCommentIsAma ? 'Verified AMA answer posted!' : 'Comment posted!');
+
+    // Background server call
+    submittingTopRef.current = true;
     try {
       const res = await fetch(`/api/community/posts/${postId}/comments`, {
         method: 'POST',
@@ -473,27 +499,26 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit comment');
 
-      showToast(topCommentIsAma ? 'Verified AMA answer posted!' : 'Comment posted!');
-      setTopCommentText('');
-      setTopCommentIsAma(false);
-
       if (data.comment) {
-        setComments(prev => {
-          if (prev.some(c => c.id === data.comment.id)) return prev;
-          return [data.comment, ...prev];
-        });
-        setTotalComments(c => c + 1);
+        setComments(prev =>
+          prev.map(c => (c.id === tempId ? { ...c, id: data.comment.id, createdAt: data.comment.createdAt || c.createdAt } : c))
+        );
       }
       refreshPosts();
     } catch (err: any) {
+      // Revert optimistic update on error
+      setComments(prev => prev.filter(c => c.id !== tempId));
+      setTotalComments(c => Math.max(0, c - 1));
+      setTopCommentText(trimmed);
       setTopCommentError(err.message || 'Failed to submit comment');
+      showToast(err.message || 'Failed to submit comment');
     } finally {
       submittingTopRef.current = false;
       setIsSubmittingTopComment(false);
     }
   };
 
-  // Inline Nested Reply Submission
+  // Inline Nested Reply Submission (Ultra-Fast Optimistic UI)
   const handleInlineReplySubmit = async (parentCommentId: string) => {
     const text = (replyTexts[parentCommentId] || '').trim();
     if (!text) return;
@@ -502,6 +527,51 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
       onOpenLoginModal?.();
       return;
     }
+
+    const tempReplyId = `temp_reply_${Date.now()}`;
+    const optimisticReply: CommentItem = {
+      id: tempReplyId,
+      postId,
+      parentId: parentCommentId,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      authorRole: currentUser.role,
+      authorAvatar: currentUser.avatar || null,
+      content: text,
+      likesCount: 0,
+      userLiked: false,
+      isAmaAnswer: false,
+      isDeleted: false,
+      replies: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Instant UI update (0ms perceived latency)
+    const insertReply = (items: CommentItem[]): CommentItem[] =>
+      items.map(item => {
+        if (item.id === parentCommentId) {
+          return {
+            ...item,
+            replies: [...(item.replies || []), optimisticReply]
+          };
+        }
+        if (item.replies && item.replies.length > 0) {
+          return {
+            ...item,
+            replies: insertReply(item.replies)
+          };
+        }
+        return item;
+      });
+
+    setComments(prev => insertReply(prev));
+    setTotalComments(c => c + 1);
+    setReplyTexts(prev => ({ ...prev, [parentCommentId]: '' }));
+    setReplyingCommentId(null);
+    showToast('Reply posted to conversation!');
+
+    // Background server call
     setIsSubmittingReplyId(parentCommentId);
     setReplyErrors(prev => ({ ...prev, [parentCommentId]: '' }));
 
@@ -517,33 +587,34 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit reply');
 
-      showToast('Reply posted to conversation!');
-      setReplyTexts(prev => ({ ...prev, [parentCommentId]: '' }));
-      setReplyingCommentId(null);
-
       if (data.comment) {
-        const insertReply = (items: CommentItem[]): CommentItem[] =>
+        const replaceTempInTree = (items: CommentItem[]): CommentItem[] =>
           items.map(item => {
-            if (item.id === parentCommentId) {
-              return {
-                ...item,
-                replies: [...(item.replies || []), data.comment]
-              };
+            if (item.id === tempReplyId) {
+              return { ...item, id: data.comment.id, createdAt: data.comment.createdAt || item.createdAt };
             }
             if (item.replies && item.replies.length > 0) {
-              return {
-                ...item,
-                replies: insertReply(item.replies)
-              };
+              return { ...item, replies: replaceTempInTree(item.replies) };
             }
             return item;
           });
-        setComments(prev => insertReply(prev));
-        setTotalComments(c => c + 1);
+        setComments(prev => replaceTempInTree(prev));
       }
       refreshPosts();
     } catch (err: any) {
+      // Revert optimistic reply on error
+      const removeTempInTree = (items: CommentItem[]): CommentItem[] =>
+        items
+          .filter(item => item.id !== tempReplyId)
+          .map(item => ({
+            ...item,
+            replies: item.replies ? removeTempInTree(item.replies) : []
+          }));
+      setComments(prev => removeTempInTree(prev));
+      setTotalComments(c => Math.max(0, c - 1));
+      setReplyTexts(prev => ({ ...prev, [parentCommentId]: text }));
       setReplyErrors(prev => ({ ...prev, [parentCommentId]: err.message || 'Failed to submit reply' }));
+      showToast(err.message || 'Failed to submit reply');
     } finally {
       setIsSubmittingReplyId(null);
     }

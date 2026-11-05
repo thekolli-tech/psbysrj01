@@ -3912,6 +3912,7 @@ app.get('/api/media/:id/comments', async (req: Request, res: Response): Promise<
 app.post('/api/media/:id/comment', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const text = String(req.body?.text || '').trim();
+    const parentId = req.body?.parentId ? String(req.body.parentId).trim() : null;
     if (!text) {
       res.status(400).json({ error: 'Comment text cannot be empty.' });
       return;
@@ -3922,6 +3923,7 @@ app.post('/api/media/:id/comment', requireAuth, requireUnrestricted, async (req:
     }
     const comment = await addMediaComment({
       mediaId: req.params.id,
+      parentId,
       userId: req.user.id,
       authorName: req.user.name || 'Member',
       authorRole: req.user.role || 'PROPERTY_SEEKER',

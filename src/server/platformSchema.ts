@@ -284,6 +284,7 @@ CREATE INDEX IF NOT EXISTS idx_media_reactions_media ON media_reactions(media_id
 CREATE TABLE IF NOT EXISTS media_comments (
   id VARCHAR(64) PRIMARY KEY,
   media_id VARCHAR(64) NOT NULL,
+  parent_id VARCHAR(64),
   user_id VARCHAR(64) NOT NULL,
   author_name VARCHAR(255) NOT NULL,
   author_role VARCHAR(128),
@@ -292,6 +293,7 @@ CREATE TABLE IF NOT EXISTS media_comments (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_media_comments_media ON media_comments(media_id);
+ALTER TABLE media_comments ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64);
 
 CREATE TABLE IF NOT EXISTS media_shares (
   id VARCHAR(64) PRIMARY KEY,
@@ -439,6 +441,7 @@ export const SQLITE_COLUMN_STATEMENTS = [
   'ALTER TABLE community_comments ADD COLUMN deleted_at TEXT',
   'ALTER TABLE community_comments ADD COLUMN deleted_by TEXT',
   'ALTER TABLE community_comments ADD COLUMN original_content TEXT',
+  'ALTER TABLE media_comments ADD COLUMN parent_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN seeker_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN property_id TEXT',
   'ALTER TABLE buyer_leads ADD COLUMN consent_granted INTEGER DEFAULT 0',
@@ -624,6 +627,7 @@ CREATE TABLE IF NOT EXISTS media_reactions (
 CREATE TABLE IF NOT EXISTS media_comments (
   id TEXT PRIMARY KEY,
   media_id TEXT NOT NULL,
+  parent_id TEXT,
   user_id TEXT NOT NULL,
   author_name TEXT NOT NULL,
   author_role TEXT,

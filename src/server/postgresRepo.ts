@@ -1419,7 +1419,7 @@ export async function pgCreatePost(post: {
   const pollOptionsStr = post.pollOptions ? JSON.stringify(post.pollOptions) : null;
   const pollVotesStr = post.pollOptions ? JSON.stringify({}) : null;
 
-  const initialStatus = (post.authorRole === 'SUPER_ADMIN' || post.authorRole === 'DEVELOPER')
+  const initialStatus = (post.authorRole === 'SUPER_ADMIN' || post.authorRole === 'DEVELOPER' || post.postType === 'QUESTION')
     ? 'APPROVED'
     : 'PENDING_APPROVAL';
 
@@ -3371,6 +3371,7 @@ export async function pgSetMediaReaction(mediaId: string, userId: string, reacti
 
 export async function pgAddMediaComment(comment: {
   mediaId: string;
+  parentId?: string | null;
   userId: string;
   authorName: string;
   authorRole?: string;
@@ -3381,11 +3382,12 @@ export async function pgAddMediaComment(comment: {
   const id = `mcomm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
   await queryPostgres(`
-    INSERT INTO media_comments (id, media_id, user_id, author_name, author_role, author_avatar, text, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    INSERT INTO media_comments (id, media_id, parent_id, user_id, author_name, author_role, author_avatar, text, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
   `, [
     id,
     comment.mediaId,
+    comment.parentId || null,
     comment.userId,
     comment.authorName,
     comment.authorRole || 'PROPERTY_SEEKER',
@@ -3396,6 +3398,7 @@ export async function pgAddMediaComment(comment: {
   return {
     id,
     media_id: comment.mediaId,
+    parent_id: comment.parentId || null,
     user_id: comment.userId,
     author_name: comment.authorName,
     author_role: comment.authorRole,
@@ -3411,6 +3414,7 @@ export async function pgGetMediaComments(mediaId: string): Promise<DbMediaCommen
   return res.rows.map((c: any) => ({
     id: c.id,
     media_id: c.media_id,
+    parent_id: c.parent_id || null,
     user_id: c.user_id,
     author_name: c.author_name,
     author_role: c.author_role,

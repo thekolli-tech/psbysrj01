@@ -88,6 +88,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
+  // Forgot Password State
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOtpSent, setResetOtpSent] = useState(false);
+  const [resetOtpInput, setResetOtpInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmNewPasswordInput, setConfirmNewPasswordInput] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [resetCountdown, setResetCountdown] = useState(0);
+  const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
+
   useEffect(() => {
     fetch('/api/auth/config')
       .then(res => res.json())
@@ -114,6 +126,99 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
     return () => clearTimeout(timer);
   }, [phoneCountdown]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (resetCountdown > 0) {
+      timer = setTimeout(() => setResetCountdown(c => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resetCountdown]);
+
+  const handleSendResetOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (submitting.current) return;
+    setErrorMsg(null);
+    setResetSuccessMsg(null);
+    const targetEmail = (resetEmail || emailInput).trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      setErrorMsg('Please enter a valid registered email address.');
+      return;
+    }
+    submitting.current = true;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to dispatch password reset code.');
+      setResetOtpSent(true);
+      setResetCountdown(60);
+      setResetEmail(targetEmail);
+      showToast('Password reset code sent! Check your inbox.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to dispatch password reset code.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting.current) return;
+    setErrorMsg(null);
+    setResetSuccessMsg(null);
+    const targetEmail = resetEmail.trim();
+    const otp = resetOtpInput.trim();
+    if (!targetEmail || !otp || !newPasswordInput) {
+      setErrorMsg('Please fill in all fields (Email, Verification Code, New Password).');
+      return;
+    }
+    if (newPasswordInput.length < 8) {
+      setErrorMsg('New password must be at least 8 characters long.');
+      return;
+    }
+    if (newPasswordInput !== confirmNewPasswordInput) {
+      setErrorMsg('Passwords do not match. Please verify your new password.');
+      return;
+    }
+    submitting.current = true;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: targetEmail,
+          otp,
+          newPassword: newPasswordInput
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reset password.');
+      setResetSuccessMsg('Password reset successfully! You can now sign in with your new password.');
+      showToast('Password reset successfully! Please sign in.');
+      setEmailInput(targetEmail);
+      setPasswordInput('');
+      setResetOtpSent(false);
+      setResetOtpInput('');
+      setNewPasswordInput('');
+      setConfirmNewPasswordInput('');
+      setTimeout(() => {
+        setForgotPasswordMode(false);
+        setResetSuccessMsg(null);
+      }, 2000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to reset password.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -410,10 +515,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold text-white font-display">
-                {isLoggedIn ? 'Account Session' : mode === 'LOGIN' ? 'Portal Sign In' : avatarStep ? 'Choose Profile Avatar' : 'Create Account'}
+                {isLoggedIn ? 'Account Session' : forgotPasswordMode ? 'Reset Password' : mode === 'LOGIN' ? 'Portal Sign In' : avatarStep ? 'Choose Profile Avatar' : 'Create Account'}
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-400">
-                {isLoggedIn ? `Active as ${currentUser.name}` : avatarStep ? 'Select 2D character avatar or upload your photo' : 'Live server database authentication'}
+                {isLoggedIn ? `Active as ${currentUser.name}` : forgotPasswordMode ? 'Verify email OTP to set new password' : avatarStep ? 'Select 2D character avatar or upload your photo' : 'Live server database authentication'}
               </p>
             </div>
           </div>
@@ -489,7 +594,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               )}
 
               {/* Mode Switcher */}
-              {!avatarStep && (
+              {!avatarStep && !forgotPasswordMode && (
                 <div className="flex bg-slate-100 p-1 rounded-xl">
                   <button
                     type="button"
@@ -512,7 +617,154 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                 </div>
               )}
 
-              {mode === 'LOGIN' ? (
+              {forgotPasswordMode ? (
+                /* Forgot Password Form */
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-500" />
+                      <span>{resetOtpSent ? 'Verify Code & Set Password' : 'Password Recovery'}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotPasswordMode(false);
+                        setErrorMsg(null);
+                        setResetSuccessMsg(null);
+                      }}
+                      className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <ArrowLeft className="w-3 h-3" />
+                      <span>Back to Sign In</span>
+                    </button>
+                  </div>
+
+                  {resetSuccessMsg && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{resetSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {!resetOtpSent ? (
+                    <form onSubmit={handleSendResetOtp} className="space-y-3">
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Enter your registered email address. We will send a secure 6-digit verification code to reset your password.
+                      </p>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Registered Account Email</label>
+                        <div className="relative">
+                          <input
+                            type="email"
+                            value={resetEmail}
+                            onChange={e => setResetEmail(e.target.value)}
+                            placeholder="e.g. user@example.com"
+                            className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
+                            required
+                          />
+                          <Mail className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading || !resetEmail.trim()}
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span>{loading ? 'Sending Code...' : 'Send Reset Code'}</span>
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleResetPassword} className="space-y-3">
+                      <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-center justify-between">
+                        <span className="truncate">Sent to: <strong>{resetEmail}</strong></span>
+                        <button
+                          type="button"
+                          onClick={() => setResetOtpSent(false)}
+                          className="text-[11px] font-bold text-amber-800 hover:underline shrink-0 ml-2 cursor-pointer"
+                        >
+                          Change
+                        </button>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block font-bold text-slate-700">6-Digit Verification Code</label>
+                          <button
+                            type="button"
+                            disabled={resetCountdown > 0 || loading}
+                            onClick={() => handleSendResetOtp()}
+                            className="text-[11px] font-semibold text-amber-600 hover:text-amber-700 disabled:text-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                          >
+                            {resetCountdown > 0 ? `Resend code in ${resetCountdown}s` : 'Resend Code'}
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={resetOtpInput}
+                          onChange={e => setResetOtpInput(e.target.value.replace(/\D/g, ''))}
+                          placeholder="123456"
+                          className="w-full px-3.5 py-2.5 text-sm tracking-widest font-mono text-center border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">New Password (min 8 chars)</label>
+                        <div className="relative">
+                          <input
+                            type={showNewPassword ? 'text' : 'password'}
+                            value={newPasswordInput}
+                            onChange={e => setNewPasswordInput(e.target.value)}
+                            placeholder="At least 8 characters"
+                            className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                          >
+                            {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Confirm New Password</label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmNewPassword ? 'text' : 'password'}
+                            value={confirmNewPasswordInput}
+                            onChange={e => setConfirmNewPasswordInput(e.target.value)}
+                            placeholder="Repeat new password"
+                            className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
+                            className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                          >
+                            {showConfirmNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading || resetOtpInput.length < 6 || newPasswordInput.length < 8}
+                        className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>{loading ? 'Resetting Password...' : 'Verify Code & Reset Password'}</span>
+                      </button>
+                    </form>
+                  )}
+                </div>
+              ) : mode === 'LOGIN' ? (
                 <form onSubmit={handleLogin} className="space-y-3.5">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Account Email</label>
@@ -527,7 +779,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Password</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-bold text-slate-700">Password</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotPasswordMode(true);
+                          setResetEmail(emailInput.trim());
+                          setErrorMsg(null);
+                          setResetSuccessMsg(null);
+                        }}
+                        className="text-[11px] font-semibold text-amber-600 hover:text-amber-700 hover:underline cursor-pointer"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
