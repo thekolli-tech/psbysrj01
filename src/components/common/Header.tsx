@@ -219,7 +219,7 @@ export const Header: React.FC<HeaderProps> = ({
           })}
         </nav>
 
-        {/* Zone 3: Actions & Controls (Right) */}
+        {/* Zone 3: Actions & Controls (Right) - Clean Icon-Based Controls */}
         <div className="flex items-center gap-1.5 xl:gap-2.5 shrink-0 ml-auto">
           {utilityLinks.includes('LEADS_MARKET') && (
             <button
@@ -227,18 +227,16 @@ export const Header: React.FC<HeaderProps> = ({
                 setActiveView('LEADS_MARKET');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
+              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'LEADS_MARKET'
                   ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                  : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'
+                  : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
               }`}
               title="Buyer Leads"
+              aria-label="Buyer Leads"
             >
-              <Users className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="whitespace-nowrap font-bold">
-                <span className="hidden min-[1680px]:inline">Buyer Leads</span>
-                <span className="min-[1680px]:hidden">Leads</span>
-              </span>
+              <Users className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="sr-only">Buyer Leads</span>
             </button>
           )}
 
@@ -248,15 +246,16 @@ export const Header: React.FC<HeaderProps> = ({
                 setActiveView('PROFESSIONAL');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
+              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'PROFESSIONAL'
                   ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                  : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'
+                  : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
               }`}
               title="Workspace"
+              aria-label="Workspace"
             >
-              <Briefcase className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="whitespace-nowrap font-bold">Workspace</span>
+              <Briefcase className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="sr-only">Workspace</span>
             </button>
           )}
 
@@ -267,15 +266,16 @@ export const Header: React.FC<HeaderProps> = ({
                 setActiveView('DEVELOPER');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
+              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'DEVELOPER'
                   ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                  : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'
+                  : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
               }`}
               title="Developer Diagnostics"
+              aria-label="Developer Diagnostics"
             >
-              <Terminal className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span className="whitespace-nowrap font-bold">Diagnostics</span>
+              <Terminal className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span className="sr-only">Diagnostics</span>
             </button>
           )}
 
@@ -285,15 +285,16 @@ export const Header: React.FC<HeaderProps> = ({
                 setActiveView('ADMIN');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
+              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'ADMIN'
-                  ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-sm'
-                  : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                  ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-sm'
+                  : 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100'
               }`}
               title={currentUser.role === 'DEVELOPER' ? 'Platform Owner Console' : 'Super Admin Console'}
+              aria-label="Super Admin Console"
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span className="whitespace-nowrap font-bold">
+              <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
+              <span className="sr-only">
                 <span className="min-[1680px]:hidden">Admin Console</span>
                 <span className="hidden min-[1680px]:inline">
                   {currentUser.role === 'DEVELOPER' ? 'Platform Owner Console' : 'Super Admin Console'}
@@ -309,15 +310,16 @@ export const Header: React.FC<HeaderProps> = ({
                 setActiveView('PROPERTY_ADMIN');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0 shadow-xs ${
+              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'PROPERTY_ADMIN'
                   ? 'bg-indigo-900 text-white border-indigo-900 shadow-sm'
-                  : 'bg-indigo-50 text-indigo-900 border-indigo-300 hover:bg-indigo-100'
+                  : 'bg-indigo-50 text-indigo-900 border-indigo-200 hover:bg-indigo-100'
               }`}
               title="PMO Workspace"
+              aria-label="PMO Workspace"
             >
-              <Building className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-              <span className="whitespace-nowrap font-bold">PMO Workspace</span>
+              <Building className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span className="sr-only">PMO Workspace</span>
             </button>
           )}
 
@@ -328,14 +330,16 @@ export const Header: React.FC<HeaderProps> = ({
                 setActiveView('DASHBOARD');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
+              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'DASHBOARD'
                   ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                  : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'
+                  : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
               }`}
+              title="Member Dashboard"
+              aria-label="Dashboard"
             >
-              <LayoutDashboard className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="whitespace-nowrap font-bold">Dashboard</span>
+              <LayoutDashboard className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="sr-only">Dashboard</span>
             </button>
           )}
 
@@ -346,15 +350,16 @@ export const Header: React.FC<HeaderProps> = ({
                 setActiveView('PROFESSIONAL');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shrink-0 shadow-xs ${
+              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'PROFESSIONAL'
                   ? 'bg-violet-900 text-white border-violet-900 shadow-sm'
-                  : 'bg-violet-50 text-violet-900 border-violet-300 hover:bg-violet-100'
+                  : 'bg-violet-50 text-violet-900 border-violet-200 hover:bg-violet-100'
               }`}
               title="Professional Workspace"
+              aria-label="Pro Workspace"
             >
-              <Briefcase className="w-3.5 h-3.5 text-violet-600 shrink-0" />
-              <span className="whitespace-nowrap font-bold">Pro Workspace</span>
+              <Briefcase className="w-4 h-4 text-violet-600 shrink-0" />
+              <span className="sr-only">Pro Workspace</span>
             </button>
           )}
 
@@ -362,7 +367,9 @@ export const Header: React.FC<HeaderProps> = ({
           {isLoggedIn ? (
             <button
               onClick={onOpenWalletModal}
-              className="flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 bg-amber-50 hover:bg-amber-100/80 text-amber-900 border border-amber-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100/80 text-amber-900 border border-amber-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer shrink-0"
+              title="Wallet Credit Balance"
+              aria-label="Wallet Credit Balance"
             >
               <Wallet className="w-3.5 h-3.5 text-amber-600 shrink-0" />
               <span className="font-mono-numbers">₹{walletBalance.toLocaleString('en-IN')}</span>
@@ -381,19 +388,19 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <button
               onClick={onOpenProfileModal}
-              className="flex items-center gap-2 px-2.5 xl:px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-xs transition-colors shadow-sm cursor-pointer shrink-0"
-              title="Open Profile Control Panel & Password Settings"
+              className="flex items-center gap-1.5 p-1 sm:p-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors shadow-xs cursor-pointer shrink-0"
+              title={`${currentUser.name} (${currentUser.role}) - Open Profile Control Panel`}
+              aria-label="Open Profile Control Panel"
             >
               <img
                 src={getSafeAvatar(currentUser.avatar)}
                 alt={currentUser.name}
-                className="w-6 h-6 rounded-full object-cover border border-slate-200 shrink-0"
+                className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                 }}
               />
-              {getRoleIcon(currentUser.role)}
-              <div className="text-left hidden min-[1680px]:block">
+              <div className="hidden min-[1680px]:block sr-only">
                 <span className="text-[11px] font-bold text-slate-900 block leading-tight truncate max-w-[90px]">
                   {currentUser.name}
                 </span>

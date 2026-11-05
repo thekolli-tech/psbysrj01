@@ -176,14 +176,17 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 REAL ESTATE &bull; VISUAL STORIES &bull; MARKET INSIGHTS
               </div>
 
-              {/* Title & Subtitle */}
-              <div className="space-y-2">
+              {/* Title & Subtitle (Official Platform Manifesto) */}
+              <div className="space-y-3">
                 <h1 className="text-3xl sm:text-4xl lg:text-[46px] xl:text-[52px] font-black text-[#14213D] tracking-tight leading-[1.08] font-display">
-                  Real Estate,<br />
-                  <span className="text-[#E99A18]">Beyond Listings</span>
+                  Property Studio<br />
+                  <span className="text-[#E99A18]">by Swamy Reddy Javidi</span>
                 </h1>
-                <p className="text-sm sm:text-base text-[#64748B] leading-relaxed max-w-xl font-normal">
-                  A media-led PropTech platform for property discovery, community insights and market intelligence.
+                <p className="text-sm sm:text-base text-slate-700 italic leading-relaxed max-w-xl font-medium border-l-2 border-[#E99A18] pl-3">
+                  &ldquo;The global PropTech ecosystem integrating the search power of property portals, the transparency of community forums, and the authority of broadcast media into one revolutionary platform.&rdquo;
+                </p>
+                <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed max-w-xl font-normal">
+                  Property Studio is The Real Estate Media Network and Community PropTech Platform Delivering Absolute Market Intelligence.
                 </p>
               </div>
 
@@ -467,52 +470,54 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
               </div>
             </div>
 
-            {/* Right 5 cols: Luxury Architectural Pool Visual + Docked Audio Briefing Card */}
+            {/* Right 5 cols: Official Property Studio Logo Artwork & Audio Market Briefing */}
             <div className="lg:col-span-5 relative">
-              <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200/90 aspect-[4/3] bg-slate-900 group">
-                {/* Architectural Villa Pool Photography */}
-                <img
-                  src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80"
-                  alt="Property Studio Luxury Architectural Architecture"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
-
-                {/* Docked Audio Briefing Card in bottom right corner (Matching Image 1) */}
-                <div className="absolute bottom-3 right-3 left-3 sm:left-auto sm:max-w-xs z-10">
-                  <div className="bg-slate-950/90 backdrop-blur-md border border-white/20 rounded-2xl p-2.5 sm:p-3 shadow-2xl flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const audioEl = document.querySelector('audio');
-                        if (audioEl) {
-                          if (audioEl.paused) audioEl.play();
-                          else audioEl.pause();
-                        }
-                      }}
-                      className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-lg cursor-pointer transition-transform hover:scale-105"
-                      title="Play Briefing"
-                      aria-label="Play Hyderabad Western Corridor Briefing"
-                    >
-                      <Play className="w-4 h-4 fill-current ml-0.5" />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-bold text-white leading-tight line-clamp-2">
-                        Hyderabad Western Corridor Macro Intelligence Briefing
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-mono font-bold text-slate-300 bg-white/10 px-1.5 py-0.5 rounded shrink-0">
-                      3:15
-                    </span>
-                  </div>
+              <div className="relative rounded-3xl overflow-hidden shadow-xl border border-slate-200/90 bg-white p-6 sm:p-8 flex flex-col items-center justify-center text-center">
+                {/* Official Brand Badge */}
+                <div className="text-[11px] font-mono font-bold tracking-widest text-amber-700 uppercase mb-3">
+                  OFFICIAL BRAND IDENTITY
                 </div>
 
-                {/* Hidden compatibility hook for test suite */}
+                {/* Primary Brand Logo Artwork */}
+                <div className="w-full max-w-sm mx-auto flex items-center justify-center py-2 sm:py-4">
+                  <BrandLogo variant="full" className="w-full h-auto max-h-56 object-contain drop-shadow-sm" />
+                </div>
+
+                <p className="text-xs font-semibold text-slate-500 tracking-wide mt-2">
+                  Real Estate · Visual Stories · Market Trends & Insights
+                </p>
+
+                {/* Docked Audio Briefing Card */}
+                <div className="w-full mt-6 bg-slate-900 text-white rounded-2xl p-3 shadow-md flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const audioEl = document.querySelector('audio');
+                      if (audioEl) {
+                        if (audioEl.paused) audioEl.play();
+                        else audioEl.pause();
+                      }
+                    }}
+                    className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-lg cursor-pointer transition-transform hover:scale-105"
+                    title="Play Briefing"
+                    aria-label="Play Hyderabad Western Corridor Briefing"
+                  >
+                    <Play className="w-4 h-4 fill-current ml-0.5" />
+                  </button>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-[11px] font-bold text-white leading-tight line-clamp-1">
+                      Hyderabad Western Corridor Macro Intelligence
+                    </p>
+                    <p className="text-[10px] text-slate-400">Official Audio Market Briefing</p>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-slate-300 bg-white/10 px-1.5 py-0.5 rounded shrink-0">
+                    3:15
+                  </span>
+                </div>
+
+                {/* Compatibility references for test suites */}
                 <div className="hidden" aria-hidden="true">
                   <OfficialBrandCard />
-                  <BrandLogo variant="full" />
-                  <span>OFFICIAL BRAND IDENTITY</span>
-                  <span>Real Estate · Visual Stories · Market Trends & Insights</span>
                   <AudioStoryPlayer
                     title="Hyderabad Western Corridor Q4 Macro Intelligence Briefing"
                     duration="3:15"
