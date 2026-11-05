@@ -25,8 +25,7 @@ import {
   TrendingUp,
   Award,
   Video,
-  MapPin,
-  Search
+  MapPin
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -187,10 +186,10 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-        {/* Zone 2: Navigation Links (Desktop - Left-aligned, directly following Logo) */}
+        {/* Zone 2: Navigation Links (Desktop - Balanced to fill navigation bar space) */}
         <nav
           aria-label="Primary navigation"
-          className="hidden xl:flex items-center justify-start gap-0.5 xl:gap-0.5 2xl:gap-1 min-[1680px]:gap-1.5 text-[10.5px] min-[1366px]:text-[11px] min-[1440px]:text-[11.5px] 2xl:text-xs font-semibold text-slate-600 whitespace-nowrap ml-1.5 xl:ml-2 2xl:ml-3 min-[1680px]:ml-5 shrink-0"
+          className="hidden xl:flex flex-1 items-center justify-center 2xl:justify-evenly gap-1 xl:gap-1.5 2xl:gap-2.5 min-[1680px]:gap-3.5 text-xs 2xl:text-[13px] font-semibold text-slate-600 whitespace-nowrap mx-2 xl:mx-4"
         >
           {navLinks.map(link => {
             const isActive = activeView === link.view;
@@ -208,7 +207,7 @@ export const Header: React.FC<HeaderProps> = ({
                   setActiveView(link.view);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className={`px-1 xl:px-1.5 2xl:px-2 min-[1680px]:px-2.5 py-1 2xl:py-1.5 rounded-lg transition-all cursor-pointer shrink-0 tracking-tight min-[1440px]:tracking-normal ${
+                className={`px-2 xl:px-2.5 2xl:px-3.5 py-1.5 rounded-lg transition-all cursor-pointer shrink-0 tracking-tight min-[1440px]:tracking-normal ${
                   isActive
                     ? 'text-amber-900 bg-[#FFF8EE] font-bold border border-amber-300 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-medium'
@@ -222,28 +221,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 3: Actions & Controls (Right) */}
         <div className="flex items-center gap-1.5 xl:gap-2.5 shrink-0 ml-auto">
-          {/* Search option visible at Top */}
-          <button
-            type="button"
-            onClick={() => {
-              setActiveView('HOME');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-              setTimeout(() => {
-                const el = document.querySelector('input[placeholder*="Search by project"]') as HTMLInputElement;
-                if (el) {
-                  el.focus();
-                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-              }, 120);
-            }}
-            className="inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 transition-all cursor-pointer shrink-0 shadow-2xs group"
-            title="Search projects, developers, localities"
-            aria-label="Search"
-          >
-            <Search className="w-3.5 h-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
-            <span className="hidden sm:inline font-bold">Search</span>
-          </button>
-
           {utilityLinks.includes('LEADS_MARKET') && (
             <button
               onClick={() => {
@@ -449,26 +426,6 @@ export const Header: React.FC<HeaderProps> = ({
           className="xl:hidden border-t border-slate-200 bg-white shadow-2xl px-4 py-5 animate-in slide-in-from-top-2 duration-200 max-h-[calc(100vh-120px)] overflow-y-auto"
         >
           <div className="space-y-4">
-            {/* Search Option at Top of Mobile Drawer */}
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setActiveView('HOME');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                setTimeout(() => {
-                  const el = document.querySelector('input[placeholder*="Search by project"]') as HTMLInputElement;
-                  if (el) {
-                    el.focus();
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  }
-                }, 150);
-              }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-xs text-slate-600 font-medium text-left cursor-pointer transition-all"
-            >
-              <Search className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Search projects, developers, localities...</span>
-            </button>
             {isLoggedIn && currentUser && (
               <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
                 <div className="flex items-center gap-2.5">

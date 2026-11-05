@@ -23,13 +23,13 @@ test('Review and Rating has pre-populated entities and Add Entity option for all
   assert.ok(content.includes('handleAddEntity'), 'Must provide entity creation handler');
 });
 
-test('City Option beside Secretariat in Header', () => {
+test('City Option beside Secretariat in Header and Search removed from navigation bar', () => {
   const content = readFileSync(resolve('src/components/common/Header.tsx'), 'utf8');
   assert.ok(content.includes('City:'), 'Header must contain City label');
   assert.ok(content.includes('Hyderabad'), 'Header must include Hyderabad');
   assert.ok(content.includes('Bengaluru'), 'Header must include Bengaluru');
   assert.ok(content.includes('Secretariat:'), 'Header must have Secretariat');
-  assert.ok(content.includes('title="Search projects, developers, localities"'), 'Header must have quick search option at top');
+  assert.ok(!content.includes('title="Search projects, developers, localities"'), 'Search button must be removed from navigation bar');
 });
 
 test('Community questions are immediately approved without super admin approval', () => {

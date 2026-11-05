@@ -156,15 +156,15 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   const logoScale = Math.min(1, 0.85 + morph * 0.15);
 
   return (
-    <div className="space-y-12 sm:space-y-16 pb-12">
+    <div className="pb-12">
       {/*
         ====================================================================
         PROMINENT TOP PROPERTY SEARCH BAR (IMMEDIATELY BELOW TOP NAVIGATION)
         ====================================================================
       */}
       <section className="bg-white border-b border-slate-200/90 shadow-xs" data-testid="homepage-top-search">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4">
-          <form onSubmit={handleTopSearch} className="space-y-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5">
+          <form onSubmit={handleTopSearch} className="space-y-2.5">
             <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 shadow-xs">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-2.5 items-center">
                 {/* 1. Keyword Input */}
@@ -249,6 +249,54 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                     <span>Search</span>
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Quick Discovery & Trending Corridor Tags (Fills empty space with high-value clickable shortcuts) */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-semibold text-slate-700 flex items-center gap-1 text-[11px] uppercase tracking-wide font-mono mr-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+                  Popular Corridors:
+                </span>
+                {['Kokapet', 'Tellapur', 'Financial District', 'Neopolis', 'Gachibowli', 'Mokila'].map(loc => (
+                  <button
+                    key={loc}
+                    type="button"
+                    onClick={() => {
+                      setSearchLocation(loc);
+                      setHasSearched(true);
+                    }}
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-all cursor-pointer ${
+                      searchLocation === loc
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-900 border-slate-200 hover:border-amber-300'
+                    }`}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500">
+                <span className="font-semibold text-slate-600">Quick Browse:</span>
+                {['Apartment', 'Villa', 'Commercial'].map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setSearchPropertyType(type);
+                      setHasSearched(true);
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[11px] transition-all cursor-pointer ${
+                      searchPropertyType === type
+                        ? 'bg-slate-900 text-white font-bold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -436,7 +484,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-10 lg:pb-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             {/* Left 7 cols: Brand Manifesto, Audio Lead & Expanded Intelligence Space */}
             <div className="lg:col-span-7 space-y-5 lg:space-y-6 order-2 lg:order-1">
@@ -604,7 +652,8 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
         </div>
       </section>
 
-      <OverviewFoundation />
+      <div className="space-y-12 sm:space-y-16 mt-12 sm:mt-16">
+        <OverviewFoundation />
 
       {/* 
         ====================================================================
@@ -858,6 +907,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
           ))}
         </div>
       </section>
+      </div>
 
       {/* Property Detail Modal */}
       {activePropertyModal && (
