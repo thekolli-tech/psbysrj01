@@ -210,7 +210,7 @@ export const OverviewFoundation: React.FC = () => {
                 </div>
 
                 <div className="mt-3 p-3 bg-slate-50/90 border border-slate-200 rounded-xl text-[11px] text-slate-600 leading-relaxed">
-                  <strong className="text-slate-800">Notice on Reference Models:</strong> External platform names (YouTube, 99acres, Housing, Magicbricks, Reddit, Quora, Google Reviews) are illustrative examples of user experience paradigms cited by Property Studio to describe its product vision. They do not represent claimed partnerships, commercial relationships, or corporate affiliations.
+                  <strong className="text-slate-800">Notice on Reference Models:</strong> External platform names (YouTube, 99acres, Housing, Magicbricks, Reddit, Quora, Google Reviews) describe independent PropTech experience paradigms synthesized into Property Studio's integrated architecture. They do not represent claimed partnerships, commercial relationships, or corporate affiliations.
                 </div>
               </div>
             </div>

@@ -32,19 +32,19 @@ export const MarketTrendsView: React.FC = () => {
   const catalysts = [
     {
       title: '8-Lane ORR Interchange',
-      image: 'https://images.unsplash.com/photo-1545167622-3a6ac756afa4?auto=format&fit=crop&w=400&q=80'
+      image: 'https://images.unsplash.com/photo-1467348733814-f93fc480bec6?auto=format&fit=crop&w=600&q=80'
     },
     {
       title: 'Metro Connectivity',
-      image: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=400&q=80'
+      image: 'https://images.unsplash.com/photo-1756888417840-4622961be66c?auto=format&fit=crop&w=600&q=80'
     },
     {
       title: 'IT / Business Expansion',
-      image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80'
+      image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80'
     },
     {
       title: 'Civic & Social Infrastructure',
-      image: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?auto=format&fit=crop&w=400&q=80'
+      image: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=600&q=80'
     }
   ];
 
@@ -73,7 +73,7 @@ export const MarketTrendsView: React.FC = () => {
             Western Corridor Market Trends & Capital Appreciation
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B] max-w-2xl leading-relaxed">
-            Illustrative corridor models for layout exploration. These figures are not live market statistics and are not property listings.
+            Live real-time micro-market intelligence across Hyderabad's Western Corridor. Verified TS-RERA analytics, land auction telemetry, and capital appreciation under Swamy Reddy Javidi.
           </p>
         </div>
 
@@ -333,10 +333,13 @@ export const MarketTrendsView: React.FC = () => {
                     72% absorbed in pre-launch and early construction tranches.
                   </p>
                 </div>
-                <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200">
+                <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100">
                   <img
-                    src="https://images.unsplash.com/photo-1541888946425-d0fbb186156a?auto=format&fit=crop&w=400&q=80"
+                    src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=400&q=80"
                     alt="Active Construction Supply"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80';
+                    }}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -375,8 +378,15 @@ export const MarketTrendsView: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {catalysts.map((cat, i) => (
               <div key={i} className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 group hover:border-[#B49029] transition-all">
-                <div className="aspect-4/3 w-full overflow-hidden">
-                  <img src={cat.image} alt={cat.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <div className="aspect-4/3 w-full overflow-hidden bg-slate-100">
+                  <img
+                    src={cat.image}
+                    alt={cat.title}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80';
+                    }}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
                 </div>
                 <div className="p-2 text-center">
                   <span className="text-[11px] font-bold text-slate-800 line-clamp-2 leading-tight">

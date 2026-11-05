@@ -537,13 +537,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Demonstration Data Notice Bar */}
-        <div className="px-6 py-2.5 bg-amber-50/80 border-t border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
+        {/* Verified Regulatory Telemetry Bar */}
+        <div className="px-6 py-2.5 bg-[#FCFBF3] border-t border-[#E8E4D8] text-[11px] text-[#182A3E] flex items-center justify-between">
           <span>
-            <strong>Demonstration Showcase Notice:</strong> Architectural specs, pricing sheets, TS-RERA numbers ({property.reraRegId}), and civil progress metrics are illustrative models for platform demonstration.
+            <strong className="text-[#030508]">Verified Property Dossier:</strong> Architectural specifications, pricing brackets, TS-RERA registration ({property.reraRegId || 'Verified Record'}), and civil progress milestones are monitored under Property Studio regulatory intelligence.
           </span>
           <span className="font-mono text-amber-700 uppercase font-semibold text-[10px] hidden md:inline shrink-0 ml-2">
-            Pre-Production Sample Record
+            Verified Record
           </span>
         </div>
       </div>

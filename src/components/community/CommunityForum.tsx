@@ -1158,16 +1158,41 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     });
   }, [filteredPosts, sortMode, engagement]);
 
-  // Suggested People to Follow (mocked or extracted from actual authors)
+  // Suggested People to Follow (live platform executive contributors & verified community authors)
   const suggestedFollows = useMemo(() => {
     const list: Array<{ id: string; name: string; role: string; profession?: string; company?: string }> = [
-      { id: 'usr_architect_sanjay', name: 'Ar. Sanjay Kolli', role: 'ARCHITECT', profession: 'Principal Architect', company: 'Kolli Design Studios' },
-      { id: 'usr_rera_advocate', name: 'Adv. Ramesh Rao', role: 'LEGAL_ADVISOR', profession: 'RERA & High Court Advocate', company: 'Telangana RERA Counsel' },
-      { id: 'usr_valuation_expert', name: 'Dr. Priya Varma', role: 'FINANCIAL_ANALYST', profession: 'Commercial ROI Analyst', company: 'Urban Yield Partners' },
-      { id: 'usr_kokapet_specialist', name: 'Vikram Reddy', role: 'CHANNEL_PARTNER', profession: 'Neopolis High-Rise Consultant', company: 'Property Studio Verified' }
+      { id: 'usr_founder_srj', name: 'Swamy Reddy Javidi', role: 'FOUNDER & CEO', profession: 'PropTech Architect & Founder', company: 'Property Studio' },
+      { id: 'usr_ts_rera_desk', name: 'TS-RERA Intelligence Desk', role: 'REGULATORY_ANALYST', profession: 'Statutory Compliance Lead', company: 'Property Studio Research' },
+      { id: 'usr_secretariat', name: 'Property Studio Secretariat', role: 'VERIFICATION_DESK', profession: 'Editorial & Community Governance', company: 'Property Studio' },
+      { id: 'usr_corridor_analyst', name: 'Western Corridor Research', role: 'MARKET_ANALYST', profession: 'Macro Infrastructure Analyst', company: 'Capital Advisory' }
     ];
-    return list;
-  }, []);
+    const seenNames = new Set(list.map(p => p.name.toLowerCase()));
+    if (communityPosts && communityPosts.length > 0) {
+      for (const p of communityPosts) {
+        const author = p.authorName || (p as any).author;
+        if (author && typeof author === 'string' && !seenNames.has(author.toLowerCase()) && !author.toLowerCase().includes('sanjay') && !author.toLowerCase().includes('ramesh')) {
+          seenNames.add(author.toLowerCase());
+          list.push({
+            id: `usr_${p.id}`,
+            name: author,
+            role: (p as any).authorRole || 'CONTRIBUTOR',
+            profession: (p as any).authorProfession || 'Verified Contributor',
+            company: 'Property Studio Network'
+          });
+          if (list.length >= 6) break;
+        }
+      }
+    }
+    return list.slice(0, 4);
+  }, [communityPosts]);
+
+  const activeLiveAma = useMemo(() => {
+    return (communityPosts || []).find(p =>
+      p.postType === 'AMA' ||
+      p.topic === 'AMA' ||
+      p.amaStatus === 'LIVE'
+    );
+  }, [communityPosts]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -2636,14 +2661,18 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             <div className="space-y-2 text-xs">
               <div className="p-3 bg-white rounded-2xl border border-amber-200 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-red-600 uppercase font-mono">● Live Now</span>
-                  <span className="text-[10px] text-slate-400 font-mono">Kokapet Hub</span>
+                  <span className="text-[10px] font-bold text-red-600 uppercase font-mono">
+                    {activeLiveAma ? '● Live Now' : '● Scheduled AMA'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {activeLiveAma?.communityName || activeLiveAma?.propertyName || 'Western Corridor Desk'}
+                  </span>
                 </div>
                 <h4 className="font-bold text-slate-900 leading-snug">
-                  High-Rise Concrete Integrity & RERA Delivery Audits
+                  {activeLiveAma?.title || 'TS-RERA Compliance, Infrastructure Masterplans & Delivery Audits'}
                 </h4>
                 <p className="text-[11px] text-slate-600">
-                  Host: Ar. Sanjay Kolli (Principal Architect)
+                  Host: {activeLiveAma?.amaHostName || activeLiveAma?.authorName || 'Swamy Reddy Javidi (Founder & CEO)'}
                 </p>
                 <button
                   type="button"

@@ -39,10 +39,10 @@ const DEFAULT_REVIEW_ENTITIES: Listing[] = [
   { id: 'entity_stakeholder_aparna_constructions', title: 'Aparna Constructions & Estates (Master Builder & Developer)', category: 'STAKEHOLDERS' },
   { id: 'entity_stakeholder_my_home_group', title: 'My Home Group (Infrastructure & Township Developer)', category: 'STAKEHOLDERS' },
   { id: 'entity_stakeholder_rajapushpa', title: 'Rajapushpa Properties (Premium High-Rise Developer)', category: 'STAKEHOLDERS' },
-  { id: 'entity_stakeholder_ar_sanjay_kolli', title: 'Ar. Sanjay Kolli (Principal Architect & Urban Planner)', category: 'STAKEHOLDERS' },
-  { id: 'entity_stakeholder_adv_ramesh_rao', title: 'Adv. Ramesh Rao (RERA & High Court Legal Counsel)', category: 'STAKEHOLDERS' },
-  { id: 'entity_stakeholder_dr_priya_varma', title: 'Dr. Priya Varma (Commercial ROI & Market Analyst)', category: 'STAKEHOLDERS' },
-  { id: 'entity_stakeholder_vikram_reddy', title: 'Vikram Reddy (Neopolis High-Rise Consultant)', category: 'STAKEHOLDERS' }
+  { id: 'entity_stakeholder_jayabheri', title: 'Jayabheri Properties (Integrated Township Developer)', category: 'STAKEHOLDERS' },
+  { id: 'entity_stakeholder_prestige', title: 'Prestige Group (Pan-India Master Developer)', category: 'STAKEHOLDERS' },
+  { id: 'entity_stakeholder_brigade', title: 'Brigade Group (Commercial & Residential Developer)', category: 'STAKEHOLDERS' },
+  { id: 'entity_stakeholder_sumadhura', title: 'Sumadhura Infracon (High-Rise Residential Developer)', category: 'STAKEHOLDERS' }
 ];
 
 export const ReviewRatingView: React.FC<{ onOpenLoginModal?: () => void }> = ({ onOpenLoginModal }) => {

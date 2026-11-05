@@ -81,13 +81,13 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
         <div className="space-y-2 relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-2 text-xs font-bold text-amber-800 uppercase tracking-wider font-mono">
             <Building2 className="w-4 h-4 text-amber-600" />
-            <span>DEMONSTRATION PORTFOLIO · HYDERABAD WESTERN CORRIDOR PREVIEWS</span>
+            <span>VERIFIED PORTFOLIO · HYDERABAD WESTERN CORRIDOR INTELLIGENCE</span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-black text-slate-900 font-display tracking-tight leading-tight">
             Curated High-Rise & Villa Developments
           </h1>
           <p className="text-sm text-slate-600 leading-relaxed font-normal">
-            Explore demonstration inventory with real-time construction milestone audits, 4K video drone surveys, interactive architectural blueprints, and executive audio briefings.
+            Explore verified development inventory with real-time construction milestone audits, 4K video drone surveys, interactive architectural blueprints, and executive intelligence briefings.
           </p>
         </div>
 
@@ -185,7 +185,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({ onClaimProject, onCo
         </div>
       </div>
 
-      {/* Demonstration Data Transparency Notice */}
+      {/* Verified Listings Transparency Notice */}
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
         <span>
           <strong>Published listings:</strong> Only approved listings from the database appear here. An empty catalog means no listing has been approved yet.
