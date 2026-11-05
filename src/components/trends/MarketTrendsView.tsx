@@ -49,13 +49,13 @@ export const MarketTrendsView: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 sm:space-y-8 bg-[#F7F9FD]">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 sm:space-y-8 bg-[#FAFCFD]">
       {/* 
         ====================================================================
         TOP BANNER: EXECUTIVE DATA INTELLIGENCE DESK (MATCHING IMAGE 4)
         ====================================================================
       */}
-      <div className="relative overflow-hidden bg-white rounded-3xl p-6 sm:p-8 border border-[#E2E8F0] shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className="relative overflow-hidden bg-white rounded-3xl p-6 sm:p-8 border border-[#E8E4D8] shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         {/* Subtle decorative background skyline */}
         <div
           className="absolute inset-y-0 right-1/4 w-96 opacity-10 bg-no-repeat bg-contain bg-right pointer-events-none"
@@ -65,11 +65,11 @@ export const MarketTrendsView: React.FC = () => {
         />
 
         <div className="space-y-2 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold uppercase tracking-wider font-mono">
-            <TrendingUp className="w-3.5 h-3.5 text-[#E99A18]" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FCFBF3] text-[#A99137] border border-[#B49029]/30 text-xs font-bold uppercase tracking-wider font-mono">
+            <TrendingUp className="w-3.5 h-3.5 text-[#B49029]" />
             EXECUTIVE DATA INTELLIGENCE DESK
           </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#14213D] font-display tracking-tight">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#030508] font-display tracking-tight">
             Western Corridor Market Trends & Capital Appreciation
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B] max-w-2xl leading-relaxed">
@@ -78,12 +78,12 @@ export const MarketTrendsView: React.FC = () => {
         </div>
 
         <div className="relative z-10 shrink-0">
-          <div className="bg-[#FFF8EE] p-4 rounded-2xl border border-amber-200/80 shadow-xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
-              <Award className="w-6 h-6 text-[#E99A18]" />
+          <div className="bg-[#FCFBF3] p-4 rounded-2xl border border-[#E8E4D8] shadow-xs flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#B49029]/10 text-[#B49029] flex items-center justify-center shrink-0">
+              <Award className="w-6 h-6 text-[#B49029]" />
             </div>
             <div>
-              <span className="text-[10px] text-amber-800 uppercase font-bold tracking-wider block">
+              <span className="text-[10px] text-[#A99137] uppercase font-bold tracking-wider block">
                 TOP PERFORMER (1-YR)
               </span>
               <span className="text-xl font-black text-emerald-600 font-mono-numbers">
@@ -110,23 +110,23 @@ export const MarketTrendsView: React.FC = () => {
               onClick={() => setSelectedMarketIndex(idx)}
               className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group ${
                 isSelected
-                  ? 'border-[#E99A18] bg-white ring-2 ring-[#E99A18]/30 shadow-md'
-                  : 'border-[#E2E8F0] bg-white hover:border-amber-300 hover:shadow-xs'
+                  ? 'border-[#B49029] bg-white ring-2 ring-[#B49029]/30 shadow-md'
+                  : 'border-[#E8E4D8] bg-white hover:border-[#B49029] hover:shadow-xs'
               }`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#14213D] truncate">
+                <div className="flex items-center gap-2 text-xs font-bold text-[#030508] truncate">
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                    isSelected ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                    isSelected ? 'bg-[#FCFBF3] text-[#A99137]' : 'bg-slate-100 text-slate-500'
                   }`}>
                     <IconComponent className="w-4 h-4" />
                   </div>
                   <span className="truncate">{market.microMarket}</span>
                 </div>
-                <ArrowUpRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? 'text-[#E99A18] scale-110' : 'text-slate-400 group-hover:text-amber-600'}`} />
+                <ArrowUpRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? 'text-[#B49029] scale-110' : 'text-slate-400 group-hover:text-[#B49029]'}`} />
               </div>
 
-              <div className="text-2xl font-black text-[#14213D] font-mono-numbers mt-3">
+              <div className="text-2xl font-black text-[#030508] font-mono-numbers mt-3">
                 ₹{market.currentAvgRate.toLocaleString('en-IN')}{' '}
                 <span className="text-xs text-[#64748B] font-normal">/sqft</span>
               </div>
@@ -151,13 +151,13 @@ export const MarketTrendsView: React.FC = () => {
       */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
         {/* Left Column: Continuous Area Chart (8 cols) */}
-        <div className="lg:col-span-8 bg-white rounded-3xl border border-[#E2E8F0] p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="lg:col-span-8 bg-white rounded-3xl border border-[#E8E4D8] p-6 sm:p-8 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <span className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider font-mono">
                 QUARTERLY PRICE INDEX (2025 – 2026)
               </span>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-[#14213D] font-display mt-0.5">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#030508] font-display mt-0.5">
                 {activeMarket.microMarket} Historical Trajectory
               </h2>
             </div>
@@ -200,8 +200,8 @@ export const MarketTrendsView: React.FC = () => {
                 >
                   <defs>
                     <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#E99A18" stopOpacity="0.35" />
-                      <stop offset="100%" stopColor="#E99A18" stopOpacity="0.0" />
+                      <stop offset="0%" stopColor="#B49029" stopOpacity="0.35" />
+                      <stop offset="100%" stopColor="#B49029" stopOpacity="0.0" />
                     </linearGradient>
                   </defs>
 
@@ -215,7 +215,7 @@ export const MarketTrendsView: React.FC = () => {
                   <path
                     d="M 50 180 L 150 150 L 250 115 L 350 80 L 450 55 L 550 42 L 650 25"
                     fill="none"
-                    stroke="#E99A18"
+                    stroke="#B49029"
                     strokeWidth="3.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -237,7 +237,7 @@ export const MarketTrendsView: React.FC = () => {
                         cy={pt.cy}
                         r={pt.active ? 6 : 4}
                         fill="#FFFFFF"
-                        stroke="#E99A18"
+                        stroke="#B49029"
                         strokeWidth="3"
                       />
                       {pt.active ? (
@@ -248,7 +248,7 @@ export const MarketTrendsView: React.FC = () => {
                             width="72"
                             height="22"
                             rx="11"
-                            fill="#E99A18"
+                            fill="#B49029"
                           />
                           <text
                             x={pt.cx}
@@ -267,7 +267,7 @@ export const MarketTrendsView: React.FC = () => {
                           x={pt.cx}
                           y={pt.cy - 10}
                           textAnchor="middle"
-                          fill="#14213D"
+                          fill="#030508"
                           fontSize="10"
                           fontWeight="bold"
                           fontFamily="monospace"
@@ -296,10 +296,10 @@ export const MarketTrendsView: React.FC = () => {
 
         {/* Right Column: Micro-Market Health Card (4 cols) */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-white rounded-3xl border border-[#E2E8F0] p-6 sm:p-7 shadow-xs space-y-5">
+          <div className="bg-white rounded-3xl border border-[#E8E4D8] p-6 sm:p-7 shadow-xs space-y-5">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#E99A18]" />
-              <h3 className="text-base font-bold text-[#14213D] font-display">
+              <TrendingUp className="w-4 h-4 text-[#B49029]" />
+              <h3 className="text-base font-bold text-[#030508] font-display">
                 Micro-Market Health Card
               </h3>
             </div>
@@ -316,17 +316,17 @@ export const MarketTrendsView: React.FC = () => {
                 </div>
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div
-                    className="bg-gradient-to-r from-amber-500 to-emerald-500 h-full rounded-full"
+                    className="bg-gradient-to-r from-[#B49029] to-emerald-500 h-full rounded-full"
                     style={{ width: '96%' }}
                   />
                 </div>
               </div>
 
               {/* Total Active Supply Card */}
-              <div className="p-4 bg-[#F7F9FD] rounded-2xl border border-[#E2E8F0] flex items-center justify-between gap-4">
+              <div className="p-4 bg-[#FAFCFD] rounded-2xl border border-[#E8E4D8] flex items-center justify-between gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-[#64748B] block">Total Active Supply Under Construction</span>
-                  <div className="text-2xl font-black text-[#14213D] font-mono-numbers">
+                  <div className="text-2xl font-black text-[#030508] font-mono-numbers">
                     3,400 Units
                   </div>
                   <p className="text-[11px] text-[#64748B]">
@@ -364,17 +364,17 @@ export const MarketTrendsView: React.FC = () => {
       */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
         {/* Left: Catalysts with Real Visual Cards (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-3xl border border-[#E2E8F0] p-6 shadow-xs space-y-4">
+        <div className="lg:col-span-7 bg-white rounded-3xl border border-[#E8E4D8] p-6 shadow-xs space-y-4">
           <div className="flex items-center gap-2">
-            <Building className="w-4 h-4 text-[#E99A18]" />
-            <h3 className="text-xs sm:text-sm font-bold text-[#14213D] uppercase tracking-wide">
+            <Building className="w-4 h-4 text-[#B49029]" />
+            <h3 className="text-xs sm:text-sm font-bold text-[#030508] uppercase tracking-wide">
               Key Infrastructure Growth Catalysts for Neopolis, Kokapet
             </h3>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {catalysts.map((cat, i) => (
-              <div key={i} className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 group hover:border-amber-300 transition-all">
+              <div key={i} className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 group hover:border-[#B49029] transition-all">
                 <div className="aspect-4/3 w-full overflow-hidden">
                   <img src={cat.image} alt={cat.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 </div>
@@ -389,12 +389,12 @@ export const MarketTrendsView: React.FC = () => {
         </div>
 
         {/* Right: Market Insights (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-3xl border border-[#E2E8F0] p-6 shadow-xs space-y-4 flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-white rounded-3xl border border-[#E8E4D8] p-6 shadow-xs space-y-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-[#E99A18]" />
-                <h3 className="text-xs sm:text-sm font-bold text-[#14213D] uppercase tracking-wide">
+                <TrendingUp className="w-4 h-4 text-[#B49029]" />
+                <h3 className="text-xs sm:text-sm font-bold text-[#030508] uppercase tracking-wide">
                   Market Insights
                 </h3>
               </div>

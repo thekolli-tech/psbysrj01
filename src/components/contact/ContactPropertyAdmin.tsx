@@ -113,7 +113,7 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
         HERO BANNER: Official Secretariat & Support Desk (Matching Reference)
         ========================================================================
       */}
-      <div className="relative overflow-hidden rounded-3xl bg-[#0B1530] text-white border border-[#101C38] shadow-xl p-6 sm:p-8 lg:p-10">
+      <div className="relative overflow-hidden rounded-3xl bg-[#182A3E] text-white border border-[#182A3E] shadow-xl p-6 sm:p-8 lg:p-10">
         {/* Right Side: Architectural Commercial Glass Tower at Dusk with Illuminated Logo */}
         <div className="absolute right-0 top-0 bottom-0 w-full lg:w-1/2 pointer-events-none overflow-hidden">
           <img
@@ -121,18 +121,18 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
             alt="Property Studio Secretariat Tower"
             className="w-full h-full object-cover object-center opacity-40 mix-blend-luminosity"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0B1530] via-[#0B1530]/90 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#182A3E] via-[#182A3E]/90 to-transparent" />
           
           {/* Illuminated Property Studio Logo on Building Façade */}
-          <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden xl:flex flex-col items-center justify-center p-6 rounded-2xl bg-black/60 backdrop-blur-md border border-amber-500/30 shadow-2xl">
-            <BrandLogo variant="full" size="md" className="max-h-24 filter brightness-110 drop-shadow-[0_0_15px_rgba(233,154,24,0.4)]" />
+          <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden xl:flex flex-col items-center justify-center p-6 rounded-2xl bg-black/60 backdrop-blur-md border border-[#B49029]/30 shadow-2xl">
+            <BrandLogo variant="full" size="md" className="max-h-24 filter brightness-110 drop-shadow-[0_0_15px_rgba(180,144,41,0.4)]" />
           </div>
         </div>
 
         {/* Left Content */}
         <div className="relative z-10 max-w-xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E99A18]/20 text-[#E99A18] border border-[#E99A18]/30 text-xs font-bold font-mono uppercase tracking-wide">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#E99A18]" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B49029]/20 text-[#B49029] border border-[#B49029]/30 text-xs font-bold font-mono uppercase tracking-wide">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#B49029]" />
             <span>CONTACT & CONNECT</span>
           </div>
 
@@ -161,13 +161,13 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
               showToast('Opening Support Desk Drawer...');
             }
           }}
-          className="bg-[#0B1530] text-white rounded-2xl p-4 sm:p-5 border border-[#101C38] flex items-center justify-between gap-3 shadow-md hover:border-amber-500/50 hover:shadow-amber-500/10 transition-all cursor-pointer group"
+          className="bg-[#182A3E] text-white rounded-2xl p-4 sm:p-5 border border-[#182A3E] flex items-center justify-between gap-3 shadow-md hover:border-[#B49029]/50 hover:shadow-[#B49029]/10 transition-all cursor-pointer group"
           role="button"
           tabIndex={0}
           title="Launch Support Desk Drawer"
         >
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-11 h-11 rounded-xl bg-amber-500/10 text-[#E99A18] border border-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <div className="w-11 h-11 rounded-xl bg-[#B49029]/10 text-[#B49029] border border-[#B49029]/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <Headphones className="w-5 h-5" />
             </div>
             <div className="truncate">
@@ -175,7 +175,7 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
               <p className="text-[11px] text-slate-400 truncate mt-0.5">Raise a ticket, track status and get assistance</p>
             </div>
           </div>
-          <div className="w-9 h-9 rounded-full bg-[#E99A18] group-hover:bg-[#d98b10] text-slate-950 flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:translate-x-1">
+          <div className="w-9 h-9 rounded-full bg-[#B49029] group-hover:bg-[#A99137] text-white flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:translate-x-1">
             <ArrowRight className="w-4 h-4 font-bold" />
           </div>
         </div>
@@ -183,14 +183,14 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
         {/* Card 2: Official Telephone Support */}
         <a
           href={`tel:${officialTel}`}
-          className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 flex items-center gap-3.5 shadow-xs hover:border-amber-400 hover:shadow-xs transition-all cursor-pointer group"
+          className="bg-white rounded-2xl p-4 sm:p-5 border border-[#E8E4D8] flex items-center gap-3.5 shadow-xs hover:border-[#B49029] hover:shadow-xs transition-all cursor-pointer group"
           title={`Call ${officialPhone}`}
         >
-          <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+          <div className="w-11 h-11 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
             <Phone className="w-5 h-5" />
           </div>
           <div className="truncate">
-            <h3 className="font-bold text-sm text-[#14213D] leading-tight">Call {officialPhone}</h3>
+            <h3 className="font-bold text-sm text-[#030508] leading-tight">Call {officialPhone}</h3>
             <p className="text-[11px] text-[#64748B] truncate mt-0.5">Mon – Sat, 10:00 AM – 7:00 PM</p>
           </div>
         </a>
@@ -198,14 +198,14 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
         {/* Card 3: Official Secretariat Email */}
         <a
           href={`mailto:${officialEmail}?subject=Property%20Studio%20Secretariat%20Enquiry`}
-          className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 flex items-center gap-3.5 shadow-xs hover:border-amber-400 hover:shadow-xs transition-all cursor-pointer group"
+          className="bg-white rounded-2xl p-4 sm:p-5 border border-[#E8E4D8] flex items-center gap-3.5 shadow-xs hover:border-[#B49029] hover:shadow-xs transition-all cursor-pointer group"
           title={`Email ${officialEmail}`}
         >
           <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
             <Mail className="w-5 h-5" />
           </div>
           <div className="truncate">
-            <h3 className="font-bold text-sm text-[#14213D] leading-tight truncate">{officialEmail}</h3>
+            <h3 className="font-bold text-sm text-[#030508] leading-tight truncate">{officialEmail}</h3>
             <p className="text-[11px] text-[#64748B] truncate mt-0.5">Official Secretariat Email</p>
           </div>
         </a>
@@ -220,10 +220,10 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
         {/* Left Column (5 cols): Why Reach Out to Us? Action Cards */}
         <div className="lg:col-span-5 space-y-4">
           <div className="flex items-center gap-2 pb-1">
-            <div className="w-6 h-6 rounded-lg bg-[#FFF5E4] text-[#E99A18] flex items-center justify-center">
+            <div className="w-6 h-6 rounded-lg bg-[#FCFBF3] text-[#B49029] flex items-center justify-center">
               <Layers className="w-3.5 h-3.5" />
             </div>
-            <h2 className="text-base font-bold text-[#14213D] font-display">
+            <h2 className="text-base font-bold text-[#030508] font-display">
               Why Reach Out to Us?
             </h2>
           </div>
@@ -327,10 +327,10 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
         </div>
 
         {/* Right Column (7 cols): Send Us an Enquiry Form */}
-        <div id="enquiry-form-card" className="lg:col-span-7 bg-white rounded-3xl border border-[#E2E8F0] p-6 sm:p-8 shadow-xs space-y-5">
+        <div id="enquiry-form-card" className="lg:col-span-7 bg-white rounded-3xl border border-[#E8E4D8] p-6 sm:p-8 shadow-xs space-y-5">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-            <Send className="w-4 h-4 text-amber-600" />
-            <h2 className="text-base font-bold text-[#14213D] font-display">
+            <Send className="w-4 h-4 text-[#B49029]" />
+            <h2 className="text-base font-bold text-[#030508] font-display">
               Send Us an Enquiry
             </h2>
           </div>
@@ -361,7 +361,7 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
               {/* Row 1: Full Name & Email Address */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="contact-full-name" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  <label htmlFor="contact-full-name" className="block text-xs font-bold text-[#030508] mb-1.5">
                     Full Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -371,12 +371,12 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                     value={form.fullName}
                     onChange={e => setForm(prev => ({ ...prev, fullName: e.target.value }))}
                     placeholder="e.g. Suresh Chandra"
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="contact-email" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  <label htmlFor="contact-email" className="block text-xs font-bold text-[#030508] mb-1.5">
                     Email Address <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -386,7 +386,7 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                     value={form.email}
                     onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
                     placeholder="e.g. you@email.com"
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                   />
                 </div>
               </div>
@@ -394,14 +394,14 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
               {/* Row 2: Enquiry Type & Subject */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="contact-enquiry-type" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  <label htmlFor="contact-enquiry-type" className="block text-xs font-bold text-[#030508] mb-1.5">
                     Enquiry Type <span className="text-red-500">*</span>
                   </label>
                   <select
                     id="contact-enquiry-type"
                     value={form.enquiryType}
                     onChange={e => setForm(prev => ({ ...prev, enquiryType: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all cursor-pointer truncate"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all cursor-pointer truncate"
                   >
                     {ENQUIRY_TYPES.map(type => (
                       <option key={type} value={type}>
@@ -412,7 +412,7 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                 </div>
 
                 <div>
-                  <label htmlFor="contact-subject" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  <label htmlFor="contact-subject" className="block text-xs font-bold text-[#030508] mb-1.5">
                     Subject <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -422,14 +422,14 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                     value={form.subject}
                     onChange={e => setForm(prev => ({ ...prev, subject: e.target.value }))}
                     placeholder="Brief subject of your enquiry"
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
+                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                   />
                 </div>
               </div>
 
               {/* Optional Phone Input (preserves test invariant /placeholder="\+91 98490 00000"/) */}
               <div>
-                <label htmlFor="contact-phone" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                <label htmlFor="contact-phone" className="block text-xs font-bold text-[#030508] mb-1.5">
                   Contact Mobile <span className="text-slate-400 font-normal">(Optional)</span>
                 </label>
                 <input
@@ -438,13 +438,13 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                   value={form.phone}
                   onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="+91 98490 00000"
-                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
+                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                 />
               </div>
 
               {/* Row 3: Message */}
               <div>
-                <label htmlFor="contact-message" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                <label htmlFor="contact-message" className="block text-xs font-bold text-[#030508] mb-1.5">
                   Message <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -454,7 +454,7 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                   value={form.message}
                   onChange={e => setForm(prev => ({ ...prev, message: e.target.value }))}
                   placeholder="Write your message, query or requirement..."
-                  className="w-full px-3.5 py-3 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
+                  className="w-full px-3.5 py-3 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                 />
               </div>
 
@@ -463,9 +463,9 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-[#101C38] hover:bg-[#0B1530] active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-60"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#182A3E] hover:bg-[#030508] active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-60"
                 >
-                  <Send className="w-4 h-4 text-amber-400" />
+                  <Send className="w-4 h-4 text-[#B49029]" />
                   <span>{submitting ? 'Transmitting…' : 'Submit Enquiry'}</span>
                 </button>
 

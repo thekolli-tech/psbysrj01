@@ -652,13 +652,13 @@ export const SuperAdminDashboard: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-[#F7F9FD] flex">
+    <div className="min-h-screen bg-[#FAFCFD] flex">
       {/* 
         ====================================================================
         LEFT SIDEBAR: SUPER ADMIN NAVIGATION (MATCHING IMAGE 2)
         ====================================================================
       */}
-      <aside className="hidden lg:flex w-64 flex-col justify-between bg-white border-r border-[#E2E8F0] p-5 shrink-0 sticky top-0 h-screen overflow-y-auto">
+      <aside className="hidden lg:flex w-64 flex-col justify-between bg-white border-r border-[#E8E4D8] p-5 shrink-0 sticky top-0 h-screen overflow-y-auto">
         <div className="space-y-6">
           {/* Logo & Super Admin Pill */}
           <div className="space-y-3">
@@ -671,19 +671,19 @@ export const SuperAdminDashboard: React.FC = () => {
               className="text-left focus:outline-none cursor-pointer"
             >
               <div className="flex items-center gap-2">
-                <ShieldAlert className="w-6 h-6 text-[#E99A18]" />
+                <ShieldAlert className="w-6 h-6 text-[#B49029]" />
                 <div>
-                  <span className="font-extrabold text-sm tracking-tight text-[#14213D] block font-display leading-tight">
+                  <span className="font-extrabold text-sm tracking-tight text-[#030508] block font-display leading-tight">
                     PROPERTY STUDIO
                   </span>
-                  <span className="text-[9px] font-mono text-[#E99A18] font-bold tracking-widest uppercase block">
+                  <span className="text-[9px] font-mono text-[#B49029] font-bold tracking-widest uppercase block">
                     BY SWAMY REDDY JAVIDI
                   </span>
                 </div>
               </div>
             </button>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/40 text-[11px] font-bold">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FCFBF3] text-[#A99137] border border-[#B49029]/40 text-[11px] font-bold">
               <span>👑</span>
               <span className="uppercase font-mono">SUPER ADMIN</span>
             </div>
@@ -706,7 +706,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 label: 'Approvals & Queue',
                 icon: CheckCircle2,
                 badge: moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length + moderationDeletionRequests.length,
-                badgeColor: 'bg-amber-500 text-white'
+                badgeColor: 'bg-[#B49029] text-white'
               },
               { id: 'CREDENTIALS', label: 'Settings', icon: KeyRound }
             ].map((item, idx) => {
@@ -720,12 +720,12 @@ export const SuperAdminDashboard: React.FC = () => {
                   onClick={() => setActiveTab(item.id as any)}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-[#FFF8EE] text-[#92580c] border border-amber-200/80 font-bold shadow-xs'
+                      ? 'bg-[#FCFBF3] text-[#A99137] border border-[#CEC8A2] font-bold shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-center gap-3 truncate">
-                    <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#E99A18]' : 'text-slate-400'}`} />
+                    <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#B49029]' : 'text-slate-400'}`} />
                     <span className="truncate">{item.label}</span>
                   </div>
                   {item.badge !== undefined && (
@@ -741,12 +741,12 @@ export const SuperAdminDashboard: React.FC = () => {
 
         {/* Bottom Console Card */}
         <div className="pt-4 border-t border-slate-100">
-          <div className="bg-gradient-to-br from-[#0B1530] to-[#101C38] text-white p-3.5 rounded-2xl relative overflow-hidden shadow-md">
+          <div className="bg-gradient-to-br from-[#182A3E] to-[#030508] text-white p-3.5 rounded-2xl relative overflow-hidden shadow-md">
             <div className="space-y-1 relative z-10">
               <span className="text-[11px] font-bold block text-white">
                 Property Studio
               </span>
-              <span className="text-[10px] text-amber-400 block font-mono">
+              <span className="text-[10px] text-[#B49029] block font-mono">
                 Platform Console
               </span>
               <p className="text-[10px] text-slate-300">
@@ -756,7 +756,7 @@ export const SuperAdminDashboard: React.FC = () => {
             <button
               type="button"
               onClick={refreshServerData}
-              className="mt-2 w-7 h-7 rounded-full bg-[#E99A18] text-slate-950 flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
+              className="mt-2 w-7 h-7 rounded-full bg-[#B49029] text-white flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
               title="Refresh Platform Telemetry"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? 'animate-spin' : ''}`} />
@@ -772,9 +772,9 @@ export const SuperAdminDashboard: React.FC = () => {
       */}
       <main className="flex-1 min-w-0 flex flex-col">
         {/* Top Bar (Matching Image 2) */}
-        <header className="bg-white border-b border-[#E2E8F0] px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
+        <header className="bg-white border-b border-[#E8E4D8] px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
           <div>
-            <h1 className="text-lg sm:text-xl font-black text-[#14213D] font-display leading-tight">
+            <h1 className="text-lg sm:text-xl font-black text-[#030508] font-display leading-tight">
               Dashboard
             </h1>
             <p className="text-xs text-[#64748B]">
@@ -823,7 +823,7 @@ export const SuperAdminDashboard: React.FC = () => {
               <img
                 src={getSafeAvatar(currentUser.avatar)}
                 alt={currentUser.name}
-                className="w-8 h-8 rounded-full object-cover border border-[#E99A18]"
+                className="w-8 h-8 rounded-full object-cover border border-[#B49029]"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                 }}
@@ -839,7 +839,7 @@ export const SuperAdminDashboard: React.FC = () => {
         {/* Inner Content Area */}
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
           {/* Sunset Skyline Hero Banner (Matching Image 2) */}
-          <div className="relative overflow-hidden bg-gradient-to-r from-[#0B1530] via-[#101C38] to-[#0B1530] text-white rounded-3xl p-6 sm:p-8 border border-[#1e2e50] shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="relative overflow-hidden bg-gradient-to-r from-[#182A3E] via-[#182A3E] to-[#030508] text-white rounded-3xl p-6 sm:p-8 border border-[#CEC8A2]/30 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
             {/* Skyline City Backdrop Silhouette */}
             <div
               className="absolute inset-0 opacity-20 bg-cover bg-right pointer-events-none"
@@ -849,7 +849,7 @@ export const SuperAdminDashboard: React.FC = () => {
             />
 
             <div className="flex items-center gap-4 relative z-10">
-              <div className="w-12 h-12 rounded-2xl bg-[#E99A18]/20 border border-[#E99A18]/50 flex items-center justify-center text-[#E99A18] shrink-0 text-xl shadow-inner">
+              <div className="w-12 h-12 rounded-2xl bg-[#B49029]/20 border border-[#B49029]/50 flex items-center justify-center text-[#B49029] shrink-0 text-xl shadow-inner">
                 👑
               </div>
               <div>
@@ -868,7 +868,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 <span>Live Server</span>
               </div>
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-mono text-slate-200">
-                <Activity className="w-3.5 h-3.5 text-[#E99A18]" />
+                <Activity className="w-3.5 h-3.5 text-[#B49029]" />
                 <span>Platform Uptime 99.9%</span>
               </div>
             </div>
@@ -892,7 +892,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`px-4 py-2 text-xs font-bold rounded-xl whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeTab === tab.id
-                    ? 'bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/50 shadow-xs'
+                    ? 'bg-[#FCFBF3] text-[#A99137] border border-[#B49029]/50 shadow-xs'
                     : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300'
                 }`}
               >
@@ -1006,13 +1006,13 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-[#E99A18]" />
+                      <TrendingUp className="w-4 h-4 text-[#B49029]" />
                       <h3 className="text-sm sm:text-base font-bold text-slate-900 font-display">
                         Platform Activity & Growth
                       </h3>
                     </div>
                     <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-[11px] font-bold">
-                      <span className="px-2.5 py-0.5 rounded-lg bg-amber-500 text-slate-950 shadow-xs">7D</span>
+                      <span className="px-2.5 py-0.5 rounded-lg bg-[#B49029] text-white shadow-xs">7D</span>
                       <span className="px-2.5 py-0.5 text-slate-600 hover:text-slate-900 cursor-pointer">30D</span>
                       <span className="px-2.5 py-0.5 text-slate-600 hover:text-slate-900 cursor-pointer">90D</span>
                       <span className="px-2.5 py-0.5 text-slate-600 hover:text-slate-900 cursor-pointer">1Y</span>
@@ -1033,8 +1033,8 @@ export const SuperAdminDashboard: React.FC = () => {
                         <svg className="absolute inset-0 w-full h-full overflow-visible" viewBox="0 0 600 200" preserveAspectRatio="none">
                           <defs>
                             <linearGradient id="adminChartGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#E99A18" stopOpacity="0.4" />
-                              <stop offset="100%" stopColor="#E99A18" stopOpacity="0.0" />
+                              <stop offset="0%" stopColor="#B49029" stopOpacity="0.4" />
+                              <stop offset="100%" stopColor="#B49029" stopOpacity="0.0" />
                             </linearGradient>
                           </defs>
                           <path
@@ -1044,7 +1044,7 @@ export const SuperAdminDashboard: React.FC = () => {
                           <path
                             d="M 20 160 L 110 145 L 200 120 L 290 125 L 380 95 L 470 90 L 560 30"
                             fill="none"
-                            stroke="#E99A18"
+                            stroke="#B49029"
                             strokeWidth="3"
                             strokeLinecap="round"
                           />
@@ -1057,7 +1057,7 @@ export const SuperAdminDashboard: React.FC = () => {
                             { cx: 470, cy: 90 },
                             { cx: 560, cy: 30 }
                           ].map((pt, i) => (
-                            <circle key={i} cx={pt.cx} cy={pt.cy} r="4" fill="#FFFFFF" stroke="#E99A18" strokeWidth="2.5" />
+                            <circle key={i} cx={pt.cx} cy={pt.cy} r="4" fill="#FFFFFF" stroke="#B49029" strokeWidth="2.5" />
                           ))}
                         </svg>
                       </div>

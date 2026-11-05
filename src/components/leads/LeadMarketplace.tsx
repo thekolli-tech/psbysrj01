@@ -190,7 +190,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 sm:space-y-8 bg-[#F7F9FD]">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 sm:space-y-8 bg-[#FAFCFD]">
       {/* 
         ====================================================================
         HERO BANNER (MATCHING IMAGE 5)
@@ -206,12 +206,12 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
         />
 
         <div className="max-w-xl space-y-3 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold uppercase tracking-wider font-mono">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#E99A18]" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FCFBF3] text-[#A99137] border border-[#B49029]/30 text-xs font-bold uppercase tracking-wider font-mono">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#B49029]" />
             100% ENCRYPTED DATA-MASKING FRAMEWORK
           </div>
 
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#14213D] font-display tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#030508] font-display tracking-tight">
             Buyer Lead Marketplace
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
@@ -247,7 +247,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
             </div>
           </div>
 
-          <div className="text-3xl font-black text-[#14213D] font-mono-numbers">
+          <div className="text-3xl font-black text-[#030508] font-mono-numbers">
             ₹{currentUser.walletBalance.toLocaleString('en-IN')}
           </div>
 
@@ -255,7 +255,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
             <button
               type="button"
               onClick={onOpenWalletModal}
-              className="w-full py-2.5 px-4 bg-[#0B1530] hover:bg-[#101C38] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+              className="w-full py-2.5 px-4 bg-[#182A3E] hover:bg-[#030508] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
             >
               <span>Recharge Credits</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -264,7 +264,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
             <button
               type="button"
               onClick={() => setIsPostLeadModalOpen(true)}
-              className="w-full py-2.5 px-4 bg-[#E99A18] hover:bg-[#d68a12] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+              className="w-full py-2.5 px-4 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Post New Buyer Lead</span>
@@ -290,7 +290,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
             onClick={() => setSelectedTier('ALL')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               selectedTier === 'ALL'
-                ? 'bg-[#0B1530] text-white shadow-xs'
+                ? 'bg-[#182A3E] text-white shadow-xs'
                 : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
             }`}
           >
@@ -302,7 +302,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
             onClick={() => setSelectedTier('STANDARD')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
               selectedTier === 'STANDARD'
-                ? 'bg-[#0B1530] text-white shadow-xs'
+                ? 'bg-[#182A3E] text-white shadow-xs'
                 : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
             }`}
           >
@@ -315,11 +315,11 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
             onClick={() => setSelectedTier('PREMIUM')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
               selectedTier === 'PREMIUM'
-                ? 'bg-[#0B1530] text-white shadow-xs'
+                ? 'bg-[#182A3E] text-white shadow-xs'
                 : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <Award className="w-3.5 h-3.5 text-amber-500" />
+            <Award className="w-3.5 h-3.5 text-[#B49029]" />
             <span>Premium (₹{leadPrices.PREMIUM})</span>
           </button>
 
@@ -328,11 +328,11 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
             onClick={() => setSelectedTier('HNI')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
               selectedTier === 'HNI'
-                ? 'bg-[#0B1530] text-white shadow-xs'
+                ? 'bg-[#182A3E] text-white shadow-xs'
                 : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <Star className="w-3.5 h-3.5 text-amber-600" />
+            <Star className="w-3.5 h-3.5 text-[#B49029]" />
             <span>HNI (₹{leadPrices.HNI})</span>
           </button>
         </div>
@@ -463,7 +463,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
           </div>
 
           <div className="max-w-md mx-auto space-y-1.5">
-            <h3 className="text-xl font-extrabold text-[#14213D] font-display">
+            <h3 className="text-xl font-extrabold text-[#030508] font-display">
               No Buyer Leads Yet
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
@@ -475,7 +475,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
             <button
               type="button"
               onClick={() => setIsPostLeadModalOpen(true)}
-              className="px-5 py-2.5 bg-[#E99A18] hover:bg-[#d68a12] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm cursor-pointer"
+              className="px-5 py-2.5 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Post New Buyer Lead</span>
@@ -587,9 +587,9 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
                     <button
                       type="button"
                       onClick={() => unlockLead(lead.id)}
-                      className="px-3.5 py-1.5 bg-[#0B1530] hover:bg-[#101C38] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="px-3.5 py-1.5 bg-[#182A3E] hover:bg-[#030508] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
-                      <Unlock className="w-3.5 h-3.5 text-amber-400" />
+                      <Unlock className="w-3.5 h-3.5 text-[#B49029]" />
                       <span>Unlock (₹{cost})</span>
                     </button>
                   )}

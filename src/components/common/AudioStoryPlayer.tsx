@@ -305,7 +305,7 @@ export const AudioStoryPlayer: React.FC<AudioStoryPlayerProps> = ({
                 className="flex-1 rounded-full transition-all duration-150"
                 style={{
                   height: `${isPlaying ? Math.max(4, Math.random() * 24 + 4) : barHeight}px`,
-                  backgroundColor: isBarPassed ? '#f59e0b' : '#334155'
+                  backgroundColor: isBarPassed ? '#b49029' : '#334155'
                 }}
               />
             );

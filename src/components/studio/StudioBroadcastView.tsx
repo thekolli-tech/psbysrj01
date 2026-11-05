@@ -57,7 +57,7 @@ export const StudioBroadcastView: React.FC = () => {
 
   // Telestrator state
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [penColor, setPenColor] = useState<string>('#F59E0B');
+  const [penColor, setPenColor] = useState<string>('#B49029');
   const [penWidth] = useState<number>(5);
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedStudioTab, setSelectedStudioTab] = useState<'MASTERPLAN' | 'TRENDS_RADAR' | 'CONSTRUCTION_AUDIT'>('MASTERPLAN');
@@ -704,7 +704,7 @@ export const StudioBroadcastView: React.FC = () => {
                 <PenTool className="w-4 h-4 text-amber-400" /> Stylus:
               </span>
               {[
-                { color: '#F59E0B', label: 'Gold' },
+                { color: '#B49029', label: 'Classic Gold' },
                 { color: '#EF4444', label: 'Red' },
                 { color: '#3B82F6', label: 'Blue' },
                 { color: '#10B981', label: 'Green' }

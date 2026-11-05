@@ -156,16 +156,16 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   const logoScale = Math.min(1, 0.85 + morph * 0.15);
 
   return (
-    <div className="pb-12 bg-[#F7F9FD]">
+    <div className="pb-12 bg-[#FAFCFD]">
       {/* 
         ====================================================================
         SECTION 1: INTEGRATED VISUAL HERO & SEARCH DESK (MATCHING IMAGE 1)
         ====================================================================
       */}
-      <section id="overview" className="relative bg-gradient-to-b from-[#F7F9FD] via-white to-[#F7F9FD] border-b border-[#E2E8F0] overflow-hidden pt-4 sm:pt-6 pb-8 lg:pb-12">
+      <section id="overview" className="relative bg-gradient-to-b from-[#FAFCFD] via-white to-[#FAFCFD] border-b border-[#E8E4D8] overflow-hidden pt-4 sm:pt-6 pb-8 lg:pb-12">
         {/* Ambient Subtle Glows */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#E99A18]/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-20 left-10 w-72 h-72 bg-[#101C38]/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#B49029]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-20 left-10 w-72 h-72 bg-[#182A3E]/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
@@ -178,11 +178,11 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
 
               {/* Title & Subtitle (Official Platform Manifesto) */}
               <div className="space-y-3">
-                <h1 className="text-3xl sm:text-4xl lg:text-[46px] xl:text-[52px] font-black text-[#14213D] tracking-tight leading-[1.08] font-display">
+                <h1 className="text-3xl sm:text-4xl lg:text-[46px] xl:text-[52px] font-black text-[#030508] tracking-tight leading-[1.08] font-display">
                   Property Studio<br />
-                  <span className="text-[#E99A18]">by Swamy Reddy Javidi</span>
+                  <span className="text-[#B49029]">by Swamy Reddy Javidi</span>
                 </h1>
-                <p className="text-sm sm:text-base text-slate-700 italic leading-relaxed max-w-xl font-medium border-l-2 border-[#E99A18] pl-3">
+                <p className="text-sm sm:text-base text-slate-700 italic leading-relaxed max-w-xl font-medium border-l-2 border-[#B49029] pl-3">
                   &ldquo;The global PropTech ecosystem integrating the search power of property portals, the transparency of community forums, and the authority of broadcast media into one revolutionary platform.&rdquo;
                 </p>
                 <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed max-w-xl font-normal">
@@ -281,7 +281,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                       <div className="md:col-span-2 lg:col-span-2 flex items-center justify-end">
                         <button
                           type="submit"
-                          className="w-full sm:w-11 md:w-full h-10 py-2.5 px-3 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer min-h-[42px]"
+                          className="w-full sm:w-11 md:w-full h-10 py-2.5 px-3 bg-[#B49029] hover:bg-[#A99137] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer min-h-[42px]"
                           title="Execute Search"
                         >
                           <Search className="w-4 h-4 shrink-0 sm:hidden" />
@@ -377,9 +377,9 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                     setActiveView('PROPERTIES');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-[#E99A18] bg-[#FFF5E4] text-[#92580c] flex flex-col items-center justify-center gap-1.5 hover:shadow-sm transition-all cursor-pointer group"
+                  className="p-2 sm:p-2.5 rounded-xl border border-[#B49029] bg-[#FCFBF3] text-[#A99137] flex flex-col items-center justify-center gap-1.5 hover:shadow-sm transition-all cursor-pointer group"
                 >
-                  <Building2 className="w-4 h-4 text-[#E99A18] group-hover:scale-110 transition-transform" />
+                  <Building2 className="w-4 h-4 text-[#B49029] group-hover:scale-110 transition-transform" />
                   <span className="text-[11px] sm:text-xs font-bold">Projects</span>
                 </button>
 
@@ -533,27 +533,27 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             HORIZONTAL TRUST PILL BAR (MATCHING IMAGE 1)
             ================================================================
           */}
-          <div className="mt-8 bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="mt-8 bg-white border border-[#E8E4D8] rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
               {/* Item 1 */}
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center shrink-0 font-bold">
+                <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0 font-bold">
                   <Building2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-base sm:text-lg font-black text-slate-900 font-mono-numbers leading-tight">5</div>
-                  <div className="text-[11px] font-medium text-slate-500">Platform Pillars</div>
+                  <div className="text-base sm:text-lg font-black text-[#030508] font-mono-numbers leading-tight">5</div>
+                  <div className="text-[11px] font-medium text-[#64748B]">Platform Pillars</div>
                 </div>
               </div>
 
               {/* Item 2 */}
               <div className="flex items-center gap-3 border-l md:border-l border-slate-100 pl-4">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center shrink-0 font-bold">
+                <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0 font-bold">
                   <Award className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-base sm:text-lg font-black text-slate-900 font-mono-numbers leading-tight">24+</div>
-                  <div className="text-[11px] font-medium text-slate-500">Years of Expertise</div>
+                  <div className="text-base sm:text-lg font-black text-[#030508] font-mono-numbers leading-tight">24+</div>
+                  <div className="text-[11px] font-medium text-[#64748B]">Years of Expertise</div>
                 </div>
               </div>
 
@@ -563,19 +563,19 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                   <ShieldCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-base sm:text-lg font-black text-slate-900 font-mono-numbers leading-tight">100%</div>
-                  <div className="text-[11px] font-medium text-slate-500">Data Privacy</div>
+                  <div className="text-base sm:text-lg font-black text-[#030508] font-mono-numbers leading-tight">100%</div>
+                  <div className="text-[11px] font-medium text-[#64748B]">Data Privacy</div>
                 </div>
               </div>
 
               {/* Item 4 */}
               <div className="flex items-center gap-3 border-l md:border-l border-slate-100 pl-4">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center shrink-0 font-bold">
+                <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0 font-bold">
                   <FileCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs sm:text-sm font-bold text-amber-800 leading-tight">TS-RERA</div>
-                  <div className="text-[11px] font-medium text-slate-500">Audited Projects</div>
+                  <div className="text-xs sm:text-sm font-bold text-[#A99137] leading-tight">TS-RERA</div>
+                  <div className="text-[11px] font-medium text-[#64748B]">Audited Projects</div>
                 </div>
               </div>
             </div>
@@ -586,7 +586,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 const el = document.getElementById('overview');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-[#FCFBF3] text-slate-700 hover:text-[#B49029] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
               title="Learn More"
             >
               <ArrowRight className="w-4 h-4" />
@@ -605,11 +605,11 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
           <div className="text-center max-w-3xl mx-auto space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold uppercase tracking-wider font-mono">
-              <Layers className="w-3.5 h-3.5 text-[#E99A18]" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FCFBF3] text-[#A99137] border border-[#CEC8A2] text-xs font-bold uppercase tracking-wider font-mono">
+              <Layers className="w-3.5 h-3.5 text-[#B49029]" />
               CORE CONGLOMERATE ARCHITECTURE
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#14213D] font-display">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#030508] font-display">
               The Five-Pillar Integration of Property Studio
             </h2>
             <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
@@ -619,12 +619,12 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Pillar 1 */}
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+            <div className="bg-white rounded-2xl border border-[#E8E4D8] p-5 shadow-xs hover:border-[#B49029] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
               <div className="space-y-2.5">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center font-bold">
                   <Search className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                <h3 className="text-sm font-bold text-[#030508] font-display">
                   The Aggregator Engine
                 </h3>
                 <p className="text-xs text-[#64748B] leading-relaxed">
@@ -634,12 +634,12 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             </div>
 
             {/* Pillar 2 */}
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+            <div className="bg-white rounded-2xl border border-[#E8E4D8] p-5 shadow-xs hover:border-[#B49029] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
               <div className="space-y-2.5">
                 <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 border border-red-200/60 flex items-center justify-center font-bold">
                   <Video className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                <h3 className="text-sm font-bold text-[#030508] font-display">
                   The Broadcast Network
                 </h3>
                 <p className="text-xs text-[#64748B] leading-relaxed">
@@ -649,12 +649,12 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             </div>
 
             {/* Pillar 3 */}
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+            <div className="bg-white rounded-2xl border border-[#E8E4D8] p-5 shadow-xs hover:border-[#B49029] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
               <div className="space-y-2.5">
                 <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-200/60 flex items-center justify-center font-bold">
                   <MessageSquare className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                <h3 className="text-sm font-bold text-[#030508] font-display">
                   The Community Hive
                 </h3>
                 <p className="text-xs text-[#64748B] leading-relaxed">
@@ -664,12 +664,12 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             </div>
 
             {/* Pillar 4 */}
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+            <div className="bg-white rounded-2xl border border-[#E8E4D8] p-5 shadow-xs hover:border-[#B49029] hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
               <div className="space-y-2.5">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center font-bold">
                   <Star className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                <h3 className="text-sm font-bold text-[#030508] font-display">
                   The Performance Index
                 </h3>
                 <p className="text-xs text-[#64748B] leading-relaxed">
@@ -679,12 +679,12 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             </div>
 
             {/* Pillar 5 */}
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all space-y-3 flex flex-col justify-between sm:col-span-2 lg:col-span-1">
+            <div className="bg-white rounded-2xl border border-[#E8E4D8] p-5 shadow-xs hover:border-[#B49029] hover:shadow-md transition-all space-y-3 flex flex-col justify-between sm:col-span-2 lg:col-span-1">
               <div className="space-y-2.5">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center font-bold">
                   <Radio className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-[#14213D] font-display">
+                <h3 className="text-sm font-bold text-[#030508] font-display">
                   The Town Hall Arena
                 </h3>
                 <p className="text-xs text-[#64748B] leading-relaxed">
@@ -702,10 +702,10 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="space-y-1">
-            <span className="text-[11px] font-mono font-bold text-[#E99A18] tracking-widest uppercase">
+            <span className="text-[11px] font-mono font-bold text-[#B49029] tracking-widest uppercase">
               DEEP SOCIETAL IMPACT
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold font-display text-[#14213D]">
+            <h2 className="text-2xl sm:text-3xl font-extrabold font-display text-[#030508]">
               How Property Studio Helps Society
             </h2>
           </div>
@@ -769,11 +769,11 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         <section id="market-feeds" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#FFF5E4] text-[#92580c] text-xs font-bold uppercase font-mono">
-                <TrendingUp className="w-3.5 h-3.5 text-[#E99A18]" />
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#FCFBF3] text-[#A99137] text-xs font-bold uppercase font-mono border border-[#CEC8A2]">
+                <TrendingUp className="w-3.5 h-3.5 text-[#B49029]" />
                 LIVE DATA INTELLIGENCE FEED
               </div>
-              <h2 className="text-2xl font-extrabold text-[#14213D] font-display mt-1">
+              <h2 className="text-2xl font-extrabold text-[#030508] font-display mt-1">
                 Western Corridor Micro-Market Feed
               </h2>
             </div>
@@ -782,10 +782,10 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 setActiveView('MARKET_INSIGHTS');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="px-3.5 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl border border-[#E8E4D8] bg-[#FCFBF3] hover:bg-[#FCFBF3]/80 text-[#182A3E] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <span>View Full Trends & Charts</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-3.5 h-3.5 text-[#B49029]" />
             </button>
           </div>
 
@@ -797,14 +797,14 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 setActiveView('MARKET_INSIGHTS');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E2E8F0] hover:border-[#E99A18] hover:shadow-md transition-all group"
+              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E8E4D8] hover:border-[#B49029] hover:shadow-md transition-all group"
             >
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                 <MapPin className="w-3.5 h-3.5 text-slate-400" />
                 <span>Neopolis, Kokapet</span>
               </div>
-              <div className="text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
-                ₹11,800 <span className="text-xs text-slate-400 font-normal">/sq.ft</span>
+              <div className="text-2xl font-black text-[#030508] font-mono-numbers mt-2">
+                ₹11,800 <span className="text-xs text-[#64748B] font-normal">/sq.ft</span>
               </div>
               <div className="flex items-center justify-between mt-2">
                 <span className="text-emerald-600 font-bold text-xs flex items-center gap-0.5">
@@ -822,14 +822,14 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 setActiveView('MARKET_INSIGHTS');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E2E8F0] hover:border-[#E99A18] hover:shadow-md transition-all group"
+              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E8E4D8] hover:border-[#B49029] hover:shadow-md transition-all group"
             >
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                 <MapPin className="w-3.5 h-3.5 text-slate-400" />
                 <span>Financial District & Nanakramguda</span>
               </div>
-              <div className="text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
-                ₹10,400 <span className="text-xs text-slate-400 font-normal">/sq.ft</span>
+              <div className="text-2xl font-black text-[#030508] font-mono-numbers mt-2">
+                ₹10,400 <span className="text-xs text-[#64748B] font-normal">/sq.ft</span>
               </div>
               <div className="flex items-center justify-between mt-2">
                 <span className="text-emerald-600 font-bold text-xs flex items-center gap-0.5">
@@ -847,14 +847,14 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 setActiveView('MARKET_INSIGHTS');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E2E8F0] hover:border-[#E99A18] hover:shadow-md transition-all group"
+              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E8E4D8] hover:border-[#B49029] hover:shadow-md transition-all group"
             >
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                 <MapPin className="w-3.5 h-3.5 text-slate-400" />
                 <span>Tellapur & Kollur</span>
               </div>
-              <div className="text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
-                ₹7,850 <span className="text-xs text-slate-400 font-normal">/sq.ft</span>
+              <div className="text-2xl font-black text-[#030508] font-mono-numbers mt-2">
+                ₹7,850 <span className="text-xs text-[#64748B] font-normal">/sq.ft</span>
               </div>
               <div className="flex items-center justify-between mt-2">
                 <span className="text-emerald-600 font-bold text-xs flex items-center gap-0.5">
@@ -872,14 +872,14 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 setActiveView('MARKET_INSIGHTS');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E2E8F0] hover:border-[#E99A18] hover:shadow-md transition-all group"
+              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E8E4D8] hover:border-[#B49029] hover:shadow-md transition-all group"
             >
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                 <MapPin className="w-3.5 h-3.5 text-slate-400" />
                 <span>Kokapet Core</span>
               </div>
-              <div className="text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
-                ₹9,650 <span className="text-xs text-slate-400 font-normal">/sq.ft</span>
+              <div className="text-2xl font-black text-[#030508] font-mono-numbers mt-2">
+                ₹9,650 <span className="text-xs text-[#64748B] font-normal">/sq.ft</span>
               </div>
               <div className="flex items-center justify-between mt-2">
                 <span className="text-emerald-600 font-bold text-xs flex items-center gap-0.5">

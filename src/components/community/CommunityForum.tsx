@@ -1172,7 +1172,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Community Header Banner - Architectural Cinematic Hero matching Reference */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#FFFDF9] via-[#FFF9EE] to-slate-100 border border-[#E2E8F0] shadow-sm p-6 sm:p-8 lg:p-10">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#FCFBF3] via-[#FCFBF3] to-slate-100 border border-[#E8E4D8] shadow-sm p-6 sm:p-8 lg:p-10">
         {/* Architectural Image Background Layer */}
         <div className="absolute right-0 top-0 bottom-0 w-full lg:w-1/2 pointer-events-none overflow-hidden">
           <img
@@ -1180,18 +1180,18 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             alt="Community Architecture"
             className="w-full h-full object-cover object-center opacity-85"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#FFFDF9] via-[#FFFDF9]/90 to-transparent lg:via-[#FFF9EE]/70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#FCFBF3] via-[#FCFBF3]/90 to-transparent lg:via-[#FCFBF3]/70" />
         </div>
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold font-mono uppercase tracking-wide mb-3">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#E99A18]" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FCFBF3] text-[#A99137] border border-[#B49029]/30 text-xs font-bold font-mono uppercase tracking-wide mb-3">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#B49029]" />
               <span>COMMUNITY Q&A, PEER ADVICE & LIVE AMAS</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#14213D] font-display tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#030508] font-display tracking-tight leading-tight">
               Real Estate Intelligence &<br />
-              <span className="text-[#E99A18]">Peer Discussions</span>
+              <span className="text-[#B49029]">Peer Discussions</span>
             </h1>
             <p className="text-xs sm:text-sm text-[#64748B] mt-2 max-w-lg leading-relaxed">
               Ask, discuss, and get verified answers on Vaastu, slab casting, audits, RERA approvals and more from industry experts and the community.
@@ -1212,9 +1212,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                     setShowModal('UNIFIED');
                   }
                 }}
-                className="px-4 py-2.5 bg-[#E99A18] hover:bg-[#d98b10] active:scale-95 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                className="px-4 py-2.5 bg-[#B49029] hover:bg-[#A99137] active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
               >
-                <PlusCircle className="w-4 h-4 text-slate-950" />
+                <PlusCircle className="w-4 h-4 text-white" />
                 <span>Add Question</span>
               </button>
 
@@ -1231,9 +1231,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                     setShowModal('UNIFIED');
                   }
                 }}
-                className="px-4 py-2.5 bg-[#101C38] hover:bg-[#0B1530] active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                className="px-4 py-2.5 bg-[#182A3E] hover:bg-[#030508] active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
               >
-                <Plus className="w-4 h-4 text-[#E99A18]" />
+                <Plus className="w-4 h-4 text-[#B49029]" />
                 <span>Create Post</span>
               </button>
 
@@ -1247,7 +1247,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                     setShowModal('PROPOSE_COMMUNITY');
                   }
                 }}
-                className="px-4 py-2.5 bg-white hover:bg-slate-50 active:scale-95 text-[#14213D] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-[#E2E8F0] shadow-2xs"
+                className="px-4 py-2.5 bg-white hover:bg-[#FCFBF3] active:scale-95 text-[#030508] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-[#E8E4D8] shadow-2xs"
               >
                 <Users className="w-4 h-4 text-[#64748B]" />
                 <span>Create Community</span>
@@ -1259,11 +1259,11 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
           <div className="relative z-10 bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/80 shadow-lg shadow-slate-200/50 w-full sm:w-auto lg:max-w-xs shrink-0">
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#FFF5E4] text-[#E99A18] flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] flex items-center justify-center shrink-0">
                   <MessageSquare className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm sm:text-base font-extrabold text-[#14213D] leading-tight">
+                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight">
                     {communityPosts.length > 0 ? `${(communityPosts.length * 12 + 2400).toLocaleString('en-US')}+` : '2.4K+'}
                   </div>
                   <div className="text-[11px] text-[#64748B] font-medium">Questions</div>
@@ -1271,31 +1271,31 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#FFF5E4] text-[#E99A18] flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] flex items-center justify-center shrink-0">
                   <Users className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm sm:text-base font-extrabold text-[#14213D] leading-tight">12K+</div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight">12K+</div>
                   <div className="text-[11px] text-[#64748B] font-medium">Members</div>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#FFF5E4] text-[#E99A18] flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] flex items-center justify-center shrink-0">
                   <Video className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm sm:text-base font-extrabold text-[#14213D] leading-tight">180+</div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight">180+</div>
                   <div className="text-[11px] text-[#64748B] font-medium">Live AMAs</div>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#FFF5E4] text-[#16A34A] flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#16A34A] flex items-center justify-center shrink-0">
                   <CheckCircle2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm sm:text-base font-extrabold text-[#14213D] leading-tight">98%</div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight">98%</div>
                   <div className="text-[11px] text-[#64748B] font-medium">Verified Answers</div>
                 </div>
               </div>
@@ -1316,7 +1316,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                 className="w-full h-full object-cover opacity-80"
               />
             ) : (
-              <div className="absolute inset-0 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
+              <div className="absolute inset-0 bg-[radial-gradient(#B49029_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
             )}
             <div className="absolute top-4 left-4">
               <button
@@ -1726,7 +1726,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                         <button
                           type="button"
                           onClick={() => setSelectedCommunityId(comm.id)}
-                          className="font-bold text-xs text-[#E99A18] hover:text-[#c7800e] hover:underline cursor-pointer flex items-center gap-0.5"
+                          className="font-bold text-xs text-[#B49029] hover:text-[#A99137] hover:underline cursor-pointer flex items-center gap-0.5"
                         >
                           <span>Enter Hub</span>
                           <span aria-hidden="true">&rarr;</span>
@@ -2562,11 +2562,11 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                     }}
                     className={`p-2 rounded-xl text-[11px] font-semibold border transition-all cursor-pointer flex items-center gap-1.5 text-left ${
                       active
-                        ? 'bg-[#FFF5E4] text-[#92580c] font-bold border-[#E99A18] shadow-2xs'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-slate-50'
+                        ? 'bg-[#FCFBF3] text-[#A99137] font-bold border-[#B49029] shadow-2xs'
+                        : 'bg-white text-slate-700 border-[#E8E4D8] hover:border-[#B49029] hover:bg-[#FCFBF3]'
                     }`}
                   >
-                    <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#E99A18]' : 'text-slate-400'}`} />
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-[#B49029]' : 'text-slate-400'}`} />
                     <span className="truncate">{t.label}</span>
                   </button>
                 );

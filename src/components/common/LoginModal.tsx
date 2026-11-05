@@ -508,9 +508,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E2E8F0] w-full max-w-md md:max-w-3xl lg:max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col md:flex-row overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E4D8] w-full max-w-md md:max-w-3xl lg:max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col md:flex-row overflow-hidden my-auto animate-in zoom-in-95 duration-150">
         {/* Left Side: Desktop Premium Brand & Architecture Showcase (Matching Image 3) */}
-        <div className="hidden md:flex md:w-5/12 lg:w-5/12 flex-col justify-between p-6 lg:p-8 bg-gradient-to-br from-[#0B1530] via-[#101C38] to-[#0B1530] text-white relative overflow-hidden shrink-0 border-r border-[#1e2e50]">
+        <div className="hidden md:flex md:w-5/12 lg:w-5/12 flex-col justify-between p-6 lg:p-8 bg-gradient-to-br from-[#182A3E] via-[#182A3E] to-[#030508] text-white relative overflow-hidden shrink-0 border-r border-[#E8E4D8]/20">
           {/* Architectural Skyline Image Overlay */}
           <div
             className="absolute inset-0 opacity-25 bg-cover bg-center pointer-events-none"
@@ -518,7 +518,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               backgroundImage: "url('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80')"
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0B1530] via-[#0B1530]/80 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#030508] via-[#182A3E]/80 to-transparent pointer-events-none" />
 
           {/* Top Branding */}
           <div className="space-y-4 relative z-10">
@@ -538,21 +538,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           {/* 3 Gold Feature Badges (Matching Image 3) */}
           <div className="space-y-3 my-6 relative z-10">
             <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
-              <div className="w-8 h-8 rounded-full bg-[#E99A18]/20 text-[#E99A18] flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#B49029]/20 text-[#B49029] flex items-center justify-center shrink-0">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <span className="text-xs font-bold text-white">Verified Projects</span>
             </div>
 
             <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
-              <div className="w-8 h-8 rounded-full bg-[#E99A18]/20 text-[#E99A18] flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#B49029]/20 text-[#B49029] flex items-center justify-center shrink-0">
                 <TrendingUp className="w-4 h-4" />
               </div>
               <span className="text-xs font-bold text-white">Market Insights</span>
             </div>
 
             <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
-              <div className="w-8 h-8 rounded-full bg-[#E99A18]/20 text-[#E99A18] flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#B49029]/20 text-[#B49029] flex items-center justify-center shrink-0">
                 <MessageSquare className="w-4 h-4" />
               </div>
               <span className="text-xs font-bold text-white">Community & Q&A</span>
@@ -568,7 +568,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         {/* Right Side: Authentication Controls & Active Form */}
         <div className="flex-1 flex flex-col overflow-hidden bg-white">
           {/* Header */}
-          <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[#E2E8F0] flex items-center justify-between bg-[#0B1530] text-white shrink-0">
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[#E8E4D8] flex items-center justify-between bg-[#182A3E] text-white shrink-0">
             <div className="flex items-center gap-2.5 sm:gap-3">
               <div className="md:hidden w-12 h-9 rounded-lg bg-white border border-white/20 flex items-center justify-center px-1 shrink-0">
                 <BrandLogo variant="compact" size="sm" />
@@ -888,7 +888,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 bg-[#E99A18] hover:bg-[#d68a12] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <span>{loading ? 'Authenticating...' : 'Sign In to Account'}</span>
                     <ArrowRight className="w-4 h-4" />
@@ -1217,7 +1217,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 sm:py-3 bg-[#E99A18] hover:bg-[#d68a12] text-white rounded-lg sm:rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
+                    className="w-full py-2.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-lg sm:rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
                   >
                     <span>{loading ? 'Sending Code...' : 'Create Verified Account'}</span>
                     <ArrowRight className="w-4 h-4" />
@@ -1522,11 +1522,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-[#E2E8F0] flex items-center justify-between text-xs text-slate-500 shrink-0">
+        <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-[#E8E4D8] flex items-center justify-between text-xs text-slate-500 shrink-0">
           <span>Official Secretariat: info@propertystudio.org</span>
           <button
             onClick={onClose}
-            className="font-bold text-[#14213D] hover:text-black cursor-pointer"
+            className="font-bold text-[#030508] hover:text-[#B49029] cursor-pointer"
           >
             Close
           </button>

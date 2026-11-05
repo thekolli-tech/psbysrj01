@@ -100,7 +100,7 @@ export const CorridorMapView: React.FC<CorridorMapViewProps> = ({
                 <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="0.5" />
               </pattern>
               <linearGradient id="orrGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.8" />
+                <stop offset="0%" stopColor="#b49029" stopOpacity="0.8" />
                 <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.8" />
               </linearGradient>
             </defs>
@@ -126,7 +126,7 @@ export const CorridorMapView: React.FC<CorridorMapViewProps> = ({
               strokeWidth="4"
               strokeLinecap="round"
             />
-            <text x="210" y="195" fill="#f59e0b" fontSize="11" fontWeight="bold" letterSpacing="1">
+            <text x="210" y="195" fill="#b49029" fontSize="11" fontWeight="bold" letterSpacing="1">
               8-LANE ORR EXPRESSWAY (NEOPOLIS TRUMPET)
             </text>
 

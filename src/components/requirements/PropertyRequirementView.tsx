@@ -176,7 +176,7 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Visual Architectural Hero Banner matching Reference Screenshot */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#FFFDF9] via-[#FFF9EE] to-slate-100 border border-[#E2E8F0] shadow-sm p-6 sm:p-8 lg:p-10">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#FCFBF3] via-[#FCFBF3] to-slate-100 border border-[#E8E4D8] shadow-sm p-6 sm:p-8 lg:p-10">
         {/* Architectural Image Background Layer */}
         <div className="absolute right-0 top-0 bottom-0 w-full lg:w-1/2 pointer-events-none overflow-hidden">
           <img
@@ -184,16 +184,16 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
             alt="Property Requirement Architecture"
             className="w-full h-full object-cover object-center opacity-85"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#FFFDF9] via-[#FFFDF9]/90 to-transparent lg:via-[#FFF9EE]/70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#FCFBF3] via-[#FCFBF3]/90 to-transparent lg:via-[#FCFBF3]/70" />
         </div>
 
         <div className="relative z-10 max-w-xl space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold font-mono uppercase tracking-wide mb-1">
-            <Building className="w-3.5 h-3.5 text-[#E99A18]" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FCFBF3] text-[#A99137] border border-[#B49029]/30 text-xs font-bold font-mono uppercase tracking-wide mb-1">
+            <Building className="w-3.5 h-3.5 text-[#B49029]" />
             <span>PROPERTY REQUIREMENT</span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#14213D] font-display tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#030508] font-display tracking-tight leading-tight">
             Tell Property Studio what you need
           </h1>
 
@@ -204,12 +204,12 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
       </div>
 
       {!isLoggedIn ? (
-        <div className="bg-white border border-[#E2E8F0] rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-xs max-w-2xl mx-auto">
-          <div className="w-14 h-14 rounded-2xl bg-[#FFF5E4] border border-[#E99A18]/30 flex items-center justify-center mx-auto text-[#E99A18]">
+        <div className="bg-white border border-[#E8E4D8] rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-xs max-w-2xl mx-auto">
+          <div className="w-14 h-14 rounded-2xl bg-[#FCFBF3] border border-[#B49029]/30 flex items-center justify-center mx-auto text-[#B49029]">
             <ClipboardList className="w-7 h-7" />
           </div>
           <div className="space-y-1.5">
-            <h2 className="text-lg font-bold text-[#14213D]">Sign in to submit your property requirement</h2>
+            <h2 className="text-lg font-bold text-[#030508]">Sign in to submit your property requirement</h2>
             <p className="text-xs sm:text-sm text-[#64748B] max-w-md mx-auto leading-relaxed">
               A verified account is required so your requirement stays linked securely to your profile and is never published as an open lead.
             </p>
@@ -217,7 +217,7 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
           <button
             type="button"
             onClick={onOpenLoginModal}
-            className="px-6 py-2.5 bg-[#101C38] hover:bg-[#0B1530] text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95"
+            className="px-6 py-2.5 bg-[#182A3E] hover:bg-[#030508] text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95"
           >
             Login / Sign Up
           </button>
@@ -226,13 +226,13 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
         /* Main Two-Column Layout matching Reference Screenshot */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Column (8 cols): Requirement Form */}
-          <div className="lg:col-span-8 bg-white border border-[#E2E8F0] rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="lg:col-span-8 bg-white border border-[#E8E4D8] rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
             <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
-              <div className="w-9 h-9 rounded-xl bg-[#FFF5E4] text-[#E99A18] flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-[#FCFBF3] text-[#B49029] flex items-center justify-center shrink-0">
                 <FileText className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-[#14213D] leading-tight">
+                <h2 className="text-base sm:text-lg font-bold text-[#030508] leading-tight">
                   Submit Your Property Requirement
                 </h2>
                 <p className="text-xs text-[#64748B] mt-0.5">
@@ -244,7 +244,7 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
             <form onSubmit={submit} className="space-y-5">
               {/* Row 1: Property Type */}
               <div>
-                <label htmlFor="requirement-property-type" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                <label htmlFor="requirement-property-type" className="block text-xs font-bold text-[#030508] mb-1.5">
                   Property Type <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -253,7 +253,7 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
                     ariaLabel="Property type"
                     value={propertyType}
                     onChange={setPropertyType}
-                    className="w-full pl-3.5 pr-8 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all bg-white"
+                    className="w-full pl-3.5 pr-8 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all bg-white"
                   />
                 </div>
               </div>
@@ -261,16 +261,16 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
               {/* Row 2: Locality & Budget */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="requirement-location" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  <label htmlFor="requirement-location" className="block text-xs font-bold text-[#030508] mb-1.5">
                     Hyderabad Locality <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <MapPin className="w-4 h-4 text-amber-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <MapPin className="w-4 h-4 text-[#B49029] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <select
                       id="requirement-location"
                       value={location}
                       onChange={event => setLocation(event.target.value)}
-                      className="w-full pl-9 pr-8 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all cursor-pointer truncate"
+                      className="w-full pl-9 pr-8 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all cursor-pointer truncate"
                       required
                     >
                       {HYDERABAD_LOCALITIES.map(loc => (
@@ -286,25 +286,25 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
                       value={customLocation}
                       onChange={e => setCustomLocation(e.target.value)}
                       placeholder="Specify locality name"
-                      className="mt-2 w-full px-3.5 py-2 text-xs border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18]"
+                      className="mt-2 w-full px-3.5 py-2 text-xs border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029]"
                       required
                     />
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="requirement-budget" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  <label htmlFor="requirement-budget" className="block text-xs font-bold text-[#030508] mb-1.5">
                     Budget (in ₹ Crores) <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <IndianRupee className="w-4 h-4 text-amber-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <IndianRupee className="w-4 h-4 text-[#B49029] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       id="requirement-budget"
                       value={budget}
                       maxLength={40}
                       onChange={event => setBudget(event.target.value)}
                       placeholder="e.g. 1.5 Cr or 2.25"
-                      className="w-full pl-9 pr-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
+                      className="w-full pl-9 pr-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                       required
                     />
                   </div>
@@ -315,15 +315,15 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label htmlFor="requirement-size" className="text-xs font-bold text-[#14213D]">
+                    <label htmlFor="requirement-size" className="text-xs font-bold text-[#030508]">
                       Property Size
                     </label>
-                    <div className="inline-flex rounded-lg border border-[#E2E8F0] bg-slate-100 p-0.5 text-[10px]">
+                    <div className="inline-flex rounded-lg border border-[#E8E4D8] bg-slate-100 p-0.5 text-[10px]">
                       <button
                         type="button"
                         onClick={() => setSizeUnit('Sq. Ft.')}
                         className={`px-1.5 py-0.5 rounded font-bold cursor-pointer ${
-                          sizeUnit === 'Sq. Ft.' ? 'bg-white text-[#14213D] shadow-xs' : 'text-[#64748B]'
+                          sizeUnit === 'Sq. Ft.' ? 'bg-white text-[#030508] shadow-xs' : 'text-[#64748B]'
                         }`}
                       >
                         Sq. Ft.
@@ -332,7 +332,7 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
                         type="button"
                         onClick={() => setSizeUnit('Sq. Yards')}
                         className={`px-1.5 py-0.5 rounded font-bold cursor-pointer ${
-                          sizeUnit === 'Sq. Yards' ? 'bg-white text-[#14213D] shadow-xs' : 'text-[#64748B]'
+                          sizeUnit === 'Sq. Yards' ? 'bg-white text-[#030508] shadow-xs' : 'text-[#64748B]'
                         }`}
                       >
                         Sq. Yards
@@ -349,22 +349,22 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
                       value={size}
                       onChange={e => setSize(e.target.value)}
                       placeholder={`e.g. 2400 (${sizeUnit})`}
-                      className="w-full pl-9 pr-3.5 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
+                      className="w-full pl-9 pr-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="requirement-possession" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  <label htmlFor="requirement-possession" className="block text-xs font-bold text-[#030508] mb-1.5">
                     Possession <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Key className="w-4 h-4 text-amber-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Key className="w-4 h-4 text-[#B49029] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <select
                       id="requirement-possession"
                       value={possession}
                       onChange={e => setPossession(e.target.value)}
-                      className="w-full pl-9 pr-8 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all cursor-pointer truncate"
+                      className="w-full pl-9 pr-8 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all cursor-pointer truncate"
                       required
                     >
                       {POSSESSION_OPTIONS.map(opt => (
@@ -377,16 +377,16 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
                 </div>
 
                 <div>
-                  <label htmlFor="requirement-timeline" className="block text-xs font-bold text-[#14213D] mb-1.5">
+                  <label htmlFor="requirement-timeline" className="block text-xs font-bold text-[#030508] mb-1.5">
                     Timeline of Purchase <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Calendar className="w-4 h-4 text-amber-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Calendar className="w-4 h-4 text-[#B49029] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <select
                       id="requirement-timeline"
                       value={timeline}
                       onChange={e => setTimeline(e.target.value)}
-                      className="w-full pl-9 pr-8 py-2.5 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all cursor-pointer truncate"
+                      className="w-full pl-9 pr-8 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all cursor-pointer truncate"
                       required
                     >
                       {PURCHASE_TIMELINES.map(t => (
@@ -402,7 +402,7 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
               {/* Row 4: Details & Preferences */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="requirement-details" className="text-xs font-bold text-[#14213D]">
+                  <label htmlFor="requirement-details" className="text-xs font-bold text-[#030508]">
                     Details & Preferences
                   </label>
                   <span className="text-[10px] text-slate-400 font-mono">
@@ -418,7 +418,7 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
                     rows={4}
                     onChange={event => setDetails(event.target.value)}
                     placeholder="e.g. East facing, high floor, Vaastu compliant, gated community, etc..."
-                    className="w-full pl-10 pr-3.5 py-3 text-xs sm:text-sm border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E99A18]/20 focus:border-[#E99A18] transition-all"
+                    className="w-full pl-10 pr-3.5 py-3 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                   />
                 </div>
               </div>
@@ -431,16 +431,16 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-3 bg-[#101C38] hover:bg-[#0B1530] active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold disabled:opacity-60 transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+                  className="px-6 py-3 bg-[#182A3E] hover:bg-[#030508] active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold disabled:opacity-60 transition-all shadow-sm flex items-center gap-2 cursor-pointer"
                 >
-                  <Send className="w-4 h-4 text-amber-400" />
+                  <Send className="w-4 h-4 text-[#B49029]" />
                   <span>{saving ? 'Encrypting & Saving…' : 'Submit Requirement'}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleSaveDraft}
-                  className="px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                  className="px-5 py-3 bg-white hover:bg-[#FCFBF3] text-slate-700 border border-[#E8E4D8] rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
                 >
                   <Bookmark className="w-4 h-4 text-slate-500" />
                   <span>Save as Draft</span>
@@ -452,10 +452,10 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
           {/* Right Column (4 cols): Information Cards matching Reference Screenshot */}
           <div className="lg:col-span-4 space-y-6">
             {/* Card 1: Your Requirement Progress */}
-            <div className="bg-white border border-[#E2E8F0] rounded-3xl p-6 shadow-xs space-y-5">
-              <div className="flex items-center gap-2 text-amber-700 font-bold text-sm font-display">
-                <Clock className="w-4 h-4 text-amber-600" />
-                <h3 className="text-[#14213D] font-bold text-base">Your Requirement Progress</h3>
+            <div className="bg-white border border-[#E8E4D8] rounded-3xl p-6 shadow-xs space-y-5">
+              <div className="flex items-center gap-2 text-[#A99137] font-bold text-sm font-display">
+                <Clock className="w-4 h-4 text-[#B49029]" />
+                <h3 className="text-[#030508] font-bold text-base">Your Requirement Progress</h3>
               </div>
 
               {/* 3-Step Progress Indicator */}
@@ -463,7 +463,7 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
                 <div className="flex items-center justify-between relative">
                   {/* Step 1 */}
                   <div className="flex flex-col items-center gap-1.5 z-10">
-                    <div className="w-7 h-7 rounded-full bg-[#E99A18] text-white font-bold text-xs flex items-center justify-center shadow-xs">
+                    <div className="w-7 h-7 rounded-full bg-[#B49029] text-white font-bold text-xs flex items-center justify-center shadow-xs">
                       1
                     </div>
                     <span className="text-[11px] font-bold text-slate-800">Details</span>
@@ -490,8 +490,8 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
                   </div>
                 </div>
 
-                <div className="mt-5 p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-2 text-xs text-amber-900">
-                  <Zap className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="mt-5 p-3 rounded-2xl bg-[#FCFBF3] border border-[#E8E4D8] flex items-start gap-2 text-xs text-[#182A3E]">
+                  <Zap className="w-4 h-4 text-[#B49029] shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
                     Get matched with verified buyers, projects, and market experts.
                   </p>
@@ -500,50 +500,50 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
             </div>
 
             {/* Card 2: Why Submit Here? */}
-            <div className="bg-white border border-[#E2E8F0] rounded-3xl p-6 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 text-amber-700 font-bold text-sm font-display pb-2 border-b border-slate-100">
-                <Award className="w-4 h-4 text-amber-600" />
-                <h3 className="text-[#14213D] font-bold text-base">Why Submit Here?</h3>
+            <div className="bg-white border border-[#E8E4D8] rounded-3xl p-6 shadow-xs space-y-4">
+              <div className="flex items-center gap-2 text-[#A99137] font-bold text-sm font-display pb-2 border-b border-slate-100">
+                <Award className="w-4 h-4 text-[#B49029]" />
+                <h3 className="text-[#030508] font-bold text-base">Why Submit Here?</h3>
               </div>
 
               <div className="space-y-3.5 pt-1">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900">Verified & Relevant Matches</h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">Connect with genuine property opportunities</p>
+                    <h4 className="text-xs font-bold text-[#030508]">Verified & Relevant Matches</h4>
+                    <p className="text-[11px] text-[#64748B] leading-relaxed">Connect with genuine property opportunities</p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0">
                     <Zap className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900">Faster Response</h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">Get outreach from verified parties quickly</p>
+                    <h4 className="text-xs font-bold text-[#030508]">Faster Response</h4>
+                    <p className="text-[11px] text-[#64748B] leading-relaxed">Get outreach from verified parties quickly</p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0">
                     <Users className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900">Expert Guidance</h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">Backed by market intelligence & RERA insights</p>
+                    <h4 className="text-xs font-bold text-[#030508]">Expert Guidance</h4>
+                    <p className="text-[11px] text-[#64748B] leading-relaxed">Backed by market intelligence & RERA insights</p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-[#FCFBF3] text-[#B49029] border border-[#E8E4D8] flex items-center justify-center shrink-0">
                     <Lock className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900">100% Confidential</h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">Your details are secure and never misused</p>
+                    <h4 className="text-xs font-bold text-[#030508]">100% Confidential</h4>
+                    <p className="text-[11px] text-[#64748B] leading-relaxed">Your details are secure and never misused</p>
                   </div>
                 </div>
               </div>
@@ -555,32 +555,32 @@ export const PropertyRequirementView: React.FC<{ onOpenLoginModal?: () => void }
       {/* Existing Requirements Ledger */}
       <section className="space-y-4 pt-4" aria-labelledby="my-requirements">
         <div className="flex items-center justify-between">
-          <h2 id="my-requirements" className="text-base sm:text-lg font-bold text-[#14213D]">
+          <h2 id="my-requirements" className="text-base sm:text-lg font-bold text-[#030508]">
             Your Submitted Requirements ({requirements.length})
           </h2>
         </div>
         {loading ? <p className="text-xs text-[#64748B]">Loading requirements…</p> : null}
         {!loading && isLoggedIn && requirements.length === 0 ? (
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 text-center text-xs sm:text-sm text-[#64748B]">
+          <div className="bg-white border border-[#E8E4D8] rounded-2xl p-6 text-center text-xs sm:text-sm text-[#64748B]">
             You have not submitted any property requirements yet.
           </div>
         ) : null}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {requirements.map(item => (
-            <article key={item.id} className="bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 space-y-2 shadow-xs">
+            <article key={item.id} className="bg-white border border-[#E8E4D8] rounded-2xl p-4 sm:p-5 space-y-2 shadow-xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#92580c] bg-[#FFF5E4] border border-[#E99A18]/30 px-2.5 py-0.5 rounded-full font-mono">
+                <span className="text-xs font-bold text-[#A99137] bg-[#FCFBF3] border border-[#B49029]/30 px-2.5 py-0.5 rounded-full font-mono">
                   {item.propertyType}
                 </span>
                 <span className="text-[10px] text-[#64748B] font-mono">
                   {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Active'}
                 </span>
               </div>
-              <p className="text-xs font-semibold text-[#14213D]">
+              <p className="text-xs font-semibold text-[#030508]">
                 {[item.location, item.budget].filter(Boolean).join(' · ') || 'No location or budget added'}
               </p>
               {item.details ? (
-                <p className="text-xs text-[#64748B] pt-1 border-t border-[#E2E8F0] leading-relaxed">
+                <p className="text-xs text-[#64748B] pt-1 border-t border-[#E8E4D8] leading-relaxed">
                   {item.details}
                 </p>
               ) : null}

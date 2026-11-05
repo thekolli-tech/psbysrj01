@@ -1,18 +1,42 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ps-navy: #101c38;
-  --color-ps-deep-navy: #0b1530;
-  --color-ps-gold: #e99a18;
-  --color-ps-amber: #f59e0b;
-  --color-ps-light-gold: #fff5e4;
-  --color-ps-bg: #f7f9fd;
+  --color-ps-navy: #182a3e;
+  --color-ps-deep-navy: #182a3e;
+  --color-ps-gold: #b49029;
+  --color-ps-gold-classic: #b49029;
+  --color-ps-gold-antique: #a99137;
+  --color-ps-black: #030508;
+  --color-ps-white: #ffffff;
+  --color-ps-off-white: #fafcfd;
+  --color-ps-champagne: #cec8a2;
+  --color-ps-champagne-light: #fcfbf3;
+  --color-ps-amber: #b49029;
+  --color-ps-light-gold: #fcfbf3;
+  --color-ps-bg: #fafcfd;
   --color-ps-surface: #ffffff;
-  --color-ps-border: #e2e8f0;
-  --color-ps-text-primary: #14213d;
+  --color-ps-border: #e8e4d8;
+  --color-ps-text-primary: #030508;
   --color-ps-text-secondary: #64748b;
   --color-ps-success: #16a34a;
   --color-ps-danger: #dc2626;
+
+  /* Remap standard amber scale to official classic and antique gold */
+  --color-amber-50: #fcfbf3;
+  --color-amber-100: #fcfbf3;
+  --color-amber-200: #e8e4d8;
+  --color-amber-300: #cec8a2;
+  --color-amber-400: #b49029;
+  --color-amber-500: #b49029;
+  --color-amber-600: #a99137;
+  --color-amber-700: #8c7320;
+  --color-amber-800: #6f5b19;
+  --color-amber-900: #524312;
+  --color-amber-950: #382c0b;
+
+  /* Remap slate scale so dark slate uses Deep Navy and Black */
+  --color-slate-900: #182a3e;
+  --color-slate-950: #030508;
 }
 
 :root {
@@ -21,16 +45,23 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
 
-  /* Property Studio Design Tokens */
-  --ps-navy: #101C38;
-  --ps-deep-navy: #0B1530;
-  --ps-gold: #E99A18;
-  --ps-amber: #F59E0B;
-  --ps-light-gold: #FFF5E4;
-  --ps-bg: #F7F9FD;
+  /* Property Studio Official Brand Design Tokens */
+  --ps-navy: #182A3E;
+  --ps-deep-navy: #182A3E;
+  --ps-gold: #B49029;
+  --ps-gold-classic: #B49029;
+  --ps-gold-antique: #A99137;
+  --ps-black: #030508;
+  --ps-white: #FFFFFF;
+  --ps-off-white: #FAFCFD;
+  --ps-champagne: #CEC8A2;
+  --ps-champagne-light: #FCFBF3;
+  --ps-amber: #B49029;
+  --ps-light-gold: #FCFBF3;
+  --ps-bg: #FAFCFD;
   --ps-surface: #FFFFFF;
-  --ps-border: #E2E8F0;
-  --ps-text-primary: #14213D;
+  --ps-border: #E8E4D8;
+  --ps-text-primary: #030508;
   --ps-text-secondary: #64748B;
   --ps-success: #16A34A;
   --ps-danger: #DC2626;
@@ -68,7 +99,7 @@
 
   /* Accessible focus indicators */
   *:focus-visible {
-    outline: 2px solid #d97706;
+    outline: 2px solid #b49029;
     outline-offset: 2px;
   }
 }
@@ -78,50 +109,50 @@
    ============================================================================== */
 .ps-card {
   background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e8e4d8;
   border-radius: 1rem;
-  box-shadow: 0 1px 3px 0 rgba(16, 28, 56, 0.04);
+  box-shadow: 0 1px 3px 0 rgba(24, 42, 62, 0.04);
 }
 
 .ps-card-hover {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .ps-card-hover:hover {
-  border-color: rgba(233, 154, 24, 0.45);
-  box-shadow: 0 10px 25px -5px rgba(16, 28, 56, 0.08), 0 8px 10px -6px rgba(16, 28, 56, 0.04);
+  border-color: rgba(180, 144, 41, 0.45);
+  box-shadow: 0 10px 25px -5px rgba(24, 42, 62, 0.08), 0 8px 10px -6px rgba(24, 42, 62, 0.04);
   transform: translateY(-2px);
 }
 
 .ps-badge-gold {
-  background-color: #fff5e4;
-  color: #92580c;
-  border: 1px solid rgba(233, 154, 24, 0.35);
+  background-color: #fcfbf3;
+  color: #a99137;
+  border: 1px solid #cec8a2;
   font-weight: 600;
 }
 
 .ps-badge-navy {
-  background-color: #101c38;
+  background-color: #182a3e;
   color: #ffffff;
 }
 
 .ps-btn-primary {
-  background-color: #0b1530;
+  background-color: #182a3e;
   color: #ffffff;
   font-weight: 700;
   transition: all 0.15s ease-in-out;
 }
 .ps-btn-primary:hover {
-  background-color: #101c38;
+  background-color: #030508;
 }
 
 .ps-btn-gold {
-  background-color: #e99a18;
+  background-color: #b49029;
   color: #ffffff;
   font-weight: 700;
   transition: all 0.15s ease-in-out;
 }
 .ps-btn-gold:hover {
-  background-color: #d1840e;
+  background-color: #a99137;
 }
 
 /* ==============================================================================
