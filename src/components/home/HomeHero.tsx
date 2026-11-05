@@ -479,18 +479,18 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         SECTION 1: CINEMATIC VISUAL HERO & EXECUTIVE AUDIO BRIEFING
         ====================================================================
       */}
-      <section id="overview" className="relative bg-gradient-to-b from-white via-slate-50 to-white border-b border-slate-200 overflow-hidden">
-        {/* Ambient Glows */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+      <section id="overview" className="relative bg-gradient-to-b from-[#F7F9FD] via-white to-[#F7F9FD] border-b border-[#E2E8F0] overflow-hidden">
+        {/* Ambient Subtle Glows */}
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#E99A18]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-20 left-10 w-72 h-72 bg-[#101C38]/5 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-10 lg:pb-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-10 lg:pb-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             {/* Left 7 cols: Brand Manifesto, Audio Lead & Expanded Intelligence Space */}
             <div className="lg:col-span-7 space-y-5 lg:space-y-6 order-2 lg:order-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold tracking-wide">
-                  <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
+                <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold tracking-wide">
+                  <span className="w-2 h-2 rounded-full bg-[#E99A18] animate-pulse" />
                   <span className="uppercase font-mono">REAL ESTATE MEDIA & DATA INTELLIGENCE</span>
                 </div>
                 <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
@@ -500,22 +500,22 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
               </div>
 
               <div className="space-y-3">
-                <h1 className="text-3xl sm:text-4xl lg:text-[42px] xl:text-5xl font-black text-slate-900 tracking-tight leading-[1.12] font-display">
+                <h1 className="text-3xl sm:text-4xl lg:text-[42px] xl:text-5xl font-extrabold text-[#14213D] tracking-tight leading-[1.12] font-display">
                   Property Studio
-                  <span className="block text-amber-700 text-2xl sm:text-3xl lg:text-[32px] xl:text-4xl font-bold mt-1">
+                  <span className="block text-[#E99A18] text-2xl sm:text-3xl lg:text-[32px] xl:text-4xl font-bold mt-1">
                     by Swamy Reddy Javidi
                   </span>
                 </h1>
-                <p className="text-base sm:text-lg text-slate-700 leading-relaxed font-normal">
+                <p className="text-base sm:text-lg text-[#14213D]/90 leading-relaxed font-normal">
                   &quot;The global PropTech ecosystem integrating the search power of property portals, the transparency of community forums, and the authority of broadcast media into one revolutionary platform.&quot;
                 </p>
-                <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                <p className="text-sm text-[#64748B] leading-relaxed font-medium">
                   Property Studio is The Real Estate Media Network and Community PropTech Platform Delivering Absolute Market Intelligence.
                 </p>
               </div>
 
               {/* Tagline callout */}
-              <div className="text-xs font-mono font-bold tracking-widest text-slate-500 uppercase border-l-2 border-amber-500 pl-3">
+              <div className="text-xs font-mono font-bold tracking-widest text-[#64748B] uppercase border-l-2 border-[#E99A18] pl-3">
                 REAL ESTATE · VISUAL STORIES · MARKET TRENDS & INSIGHTS
               </div>
 
@@ -543,9 +543,9 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                     setActiveView('PROPERTIES');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="w-full sm:w-auto justify-center px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-slate-900/10 active:scale-95 transition-all cursor-pointer min-h-[44px]"
+                  className="w-full sm:w-auto justify-center px-6 py-3.5 bg-[#0B1530] hover:bg-[#101C38] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-[#0B1530]/15 active:scale-95 transition-all cursor-pointer min-h-[44px]"
                 >
-                  <Building2 className="w-4 h-4 text-amber-400" />
+                  <Building2 className="w-4 h-4 text-[#E99A18]" />
                   <span>Explore Audited Projects</span>
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </button>
@@ -556,9 +556,9 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                       setActiveView('LEADS_MARKET');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
+                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-[#FFF5E4] hover:bg-[#ffebd0] text-[#92580c] border border-[#E99A18]/40 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
                   >
-                    <Users className="w-4 h-4 text-amber-600" />
+                    <Users className="w-4 h-4 text-[#E99A18]" />
                     <span>Buyer Leads</span>
                   </button>
                 ) : (
@@ -567,9 +567,9 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                       setActiveView('MARKET_INSIGHTS');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
+                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-[#FFF5E4] hover:bg-[#ffebd0] text-[#92580c] border border-[#E99A18]/40 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer min-h-[44px]"
                   >
-                    <TrendingUp className="w-4 h-4 text-amber-600" />
+                    <TrendingUp className="w-4 h-4 text-[#E99A18]" />
                     <span>Market Trends</span>
                   </button>
                 )}
@@ -577,27 +577,27 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                 {onOpenSupport && (
                   <button
                     onClick={onOpenSupport}
-                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all shadow-xs cursor-pointer min-h-[44px]"
+                    className="w-full sm:w-auto justify-center px-5 py-3.5 bg-white hover:bg-slate-50 text-[#14213D] border border-[#E2E8F0] rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all shadow-xs cursor-pointer min-h-[44px]"
                   >
-                    <LifeBuoy className="w-4 h-4 text-amber-600" />
+                    <LifeBuoy className="w-4 h-4 text-[#E99A18]" />
                     <span>Official Support Desk</span>
                   </button>
                 )}
               </div>
 
               {/* Key Trust Metrics */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4 pt-4 border-t border-slate-200/80">
-                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
-                  <div className="text-xl sm:text-2xl font-black font-mono-numbers text-slate-900">5 Pillars</div>
-                  <div className="text-[11px] font-medium text-slate-500 mt-0.5">PropTech Integration</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4 pt-4 border-t border-[#E2E8F0]">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
+                  <div className="text-xl sm:text-2xl font-black font-mono-numbers text-[#14213D]">5 Pillars</div>
+                  <div className="text-[11px] font-medium text-[#64748B] mt-0.5">PropTech Integration</div>
                 </div>
-                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
-                  <div className="text-xl sm:text-2xl font-black font-mono-numbers text-amber-700">24+ Years</div>
-                  <div className="text-[11px] font-medium text-slate-500 mt-0.5">Corporate Governance</div>
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
+                  <div className="text-xl sm:text-2xl font-black font-mono-numbers text-[#E99A18]">24+ Years</div>
+                  <div className="text-[11px] font-medium text-[#64748B] mt-0.5">Corporate Governance</div>
                 </div>
-                <div className="bg-white/80 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 sm:p-3.5 shadow-xs text-center sm:text-left">
                   <div className="text-xl sm:text-2xl font-black font-mono-numbers text-emerald-700">100%</div>
-                  <div className="text-[11px] font-medium text-slate-500 mt-0.5">Data Masking Privacy</div>
+                  <div className="text-[11px] font-medium text-[#64748B] mt-0.5">Data Masking Privacy</div>
                 </div>
               </div>
             </div>
@@ -662,53 +662,53 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
       */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <div className="text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold uppercase tracking-wider font-mono">
-            <Layers className="w-3.5 h-3.5 text-amber-600" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold uppercase tracking-wider font-mono">
+            <Layers className="w-3.5 h-3.5 text-[#E99A18]" />
             CORE CONGLOMERATE ARCHITECTURE
           </div>
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 font-display">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#14213D] font-display">
             The Five-Pillar Integration of Property Studio
           </h2>
-          <p className="text-sm text-slate-600 leading-relaxed">
+          <p className="text-sm text-[#64748B] leading-relaxed">
             Consolidating market search, verified performance analytics, and unedited developer town halls into a single PropTech destination.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Pillar 1 */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs hover:border-amber-400 hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 border border-amber-500/20 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-[#FFF5E4] text-[#E99A18] border border-[#E99A18]/30 flex items-center justify-center font-bold">
                 <Search className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest">
+              <span className="text-[10px] font-mono font-bold text-[#E99A18] uppercase tracking-widest">
                 PILLAR 01
               </span>
-              <h3 className="text-base font-bold text-slate-900 font-display">
+              <h3 className="text-base font-bold text-[#14213D] font-display">
                 1. The Aggregator Engine
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-[#64748B] leading-relaxed">
                 Integrating the comprehensive search and discovery features of major property portals with curated inventory, high-resolution masterplans, and verified floor plans.
               </p>
             </div>
-            <div className="pt-2 text-[11px] font-bold text-amber-700 flex items-center gap-1">
+            <div className="pt-2 text-[11px] font-bold text-[#E99A18] flex items-center gap-1">
               <span>Smart Search Discovery</span>
             </div>
           </div>
 
           {/* Pillar 2 */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs hover:border-amber-400 hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-600 border border-red-500/20 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center font-bold">
                 <Video className="w-5 h-5" />
               </div>
               <span className="text-[10px] font-mono font-bold text-red-600 uppercase tracking-widest">
                 PILLAR 02
               </span>
-              <h3 className="text-base font-bold text-slate-900 font-display">
+              <h3 className="text-base font-bold text-[#14213D] font-display">
                 2. The Broadcast Network
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-[#64748B] leading-relaxed">
                 Powered by high-definition YouTube studio analytics, professional TV Anchors, and live field Ground Reports.
               </p>
             </div>
@@ -718,18 +718,18 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
           </div>
 
           {/* Pillar 3 */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs hover:border-amber-400 hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 border border-indigo-500/20 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center font-bold">
                 <MessageSquare className="w-5 h-5" />
               </div>
               <span className="text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-widest">
                 PILLAR 03
               </span>
-              <h3 className="text-base font-bold text-slate-900 font-display">
+              <h3 className="text-base font-bold text-[#14213D] font-display">
                 3. The Community Hive
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-[#64748B] leading-relaxed">
                 An anonymous, unedited forum for uncensored neighborhood Project and Community level discussions, title checks, and engineering reviews.
               </p>
             </div>
@@ -739,18 +739,18 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
           </div>
 
           {/* Pillar 4 */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs hover:border-amber-400 hover:shadow-md transition-all space-y-3 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
                 <Star className="w-5 h-5" />
               </div>
               <span className="text-[10px] font-mono font-bold text-emerald-600 uppercase tracking-widest">
                 PILLAR 04
               </span>
-              <h3 className="text-base font-bold text-slate-900 font-display">
+              <h3 className="text-base font-bold text-[#14213D] font-display">
                 4. The Performance Index
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-[#64748B] leading-relaxed">
                 A transparent, verification-driven layout addressing developer track records and agent ratings, verified through actual construction delivery milestones.
               </p>
             </div>
@@ -760,18 +760,18 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
           </div>
 
           {/* Pillar 5 */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs hover:border-amber-400 hover:shadow-md transition-all space-y-3 flex flex-col justify-between md:col-span-2 lg:col-span-2">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs hover:border-[#E99A18] hover:shadow-md transition-all duration-200 space-y-3 flex flex-col justify-between md:col-span-2 lg:col-span-2">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 border border-blue-500/20 flex items-center justify-center font-bold">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center font-bold">
                 <Radio className="w-5 h-5" />
               </div>
               <span className="text-[10px] font-mono font-bold text-blue-600 uppercase tracking-widest">
                 PILLAR 05
               </span>
-              <h3 className="text-base font-bold text-slate-900 font-display">
+              <h3 className="text-base font-bold text-[#14213D] font-display">
                 5. The Town Hall Arena
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-[#64748B] leading-relaxed">
                 Hosting dynamic Live Summits and Podcasts that provide interactive digital bridges connecting builders, landowners, realtors, industry leaders, and global property seekers directly without intermediary filters.
               </p>
             </div>
@@ -787,13 +787,13 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
         SECTION 3: HOW PROPERTY STUDIO HELPS SOCIETY
         ====================================================================
       */}
-      <section className="bg-slate-900 text-white py-14 border-y border-slate-800">
+      <section className="bg-[#0B1530] text-white py-14 border-y border-[#101C38]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
           <div className="max-w-3xl space-y-3">
-            <span className="text-xs font-mono font-bold text-amber-400 tracking-widest uppercase">
+            <span className="text-xs font-mono font-bold text-[#E99A18] tracking-widest uppercase">
               DEEP SOCIETAL IMPACT
             </span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-display text-white">
               How Property Studio Helps Society
             </h2>
             <p className="text-sm text-slate-300 leading-relaxed">
@@ -802,8 +802,8 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+            <div className="bg-[#101C38] p-6 rounded-2xl border border-[#1e2e50] hover:border-[#E99A18]/40 transition-all space-y-3">
+              <div className="w-9 h-9 rounded-xl bg-[#E99A18]/15 text-[#E99A18] flex items-center justify-center font-bold">
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-white font-display">
@@ -814,7 +814,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               </p>
             </div>
 
-            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3">
+            <div className="bg-[#101C38] p-6 rounded-2xl border border-[#1e2e50] hover:border-[#E99A18]/40 transition-all space-y-3">
               <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
                 <Users className="w-5 h-5" />
               </div>
@@ -826,7 +826,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               </p>
             </div>
 
-            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3">
+            <div className="bg-[#101C38] p-6 rounded-2xl border border-[#1e2e50] hover:border-[#E99A18]/40 transition-all space-y-3">
               <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
                 <Lock className="w-5 h-5" />
               </div>
@@ -838,7 +838,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               </p>
             </div>
 
-            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3">
+            <div className="bg-[#101C38] p-6 rounded-2xl border border-[#1e2e50] hover:border-[#E99A18]/40 transition-all space-y-3">
               <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
                 <Briefcase className="w-5 h-5" />
               </div>
@@ -861,11 +861,11 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
       <section id="market-feeds" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 text-amber-900 text-xs font-bold uppercase font-mono">
-              <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#FFF5E4] text-[#92580c] text-xs font-bold uppercase font-mono">
+              <TrendingUp className="w-3.5 h-3.5 text-[#E99A18]" />
               LIVE DATA INTELLIGENCE FEED
             </div>
-            <h2 className="text-2xl font-black text-slate-900 font-display mt-1">
+            <h2 className="text-2xl font-extrabold text-[#14213D] font-display mt-1">
               Western Corridor Micro-Market Feed
             </h2>
           </div>
@@ -874,7 +874,7 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
               setActiveView('MARKET_INSIGHTS');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="text-xs font-bold text-amber-700 hover:underline flex items-center gap-1 cursor-pointer"
+            className="text-xs font-bold text-[#E99A18] hover:underline flex items-center gap-1 cursor-pointer"
           >
             <span>View Full Trends & Charts</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -890,17 +890,17 @@ Explore our verified visual blueprints and 4K aerial surveys below to make insti
                 setActiveView('MARKET_INSIGHTS');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="cursor-pointer bg-white p-5 rounded-2xl border border-slate-200 hover:border-amber-400 hover:shadow-md transition-all group"
+              className="cursor-pointer bg-white p-5 rounded-2xl border border-[#E2E8F0] hover:border-[#E99A18] hover:shadow-md transition-all group"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-600 truncate">{t.microMarket}</span>
-                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
+                <span className="text-xs font-bold text-[#64748B] truncate">{t.microMarket}</span>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-[#E99A18] transition-colors" />
               </div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono-numbers mt-2">
+              <div className="text-xl sm:text-2xl font-black text-[#14213D] font-mono-numbers mt-2">
                 ₹{t.currentAvgRate.toLocaleString('en-IN')}{' '}
                 <span className="text-[10px] text-slate-400 font-normal">/sqft</span>
               </div>
-              <div className="flex items-center gap-1 text-emerald-600 font-bold text-xs mt-1">
+              <div className="flex items-center gap-1 text-[#16A34A] font-bold text-xs mt-1">
                 <span>+{t.yearlyAppreciationPct}% 1-Yr Surge</span>
               </div>
             </div>

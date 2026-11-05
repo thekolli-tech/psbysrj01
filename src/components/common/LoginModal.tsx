@@ -26,6 +26,7 @@ import {
   MapPin,
   Check,
   Lock,
+  MessageSquare,
   Sparkles,
   Camera,
   Trash2,
@@ -505,32 +506,97 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
-        {/* Header */}
-        <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-12 h-9 sm:w-14 sm:h-10 rounded-lg sm:rounded-xl bg-white border border-white/20 flex items-center justify-center px-1 shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E2E8F0] w-full max-w-md md:max-w-3xl lg:max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col md:flex-row overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+        {/* Left Side: Desktop Premium Brand & Architecture Showcase */}
+        <div className="hidden md:flex md:w-5/12 lg:w-5/12 flex-col justify-between p-6 lg:p-8 bg-gradient-to-br from-[#0B1530] via-[#101C38] to-[#0B1530] text-white relative overflow-hidden shrink-0 border-r border-[#1e2e50]">
+          {/* Subtle Ambient Glows */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#E99A18]/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Top Branding */}
+          <div className="space-y-3 relative z-10">
+            <div className="w-14 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md">
               <BrandLogo variant="compact" size="sm" />
             </div>
             <div>
-              <h3 className="text-sm sm:text-base font-bold text-white font-display">
-                {isLoggedIn ? 'Account Session' : forgotPasswordMode ? 'Reset Password' : mode === 'LOGIN' ? 'Portal Sign In' : avatarStep ? 'Choose Profile Avatar' : 'Create Account'}
-              </h3>
-              <p className="text-[11px] sm:text-xs text-slate-400">
-                {isLoggedIn ? `Active as ${currentUser.name}` : forgotPasswordMode ? 'Verify email OTP to set new password' : avatarStep ? 'Select 2D character avatar or upload your photo' : 'Live server database authentication'}
+              <span className="text-[10px] font-mono font-bold text-[#E99A18] tracking-widest uppercase block">
+                PROPERTY STUDIO
+              </span>
+              <h2 className="text-xl lg:text-2xl font-black font-display text-white mt-0.5">
+                Institutional Real Estate Intelligence
+              </h2>
+              <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                Direct leadership of CEO Swamy Reddy Javidi · 24+ Years Governance
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="p-1 sm:p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
+
+          {/* Trust Value Badges */}
+          <div className="space-y-3 my-6 relative z-10">
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
+              <div className="w-8 h-8 rounded-lg bg-[#E99A18]/20 text-[#E99A18] flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white">TS-RERA Compliance Audits</h4>
+                <p className="text-[11px] text-slate-300">Ground telemetry, concrete certifications, and verified blueprints.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <Lock className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white">100% Data Masking Privacy</h4>
+                <p className="text-[11px] text-slate-300">Strict buyer anonymity—never sold to aggressive broker spam databases.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                <MessageSquare className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white">Uncensored Community Forum</h4>
+                <p className="text-[11px] text-slate-300">Authentic resident feedback, builder delivery tracking, and title checks.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Footnote */}
+          <div className="pt-3 border-t border-white/10 text-[10px] text-slate-400 font-mono tracking-wider relative z-10">
+            REAL ESTATE · VISUAL STORIES · MARKET TRENDS
           </div>
         </div>
+
+        {/* Right Side: Authentication Controls & Active Form */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-white">
+          {/* Header */}
+          <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[#E2E8F0] flex items-center justify-between bg-[#0B1530] text-white shrink-0">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="md:hidden w-12 h-9 rounded-lg bg-white border border-white/20 flex items-center justify-center px-1 shrink-0">
+                <BrandLogo variant="compact" size="sm" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-white font-display">
+                  {isLoggedIn ? 'Account Session' : forgotPasswordMode ? 'Reset Password' : mode === 'LOGIN' ? 'Portal Sign In' : avatarStep ? 'Choose Profile Avatar' : 'Create Account'}
+                </h3>
+                <p className="text-[11px] sm:text-xs text-slate-400">
+                  {isLoggedIn ? `Active as ${currentUser.name}` : forgotPasswordMode ? 'Verify email OTP to set new password' : avatarStep ? 'Select 2D character avatar or upload your photo' : 'Live server database authentication'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onClose}
+                className="p-1 sm:p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+            </div>
+          </div>
 
         {/* Content */}
         <div className="p-4 sm:p-5 space-y-3 sm:space-y-3.5 text-xs overflow-y-auto overscroll-contain flex-1">
@@ -1398,16 +1464,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+        <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-[#E2E8F0] flex items-center justify-between text-xs text-slate-500 shrink-0">
           <span>Official Secretariat: info@propertystudio.org</span>
           <button
             onClick={onClose}
-            className="font-bold text-slate-800 hover:text-slate-950"
+            className="font-bold text-[#14213D] hover:text-black cursor-pointer"
           >
             Close
           </button>
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };

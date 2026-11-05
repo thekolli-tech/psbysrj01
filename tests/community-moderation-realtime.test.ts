@@ -77,7 +77,7 @@ test('1. Property Seeker submits a question: defaults to PENDING_APPROVAL, visib
       title: 'Is Kokapet Neopolis Phase 2 RERA registered?',
       content: 'Seeking clarity on Tower 4 approvals and expected handover schedule.',
       topic: 'Kokapet & Neopolis',
-      postType: 'QUESTION'
+      postType: 'POST'
     })
   });
   assert.equal(createPostRes.status, 200);

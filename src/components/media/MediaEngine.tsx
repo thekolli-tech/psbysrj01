@@ -651,10 +651,10 @@ export const MediaEngine: React.FC<{
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Platform Header Banner */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold uppercase tracking-wider mb-2 font-mono">
-            <Radio className="w-4 h-4 text-amber-400" />
+      <div className="bg-[#0B1530] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#101C38] flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+        <div className="relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold uppercase tracking-wider mb-2 font-mono">
+            <Radio className="w-4 h-4 text-[#E99A18]" />
             <span>MULTIMEDIA BROADCASTING & PODCAST NETWORK</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white font-display">
@@ -664,12 +664,13 @@ export const MediaEngine: React.FC<{
             Hosted by <strong className="text-white">Swamy Reddy Javidi</strong>. Unbiased technical breakdowns, soil load certifications, candid builder leader interviews, and live audio/video telemetry.
           </p>
         </div>
+        <div className="absolute -right-8 -bottom-8 w-60 h-60 bg-[#E99A18]/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0 relative z-10">
           {isSuperAdmin && (
             <button
               onClick={() => setIsPostModalOpen(true)}
-              className="px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black tracking-wide flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+              className="px-4 py-3 bg-[#E99A18] hover:bg-[#d88d13] text-[#0B1530] rounded-xl text-xs font-black tracking-wide flex items-center gap-2 shadow-lg shadow-[#E99A18]/20 active:scale-95 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Post Video / Podcast Update</span>
@@ -678,16 +679,16 @@ export const MediaEngine: React.FC<{
 
           <button
             onClick={handleEnquire}
-            className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+            className="px-4 py-3 bg-[#101C38] hover:bg-slate-800 text-white border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
           >
-            <LifeBuoy className="w-4 h-4 text-amber-400" />
+            <LifeBuoy className="w-4 h-4 text-[#E99A18]" />
             <span>Enquire on Projects</span>
           </button>
         </div>
       </div>
 
       {/* Discovery Content Filter Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E2E8F0] pb-3">
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {(
             [
@@ -707,8 +708,8 @@ export const MediaEngine: React.FC<{
                 onClick={() => setActiveFilter(tab.key)}
                 className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   isActive
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'bg-[#0B1530] text-white shadow-xs'
+                    : 'bg-white border border-[#E2E8F0] text-[#64748B] hover:bg-slate-100 hover:text-[#14213D]'
                 }`}
               >
                 {tab.isLivePulse ? (
@@ -717,7 +718,7 @@ export const MediaEngine: React.FC<{
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
                   </span>
                 ) : (
-                  <Icon className="w-3.5 h-3.5 text-amber-500" />
+                  <Icon className="w-3.5 h-3.5 text-[#E99A18]" />
                 )}
                 <span>
                   {tab.key === 'ALL'

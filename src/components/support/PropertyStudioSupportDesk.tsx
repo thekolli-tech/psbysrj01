@@ -110,7 +110,7 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300">
         {/* Support Header */}
-        <div className="p-5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+        <div className="p-5 bg-[#0B1530] text-white flex items-center justify-between border-b border-[#101C38]">
           <div className="flex items-center gap-3">
             <div className="w-16 h-12 rounded-xl bg-white flex items-center justify-center px-1 shrink-0">
               <BrandLogo variant="compact" size="sm" />
@@ -121,14 +121,14 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                   Official Support Desk
                 </h2>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-300 mt-0.5">
                 Property Studio by Swamy Reddy Javidi · Secretariat Assistance
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#101C38] transition-colors cursor-pointer"
             aria-label="Close Support Desk"
           >
             <X className="w-5 h-5" />

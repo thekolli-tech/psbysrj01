@@ -115,7 +115,7 @@ test('LoginModal component fixes signup location to Hyderabad, Telangana, India 
 });
 
 test('Backend registerVerifiedUser defaults town_city to Hyderabad, Telangana, India when omitted', async () => {
-  const email = 'default-loc-repo@example.com';
+  const email = `default-loc-repo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   const issued = await generateOtp(email, 'EMAIL_VERIFICATION');
 
   const registered = await registerVerifiedUser({
@@ -135,7 +135,7 @@ test('Backend registerVerifiedUser defaults town_city to Hyderabad, Telangana, I
 });
 
 test('Backend registerVerifiedUser persists user-customized location when changed', async () => {
-  const email = 'custom-loc-repo@example.com';
+  const email = `custom-loc-repo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   const issued = await generateOtp(email, 'EMAIL_VERIFICATION');
 
   const customLocation = 'Bengaluru, Karnataka, India';
@@ -156,7 +156,7 @@ test('Backend registerVerifiedUser persists user-customized location when change
 });
 
 test('HTTP POST /api/auth/register defaults to Hyderabad, Telangana, India and returns in profile', async () => {
-  const email = 'http-default-loc@example.com';
+  const email = `http-default-loc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
 
   // 1. Request Email OTP
   const otpRes = await api('POST', '/api/auth/send-email-otp', { email });
@@ -192,7 +192,7 @@ test('HTTP POST /api/auth/register defaults to Hyderabad, Telangana, India and r
 });
 
 test('HTTP POST /api/auth/register persists user-customized location and persists after login', async () => {
-  const email = 'http-custom-loc@example.com';
+  const email = `http-custom-loc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
 
   const otpRes = await api('POST', '/api/auth/send-email-otp', { email });
   assert.equal(otpRes.status, 200);
@@ -223,7 +223,7 @@ test('HTTP POST /api/auth/register persists user-customized location and persist
 });
 
 test('HTTP POST /api/auth/register supports separate city and state fields', async () => {
-  const email = 'http-city-state@example.com';
+  const email = `http-city-state-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
 
   const otpRes = await api('POST', '/api/auth/send-email-otp', { email });
   assert.equal(otpRes.status, 200);
@@ -246,7 +246,7 @@ test('HTTP POST /api/auth/register supports separate city and state fields', asy
 });
 
 test('Registration rejects invalid location input containing HTML or exceeding 80 characters', async () => {
-  const emailHtml = 'invalid-html-loc@example.com';
+  const emailHtml = `invalid-html-loc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   await api('POST', '/api/auth/send-email-otp', { email: emailHtml });
   const codeHtml = otpMap.get(emailHtml)!;
 
@@ -261,7 +261,7 @@ test('Registration rejects invalid location input containing HTML or exceeding 8
   assert.equal(htmlRes.status, 400);
   assert.match(htmlRes.json.error, /Location cannot include HTML/);
 
-  const emailLong = 'invalid-long-loc@example.com';
+  const emailLong = `invalid-long-loc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   await api('POST', '/api/auth/send-email-otp', { email: emailLong });
   const codeLong = otpMap.get(emailLong)!;
 
@@ -279,7 +279,7 @@ test('Registration rejects invalid location input containing HTML or exceeding 8
 
 test('Existing users with saved locations are never overwritten during new user registrations', async () => {
   // Create an existing user with an existing custom location
-  const existingEmail = 'existing-user-loc@example.com';
+  const existingEmail = `existing-user-loc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   const existingUser = await createUser({
     name: 'Existing Member',
     email: existingEmail,
@@ -290,7 +290,7 @@ test('Existing users with saved locations are never overwritten during new user 
   assert.equal(existingUser.town_city, 'Mumbai, Maharashtra, India');
 
   // Register another user
-  const newEmail = 'new-user-non-overwrite@example.com';
+  const newEmail = `new-user-non-overwrite-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   await api('POST', '/api/auth/send-email-otp', { email: newEmail });
   const code = otpMap.get(newEmail)!;
 

@@ -22,22 +22,22 @@ export const MarketTrendsView: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Trends Intelligence Header */}
-      <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E2E8F0] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider mb-2">
-            <TrendingUp className="w-4 h-4 text-amber-600" />
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#FFF5E4] text-[#92580c] border border-[#E99A18]/30 text-xs font-bold uppercase tracking-wider mb-2">
+            <TrendingUp className="w-4 h-4 text-[#E99A18]" />
             Executive Data Intelligence Desk
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-display">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#14213D] font-display">
             Western Corridor Market Trends & Capital Appreciation
           </h1>
-          <p className="text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
+          <p className="text-sm text-[#64748B] mt-1 max-w-2xl leading-relaxed">
             Illustrative corridor models for layout exploration. These figures are not live market statistics and are not property listings.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-right">
+          <div className="bg-[#F7F9FD] p-4 rounded-xl border border-[#E2E8F0] text-right">
             <span className="text-[10px] text-slate-400 uppercase font-semibold block">Top Performer (1-Yr)</span>
             <span className="text-lg font-black text-emerald-600 font-mono-numbers">+22.4% Neopolis</span>
           </div>
@@ -52,21 +52,21 @@ export const MarketTrendsView: React.FC = () => {
             <button
               key={market.microMarket}
               onClick={() => setSelectedMarketIndex(idx)}
-              className={`p-4 rounded-xl border text-left transition-all ${
+              className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
                 isSelected
-                  ? 'border-amber-600 bg-amber-50/50 ring-2 ring-amber-500/20 shadow-sm'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
+                  ? 'border-[#E99A18] bg-[#FFF5E4]/50 ring-2 ring-[#E99A18]/20 shadow-xs'
+                  : 'border-[#E2E8F0] bg-white hover:border-[#E99A18]/40 hover:shadow-xs'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900 truncate">
+                <span className="text-xs font-bold text-[#14213D] truncate">
                   {market.microMarket}
                 </span>
-                <ArrowUpRight className={`w-4 h-4 ${isSelected ? 'text-amber-600' : 'text-slate-400'}`} />
+                <ArrowUpRight className={`w-4 h-4 ${isSelected ? 'text-[#E99A18]' : 'text-slate-400'}`} />
               </div>
-              <div className="text-xl font-black text-slate-900 font-mono-numbers mt-1.5">
+              <div className="text-xl font-black text-[#14213D] font-mono-numbers mt-1.5">
                 ₹{market.currentAvgRate.toLocaleString('en-IN')}{' '}
-                <span className="text-[10px] text-slate-500 font-normal">/sqft</span>
+                <span className="text-[10px] text-[#64748B] font-normal">/sqft</span>
               </div>
               <div className="flex items-center gap-1 text-emerald-600 font-bold text-xs mt-1">
                 <span>+{market.yearlyAppreciationPct}% 1-Yr CAGR</span>
@@ -79,18 +79,18 @@ export const MarketTrendsView: React.FC = () => {
       {/* Dynamic Interactive Price Chart & Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left: Interactive Quarterly Trend Chart (8 cols) */}
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-[#E2E8F0] p-6 sm:p-8 shadow-xs space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-[#64748B] uppercase tracking-wider">
                 Quarterly Price Index (2025 - 2026)
               </span>
-              <h2 className="text-xl font-bold text-slate-900 mt-0.5">
+              <h2 className="text-xl font-extrabold text-[#14213D] font-display mt-0.5">
                 {activeMarket.microMarket} Historical Trajectory
               </h2>
             </div>
             <div className="text-right">
-              <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
+              <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
                 +{activeMarket.quarterlyChangePct}% QoQ
               </span>
             </div>
@@ -98,7 +98,7 @@ export const MarketTrendsView: React.FC = () => {
 
           {/* SVG Line / Bar Interactive Graph */}
           <div className="h-64 sm:h-72 w-full pt-6 flex flex-col justify-end">
-            <div className="grid grid-cols-7 gap-3 sm:gap-6 items-end h-48 border-b border-slate-200 pb-2">
+            <div className="grid grid-cols-7 gap-3 sm:gap-6 items-end h-48 border-b border-[#E2E8F0] pb-2">
               {activeMarket.history.map((h, i) => {
                 const heightPct = Math.round((h.avgRate / maxRate) * 100);
                 const isLatest = i === activeMarket.history.length - 1;
@@ -106,7 +106,7 @@ export const MarketTrendsView: React.FC = () => {
                 return (
                   <div key={h.quarter} className="flex flex-col items-center gap-2 group h-full justify-end">
                     {/* Hover Tooltip */}
-                    <div className="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 group-hover:bg-slate-900 group-hover:text-white px-1.5 py-0.5 rounded transition-colors whitespace-nowrap">
+                    <div className="text-[11px] font-mono font-bold text-[#14213D] bg-slate-100 group-hover:bg-[#0B1530] group-hover:text-white px-1.5 py-0.5 rounded transition-colors whitespace-nowrap">
                       ₹{h.avgRate}
                     </div>
 
@@ -114,14 +114,14 @@ export const MarketTrendsView: React.FC = () => {
                     <div
                       className={`w-full rounded-t-lg transition-all duration-300 ${
                         isLatest
-                          ? 'bg-amber-500 shadow-md shadow-amber-500/20'
-                          : 'bg-slate-800 hover:bg-slate-700'
+                          ? 'bg-[#E99A18] shadow-md shadow-[#E99A18]/20'
+                          : 'bg-[#0B1530] hover:bg-[#101C38]'
                       }`}
                       style={{ height: `${heightPct}%` }}
                     />
 
                     {/* Label */}
-                    <span className="text-[10px] font-semibold text-slate-400 truncate mt-1">
+                    <span className="text-[10px] font-semibold text-[#64748B] truncate mt-1">
                       {h.quarter}
                     </span>
                   </div>
@@ -131,14 +131,14 @@ export const MarketTrendsView: React.FC = () => {
           </div>
 
           {/* Key Infrastructure Catalysts */}
-          <div className="pt-4 border-t border-slate-100 space-y-3">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+          <div className="pt-4 border-t border-[#E2E8F0] space-y-3">
+            <h3 className="text-xs font-bold text-[#14213D] uppercase tracking-wide">
               Key Infrastructure Growth Catalysts for {activeMarket.microMarket}:
             </h3>
             <div className="space-y-2">
               {activeMarket.infrastructureHighlights.map((hl, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs text-slate-600">
-                  <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div key={i} className="flex items-start gap-2 text-xs text-[#64748B]">
+                  <CheckCircle2 className="w-4 h-4 text-[#E99A18] shrink-0 mt-0.5" />
                   <span>{hl}</span>
                 </div>
               ))}
@@ -148,31 +148,31 @@ export const MarketTrendsView: React.FC = () => {
 
         {/* Right: Supply, Absorption & Investment Rating (4 cols) */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
-            <h3 className="text-base font-bold text-slate-900">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-xs space-y-5">
+            <h3 className="text-base font-bold text-[#14213D] font-display">
               Micro-Market Health Card
             </h3>
 
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-slate-600">Demand Heat Index</span>
-                  <span className="text-amber-600 font-mono font-bold">{activeMarket.demandScore} / 100</span>
+                  <span className="text-[#64748B]">Demand Heat Index</span>
+                  <span className="text-[#E99A18] font-mono font-bold">{activeMarket.demandScore} / 100</span>
                 </div>
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div
-                    className="bg-amber-500 h-full rounded-full"
+                    className="bg-[#E99A18] h-full rounded-full"
                     style={{ width: `${activeMarket.demandScore}%` }}
                   />
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
-                <span className="text-xs text-slate-500 block">Total Active Supply Under Construction</span>
-                <div className="text-2xl font-black text-slate-900 font-mono-numbers">
+              <div className="p-4 bg-[#F7F9FD] rounded-xl border border-[#E2E8F0] space-y-2">
+                <span className="text-xs text-[#64748B] block">Total Active Supply Under Construction</span>
+                <div className="text-2xl font-black text-[#14213D] font-mono-numbers">
                   {activeMarket.supplyUnits.toLocaleString()} Units
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-[#64748B]">
                   72% absorbed in pre-launch and early construction tranches.
                 </p>
               </div>

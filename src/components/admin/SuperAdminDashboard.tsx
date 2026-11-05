@@ -653,15 +653,15 @@ export const SuperAdminDashboard: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Super Admin Command Center Header */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-800">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#0B1530] text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-[#101C38] relative overflow-hidden">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+            <div className="w-14 h-14 rounded-2xl bg-[#FFF5E4] border border-[#E99A18]/40 flex items-center justify-center text-[#E99A18] shrink-0">
               <ShieldAlert className="w-7 h-7" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-500 text-slate-950 uppercase tracking-wide">
+                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#E99A18] text-[#0B1530] uppercase tracking-wide">
                   Global Command Center
                 </span>
                 <span className="text-xs text-emerald-400 font-mono flex items-center gap-1">
@@ -681,30 +681,30 @@ export const SuperAdminDashboard: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={refreshServerData}
-              className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors"
+              className="p-2.5 bg-[#101C38] hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors cursor-pointer"
               title="Refresh database records"
             >
               <RefreshCw className={`w-4 h-4 ${loadingData ? 'animate-spin' : ''}`} />
             </button>
 
-            <div className="bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700 text-right hidden sm:block">
+            <div className="bg-[#101C38] px-4 py-2.5 rounded-xl border border-slate-700 text-right hidden sm:block">
               <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Registered Accounts</span>
-              <span className="text-lg font-bold text-amber-400 font-mono-numbers">{liveUsers.length || users.length} Accounts</span>
+              <span className="text-lg font-bold text-[#E99A18] font-mono-numbers">{liveUsers.length || users.length} Accounts</span>
             </div>
 
             {/* Admin Session Details & Logout Button */}
-            <div className="flex items-center gap-2.5 bg-slate-800/90 pl-3 pr-2 py-1.5 rounded-xl border border-slate-700 shadow-sm">
+            <div className="flex items-center gap-2.5 bg-[#101C38] pl-3 pr-2 py-1.5 rounded-xl border border-slate-700 shadow-sm">
               <img
                 src={getSafeAvatar(currentUser.avatar)}
                 alt={currentUser.name}
-                className="w-8 h-8 rounded-full object-cover border border-amber-500/60"
+                className="w-8 h-8 rounded-full object-cover border border-[#E99A18]/60"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                 }}
               />
               <div className="text-left hidden md:block pr-1">
                 <span className="text-xs font-bold text-white block leading-tight">{currentUser.name}</span>
-                <span className="text-[10px] text-amber-400 block font-semibold leading-tight">Super Admin</span>
+                <span className="text-[10px] text-[#E99A18] block font-semibold leading-tight">Super Admin</span>
               </div>
               <button
                 onClick={() => {
@@ -721,9 +721,10 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        <div className="absolute -right-8 -bottom-8 w-60 h-60 bg-[#E99A18]/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 mt-6 pt-6 border-t border-slate-800 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 mt-6 pt-6 border-t border-slate-800 overflow-x-auto no-scrollbar relative z-10">
           {[
             { id: 'OVERVIEW', label: 'Platform Metrics' },
             { id: 'MODERATION', label: `Moderation Queue (${moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length + moderationDeletionRequests.length})`, highlight: true },
@@ -744,10 +745,10 @@ export const SuperAdminDashboard: React.FC = () => {
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-3.5 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-all cursor-pointer ${
                 activeTab === tab.id
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                  ? 'bg-[#E99A18] text-[#0B1530] font-bold shadow'
                   : tab.highlight
-                  ? 'text-amber-300 hover:text-white bg-slate-800/80 hover:bg-slate-800'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  ? 'text-amber-300 hover:text-white bg-[#101C38] hover:bg-slate-800'
+                  : 'text-slate-300 hover:text-white hover:bg-[#101C38]'
               }`}
             >
               {tab.label}
