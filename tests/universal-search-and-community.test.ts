@@ -67,7 +67,7 @@ test('2. Navigation Bar: Universal search icon present in Desktop and Mobile hea
   );
 });
 
-test('3. UniversalSearchModal: Comprehensive multi-domain search across Properties, Communities, Trends, Media, and Pages', () => {
+test('3. UniversalSearchModal: Clean X mark, no separate exit button, and system navigation compatibility', () => {
   const modalPath = path.resolve('src/components/common/UniversalSearchModal.tsx');
   assert.ok(fs.existsSync(modalPath), 'UniversalSearchModal component file must exist');
 
@@ -79,6 +79,36 @@ test('3. UniversalSearchModal: Comprehensive multi-domain search across Properti
   assert.ok(modalContent.includes('PAGES'), 'Must index platform pages');
   assert.ok(modalContent.includes('handleKeyDown'), 'Must support keyboard navigation');
   assert.ok(modalContent.includes('STATIC_MARKET_TRENDS'), 'Must include Western Corridor trends');
+
+  // Verify NO separate exit button (e.g. text button ESC inside input)
+  assert.ok(
+    !modalContent.includes('>ESC</button>'),
+    'Must not have a separate text exit button in search bar'
+  );
+
+  // Verify single clean X mark button to close
+  assert.ok(
+    modalContent.includes('aria-label="Close search"'),
+    'Must have clean X mark button with Close search label'
+  );
+
+  // Verify system navigation compatibility: browser & mobile Android back navigation (popstate)
+  assert.ok(
+    modalContent.includes('window.addEventListener(\'popstate\', handlePopState)'),
+    'Must integrate with system back navigation (popstate) for Android and browser history'
+  );
+
+  // Verify Escape key handling
+  assert.ok(
+    modalContent.includes('e.key === \'Escape\''),
+    'Must handle system hardware Escape key'
+  );
+
+  // Verify backdrop click dismiss
+  assert.ok(
+    modalContent.includes('onClick={onClose}'),
+    'Backdrop must dismiss search on click'
+  );
 });
 
 test('4. App.tsx: Registers global Ctrl+K / Cmd+K / "/" shortcuts and mounts UniversalSearchModal', () => {

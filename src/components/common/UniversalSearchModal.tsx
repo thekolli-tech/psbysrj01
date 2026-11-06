@@ -91,6 +91,7 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const poppedBySystemRef = useRef(false);
 
   // Focus input on open
   useEffect(() => {
@@ -103,6 +104,34 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
+
+  // System Navigation Compatibility: Browser & Mobile Android Back button support
+  useEffect(() => {
+    if (!isOpen) {
+      poppedBySystemRef.current = false;
+      return;
+    }
+
+    try {
+      const originalState = window.history.state || {};
+      window.history.pushState({ ...originalState, ps_search_modal: true }, '');
+    } catch {}
+
+    const handlePopState = () => {
+      poppedBySystemRef.current = true;
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (!poppedBySystemRef.current && window.history.state?.ps_search_modal) {
+        try {
+          window.history.back();
+        } catch {}
+      }
+    };
+  }, [isOpen, onClose]);
 
   // Static Platform Pages
   const platformPages = useMemo(() => [
@@ -377,9 +406,12 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 sm:pt-20 px-3 sm:px-4 bg-[#030508]/60 backdrop-blur-sm animate-in fade-in duration-150">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-12 sm:pt-20 px-3 sm:px-4 bg-[#030508]/60 backdrop-blur-sm animate-in fade-in duration-150 cursor-pointer"
+      onClick={onClose}
+    >
       <div
-        className="relative w-full max-w-2xl bg-white rounded-2xl sm:rounded-3xl border border-[#E8E4D8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
+        className="relative w-full max-w-2xl bg-white rounded-2xl sm:rounded-3xl border border-[#E8E4D8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150 cursor-default"
         onClick={e => e.stopPropagation()}
       >
         {/* Universal Search Header & Input */}
@@ -392,25 +424,18 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Search properties, communities, market trends, media, pages..."
-              className="w-full pl-11 pr-20 py-3 text-sm sm:text-base bg-white border border-[#E8E4D8] focus:border-[#B49029] focus:ring-2 focus:ring-[#B49029]/20 rounded-xl text-[#030508] placeholder-slate-400 font-medium shadow-2xs outline-none transition-all"
+              className="w-full pl-11 pr-12 py-3 text-sm sm:text-base bg-white border border-[#E8E4D8] focus:border-[#B49029] focus:ring-2 focus:ring-[#B49029]/20 rounded-xl text-[#030508] placeholder-slate-400 font-medium shadow-2xs outline-none transition-all"
             />
-            <div className="absolute right-3 flex items-center gap-1.5">
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery('')}
-                  className="p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors"
-                  aria-label="Clear query"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+            {/* Single X Mark Button to Close Search (No Separate Exit Button) */}
+            <div className="absolute right-3 flex items-center">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-2 py-1 text-[11px] font-mono font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-[#030508] hover:bg-slate-100 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
+                title="Close search"
+                aria-label="Close search"
               >
-                ESC
+                <X className="w-5 h-5 text-slate-500 hover:text-[#030508] transition-colors" />
               </button>
             </div>
           </div>
@@ -520,10 +545,6 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
             <span className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono">↵</kbd>
               <span>select</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono">esc</kbd>
-              <span>close</span>
             </span>
           </div>
 

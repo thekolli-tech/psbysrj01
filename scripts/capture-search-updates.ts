@@ -10,7 +10,7 @@ import {
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const ARTIFACT_DIR = 'C:\\Users\\ADMIN\\.gemini\\antigravity\\brain\\530c6b2d-a61b-4896-9d9c-e22414c7582d';
-const PORT = 4197;
+const PORT = 4198;
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
