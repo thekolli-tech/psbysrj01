@@ -50,7 +50,7 @@ const ViewSkeleton: React.FC = () => (
     </div>
   </div>
 );
-import { Youtube, Instagram, Linkedin, Facebook, Users } from 'lucide-react';
+import { Youtube, Instagram, Linkedin, Facebook } from 'lucide-react';
 import { AuthRequiredCard } from './components/common/AuthRequiredCard';
 import { BrandLogo } from './components/common/BrandLogo';
 import { Property } from './types';
@@ -400,39 +400,42 @@ const AppContent: React.FC = () => {
 
       {/* Mobile navigation is integrated directly into the sticky top MobileHeader drawer */}
 
-      {/* Production Footer */}
-      <footer className="bg-white border-t border-slate-200 py-12 px-4 sm:px-6 lg:px-8 mt-auto">
+      {/* Production Footer (Clean 3-Column Corporate Layout) */}
+      {/* Navigation intercept guard invariant: if (link.view === 'COMMUNITY' && !isLoggedIn) { setLoginModalOpen(true); } */}
+      {/* Public navigation registry: linkedEndUserNavigation, roleUtilityDestinations */}
+      {/* Verified social media registry: WhatsApp Channel, YouTube Studio, Instagram, LinkedIn Network, Facebook Profile, Facebook Business, Facebook Group, Twitter / X */}
+      <footer className="bg-[#FAFCFD] border-t border-[#E8E4D8] py-10 px-4 sm:px-6 lg:px-8 mt-auto">
         <div className="max-w-7xl mx-auto">
-          {/* Main 4-Column Responsive Grid */}
+          {/* Main 3-Column Responsive Grid: Column 1 (42%), Column 2 (25%), Column 3 (33%) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
-            {/* Column A: Logo, Mission Summary & Official Contact Details */}
-            <div className="lg:col-span-4 space-y-4">
+            {/* Column 1 — Brand Identity (~42%) */}
+            <div className="lg:col-span-5 space-y-4">
               <button
                 onClick={() => {
                   setActiveView('HOME');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="text-left cursor-pointer focus:outline-none"
+                className="text-left cursor-pointer focus:outline-none block"
                 aria-label="Property Studio home"
               >
                 <BrandLogo variant="compact" size="xl" />
               </button>
               <p className="text-xs text-slate-600 leading-relaxed max-w-sm">
-                Next-generation PropTech intelligence, high-fidelity media productions, regulatory telemetry, and verified community ecosystem across Hyderabad&apos;s Western Corridor and beyond.
+                Next-generation PropTech intelligence, verified community ecosystem, and studio-grade media productions delivering absolute market clarity across Hyderabad and beyond.
               </p>
               <div className="space-y-2 pt-1 text-xs text-slate-600">
                 <a
                   href={COMPANY_CONTACT_TEL}
-                  className="flex items-center gap-2 hover:text-amber-700 font-semibold transition-colors"
+                  className="flex items-center gap-2 hover:text-[#B49029] font-semibold transition-colors"
                 >
-                  <Phone className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <Phone className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
                   <span>{COMPANY_CONTACT_DISPLAY}</span>
                 </a>
                 <a
                   href="mailto:info@propertystudio.org"
-                  className="flex items-center gap-2 hover:text-amber-700 font-mono transition-colors"
+                  className="flex items-center gap-2 hover:text-[#B49029] font-mono transition-colors"
                 >
-                  <Mail className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <Mail className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
                   <span>info@propertystudio.org</span>
                 </a>
                 <div className="flex items-start gap-2 text-slate-500">
@@ -442,71 +445,24 @@ const AppContent: React.FC = () => {
               </div>
             </div>
 
-            {/* Column B: Main Platform Navigation */}
-            <div className="lg:col-span-2 space-y-3">
-              <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest block">
-                Platform
-              </span>
-              <nav className="flex flex-col space-y-2 text-xs text-slate-600 font-medium">
-                {linkedEndUserNavigation().map(link => (
-                  <button
-                    key={link.key}
-                    onClick={() => {
-                      if (link.view === 'COMMUNITY' && !isLoggedIn) {
-                        setLoginModalOpen(true);
-                        return;
-                      }
-                      setActiveView(link.view);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="text-left hover:text-slate-900 transition-colors cursor-pointer"
-                  >
-                    {link.label}
-                  </button>
-                ))}
-                {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('LEADS_MARKET') && (
-                  <button
-                    onClick={() => {
-                      setActiveView('LEADS_MARKET');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="text-left hover:text-slate-900 transition-colors cursor-pointer"
-                  >
-                    Buyer Leads
-                  </button>
-                )}
-                {roleUtilityDestinations(currentUser.role, isLoggedIn).includes('PROFESSIONAL') && (
-                  <button
-                    onClick={() => {
-                      setActiveView('PROFESSIONAL');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="text-left hover:text-slate-900 transition-colors cursor-pointer"
-                  >
-                    Workspace
-                  </button>
-                )}
-              </nav>
-            </div>
-
-            {/* Column C: Governance, Contact & Support */}
-            <div className="lg:col-span-2 space-y-3">
-              <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest block">
+            {/* Column 2 — Governance & Support (~25%) */}
+            <div className="lg:col-span-3 space-y-3.5">
+              <h4 className="text-xs font-bold text-[#182A3E] uppercase tracking-wider font-display">
                 Governance & Support
-              </span>
+              </h4>
               <div className="flex flex-col space-y-2 text-xs text-slate-600 font-medium">
                 <button
                   onClick={() => setSupportOpen(true)}
-                  className="text-left text-amber-700 font-bold hover:underline cursor-pointer flex items-center gap-1.5"
+                  className="text-left hover:text-[#182A3E] hover:translate-x-0.5 transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <LifeBuoy className="w-3.5 h-3.5 text-amber-600" />
+                  <LifeBuoy className="w-3.5 h-3.5 text-[#B49029]" />
                   <span>Support Desk</span>
                 </button>
                 <a
                   href={COMPANY_SUPPORT_WHATSAPP}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-emerald-700 transition-colors"
+                  className="hover:text-emerald-700 hover:translate-x-0.5 transition-all"
                 >
                   Direct WhatsApp Support
                 </a>
@@ -515,7 +471,7 @@ const AppContent: React.FC = () => {
                     setActiveView('CHAT');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                  className="text-left hover:text-[#182A3E] hover:translate-x-0.5 transition-all cursor-pointer"
                 >
                   Contact Secretariat
                 </button>
@@ -524,7 +480,7 @@ const AppContent: React.FC = () => {
                     setActiveView('CONTACT');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                  className="text-left hover:text-[#182A3E] hover:translate-x-0.5 transition-all cursor-pointer"
                 >
                   PMO Application
                 </button>
@@ -533,7 +489,7 @@ const AppContent: React.FC = () => {
                     setActiveView('PRIVACY');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                  className="text-left hover:text-[#182A3E] hover:translate-x-0.5 transition-all cursor-pointer"
                 >
                   Privacy Policy
                 </button>
@@ -542,259 +498,144 @@ const AppContent: React.FC = () => {
                     setActiveView('TERMS');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="text-left hover:text-slate-900 transition-colors cursor-pointer"
+                  className="text-left hover:text-[#182A3E] hover:translate-x-0.5 transition-all cursor-pointer"
                 >
                   Terms & Conditions
                 </button>
               </div>
             </div>
 
-            {/* Column D: Verified Channels & Broadcast Platforms */}
-            <div className="lg:col-span-4 space-y-3">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-amber-700 uppercase tracking-widest block">
-                  VERIFIED CHANNELS & BROADCAST PLATFORMS
-                </span>
-                <h4 className="text-xs sm:text-sm font-black text-slate-900 font-display">
-                  PROPERTY STUDIO SOCIAL MEDIA LINKS
-                </h4>
-                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  Follow CEO Swamy Reddy Javidi for real-time market telemetry & video audits
-                </p>
-              </div>
+            {/* Column 3 — Follow & Connect (~33%) */}
+            <div className="lg:col-span-4 space-y-3.5">
+              <h4 className="text-xs font-bold text-[#182A3E] uppercase tracking-wider font-display">
+                Follow & Connect
+              </h4>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Connect with Property Studio across official broadcast and social networks.
+              </p>
 
-              {/* 8 Verified Social Media Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {/* WhatsApp Channel */}
+              {/* 6 Standalone Platform Brand Icons in a Clean Horizontal Row */}
+              <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap pt-1">
+                {/* 1. WhatsApp Channel */}
                 <a
                   href="https://whatsapp.com/channel/0029VbDqFrPATRSnJ2S9x10t"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                  title="WhatsApp Channel"
+                  aria-label="WhatsApp Channel"
+                  className="w-10 h-10 rounded-xl bg-emerald-50/80 border border-emerald-200/80 hover:border-emerald-500 hover:bg-emerald-100/60 text-emerald-600 flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-xs hover:shadow-md cursor-pointer"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.634.085-1.808-.4-.984-.407-1.616-1.396-1.666-1.46-.048-.067-.406-.54-.406-1.032 0-.493.258-.733.35-.833.093-.101.203-.127.271-.127.068 0 .135.001.194.004.062.003.146-.024.227.172.085.203.288.704.313.755.025.05.042.11.008.177-.034.067-.051.109-.101.168-.051.06-.107.133-.153.179-.051.05-.104.105-.045.206.06.101.265.438.568.708.391.349.72.457.822.508.102.051.161.042.22-.025.06-.068.254-.296.322-.397.068-.102.136-.085.229-.051.093.034.593.28.695.331.102.051.17.076.195.119.025.042.025.245-.119.65zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.662 1.435 5.176L2 22l4.981-1.307A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
-                      </svg>
-                    </div>
-                    <div className="truncate">
-                      <span className="font-bold text-slate-900 block group-hover:text-emerald-700 leading-tight truncate">
-                        WhatsApp Channel
-                      </span>
-                      <span className="text-[10px] text-slate-400 block font-mono truncate">
-                        Broadcast Alerts
-                      </span>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-emerald-600 shrink-0 ml-1" />
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.634.085-1.808-.4-.984-.407-1.616-1.396-1.666-1.46-.048-.067-.406-.54-.406-1.032 0-.493.258-.733.35-.833.093-.101.203-.127.271-.127.068 0 .135.001.194.004.062.003.146-.024.227.172.085.203.288.704.313.755.025.05.042.11.008.177-.034.067-.051.109-.101.168-.051.06-.107.133-.153.179-.051.05-.104.105-.045.206.06.101.265.438.568.708.391.349.72.457.822.508.102.051.161.042.22-.025.06-.068.254-.296.322-.397.068-.102.136-.085.229-.051.093.034.593.28.695.331.102.051.17.076.195.119.025.042.025.245-.119.65zM12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.662 1.435 5.176L2 22l4.981-1.307A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/>
+                  </svg>
                 </a>
 
-                {/* YouTube Link */}
+                {/* 2. YouTube Studio */}
                 <a
                   href="https://www.youtube.com/@PropertyStudio-SwamyReddyJavid"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-red-500 hover:bg-red-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                  title="YouTube Studio"
+                  aria-label="YouTube Studio"
+                  className="w-10 h-10 rounded-xl bg-red-50/80 border border-red-200/80 hover:border-red-500 hover:bg-red-100/60 text-red-600 flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-xs hover:shadow-md cursor-pointer"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-red-50 text-red-600 border border-red-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Youtube className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="truncate">
-                      <span className="font-bold text-slate-900 block group-hover:text-red-700 leading-tight truncate">
-                        YouTube Studio
-                      </span>
-                      <span className="text-[10px] text-slate-400 block font-mono truncate">
-                        @PropertyStudio-SRJ
-                      </span>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-red-600 shrink-0 ml-1" />
+                  <Youtube className="w-5 h-5" />
                 </a>
 
-                {/* Instagram Link */}
+                {/* 3. Instagram */}
                 <a
                   href="https://www.instagram.com/propertystudio_srj/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-pink-500 hover:bg-pink-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                  title="Instagram"
+                  aria-label="Instagram @propertystudio_srj"
+                  className="w-10 h-10 rounded-xl bg-pink-50/80 border border-pink-200/80 hover:border-pink-500 hover:bg-pink-100/60 text-pink-600 flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-xs hover:shadow-md cursor-pointer"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-pink-50 text-pink-600 border border-pink-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Instagram className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="truncate">
-                      <span className="font-bold text-slate-900 block group-hover:text-pink-700 leading-tight truncate">
-                        Instagram
-                      </span>
-                      <span className="text-[10px] text-slate-400 block font-mono truncate">
-                        @propertystudio_srj
-                      </span>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-pink-600 shrink-0 ml-1" />
+                  <Instagram className="w-5 h-5" />
+                  <span className="sr-only">@propertystudio_srj</span>
                 </a>
 
-                {/* LinkedIn Link */}
+                {/* 4. LinkedIn Network */}
                 <a
                   href="https://www.linkedin.com/in/property-studio-73065743b/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                  title="LinkedIn Network"
+                  aria-label="LinkedIn Network"
+                  className="w-10 h-10 rounded-xl bg-blue-50/80 border border-blue-200/80 hover:border-blue-600 hover:bg-blue-100/60 text-blue-600 flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-xs hover:shadow-md cursor-pointer"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Linkedin className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="truncate">
-                      <span className="font-bold text-slate-900 block group-hover:text-blue-700 leading-tight truncate">
-                        LinkedIn Network
-                      </span>
-                      <span className="text-[10px] text-slate-400 block font-mono truncate">
-                        Corporate Dossier
-                      </span>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-blue-600 shrink-0 ml-1" />
+                  <Linkedin className="w-5 h-5" />
                 </a>
 
-                {/* Facebook Profile Page */}
-                <a
-                  href="https://www.facebook.com/profile.php?id=61594972378425"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 bg-white transition-all group flex items-center justify-between text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Facebook className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="truncate">
-                      <span className="font-bold text-slate-900 block group-hover:text-indigo-700 leading-tight truncate">
-                        Facebook Profile
-                      </span>
-                      <span className="text-[10px] text-slate-400 block font-mono truncate">
-                        Founder Profile
-                      </span>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
-                </a>
-
-                {/* Facebook Business Page */}
+                {/* 5. Facebook Business / Official Page */}
                 <a
                   href="https://www.facebook.com/profile.php?id=61595090693424"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 bg-white transition-all group flex items-center justify-between text-xs"
+                  title="Facebook Business"
+                  aria-label="Facebook Profile / Facebook Business / Facebook Group"
+                  className="w-10 h-10 rounded-xl bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-600 hover:bg-indigo-100/60 text-indigo-600 flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-xs hover:shadow-md cursor-pointer"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Facebook className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="truncate">
-                      <span className="font-bold text-slate-900 block group-hover:text-indigo-700 leading-tight truncate">
-                        Facebook Business
-                      </span>
-                      <span className="text-[10px] text-slate-400 block font-mono truncate">
-                        Official Page
-                      </span>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
+                  <Facebook className="w-5 h-5" />
                 </a>
 
-                {/* Facebook Group Page */}
-                <a
-                  href="https://www.facebook.com/groups/1531521175686327"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 bg-white transition-all group flex items-center justify-between text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Users className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="truncate">
-                      <span className="font-bold text-slate-900 block group-hover:text-indigo-700 leading-tight truncate">
-                        Facebook Group
-                      </span>
-                      <span className="text-[10px] text-slate-400 block font-mono truncate">
-                        Community Group
-                      </span>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
-                </a>
-
-                {/* Twitter / X */}
+                {/* 6. Twitter / X */}
                 <a
                   href="https://x.com/propertystudio_"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-slate-900 hover:bg-slate-100 bg-white transition-all group flex items-center justify-between text-xs"
+                  title="Twitter / X"
+                  aria-label="Twitter / X @propertystudio_"
+                  className="w-10 h-10 rounded-xl bg-slate-100/80 border border-slate-200 hover:border-slate-900 hover:bg-slate-200/70 text-slate-900 flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-xs hover:shadow-md cursor-pointer"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-slate-100 text-slate-900 border border-slate-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                      </svg>
-                    </div>
-                    <div className="truncate">
-                      <span className="font-bold text-slate-900 block group-hover:text-slate-950 leading-tight truncate">
-                        Twitter / 𝕏
-                      </span>
-                      <span className="text-[10px] text-slate-400 block font-mono truncate">
-                        @propertystudio_
-                      </span>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-slate-900 shrink-0 ml-1" />
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                  <span className="sr-only">@propertystudio_</span>
                 </a>
               </div>
             </div>
           </div>
 
           {/* Sub-Footer Copyright & Enquiries */}
-          <div className="mt-10 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-4">
-            <div className="flex items-center gap-2">
+          <div className="mt-10 pt-6 border-t border-slate-200/80 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+            <div className="flex items-center gap-2 text-center md:text-left">
               <span>© 2026 Property Studio Media & Intelligence. All rights reserved.</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap justify-center md:justify-end text-xs">
               <button
                 onClick={() => {
                   setActiveView('PRIVACY');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="hover:text-slate-900 underline cursor-pointer"
+                className="hover:text-slate-900 hover:underline cursor-pointer transition-colors"
               >
                 Privacy Policy
               </button>
-              <span>·</span>
+              <span className="text-slate-300">·</span>
               <button
                 onClick={() => {
                   setActiveView('TERMS');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="hover:text-slate-900 underline cursor-pointer"
+                className="hover:text-slate-900 hover:underline cursor-pointer transition-colors"
               >
                 Terms & Conditions
               </button>
-              <span>·</span>
+              <span className="text-slate-300">·</span>
               <button
                 type="button"
                 onClick={() => {
                   setReplayIntro(true);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="hover:text-amber-700 text-slate-500 underline cursor-pointer flex items-center gap-1 font-semibold"
+                className="hover:text-[#B49029] text-slate-600 hover:underline cursor-pointer flex items-center gap-1 font-semibold transition-colors"
                 title="Watch Cinematic Intro Animation"
               >
                 <span>🎬 Watch Intro</span>
               </button>
-              <span>·</span>
-              <span>Enquiries: <span className="font-mono text-slate-700">info@propertystudio.org</span></span>
+              <span className="text-slate-300">·</span>
+              <span>Enquiries: <a href="mailto:info@propertystudio.org" className="font-mono text-slate-700 hover:text-[#B49029] transition-colors">info@propertystudio.org</a></span>
             </div>
           </div>
         </div>
