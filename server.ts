@@ -193,6 +193,14 @@ import { buildHealthReport } from './src/server/health.ts';
 import { canViewModeratedContent, communityReplayVisible, selfServeStorageRole } from './src/shared/policy.ts';
 import { allowRequest, clientKey } from './src/server/rateLimit.ts';
 import { isPhoneOtpRequired } from './src/shared/authConfig.ts';
+import {
+  verifyGoogleIdToken,
+  exchangeGoogleCodeForIdentity,
+  authenticateGoogleIdentity,
+  createGoogleOAuthState,
+  validateGoogleOAuthState,
+  getGoogleOAuthAuthorizeUrl as getGoogleAuthUrl
+} from './src/server/googleAuth.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -485,6 +493,167 @@ app.post('/api/auth/logout', async (req: AuthenticatedRequest, res: Response): P
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
+// ----------------------------------------------------
+// Google OAuth 2.0 & OpenID Connect Endpoints
+// ----------------------------------------------------
+
+// 1. POST /api/auth/google: Handles Google Identity Services ID Token credential OR auth code
+app.post('/api/auth/google', async (req: Request, res: Response): Promise<void> => {
+  if (rejectIfRateLimited(req, res, 'google-auth')) return;
+
+  try {
+    const { credential, code, redirectUri } = req.body || {};
+
+    if (!credential && !code) {
+      res.status(400).json({ error: 'Google credential (ID token) or authorization code is required.' });
+      return;
+    }
+
+    let identityResult: { valid: boolean; identity?: any; error?: string };
+
+    if (credential) {
+      identityResult = await verifyGoogleIdToken(credential);
+    } else {
+      const effectiveRedirectUri = redirectUri || 'postmessage';
+      identityResult = await exchangeGoogleCodeForIdentity(code, effectiveRedirectUri);
+    }
+
+    if (!identityResult.valid || !identityResult.identity) {
+      res.status(401).json({ error: identityResult.error || 'Google authentication verification failed.' });
+      return;
+    }
+
+    const authResult = await authenticateGoogleIdentity(
+      identityResult.identity,
+      req.headers['user-agent'],
+      req.ip
+    );
+
+    if (!authResult.success) {
+      res.status(authResult.statusCode || 400).json({ error: authResult.error || 'Authentication failed.' });
+      return;
+    }
+
+    if (authResult.sessionToken) {
+      res.cookie('ps_session', authResult.sessionToken, sessionCookieOptions());
+    }
+
+    res.json({
+      success: true,
+      user: authResult.user,
+      isNewUser: authResult.isNewUser
+    });
+  } catch (err: any) {
+    console.error('[Google Auth] Error during authentication:', err);
+    res.status(500).json({ error: err.message || 'Internal server error during Google sign-in.' });
+  }
+});
+
+// 2. GET /api/auth/google/authorize: Starts server-side OAuth 2.0 flow
+app.get('/api/auth/google/authorize', (req: Request, res: Response): void => {
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const host = req.get('host') || 'localhost:3000';
+  const defaultRedirectUri = `${protocol}://${host}/api/auth/google/callback`;
+  const redirectUri = (req.query.redirect_uri as string) || process.env.GOOGLE_REDIRECT_URI || defaultRedirectUri;
+
+  const state = createGoogleOAuthState();
+  const authorizeUrl = getGoogleAuthUrl(redirectUri, state);
+
+  if (req.query.mode === 'redirect') {
+    res.redirect(authorizeUrl);
+  } else {
+    res.json({
+      authUrl: authorizeUrl,
+      state,
+      redirectUri
+    });
+  }
+});
+
+// 3. GET /api/auth/google/callback: Handles OAuth 2.0 callback from Google
+app.get('/api/auth/google/callback', async (req: Request, res: Response): Promise<void> => {
+  const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
+
+  const sendPostMessageResponse = (success: boolean, payload: any) => {
+    const serialized = JSON.stringify(payload);
+    res.status(success ? 200 : 400).send(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Property Studio — Google Authentication</title>
+  </head>
+  <body style="font-family:sans-serif;text-align:center;padding:40px;background:#f8fafc;color:#1e293b;">
+    <h3>${success ? '✓ Google Authentication Successful' : '⚠ Google Authentication Failed'}</h3>
+    <p>${success ? 'Completing sign-in, please wait...' : (payload.error || 'An error occurred.')}</p>
+    <script>
+      (function() {
+        const data = ${serialized};
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({
+            type: ${JSON.stringify(success ? 'GOOGLE_AUTH_SUCCESS' : 'GOOGLE_AUTH_ERROR')},
+            ...data
+          }, window.location.origin);
+          setTimeout(function() { window.close(); }, 800);
+        } else {
+          if (${success}) {
+            window.location.href = '/';
+          } else {
+            window.location.href = '/?auth_error=' + encodeURIComponent(data.error || 'Authentication failed');
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>`);
+  };
+
+  if (error) {
+    sendPostMessageResponse(false, { error: error === 'access_denied' ? 'Google sign-in was cancelled.' : `Google error: ${error}` });
+    return;
+  }
+
+  if (!code) {
+    sendPostMessageResponse(false, { error: 'No authorization code received from Google.' });
+    return;
+  }
+
+  if (!state || !validateGoogleOAuthState(state)) {
+    sendPostMessageResponse(false, { error: 'Invalid or expired OAuth state token (CSRF defense).' });
+    return;
+  }
+
+  try {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.get('host') || 'localhost:3000';
+    const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+
+    const identityResult = await exchangeGoogleCodeForIdentity(code, redirectUri);
+    if (!identityResult.valid || !identityResult.identity) {
+      sendPostMessageResponse(false, { error: identityResult.error || 'Failed to verify Google identity.' });
+      return;
+    }
+
+    const authResult = await authenticateGoogleIdentity(
+      identityResult.identity,
+      req.headers['user-agent'],
+      req.ip
+    );
+
+    if (!authResult.success) {
+      sendPostMessageResponse(false, { error: authResult.error || 'Failed to authenticate user.' });
+      return;
+    }
+
+    if (authResult.sessionToken) {
+      res.cookie('ps_session', authResult.sessionToken, sessionCookieOptions());
+    }
+
+    sendPostMessageResponse(true, { user: authResult.user, isNewUser: authResult.isNewUser });
+  } catch (err: any) {
+    sendPostMessageResponse(false, { error: err.message || 'Error completing Google sign-in.' });
+  }
+});
+
 app.patch('/api/me/profile', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const patch = readProfilePatch(req.body);
@@ -634,8 +803,11 @@ app.get('/api/me/bookmarks', requireAuth, async (req: AuthenticatedRequest, res:
 // Public auth configuration flags
 app.get('/api/auth/config', (_req: Request, res: Response): void => {
   res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+  const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '';
   res.json({
-    phoneOtpRequired: isPhoneOtpRequired()
+    phoneOtpRequired: isPhoneOtpRequired(),
+    googleClientId,
+    googleAuthEnabled: Boolean(googleClientId)
   });
 });
 
