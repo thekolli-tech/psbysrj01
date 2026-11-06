@@ -267,6 +267,22 @@ async function run() {
     });
     console.log('Saved contact-desktop.png');
 
+    // Capture specific compact enquiry form element
+    const formEl = await page.$('#enquiry-form-card');
+    if (formEl) {
+      await formEl.screenshot({ path: path.join(ARTIFACT_DIR, 'contact-enquiry-form-compact.png') });
+      console.log('Saved contact-enquiry-form-compact.png');
+    }
+
+    // Scroll to bottom and capture compact footer
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await sleep(800);
+    const footerEl = await page.$('footer');
+    if (footerEl) {
+      await footerEl.screenshot({ path: path.join(ARTIFACT_DIR, 'footer-compact.png') });
+      console.log('Saved footer-compact.png');
+    }
+
     // 9. Buyer Leads Marketplace (Desktop 1440px)
     console.log('9. Capturing Buyer Leads Marketplace (Desktop 1440px)...');
     await page.goto(`http://127.0.0.1:${PORT}/?view=leads_market`, { waitUntil: 'domcontentloaded', timeout: 15000 });

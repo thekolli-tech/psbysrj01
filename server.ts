@@ -2353,12 +2353,13 @@ app.get('/api/community/posts/:id/comments', requireAuth, async (req: Authentica
 });
 
 
-// Support Ticket Enquiry API
-app.post('/api/support/ticket', async (req: Request, res: Response): Promise<void> => {
+// Support Ticket Enquiry API (Mandatory Name, Contact Mobile, and Message)
+const handleSupportTicketSubmission = async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, email, phone, topic, message, ticketId } = req.body || {};
-    if (!name || !message) {
-      res.status(400).json({ error: 'Name and enquiry message are required.' });
+    const cleanPhone = String(phone || '').replace(/[\s\-()]/g, '');
+    if (!name || !String(name).trim() || !message || !String(message).trim() || !cleanPhone) {
+      res.status(400).json({ error: 'Name, contact mobile number, and enquiry message are required.' });
       return;
     }
     const cleanTicketId = ticketId || `PS-SUP-${Date.now().toString().slice(-6)}`;
@@ -2366,7 +2367,7 @@ app.post('/api/support/ticket', async (req: Request, res: Response): Promise<voi
       ticketId: cleanTicketId,
       name: String(name).trim(),
       email: String(email || '').trim(),
-      phone: String(phone || '').trim(),
+      phone: String(cleanPhone).trim(),
       topic: String(topic || 'General Enquiry').trim(),
       message: String(message).trim()
     });
@@ -2384,7 +2385,10 @@ app.post('/api/support/ticket', async (req: Request, res: Response): Promise<voi
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to submit enquiry' });
   }
-});
+};
+
+app.post('/api/support/ticket', handleSupportTicketSubmission);
+app.post('/api/support/tickets', handleSupportTicketSubmission);
 
 // Add comment or nested reply to a post
 app.post('/api/community/posts/:id/comments', requireAuth, requireUnrestricted, async (req: AuthenticatedRequest, res: Response): Promise<void> => {

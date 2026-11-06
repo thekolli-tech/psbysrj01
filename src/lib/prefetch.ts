@@ -48,7 +48,53 @@ export const prefetchView = (view: string) => {
     case 'PROFESSIONAL':
       import('../components/admin/ProfessionalDashboard');
       break;
+    case 'PROPERTY_ADMIN':
+      import('../components/admin/PropertyAdminDashboard');
+      break;
+    case 'DEVELOPER':
+      import('../components/admin/DeveloperDashboard');
+      break;
+    case 'PRIVACY':
+      import('../components/legal/PrivacyPolicyView');
+      break;
+    case 'TERMS':
+      import('../components/legal/TermsConditionsView');
+      break;
     default:
       break;
+  }
+};
+
+/** Eagerly prefetches all application views in the background for 0ms transitions */
+export const prefetchAllViews = () => {
+  const views = [
+    'MEDIA',
+    'MARKET_INSIGHTS',
+    'REVIEWS',
+    'COMMUNITY',
+    'CONFERENCE',
+    'REQUIREMENT',
+    'LEADS_MARKET',
+    'DASHBOARD',
+    'CONTACT',
+    'ADMIN',
+    'STUDIO',
+    'PROFESSIONAL',
+    'DEVELOPER',
+    'PROPERTY_ADMIN',
+    'PRIVACY',
+    'TERMS'
+  ];
+  const runner = () => {
+    views.forEach((v, idx) => {
+      setTimeout(() => prefetchView(v), idx * 25);
+    });
+  };
+  if (typeof window !== 'undefined') {
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(runner);
+    } else {
+      setTimeout(runner, 50);
+    }
   }
 };

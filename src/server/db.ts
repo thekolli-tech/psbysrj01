@@ -212,6 +212,9 @@ export function getSqliteDb(): SqliteDatabase {
     try {
       sqliteDb.exec('PRAGMA journal_mode = WAL;');
       sqliteDb.exec('PRAGMA busy_timeout = 5000;');
+      sqliteDb.exec('PRAGMA synchronous = NORMAL;');
+      sqliteDb.exec('PRAGMA cache_size = -64000;');
+      sqliteDb.exec('PRAGMA temp_store = MEMORY;');
     } catch {}
   }
   return sqliteDb;

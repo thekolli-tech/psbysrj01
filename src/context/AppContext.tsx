@@ -265,7 +265,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [conference, setConference] = useState<CorporateConference>(EMPTY_CONFERENCE);
 
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
-  const [communities, setCommunities] = useState<CommunityHub[]>([]);
+  const [communities, setCommunities] = useState<CommunityHub[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem('ps_communities_cache');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
 
   const refreshPosts = async () => {
     try {
@@ -312,6 +320,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updatedAt: c.updated_at
         }));
         setCommunities(mapped);
+        try {
+          sessionStorage.setItem('ps_communities_cache', JSON.stringify(mapped));
+        } catch {}
       }
     } catch (_err) {}
   };

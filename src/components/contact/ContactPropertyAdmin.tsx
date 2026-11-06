@@ -67,31 +67,47 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.fullName || !form.email || !form.message) {
-      showToast('Please fill out all required fields.');
+    const cleanPhone = form.phone.replace(/[\s\-()]/g, '');
+    const phoneDigits = cleanPhone.replace(/\D/g, '');
+
+    if (!form.fullName.trim() || !form.email.trim() || !cleanPhone || !form.message.trim()) {
+      showToast('Please fill out all required fields, including your contact mobile.');
       return;
     }
 
-    setSubmitting(true);
-    try {
-      // Fire support ticket endpoint or fallback
+    if (phoneDigits.length < 10) {
+      showToast('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    // Instant optimistic sub-millisecond response
+    setSubmitted(true);
+    showToast('Enquiry successfully submitted to Secretariat.');
+
+    // Asynchronous background delivery
+    fetch('/api/support/ticket', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.fullName.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        topic: form.enquiryType,
+        message: `[Subject: ${form.subject.trim()}]\n\n${form.message.trim()}`
+      })
+    }).catch(() => {
       fetch('/api/support/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: form.fullName,
-          email: form.email,
-          phone: form.phone,
+          name: form.fullName.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
           topic: form.enquiryType,
-          message: `[Subject: ${form.subject}]\n\n${form.message}`
+          message: `[Subject: ${form.subject.trim()}]\n\n${form.message.trim()}`
         })
       }).catch(() => {});
-
-      setSubmitted(true);
-      showToast('Enquiry successfully submitted to Secretariat.');
-    } finally {
-      setSubmitting(false);
-    }
+    });
   };
 
   const handleResetForm = () => {
@@ -327,41 +343,41 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
         </div>
 
         {/* Right Column (7 cols): Send Us an Enquiry Form */}
-        <div id="enquiry-form-card" className="lg:col-span-7 bg-white rounded-3xl border border-[#E8E4D8] p-6 sm:p-8 shadow-xs space-y-5">
+        <div id="enquiry-form-card" className="lg:col-span-7 bg-white rounded-2xl border border-[#E8E4D8] p-4 sm:p-5 shadow-xs space-y-3.5">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-            <Send className="w-4 h-4 text-[#B49029]" />
-            <h2 className="text-base font-bold text-[#030508] font-display">
+            <Send className="w-3.5 h-3.5 text-[#B49029]" />
+            <h2 className="text-sm sm:text-base font-bold text-[#030508] font-display">
               Send Us an Enquiry
             </h2>
           </div>
 
           {submitted ? (
-            <div className="p-8 text-center space-y-3 bg-emerald-50/60 border border-emerald-200 rounded-2xl">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-6 h-6" />
+            <div className="p-6 text-center space-y-2.5 bg-emerald-50/60 border border-emerald-200 rounded-xl">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-emerald-950">
+              <h3 className="text-sm font-bold text-emerald-950">
                 Enquiry Successfully Dispatched
               </h3>
               <p className="text-xs text-emerald-800 max-w-md mx-auto leading-relaxed">
                 Thank you, <strong>{form.fullName}</strong>. Your enquiry regarding <strong>{form.enquiryType}</strong> has been registered with the Official Secretariat.
               </p>
-              <div className="pt-2">
+              <div className="pt-1">
                 <button
                   type="button"
                   onClick={handleResetForm}
-                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg transition-all cursor-pointer"
                 >
                   Send Another Enquiry
                 </button>
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               {/* Row 1: Full Name & Email Address */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="contact-full-name" className="block text-xs font-bold text-[#030508] mb-1.5">
+                  <label htmlFor="contact-full-name" className="block text-[11px] sm:text-xs font-bold text-[#030508] mb-1">
                     Full Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -371,12 +387,12 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                     value={form.fullName}
                     onChange={e => setForm(prev => ({ ...prev, fullName: e.target.value }))}
                     placeholder="e.g. Suresh Chandra"
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
+                    className="w-full px-3 py-2 text-xs sm:text-sm border border-[#E8E4D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="contact-email" className="block text-xs font-bold text-[#030508] mb-1.5">
+                  <label htmlFor="contact-email" className="block text-[11px] sm:text-xs font-bold text-[#030508] mb-1">
                     Email Address <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -386,22 +402,37 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                     value={form.email}
                     onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
                     placeholder="e.g. you@email.com"
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
+                    className="w-full px-3 py-2 text-xs sm:text-sm border border-[#E8E4D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                   />
                 </div>
               </div>
 
-              {/* Row 2: Enquiry Type & Subject */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Row 2: Contact Mobile & Enquiry Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="contact-enquiry-type" className="block text-xs font-bold text-[#030508] mb-1.5">
+                  <label htmlFor="contact-phone" className="block text-[11px] sm:text-xs font-bold text-[#030508] mb-1">
+                    Contact Mobile <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="contact-phone"
+                    type="tel"
+                    required
+                    value={form.phone}
+                    onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="+91 98490 00000"
+                    className="w-full px-3 py-2 text-xs sm:text-sm border border-[#E8E4D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all font-mono-numbers"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="contact-enquiry-type" className="block text-[11px] sm:text-xs font-bold text-[#030508] mb-1">
                     Enquiry Type <span className="text-red-500">*</span>
                   </label>
                   <select
                     id="contact-enquiry-type"
                     value={form.enquiryType}
                     onChange={e => setForm(prev => ({ ...prev, enquiryType: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all cursor-pointer truncate"
+                    className="w-full px-3 py-2 text-xs sm:text-sm border border-[#E8E4D8] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all cursor-pointer truncate"
                   >
                     {ENQUIRY_TYPES.map(type => (
                       <option key={type} value={type}>
@@ -410,68 +441,54 @@ export const ContactPropertyAdmin: React.FC<ContactPropertyAdminProps> = ({ onOp
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label htmlFor="contact-subject" className="block text-xs font-bold text-[#030508] mb-1.5">
-                    Subject <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="contact-subject"
-                    type="text"
-                    required
-                    value={form.subject}
-                    onChange={e => setForm(prev => ({ ...prev, subject: e.target.value }))}
-                    placeholder="Brief subject of your enquiry"
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
-                  />
-                </div>
               </div>
 
-              {/* Optional Phone Input (preserves test invariant /placeholder="\+91 98490 00000"/) */}
+              {/* Row 3: Subject */}
               <div>
-                <label htmlFor="contact-phone" className="block text-xs font-bold text-[#030508] mb-1.5">
-                  Contact Mobile <span className="text-slate-400 font-normal">(Optional)</span>
+                <label htmlFor="contact-subject" className="block text-[11px] sm:text-xs font-bold text-[#030508] mb-1">
+                  Subject <span className="text-red-500">*</span>
                 </label>
                 <input
-                  id="contact-phone"
-                  type="tel"
-                  value={form.phone}
-                  onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="+91 98490 00000"
-                  className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
+                  id="contact-subject"
+                  type="text"
+                  required
+                  value={form.subject}
+                  onChange={e => setForm(prev => ({ ...prev, subject: e.target.value }))}
+                  placeholder="Brief subject of your enquiry"
+                  className="w-full px-3 py-2 text-xs sm:text-sm border border-[#E8E4D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                 />
               </div>
 
-              {/* Row 3: Message */}
+              {/* Row 4: Message */}
               <div>
-                <label htmlFor="contact-message" className="block text-xs font-bold text-[#030508] mb-1.5">
+                <label htmlFor="contact-message" className="block text-[11px] sm:text-xs font-bold text-[#030508] mb-1">
                   Message <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   id="contact-message"
                   required
-                  rows={4}
+                  rows={3}
                   value={form.message}
                   onChange={e => setForm(prev => ({ ...prev, message: e.target.value }))}
                   placeholder="Write your message, query or requirement..."
-                  className="w-full px-3.5 py-3 text-xs sm:text-sm border border-[#E8E4D8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
+                  className="w-full px-3 py-2 text-xs sm:text-sm border border-[#E8E4D8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B49029]/20 focus:border-[#B49029] transition-all"
                 />
               </div>
 
               {/* Form Footer: Submit Button + Reassurance */}
-              <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="pt-1 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-[#182A3E] hover:bg-[#030508] active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-60"
+                  className="w-full sm:w-auto px-5 py-2 bg-[#182A3E] hover:bg-[#030508] active:scale-95 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-60"
                 >
-                  <Send className="w-4 h-4 text-[#B49029]" />
-                  <span>{submitting ? 'Transmitting…' : 'Submit Enquiry'}</span>
+                  <Send className="w-3.5 h-3.5 text-[#B49029]" />
+                  <span>Submit Enquiry</span>
                 </button>
 
-                <div className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
-                  <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span>Your information is secure and will be used only for official communication.</span>
+                <div className="flex items-center gap-1.5 text-[10px] text-[#64748B]">
+                  <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span>Your information is secure and used strictly for official communication.</span>
                 </div>
               </div>
             </form>

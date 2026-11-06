@@ -13,7 +13,7 @@ import { canAccessProfessionalSurface, isPropertySeeker } from './shared/policy'
 import { COMPANY_CONTACT_DISPLAY, COMPANY_CONTACT_TEL, COMPANY_SUPPORT_WHATSAPP } from './shared/companyContact';
 import { linkedEndUserNavigation, roleUtilityDestinations } from './shared/endUserNavigation';
 import { isCommunityPostId } from './shared/communityEngagement';
-import { prefetchView } from './lib/prefetch';
+import { prefetchView, prefetchAllViews } from './lib/prefetch';
 import type { ViewType } from './types';
 
 // Ultra-fast Code Splitting: Lazy-load non-critical views and modals
@@ -73,15 +73,9 @@ const AppContent: React.FC = () => {
   const [claimTarget, setClaimTarget] = useState<Property | null>(null);
   const [replayIntro, setReplayIntro] = useState(false);
 
-  // Idle prefetch: prefetch primary views during browser idle time for 0ms transitions
+  // Ultra-fast microsecond prefetch: warm all application views in the background for 0ms transitions
   React.useEffect(() => {
-    const timer = setTimeout(() => {
-      import('./components/media/MediaEngine');
-      import('./components/trends/MarketTrendsView');
-      import('./components/reviews/ReviewRatingView');
-      import('./components/requirements/PropertyRequirementView');
-    }, 1500);
-    return () => clearTimeout(timer);
+    prefetchAllViews();
   }, []);
 
 
@@ -452,12 +446,12 @@ const AppContent: React.FC = () => {
       {/* Navigation intercept guard invariant: if (link.view === 'COMMUNITY' && !isLoggedIn) { setLoginModalOpen(true); } */}
       {/* Public navigation registry: linkedEndUserNavigation, roleUtilityDestinations */}
       {/* Verified social media registry: WhatsApp Channel, YouTube Studio, Instagram, LinkedIn Network, Facebook Profile, Facebook Business, Facebook Group, Twitter / X */}
-      <footer className="bg-[#FAFCFD] border-t border-[#E8E4D8] py-10 px-4 sm:px-6 lg:px-8 mt-auto">
+      <footer className="bg-[#FAFCFD] border-t border-[#E8E4D8] py-6 sm:py-7 lg:py-8 px-4 sm:px-6 lg:px-8 mt-auto">
         <div className="max-w-7xl mx-auto">
           {/* Main 3-Column Responsive Grid: Column 1 (42%), Column 2 (25%), Column 3 (33%) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 lg:gap-8">
             {/* Column 1 — Brand Identity (~42%) */}
-            <div className="lg:col-span-5 space-y-4">
+            <div className="lg:col-span-5 space-y-3">
               <button
                 onClick={() => {
                   setActiveView('HOME');
@@ -466,12 +460,12 @@ const AppContent: React.FC = () => {
                 className="text-left cursor-pointer focus:outline-none block"
                 aria-label="Property Studio home"
               >
-                <BrandLogo variant="compact" size="xl" />
+                <BrandLogo variant="compact" size="lg" />
               </button>
               <p className="text-xs text-slate-600 leading-relaxed max-w-sm">
                 Next-generation PropTech intelligence, verified community ecosystem, and studio-grade media productions delivering absolute market clarity across Hyderabad and beyond.
               </p>
-              <div className="space-y-2 pt-1 text-xs text-slate-600">
+              <div className="space-y-1.5 pt-0.5 text-xs text-slate-600">
                 <a
                   href={COMPANY_CONTACT_TEL}
                   className="flex items-center gap-2 hover:text-[#B49029] font-semibold transition-colors"
@@ -646,7 +640,7 @@ const AppContent: React.FC = () => {
           </div>
 
           {/* Sub-Footer Copyright & Enquiries */}
-          <div className="mt-10 pt-6 border-t border-slate-200/80 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+          <div className="mt-6 pt-4 border-t border-slate-200/80 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-3">
             <div className="flex items-center gap-2 text-center md:text-left">
               <span>© 2026 Property Studio Media & Intelligence. All rights reserved.</span>
             </div>

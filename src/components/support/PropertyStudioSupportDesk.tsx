@@ -55,8 +55,16 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
 
   const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !message.trim()) {
-      showToast('Please provide your name and enquiry details.');
+    const cleanPhone = phone.replace(/[\s\-()]/g, '');
+    const phoneDigits = cleanPhone.replace(/\D/g, '');
+
+    if (!name.trim() || !message.trim() || !cleanPhone) {
+      showToast('Please provide your name, contact mobile number, and enquiry details.');
+      return;
+    }
+
+    if (phoneDigits.length < 10) {
+      showToast('Please enter a valid 10-digit mobile number.');
       return;
     }
 
@@ -318,13 +326,16 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">Phone Number</label>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        Phone Number <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="tel"
+                        required
                         value={phone}
                         onChange={e => setPhone(e.target.value)}
                         placeholder="+91 98490..."
-                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono-numbers"
                       />
                     </div>
                     <div>
