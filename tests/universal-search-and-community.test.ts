@@ -132,3 +132,21 @@ test('4. App.tsx: Registers global Ctrl+K / Cmd+K / "/" shortcuts and mounts Uni
     'App.tsx must pass onOpenSearchModal handler to headers'
   );
 });
+
+test('5. LoginModal: LinkedIn and Microsoft login options removed, Google retained', () => {
+  const loginModalPath = path.resolve('src/components/common/LoginModal.tsx');
+  const loginModalContent = fs.readFileSync(loginModalPath, 'utf-8');
+
+  assert.ok(
+    !loginModalContent.includes('Sign in with LinkedIn'),
+    'LoginModal must not contain Sign in with LinkedIn'
+  );
+  assert.ok(
+    !loginModalContent.includes('Sign in with Microsoft'),
+    'LoginModal must not contain Sign in with Microsoft'
+  );
+  assert.ok(
+    loginModalContent.includes('Continue with Google') || loginModalContent.includes('Sign in with Google'),
+    'LoginModal must retain Google sign-in option'
+  );
+});
