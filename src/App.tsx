@@ -5,6 +5,7 @@ import { MobileHeader } from './components/common/MobileHeader';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import { Toast } from './components/common/Toast';
 import { LoginModal } from './components/common/LoginModal';
+import { UniversalSearchModal } from './components/common/UniversalSearchModal';
 import { HomeHero } from './components/home/HomeHero';
 import { PropertyList } from './components/properties/PropertyList';
 import { SupportDeskButton } from './components/support/SupportDeskButton';
@@ -70,8 +71,27 @@ const AppContent: React.FC = () => {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [agentModalOpen, setAgentModalOpen] = useState(false);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [claimTarget, setClaimTarget] = useState<Property | null>(null);
   const [replayIntro, setReplayIntro] = useState(false);
+
+  // Universal Search keyboard shortcut (Ctrl+K, Cmd+K, or '/')
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchModalOpen(prev => !prev);
+      } else if (e.key === '/' && !isInput && !searchModalOpen) {
+        e.preventDefault();
+        setSearchModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchModalOpen]);
 
   // Ultra-fast microsecond prefetch: warm all application views in the background for 0ms transitions
   React.useEffect(() => {
@@ -188,6 +208,7 @@ const AppContent: React.FC = () => {
           onOpenWalletModal={() => setWalletModalOpen(true)}
           onOpenLoginModal={() => setLoginModalOpen(true)}
           onOpenSupport={() => setSupportOpen(true)}
+          onOpenSearchModal={() => setSearchModalOpen(true)}
         />
       ) : isForcedDesktop ? (
         <Header
@@ -195,6 +216,7 @@ const AppContent: React.FC = () => {
           onOpenWalletModal={() => setWalletModalOpen(true)}
           onOpenLoginModal={() => setLoginModalOpen(true)}
           onOpenSupport={() => setSupportOpen(true)}
+          onOpenSearchModal={() => setSearchModalOpen(true)}
         />
       ) : (
         <>
@@ -204,6 +226,7 @@ const AppContent: React.FC = () => {
               onOpenWalletModal={() => setWalletModalOpen(true)}
               onOpenLoginModal={() => setLoginModalOpen(true)}
               onOpenSupport={() => setSupportOpen(true)}
+              onOpenSearchModal={() => setSearchModalOpen(true)}
             />
           </div>
           <div className="hidden md:block">
@@ -212,6 +235,7 @@ const AppContent: React.FC = () => {
               onOpenWalletModal={() => setWalletModalOpen(true)}
               onOpenLoginModal={() => setLoginModalOpen(true)}
               onOpenSupport={() => setSupportOpen(true)}
+              onOpenSearchModal={() => setSearchModalOpen(true)}
             />
           </div>
         </>
@@ -706,6 +730,13 @@ const AppContent: React.FC = () => {
       <LoginModal
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
+      />
+
+      <UniversalSearchModal
+        isOpen={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onOpenLoginModal={() => setLoginModalOpen(true)}
+        onOpenSupport={() => setSupportOpen(true)}
       />
 
       {profileModalOpen && (

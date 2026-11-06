@@ -58,6 +58,7 @@ import {
   Settings,
   MapPin,
   Filter,
+  Search,
   Shield,
   Scale,
   Trash2
@@ -1222,61 +1223,116 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
               Ask, discuss, and get verified answers on Vaastu, slab casting, audits, RERA approvals and more from industry experts and the community.
             </p>
 
-            {/* 3 Prominent Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2.5 pt-5">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isLoggedIn) {
-                    showToast('Please sign in to ask a question.');
-                    onOpenLoginModal?.();
-                  } else if (activeCommunity && !canAccessSelectedCommunity) {
-                    showToast('You must be an approved member of this private community to ask questions.');
-                  } else {
-                    setUnifiedTab('QUESTION');
-                    setShowModal('UNIFIED');
+            {/* Search Community Bar (Replaces Add Question / Create Post Buttons) */}
+            <div className="pt-4 w-full max-w-lg relative">
+              <form
+                role="search"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const hubsEl = document.getElementById('verified-community-hubs');
+                  if (hubsEl) {
+                    hubsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }
                 }}
-                className="px-4 py-2.5 bg-[#B49029] hover:bg-[#A99137] active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                className="flex items-center gap-2"
               >
-                <PlusCircle className="w-4 h-4 text-white" />
-                <span>Add Question</span>
-              </button>
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-[#B49029] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    id="hero-search-community"
+                    type="text"
+                    value={hubSearchQuery}
+                    onChange={(e) => setHubSearchQuery(e.target.value)}
+                    placeholder="Search community hubs, corridors, or topics..."
+                    className="w-full pl-10 pr-9 py-2.5 text-xs sm:text-sm bg-white border border-[#E8E4D8] focus:border-[#B49029] focus:ring-2 focus:ring-[#B49029]/20 rounded-xl text-[#030508] placeholder-slate-400 font-medium shadow-xs transition-all outline-none"
+                    aria-label="Search Community"
+                  />
+                  {hubSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setHubSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                      aria-label="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isLoggedIn) {
-                    showToast('Please sign in to create a post.');
-                    onOpenLoginModal?.();
-                  } else if (activeCommunity && !canAccessSelectedCommunity) {
-                    showToast('You must be an approved member of this private community to create posts.');
-                  } else {
-                    setUnifiedTab('POST');
-                    setShowModal('UNIFIED');
-                  }
-                }}
-                className="px-4 py-2.5 bg-[#182A3E] hover:bg-[#030508] active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-[#B49029]" />
-                <span>Create Post</span>
-              </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 bg-[#182A3E] hover:bg-[#030508] active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Search className="w-3.5 h-3.5 text-[#B49029]" />
+                  <span>Search Community</span>
+                </button>
+              </form>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isLoggedIn) {
-                    showToast('Please sign in to create a community.');
-                    onOpenLoginModal?.();
-                  } else {
-                    setShowModal('PROPOSE_COMMUNITY');
-                  }
-                }}
-                className="px-4 py-2.5 bg-white hover:bg-[#FCFBF3] active:scale-95 text-[#030508] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-[#E8E4D8] shadow-2xs"
-              >
-                <Users className="w-4 h-4 text-[#64748B]" />
-                <span>Create Community</span>
-              </button>
+              {/* Instant Live Autocomplete Dropdown when searching */}
+              {hubSearchQuery.trim() && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl border border-[#E8E4D8] shadow-xl p-2 z-30 max-h-60 overflow-y-auto space-y-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
+                    Matching Community Hubs ({filteredHubs.length})
+                  </div>
+                  {filteredHubs.length > 0 ? (
+                    filteredHubs.slice(0, 5).map(comm => (
+                      <div
+                        key={comm.id}
+                        onClick={() => {
+                          setSelectedCommunityId(comm.id);
+                          setHubSearchQuery('');
+                        }}
+                        className="flex items-center justify-between p-2 rounded-xl hover:bg-[#FCFBF3] cursor-pointer transition-colors border border-transparent hover:border-[#CEC8A2]/50 group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
+                            <img
+                              src={comm.bannerImage || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=400&q=80'}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-[#030508] truncate group-hover:text-[#B49029] transition-colors">
+                              {comm.name}
+                            </div>
+                            <div className="text-[10px] text-slate-500 truncate">
+                              {comm.location || comm.category} · {comm.memberCount} members
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold text-[#B49029] shrink-0 ml-2">
+                          Enter Hub →
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-3 text-xs text-slate-500 text-center">
+                      No community hubs found for "{hubSearchQuery}".
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Secondary Community Creation Link */}
+              <div className="flex items-center gap-2 pt-2.5">
+                <span className="text-[11px] text-[#64748B]">Looking to launch a verified circle?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      showToast('Please sign in to create a community.');
+                      onOpenLoginModal?.();
+                    } else {
+                      setShowModal('PROPOSE_COMMUNITY');
+                    }
+                  }}
+                  className="text-[11px] font-bold text-[#B49029] hover:text-[#A99137] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Users className="w-3 h-3" />
+                  <span>+ Create Community</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1571,7 +1627,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
         </div>
       ) : (
         /* Verified Live Community Hubs Section */
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+        <div id="verified-community-hubs" className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
               <div className="flex items-center gap-2">

@@ -26,7 +26,8 @@ import {
   Handshake,
   TrendingUp,
   Award,
-  Video
+  Video,
+  Search
 } from 'lucide-react';
 
 interface MobileHeaderProps {
@@ -34,6 +35,7 @@ interface MobileHeaderProps {
   onOpenWalletModal: () => void;
   onOpenLoginModal?: () => void;
   onOpenSupport?: () => void;
+  onOpenSearchModal?: () => void;
 }
 
 const getRoleIcon = (role: string) => {
@@ -69,7 +71,8 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   onOpenProfileModal,
   onOpenWalletModal,
   onOpenLoginModal,
-  onOpenSupport
+  onOpenSupport,
+  onOpenSearchModal
 }) => {
   const {
     currentUser,
@@ -152,6 +155,18 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* Universal Search Icon in Mobile Navigation Bar */}
+          {onOpenSearchModal && (
+            <button
+              type="button"
+              onClick={onOpenSearchModal}
+              className="p-1.5 text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg active:scale-95 transition-transform shrink-0"
+              title="Universal Search"
+              aria-label="Universal Search"
+            >
+              <Search className="w-4 h-4 text-[#B49029]" />
+            </button>
+          )}
           {/* Admin console button (Super Admin or Platform Owner / Developer) */}
           {isPlatformAdmin(currentUser.role) && isLoggedIn && activeView !== 'ADMIN' && (
             <button

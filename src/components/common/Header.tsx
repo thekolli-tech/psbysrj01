@@ -25,7 +25,8 @@ import {
   TrendingUp,
   Award,
   Video,
-  MapPin
+  MapPin,
+  Search
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -33,6 +34,7 @@ interface HeaderProps {
   onOpenWalletModal: () => void;
   onOpenLoginModal: () => void;
   onOpenSupport?: () => void;
+  onOpenSearchModal?: () => void;
 }
 
 const getRoleIcon = (role: string) => {
@@ -68,7 +70,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProfileModal,
   onOpenWalletModal,
   onOpenLoginModal,
-  onOpenSupport
+  onOpenSupport,
+  onOpenSearchModal
 }) => {
   const {
     activeView,
@@ -221,6 +224,23 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 3: Actions & Controls (Right) - Clean Icon-Based Controls */}
         <div className="flex items-center gap-1.5 xl:gap-2.5 shrink-0 ml-auto">
+          {/* Universal Search Icon in Navigation Bar */}
+          {onOpenSearchModal && (
+            <button
+              type="button"
+              onClick={onOpenSearchModal}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#FCFBF3] hover:bg-[#FCFBF3]/80 text-[#182A3E] border border-[#E8E4D8] hover:border-[#B49029] rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95 group shrink-0"
+              title="Universal Search (Ctrl+K)"
+              aria-label="Universal Search"
+            >
+              <Search className="w-4 h-4 text-[#B49029] group-hover:scale-110 transition-transform shrink-0" />
+              <span className="hidden min-[1536px]:inline text-slate-500 font-medium">Search</span>
+              <kbd className="hidden min-[1680px]:inline-flex items-center px-1.5 py-0.5 text-[9px] font-mono font-bold text-slate-400 bg-white border border-[#E8E4D8] rounded shadow-2xs">
+                Ctrl K
+              </kbd>
+            </button>
+          )}
+
           {utilityLinks.includes('LEADS_MARKET') && (
             <button
               onClick={() => {
@@ -467,6 +487,23 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             )}
+            {onOpenSearchModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenSearchModal();
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-[#FCFBF3] border border-[#E8E4D8] text-xs font-bold text-[#182A3E] hover:border-[#B49029] transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4 text-[#B49029]" />
+                  <span>Universal Search (Properties, Hubs, Trends)</span>
+                </div>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-white border border-[#E8E4D8] rounded text-slate-500">Ctrl K</kbd>
+              </button>
+            )}
+
             <div>
               <span className="text-[10px] font-mono font-bold text-[#A99137] uppercase tracking-widest block mb-2">
                 Platform Navigation
