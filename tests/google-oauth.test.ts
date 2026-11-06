@@ -322,6 +322,193 @@ test('Property Studio — Production Google OAuth 2.0 & OpenID Connect Integrati
     }
   });
 
+  await t.test('15. New Google user authentication returns isNewUser: true and isProfileComplete: false', async () => {
+    const freshToken = makeTestToken({
+      sub: 'google-sub-fresh-999',
+      email: 'fresh.profile.user@example.com',
+      email_verified: true,
+      name: 'Fresh User',
+      picture: 'https://lh3.googleusercontent.com/a/fresh-avatar',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iss: 'https://accounts.google.com',
+      aud: 'test-google-client-id.apps.googleusercontent.com'
+    });
+    const res = await api('POST', '/api/auth/google', { credential: freshToken });
+    assert.equal(res.status, 200);
+    assert.equal(res.json.isNewUser, true);
+    assert.equal(res.json.isProfileComplete, false, 'New user profile must be incomplete initially');
+    assert.equal(res.json.googlePicture, 'https://lh3.googleusercontent.com/a/fresh-avatar');
+    assert.ok(res.cookie, 'Session cookie must be issued');
+  });
+
+  await t.test('16. POST /api/auth/google/complete-profile fails without active session cookie (401)', async () => {
+    const res = await api('POST', '/api/auth/google/complete-profile', {
+      name: 'Hacker User',
+      role: 'PROPERTY_SEEKER'
+    });
+    assert.equal(res.status, 401);
+  });
+
+  await t.test('17. POST /api/auth/google/complete-profile strictly rejects role SUPER_ADMIN with 403', async () => {
+    // Authenticate as a new Google user
+    const token = makeTestToken({
+      sub: 'google-sub-superadmin-attempt',
+      email: 'superadmin.attempt@example.com',
+      email_verified: true,
+      name: 'SuperAdmin Attempt',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iss: 'https://accounts.google.com',
+      aud: 'test-google-client-id.apps.googleusercontent.com'
+    });
+    const authRes = await api('POST', '/api/auth/google', { credential: token });
+    assert.equal(authRes.status, 200);
+    const sessionCookie = authRes.cookie;
+
+    // Attempt to escalate role to SUPER_ADMIN
+    const escalateRes = await api('POST', '/api/auth/google/complete-profile', {
+      name: 'SuperAdmin Attempt',
+      role: 'SUPER_ADMIN',
+      interests: ['Kokapet & Neopolis'],
+      avatar: 'https://api.dicebear.com/7.x/adventurer/png?seed=Alex'
+    }, sessionCookie);
+
+    assert.equal(escalateRes.status, 403);
+    assert.match(escalateRes.json.error, /Super Administrator/i);
+  });
+
+  await t.test('18. POST /api/auth/google/complete-profile validates required profession for professional roles', async () => {
+    const token = makeTestToken({
+      sub: 'google-sub-partner-test',
+      email: 'channel.partner.test@example.com',
+      email_verified: true,
+      name: 'Partner User',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iss: 'https://accounts.google.com',
+      aud: 'test-google-client-id.apps.googleusercontent.com'
+    });
+    const authRes = await api('POST', '/api/auth/google', { credential: token });
+    const sessionCookie = authRes.cookie;
+
+    // Missing profession for CHANNEL_PARTNER
+    const missingProfRes = await api('POST', '/api/auth/google/complete-profile', {
+      name: 'Partner User',
+      role: 'CHANNEL_PARTNER',
+      profession: '',
+      interests: ['Kokapet & Neopolis'],
+      avatar: 'https://api.dicebear.com/7.x/adventurer/png?seed=Alex'
+    }, sessionCookie);
+
+    assert.equal(missingProfRes.status, 400);
+    assert.match(missingProfRes.json.error, /profession/i);
+  });
+
+  await t.test('19. POST /api/auth/google/complete-profile rejects empty interests and invalid avatar', async () => {
+    const token = makeTestToken({
+      sub: 'google-sub-validation-test',
+      email: 'validation.user@example.com',
+      email_verified: true,
+      name: 'Validation User',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iss: 'https://accounts.google.com',
+      aud: 'test-google-client-id.apps.googleusercontent.com'
+    });
+    const authRes = await api('POST', '/api/auth/google', { credential: token });
+    const sessionCookie = authRes.cookie;
+
+    // Empty interests
+    const emptyInterestsRes = await api('POST', '/api/auth/google/complete-profile', {
+      name: 'Validation User',
+      role: 'PROPERTY_SEEKER',
+      interests: [],
+      avatar: 'https://api.dicebear.com/7.x/adventurer/png?seed=Alex'
+    }, sessionCookie);
+    assert.equal(emptyInterestsRes.status, 400);
+    assert.match(emptyInterestsRes.json.error, /interest/i);
+
+    // Invalid avatar (script or vector)
+    const invalidAvatarRes = await api('POST', '/api/auth/google/complete-profile', {
+      name: 'Validation User',
+      role: 'PROPERTY_SEEKER',
+      interests: ['Kokapet & Neopolis'],
+      avatar: 'data:image/svg+xml;base64,PHN2Zz48c2NyaXB0PmFsZXJ0KDEpPC9zY3JpcHQ+PC9zdmc+'
+    }, sessionCookie);
+    assert.equal(invalidAvatarRes.status, 400);
+    assert.match(invalidAvatarRes.json.error, /SVG and vector formats are not permitted/i);
+  });
+
+  await t.test('20. Completing profile succeeds, locks territory to Hyderabad, and marks profile complete', async () => {
+    const token = makeTestToken({
+      sub: 'google-sub-complete-success',
+      email: 'successful.complete@example.com',
+      email_verified: true,
+      name: 'Suresh Kumar',
+      picture: 'https://lh3.googleusercontent.com/a/suresh-pic',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iss: 'https://accounts.google.com',
+      aud: 'test-google-client-id.apps.googleusercontent.com'
+    });
+    const authRes = await api('POST', '/api/auth/google', { credential: token });
+    assert.equal(authRes.status, 200);
+    assert.equal(authRes.json.isProfileComplete, false);
+    const sessionCookie = authRes.cookie;
+
+    const completeRes = await api('POST', '/api/auth/google/complete-profile', {
+      name: 'Suresh Kumar Javidi',
+      role: 'CHANNEL_PARTNER',
+      phone: '+91 98490 12345',
+      organization: 'Javidi Commercial Holdings',
+      profession: 'Principal Broker',
+      company: 'Property Studio Advisors',
+      interests: ['Kokapet & Neopolis', 'Legal Due Diligence & RERA', 'Rental Yield & ROI'],
+      avatar: 'https://lh3.googleusercontent.com/a/suresh-pic'
+    }, sessionCookie);
+
+    assert.equal(completeRes.status, 200);
+    assert.equal(completeRes.json.success, true);
+    assert.equal(completeRes.json.user.name, 'Suresh Kumar Javidi');
+    assert.equal(completeRes.json.user.role, 'CHANNEL_PARTNER');
+    assert.equal(completeRes.json.user.profession, 'Principal Broker');
+    assert.equal(completeRes.json.user.townCity, 'Hyderabad, Telangana, India', 'Must lock territory to Hyderabad');
+    assert.equal(completeRes.json.user.isProfileComplete, true);
+    assert.equal(completeRes.json.user.interests.length, 3);
+
+    // Subsequent Google login recognizes existing account as complete
+    const reLoginRes = await api('POST', '/api/auth/google', { credential: token });
+    assert.equal(reLoginRes.status, 200);
+    assert.equal(reLoginRes.json.isNewUser, false);
+    assert.equal(reLoginRes.json.isProfileComplete, true, 'Subsequent login must identify profile as complete');
+    assert.equal(reLoginRes.json.user.role, 'CHANNEL_PARTNER');
+  });
+
+  await t.test('21. Public self-registered DEVELOPER account cannot access admin API', async () => {
+    const token = makeTestToken({
+      sub: 'google-sub-developer-selfserve',
+      email: 'public.developer@example.com',
+      email_verified: true,
+      name: 'SelfServe Dev',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iss: 'https://accounts.google.com',
+      aud: 'test-google-client-id.apps.googleusercontent.com'
+    });
+    const authRes = await api('POST', '/api/auth/google', { credential: token });
+    const sessionCookie = authRes.cookie;
+
+    // Complete as DEVELOPER
+    const completeRes = await api('POST', '/api/auth/google/complete-profile', {
+      name: 'SelfServe Dev',
+      role: 'DEVELOPER',
+      profession: 'Real Estate Developer',
+      organization: 'Skyline Builders',
+      interests: ['High-Rise Construction'],
+      avatar: 'https://api.dicebear.com/7.x/adventurer/png?seed=Leo'
+    }, sessionCookie);
+    assert.equal(completeRes.status, 200);
+
+    // Verify unverified public DEVELOPER account cannot access administrative endpoints
+    const adminRes = await api('GET', '/api/admin/users', undefined, sessionCookie);
+    assert.equal(adminRes.status, 403, 'Unverified DEVELOPER must NOT have admin access');
+  });
+
   // Teardown
   server.close();
 });

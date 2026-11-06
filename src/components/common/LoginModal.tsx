@@ -6,6 +6,7 @@ import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
 import { ANIME_AVATARS, getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { prepareAvatarUpload, validateAvatarFile } from '../../lib/avatarUpload';
+import { GoogleProfileCompletionModal } from './GoogleProfileCompletionModal';
 import {
   LogIn,
   LogOut,
@@ -74,6 +75,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
   // Google OAuth 2.0 & GIS Authentication State
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showGoogleProfileCompletion, setShowGoogleProfileCompletion] = useState(false);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<{ user: any; googlePicture?: string } | null>(null);
   const [googleClientId, setGoogleClientId] = useState<string>(
     (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || ''
   );
@@ -133,6 +136,48 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       }
     } catch {}
   }, []);
+
+  // Listen for Google OAuth popup callback messages
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleWindowMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+        const user = event.data.user;
+        const isNewUser = Boolean(event.data.isNewUser);
+        const isProfileComplete = Boolean(event.data.isProfileComplete);
+
+        if (isNewUser || !isProfileComplete) {
+          setPendingGoogleUser({
+            user,
+            googlePicture: event.data?.googlePicture || user?.avatar
+          });
+          setShowGoogleProfileCompletion(true);
+          setGoogleLoading(false);
+          return;
+        }
+
+        login(user as Parameters<typeof login>[0]);
+        showToast(`Welcome back, ${user.name || 'User'}!`);
+        if (isPropertySeeker(user.role)) {
+          setActiveView('DASHBOARD');
+        } else {
+          setActiveView(postLoginDestination(user.role));
+        }
+        setGoogleLoading(false);
+        onClose();
+      } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
+        setGoogleLoading(false);
+        setErrorMsg(event.data.error || 'Google authentication failed.');
+      }
+    };
+
+    window.addEventListener('message', handleWindowMessage);
+    return () => {
+      window.removeEventListener('message', handleWindowMessage);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!googleClientId) return;
@@ -265,6 +310,33 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
+  if (showGoogleProfileCompletion && pendingGoogleUser) {
+    return (
+      <GoogleProfileCompletionModal
+        isOpen={true}
+        onClose={() => {
+          setShowGoogleProfileCompletion(false);
+          setPendingGoogleUser(null);
+          onClose();
+        }}
+        user={pendingGoogleUser.user}
+        googlePicture={pendingGoogleUser.googlePicture}
+        onCompleted={(updatedUser) => {
+          login(updatedUser as Parameters<typeof login>[0]);
+          showToast(`Welcome to Property Studio, ${updatedUser.name || 'User'}!`);
+          if (isPropertySeeker(updatedUser.role)) {
+            setActiveView('DASHBOARD');
+          } else {
+            setActiveView(postLoginDestination(updatedUser.role));
+          }
+          setShowGoogleProfileCompletion(false);
+          setPendingGoogleUser(null);
+          onClose();
+        }}
+      />
+    );
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting.current) return;
@@ -287,6 +359,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       if (!result.ok || !user) {
         throw new Error(result.error || 'Authentication failed');
       }
+
+
 
       login(user as Parameters<typeof login>[0]);
       showToast(`Welcome back, ${user.name}!`);
@@ -321,8 +395,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         throw new Error(result.error || 'Google authentication failed.');
       }
 
+
+
+      const isNewUser = Boolean(result.data?.isNewUser);
+      const isProfileComplete = Boolean(result.data?.isProfileComplete);
+
+      if (isNewUser || !isProfileComplete) {
+        setPendingGoogleUser({
+          user,
+          googlePicture: result.data?.googlePicture || (user as any).avatar
+        });
+        setShowGoogleProfileCompletion(true);
+        setGoogleLoading(false);
+        return;
+      }
+
       login(user as Parameters<typeof login>[0]);
-      showToast(result.data?.isNewUser ? `Welcome to Property Studio, ${user.name || 'User'}!` : `Welcome back, ${user.name || 'User'}!`);
+      showToast(`Welcome back, ${user.name || 'User'}!`);
 
       if (isPropertySeeker(user.role)) {
         setActiveView('DASHBOARD');
@@ -423,8 +512,22 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           clearInterval(pollTimer);
           const user = event.data.user;
           const isNewUser = event.data.isNewUser;
+    
+
+          const isProfileComplete = Boolean(event.data?.isProfileComplete);
+
+          if (isNewUser || !isProfileComplete) {
+            setPendingGoogleUser({
+              user,
+              googlePicture: event.data?.googlePicture || user?.avatar
+            });
+            setShowGoogleProfileCompletion(true);
+            setGoogleLoading(false);
+            return;
+          }
+
           login(user as Parameters<typeof login>[0]);
-          showToast(isNewUser ? `Welcome to Property Studio, ${user.name || 'User'}!` : `Welcome back, ${user.name || 'User'}!`);
+      showToast(`Welcome back, ${user.name || 'User'}!`);
           if (isPropertySeeker(user.role)) {
             setActiveView('DASHBOARD');
           } else {

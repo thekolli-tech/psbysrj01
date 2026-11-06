@@ -23,9 +23,54 @@ export interface GoogleAuthResult {
   success: boolean;
   user?: any;
   isNewUser?: boolean;
+  isProfileComplete?: boolean;
+  googlePicture?: string;
   sessionToken?: string;
   error?: string;
   statusCode?: number;
+}
+
+/**
+ * Checks if a user profile is complete according to Property Studio requirements:
+ * - Valid non-empty name
+ * - Valid non-empty avatar
+ * - At least one interest selected
+ * - If in a professional role, a non-empty profession is required
+ */
+export function isUserProfileComplete(user: {
+  name?: string | null;
+  role?: string | null;
+  avatar?: string | null;
+  profession?: string | null;
+  interests?: string[] | string | null;
+}): boolean {
+  if (!user || typeof user !== 'object') return false;
+  if (!user.name || !user.name.trim()) return false;
+  if (!user.avatar || !user.avatar.trim()) return false;
+
+  // Interests check: must have at least 1 interest
+  let parsedInterests: string[] = [];
+  if (Array.isArray(user.interests)) {
+    parsedInterests = user.interests;
+  } else if (typeof user.interests === 'string' && user.interests.trim()) {
+    try {
+      const parsed = JSON.parse(user.interests);
+      if (Array.isArray(parsed)) parsedInterests = parsed;
+    } catch {
+      if (user.interests.trim().length > 0) parsedInterests = [user.interests.trim()];
+    }
+  }
+  if (!parsedInterests || parsedInterests.length === 0) return false;
+
+  // Professional roles require non-empty profession
+  const profRoles = ['DEVELOPER', 'LANDOWNER', 'CHANNEL_PARTNER', 'RESELLER', 'RERA_AGENT', 'REAL_ESTATE_MEDIA'];
+  if (user.role && profRoles.includes(user.role)) {
+    if (!user.profession || !user.profession.trim()) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 const OAUTH_STATE_SECRET = process.env.OTP_HASH_SECRET || 'property-studio-google-oauth-state-secret';
@@ -371,6 +416,8 @@ export async function authenticateGoogleIdentity(
       }
     }
 
+    const isProfileComplete = isUserProfileComplete(user);
+
     return {
       success: true,
       statusCode: 200,
@@ -378,10 +425,13 @@ export async function authenticateGoogleIdentity(
         ...safeUser,
         isVerified: Boolean(safeUser.is_verified),
         preferredLanguage: safeUser.preferred_language || 'en',
-        assignedPropertyIds
+        assignedPropertyIds,
+        isProfileComplete
       },
       sessionToken: token,
-      isNewUser: false
+      isNewUser: false,
+      isProfileComplete,
+      googlePicture: identity.picture
     };
   }
 
@@ -418,9 +468,12 @@ export async function authenticateGoogleIdentity(
       interests: [],
       isVerified: true,
       phone_verified: 0,
-      assignedPropertyIds: []
+      assignedPropertyIds: [],
+      isProfileComplete: false
     },
     sessionToken: token,
-    isNewUser: true
+    isNewUser: true,
+    isProfileComplete: false,
+    googlePicture: identity.picture
   };
 }

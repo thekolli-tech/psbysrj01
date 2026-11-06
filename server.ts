@@ -14,6 +14,7 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {
+  type UserRole,
   initDatabase,
   isPostgresAuthoritative,
   findUserByEmail,
@@ -22,6 +23,7 @@ import {
   createUser,
   updateUser,
   updateUserProfileFields,
+  completeUserProfile,
   updateUserRole,
   deleteUser,
   suspendUser,
@@ -270,7 +272,7 @@ const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunctio
 };
 
 const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-  if (!req.user || (req.user.role !== 'DEVELOPER' && req.user.role !== 'SUPER_ADMIN')) {
+  if (!req.user || (req.user.role !== 'SUPER_ADMIN' && (req.user.role !== 'DEVELOPER' || !req.user.is_verified))) {
     res.status(403).json({ error: 'Access denied: Super Administrator or Developer privileges required.' });
     return;
   }
@@ -312,7 +314,8 @@ const requireUnrestricted = (req: AuthenticatedRequest, res: Response, next: Nex
 };
 
 function rejectIfRateLimited(req: Request, res: Response, action: string, identity = ''): boolean {
-  const allowed = allowRequest(clientKey(req.ip, action, identity), action === 'login' ? 20 : 8, 15 * 60 * 1000);
+  const limit = action === 'login' ? 20 : action === 'google-auth' ? 50 : 8;
+  const allowed = allowRequest(clientKey(req.ip, action, identity), limit, 15 * 60 * 1000);
   if (!allowed) {
     res.status(429).json({ error: 'Too many attempts. Wait and try again.' });
     return true;
@@ -321,7 +324,7 @@ function rejectIfRateLimited(req: Request, res: Response, action: string, identi
 }
 
 const requireDeveloper = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-  if (!req.user || req.user.role !== 'DEVELOPER') {
+  if (!req.user || req.user.role !== 'DEVELOPER' || !req.user.is_verified) {
     res.status(403).json({ error: 'Access denied: Platform Developer (Owner) privileges required.' });
     return;
   }
@@ -542,7 +545,9 @@ app.post('/api/auth/google', async (req: Request, res: Response): Promise<void> 
     res.json({
       success: true,
       user: authResult.user,
-      isNewUser: authResult.isNewUser
+      isNewUser: authResult.isNewUser,
+      isProfileComplete: Boolean(authResult.isProfileComplete),
+      googlePicture: authResult.googlePicture
     });
   } catch (err: any) {
     console.error('[Google Auth] Error during authentication:', err);
@@ -692,9 +697,177 @@ app.get('/api/auth/google/callback', async (req: Request, res: Response): Promis
       res.cookie('ps_session', authResult.sessionToken, sessionCookieOptions());
     }
 
-    sendPostMessageResponse(true, { user: authResult.user, isNewUser: authResult.isNewUser });
+    sendPostMessageResponse(true, {
+      user: authResult.user,
+      isNewUser: authResult.isNewUser,
+      isProfileComplete: Boolean(authResult.isProfileComplete),
+      googlePicture: authResult.googlePicture
+    });
   } catch (err: any) {
     sendPostMessageResponse(false, { error: err.message || 'Error completing Google sign-in.' });
+  }
+});
+
+// 4. POST /api/auth/google/complete-profile: Complete profile after Google authentication
+app.post('/api/auth/google/complete-profile', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { name, role, phone, organization, profession, company, interests, avatar } = req.body || {};
+
+    // 1. Validate full name (prefilled from Google, editable)
+    const trimmedName = typeof name === 'string' ? name.trim() : '';
+    if (!trimmedName || trimmedName.length < 2) {
+      res.status(400).json({ error: 'Please enter your full name (minimum 2 characters).' });
+      return;
+    }
+    if (trimmedName.length > 80) {
+      res.status(400).json({ error: 'Name must not exceed 80 characters.' });
+      return;
+    }
+
+    // 2. Validate role: NEVER allow SUPER_ADMIN
+    const requestedRole = String(role || '').trim();
+    if (requestedRole === 'SUPER_ADMIN') {
+      res.status(403).json({ error: 'Super Administrator privileges cannot be assigned through public registration.' });
+      return;
+    }
+
+    const ALLOWED_ROLES = [
+      'PROPERTY_SEEKER',
+      'DEVELOPER',
+      'LANDOWNER',
+      'CHANNEL_PARTNER',
+      'RESELLER',
+      'RERA_AGENT',
+      'REAL_ESTATE_MEDIA'
+    ];
+
+    if (!ALLOWED_ROLES.includes(requestedRole)) {
+      res.status(400).json({ error: 'Please select a valid account type.' });
+      return;
+    }
+
+    const safeRole = requestedRole as UserRole;
+    const isSeeker = safeRole === 'PROPERTY_SEEKER';
+
+    // 3. Optional mobile phone
+    let resolvedPhone: string | undefined = undefined;
+    if (phone && typeof phone === 'string' && phone.trim()) {
+      const normalized = normalizeIndianMobile(phone.trim());
+      resolvedPhone = normalized || phone.trim();
+    }
+
+    // 4. Profession: Required for professional roles
+    let validatedProfession: string | undefined = undefined;
+    if (!isSeeker) {
+      if (!profession || typeof profession !== 'string' || !profession.trim()) {
+        res.status(400).json({ error: 'Please enter your profession.' });
+        return;
+      }
+      const fieldRes = readProfileField(profession, true, 'Profession');
+      if ('error' in fieldRes) {
+        res.status(400).json({ error: fieldRes.error });
+        return;
+      }
+      validatedProfession = !fieldRes.omit && fieldRes.value ? fieldRes.value.trim() : profession.trim();
+    } else if (profession && typeof profession === 'string' && profession.trim()) {
+      const fieldRes = readProfileField(profession, true, 'Profession');
+      if (!('error' in fieldRes) && !fieldRes.omit && fieldRes.value) {
+        validatedProfession = fieldRes.value.trim();
+      }
+    }
+
+    // 5. Company / Practice (optional)
+    let validatedCompany: string | undefined = undefined;
+    if (company && typeof company === 'string' && company.trim()) {
+      const fieldRes = readProfileField(company, true, 'Company');
+      if (!('error' in fieldRes) && !fieldRes.omit && fieldRes.value) {
+        validatedCompany = fieldRes.value.trim();
+      }
+    }
+
+    // 6. Organization (optional)
+    const validatedOrg = typeof organization === 'string' ? organization.trim().slice(0, 120) : '';
+
+    // 7. Interests & Topics (required: select at least 1)
+    if (!interests || !Array.isArray(interests) || interests.length === 0) {
+      res.status(400).json({ error: 'Please select at least one topic of interest.' });
+      return;
+    }
+    const validatedInterests = interests.map((s: any) => String(s).trim()).filter(Boolean);
+    if (validatedInterests.length === 0) {
+      res.status(400).json({ error: 'Please select at least one topic of interest.' });
+      return;
+    }
+
+    // 8. Avatar selection (required)
+    if (!avatar || typeof avatar !== 'string' || !avatar.trim()) {
+      res.status(400).json({ error: 'Please select or upload a profile avatar.' });
+      return;
+    }
+    const avatarValidation = validateAvatarUpload(avatar.trim());
+    if (!avatarValidation.valid || !avatarValidation.avatar) {
+      res.status(400).json({ error: avatarValidation.error || 'Invalid avatar image.' });
+      return;
+    }
+
+    // 9. Fixed Territory
+    const fixedTerritory = 'Hyderabad, Telangana, India';
+
+    // 10. Update user in authoritative database
+    const updated = await completeUserProfile(req.user.id, {
+      name: trimmedName,
+      role: safeRole,
+      phone: resolvedPhone,
+      organization: validatedOrg,
+      profession: validatedProfession || '',
+      company: validatedCompany || '',
+      interests: validatedInterests,
+      avatar: avatarValidation.avatar,
+      townCity: fixedTerritory,
+      isVerified: isSeeker ? 1 : 0
+    });
+
+    if (!updated) {
+      res.status(404).json({ error: 'User account not found.' });
+      return;
+    }
+
+    // 11. Upsert professional profile if professional role (pending verification)
+    if (safeRole !== 'PROPERTY_SEEKER') {
+      try {
+        await upsertProfessionalProfile({
+          userId: req.user.id,
+          role: safeRole,
+          organization: validatedOrg
+        });
+      } catch (profErr) {
+        console.error('[Google Profile Complete] Professional profile upsert failed:', profErr);
+      }
+    }
+
+    const { password_hash, salt, ...safeUser } = updated;
+    const finalUser = {
+      ...safeUser,
+      townCity: updated.town_city || fixedTerritory,
+      profession: updated.profession || '',
+      company: updated.company || '',
+      organization: updated.organization || '',
+      avatar: updated.avatar || avatarValidation.avatar,
+      interests: typeof updated.interests === 'string' ? JSON.parse(updated.interests) : (updated.interests || []),
+      isVerified: Boolean(updated.is_verified),
+      preferredLanguage: updated.preferred_language || 'en',
+      assignedPropertyIds: JSON.parse(updated.assigned_properties || '[]'),
+      isProfileComplete: true
+    };
+
+    res.json({
+      success: true,
+      user: finalUser,
+      message: 'Profile completed successfully.'
+    });
+  } catch (err: any) {
+    console.error('[Google Profile Complete] Error:', err);
+    res.status(500).json({ error: err.message || 'Failed to complete profile.' });
   }
 });
 

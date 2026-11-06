@@ -899,8 +899,8 @@ export async function setOwnedListingState(ownerId: string, listingId: string, s
 export async function listFinancialRecords(): Promise<{ payments: string; transactions: any[]; ledger: any[] }> {
   if (isPostgresAuthoritative()) {
     const [transactions, ledger] = await Promise.all([
-      queryPostgres('SELECT id, user_id, provider, amount, purpose, status, idempotency_key, created_at FROM payment_transactions ORDER BY created_at DESC LIMIT 200'),
-      queryPostgres('SELECT id, user_id, entry_type, amount, balance_after, reference_type, reference_id, status, created_at FROM wallet_ledger ORDER BY created_at DESC LIMIT 200')
+      queryPostgres('SELECT id, user_id, provider, amount, purpose, status, idempotency_key, created_at FROM payment_transactions ORDER BY created_at DESC, id DESC LIMIT 200'),
+      queryPostgres('SELECT id, user_id, entry_type, amount, balance_after, reference_type, reference_id, status, created_at FROM wallet_ledger ORDER BY created_at DESC, id DESC LIMIT 200')
     ]);
     return { payments: paymentsStatus(), transactions: transactions.rows, ledger: ledger.rows };
   }
@@ -908,8 +908,8 @@ export async function listFinancialRecords(): Promise<{ payments: string; transa
   const db = getSqliteDb();
   return {
     payments: paymentsStatus(),
-    transactions: db.prepare('SELECT id, user_id, provider, amount, purpose, status, idempotency_key, created_at FROM payment_transactions ORDER BY created_at DESC LIMIT 200').all() as any[],
-    ledger: db.prepare('SELECT id, user_id, entry_type, amount, balance_after, reference_type, reference_id, status, created_at FROM wallet_ledger ORDER BY created_at DESC LIMIT 200').all() as any[]
+    transactions: db.prepare('SELECT id, user_id, provider, amount, purpose, status, idempotency_key, created_at FROM payment_transactions ORDER BY created_at DESC, id DESC LIMIT 200').all() as any[],
+    ledger: db.prepare('SELECT id, user_id, entry_type, amount, balance_after, reference_type, reference_id, status, created_at FROM wallet_ledger ORDER BY created_at DESC, id DESC LIMIT 200').all() as any[]
   };
 }
 

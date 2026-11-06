@@ -280,6 +280,73 @@ export async function pgUpdateProfileFields(
   return pgFindUserById(id);
 }
 
+export async function pgCompleteUserProfile(
+  id: string,
+  fields: {
+    name?: string;
+    role?: any;
+    phone?: string | null;
+    organization?: string | null;
+    profession?: string | null;
+    company?: string | null;
+    interests?: string[] | null;
+    avatar?: string | null;
+    townCity?: string | null;
+    isVerified?: number;
+  }
+): Promise<DbUser | null> {
+  await ensurePostgresAdditiveSchema();
+  const sets: string[] = [];
+  const values: Array<any> = [];
+  let paramIdx = 1;
+  if (fields.name !== undefined) {
+    sets.push(`name = $${paramIdx++}`);
+    values.push(fields.name);
+  }
+  if (fields.role !== undefined) {
+    sets.push(`role = $${paramIdx++}`);
+    values.push(fields.role);
+  }
+  if (fields.phone !== undefined) {
+    sets.push(`phone = $${paramIdx++}`);
+    values.push(fields.phone);
+  }
+  if (fields.organization !== undefined) {
+    sets.push(`organization = $${paramIdx++}`);
+    values.push(fields.organization);
+  }
+  if (fields.townCity !== undefined) {
+    sets.push(`town_city = $${paramIdx++}`);
+    values.push(fields.townCity);
+  }
+  if (fields.profession !== undefined) {
+    sets.push(`profession = $${paramIdx++}`);
+    values.push(fields.profession);
+  }
+  if (fields.company !== undefined) {
+    sets.push(`company = $${paramIdx++}`);
+    values.push(fields.company);
+  }
+  if (fields.avatar !== undefined) {
+    sets.push(`avatar = $${paramIdx++}`);
+    values.push(fields.avatar);
+  }
+  if (fields.interests !== undefined) {
+    sets.push(`interests = $${paramIdx++}`);
+    values.push(fields.interests ? JSON.stringify(fields.interests) : null);
+  }
+  if (fields.isVerified !== undefined) {
+    sets.push(`is_verified = $${paramIdx++}`);
+    values.push(fields.isVerified);
+  }
+  if (sets.length === 0) return pgFindUserById(id);
+  sets.push(`updated_at = $${paramIdx++}`);
+  values.push(new Date().toISOString());
+  values.push(id);
+  await queryPostgres(`UPDATE users SET ${sets.join(', ')} WHERE id = $${paramIdx}`, values);
+  return pgFindUserById(id);
+}
+
 export async function pgProfessionsByUserId(ids: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return new Map();

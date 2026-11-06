@@ -50,6 +50,7 @@ import {
   pgCommunityEngagement,
   pgProfessionsByUserId,
   pgUpdateProfileFields,
+  pgCompleteUserProfile,
   pgCreatePost,
   pgUpdatePost,
   pgDeletePost,
@@ -859,6 +860,26 @@ export async function updateUserProfileFields(
 ): Promise<DbUser | null> {
   if (isPostgresAuthoritative()) return pgUpdateProfileFields(id, fields);
   return sqliteUpdateProfileFields(id, fields);
+}
+
+/** Completes user profile registration after Google OAuth. */
+export async function completeUserProfile(
+  id: string,
+  fields: {
+    name?: string;
+    role?: UserRole;
+    phone?: string | null;
+    organization?: string | null;
+    profession?: string | null;
+    company?: string | null;
+    interests?: string[] | null;
+    avatar?: string | null;
+    townCity?: string | null;
+    isVerified?: number;
+  }
+): Promise<DbUser | null> {
+  if (isPostgresAuthoritative()) return pgCompleteUserProfile(id, fields);
+  return sqliteCompleteUserProfile(id, fields);
 }
 
 export async function updateUserRole(
@@ -2599,6 +2620,70 @@ function sqliteUpdateProfileFields(
   if (fields.preferredLanguage !== undefined) {
     sets.push('preferred_language = ?');
     values.push(fields.preferredLanguage);
+  }
+  if (sets.length === 0) return sqliteFindUserById(id);
+  sets.push('updated_at = ?');
+  values.push(new Date().toISOString());
+  db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
+  return sqliteFindUserById(id);
+}
+
+function sqliteCompleteUserProfile(
+  id: string,
+  fields: {
+    name?: string;
+    role?: UserRole;
+    phone?: string | null;
+    organization?: string | null;
+    profession?: string | null;
+    company?: string | null;
+    interests?: string[] | null;
+    avatar?: string | null;
+    townCity?: string | null;
+    isVerified?: number;
+  }
+): DbUser | null {
+  const sets: string[] = [];
+  const values: Array<any> = [];
+  if (fields.name !== undefined) {
+    sets.push('name = ?');
+    values.push(fields.name);
+  }
+  if (fields.role !== undefined) {
+    sets.push('role = ?');
+    values.push(fields.role);
+  }
+  if (fields.phone !== undefined) {
+    sets.push('phone = ?');
+    values.push(fields.phone);
+  }
+  if (fields.organization !== undefined) {
+    sets.push('organization = ?');
+    values.push(fields.organization);
+  }
+  if (fields.townCity !== undefined) {
+    sets.push('town_city = ?');
+    values.push(fields.townCity);
+  }
+  if (fields.profession !== undefined) {
+    sets.push('profession = ?');
+    values.push(fields.profession);
+  }
+  if (fields.company !== undefined) {
+    sets.push('company = ?');
+    values.push(fields.company);
+  }
+  if (fields.avatar !== undefined) {
+    sets.push('avatar = ?');
+    values.push(fields.avatar);
+  }
+  if (fields.interests !== undefined) {
+    sets.push('interests = ?');
+    values.push(fields.interests ? JSON.stringify(fields.interests) : null);
+  }
+  if (fields.isVerified !== undefined) {
+    sets.push('is_verified = ?');
+    values.push(fields.isVerified);
   }
   if (sets.length === 0) return sqliteFindUserById(id);
   sets.push('updated_at = ?');
