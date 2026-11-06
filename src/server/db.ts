@@ -34,6 +34,7 @@ import {
   pgRegisterVerifiedUser,
   pgCreateAuditLog,
   pgGetAuditLogs,
+  pgGetActivityGrowthData,
   pgGetAllPosts,
   pgGetPostById,
   pgCastCommunityVote,
@@ -149,13 +150,17 @@ import {
 import type {
   UserNotificationPreferences,
   DbEmailNotification,
-  CreateEmailNotificationInput
+  CreateEmailNotificationInput,
+  ActivityBucket,
+  ActivityGrowthData
 } from './postgresRepo.ts';
 
 export type {
   UserNotificationPreferences,
   DbEmailNotification,
-  CreateEmailNotificationInput
+  CreateEmailNotificationInput,
+  ActivityBucket,
+  ActivityGrowthData
 };
 
 type SqliteDatabase = import('node:sqlite').DatabaseSync;
@@ -1023,6 +1028,12 @@ export async function createAuditLog(entry: {
 export async function getAuditLogs(limit = 50, offset = 0, filterAction?: string): Promise<DbAuditLog[]> {
   if (isPostgresAuthoritative()) return pgGetAuditLogs(limit, offset, filterAction);
   return sqliteGetAuditLogs(limit, offset, filterAction);
+}
+
+export async function getActivityGrowthData(period: string): Promise<ActivityGrowthData> {
+  const normPeriod = (['7D', '30D', '90D', '1Y'].includes(period.toUpperCase()) ? period.toUpperCase() : '7D') as '7D' | '30D' | '90D' | '1Y';
+  if (isPostgresAuthoritative()) return pgGetActivityGrowthData(normPeriod);
+  return sqliteGetActivityGrowthData(normPeriod);
 }
 
 export async function getAllPosts(params?: {
@@ -3223,6 +3234,149 @@ function sqliteGetAuditLogs(limit = 50, offset = 0, filterAction?: string): DbAu
   }
   const stmt = db.prepare('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT ? OFFSET ?');
   return stmt.all(limit, offset) as unknown as DbAuditLog[];
+}
+
+function sqliteGetActivityGrowthData(period: '7D' | '30D' | '90D' | '1Y'): ActivityGrowthData {
+  const now = new Date();
+  const buckets: ActivityBucket[] = [];
+  let dateRange = '';
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  interface WindowDef {
+    label: string;
+    fullDate: string;
+    startIso: string;
+    endIso: string;
+  }
+
+  const windows: WindowDef[] = [];
+
+  if (period === '7D') {
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 86400000);
+      const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+      const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0, 0));
+      windows.push({
+        label: dayNames[start.getUTCDay()],
+        fullDate: start.toISOString().split('T')[0],
+        startIso: start.toISOString(),
+        endIso: end.toISOString()
+      });
+    }
+    dateRange = `${monthNames[new Date(windows[0].startIso).getUTCMonth()]} ${new Date(windows[0].startIso).getUTCDate()} – ${monthNames[now.getUTCMonth()]} ${now.getUTCDate()}, ${now.getUTCFullYear()}`;
+  } else if (period === '30D') {
+    for (let i = 5; i >= 0; i--) {
+      const endMs = now.getTime() - i * 5 * 86400000;
+      const startMs = endMs - 5 * 86400000;
+      const start = new Date(startMs);
+      const end = new Date(endMs);
+      windows.push({
+        label: `${monthNames[start.getUTCMonth()]} ${start.getUTCDate()}`,
+        fullDate: `${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`,
+        startIso: start.toISOString(),
+        endIso: end.toISOString()
+      });
+    }
+    dateRange = `Last 30 Days (${monthNames[new Date(windows[0].startIso).getUTCMonth()]} ${new Date(windows[0].startIso).getUTCDate()} – ${monthNames[now.getUTCMonth()]} ${now.getUTCDate()}, ${now.getUTCFullYear()})`;
+  } else if (period === '90D') {
+    for (let i = 5; i >= 0; i--) {
+      const endMs = now.getTime() - i * 15 * 86400000;
+      const startMs = endMs - 15 * 86400000;
+      const start = new Date(startMs);
+      const end = new Date(endMs);
+      windows.push({
+        label: `${monthNames[start.getUTCMonth()]} ${start.getUTCDate()}`,
+        fullDate: `${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`,
+        startIso: start.toISOString(),
+        endIso: end.toISOString()
+      });
+    }
+    dateRange = `Last 90 Days (${monthNames[new Date(windows[0].startIso).getUTCMonth()]} ${new Date(windows[0].startIso).getUTCDate()} – ${monthNames[now.getUTCMonth()]} ${now.getUTCDate()}, ${now.getUTCFullYear()})`;
+  } else {
+    for (let i = 11; i >= 0; i--) {
+      const mDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      const mEnd = new Date(Date.UTC(mDate.getUTCFullYear(), mDate.getUTCMonth() + 1, 1));
+      windows.push({
+        label: monthNames[mDate.getUTCMonth()],
+        fullDate: `${monthNames[mDate.getUTCMonth()]} ${mDate.getUTCFullYear()}`,
+        startIso: mDate.toISOString(),
+        endIso: mEnd.toISOString()
+      });
+    }
+    dateRange = `Last 12 Months (${windows[0].label} ${new Date(windows[0].startIso).getUTCFullYear()} – ${windows[windows.length - 1].label} ${now.getUTCFullYear()})`;
+  }
+
+  let totalEvents = 0;
+  let peakValue = 0;
+
+  for (const win of windows) {
+    let auditCount = 0;
+    let postCount = 0;
+    let userCount = 0;
+    let txnCount = 0;
+
+    try {
+      const row = db.prepare(`
+        SELECT
+          (SELECT COUNT(*) FROM audit_logs WHERE created_at >= ? AND created_at < ?) AS audit_count,
+          (SELECT COUNT(*) FROM community_posts WHERE created_at >= ? AND created_at < ? AND status != 'DELETED') AS post_count,
+          (SELECT COUNT(*) FROM users WHERE created_at >= ? AND created_at < ?) AS user_count,
+          (SELECT COUNT(*) FROM wallet_ledger WHERE created_at >= ? AND created_at < ?) AS txn_count
+      `).get(
+        win.startIso, win.endIso,
+        win.startIso, win.endIso,
+        win.startIso, win.endIso,
+        win.startIso, win.endIso
+      ) as any;
+
+      auditCount = Number(row?.audit_count || 0);
+      postCount = Number(row?.post_count || 0);
+      userCount = Number(row?.user_count || 0);
+      txnCount = Number(row?.txn_count || 0);
+    } catch {
+      auditCount = 0;
+    }
+
+    const count = auditCount + postCount + userCount + txnCount;
+    totalEvents += count;
+    if (count > peakValue) peakValue = count;
+
+    buckets.push({
+      label: win.label,
+      fullDate: win.fullDate,
+      count,
+      breakdown: {
+        audit: auditCount,
+        posts: postCount,
+        users: userCount,
+        txns: txnCount
+      }
+    });
+  }
+
+  const mid = Math.floor(buckets.length / 2);
+  const firstHalf = buckets.slice(0, mid).reduce((sum, b) => sum + b.count, 0);
+  const secondHalf = buckets.slice(mid).reduce((sum, b) => sum + b.count, 0);
+
+  let growthRate = '+0.0%';
+  if (firstHalf > 0) {
+    const diff = ((secondHalf - firstHalf) / firstHalf) * 100;
+    growthRate = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
+  } else if (secondHalf > 0) {
+    growthRate = '+100.0%';
+  }
+
+  return {
+    period,
+    dateRange,
+    totalEvents,
+    growthRate,
+    peakValue,
+    isEmpty: totalEvents === 0,
+    buckets
+  };
 }
 
 function sqliteGetAllPosts(params?: {

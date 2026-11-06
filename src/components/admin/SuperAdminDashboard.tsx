@@ -219,6 +219,48 @@ export const SuperAdminDashboard: React.FC = () => {
     dbTarget: 'PostgreSQL Production'
   });
 
+  // Platform Activity & Growth Chart State (Controlled Period 7D, 30D, 90D, 1Y)
+  const [activityPeriod, setActivityPeriod] = useState<'7D' | '30D' | '90D' | '1Y'>('7D');
+  const [activityData, setActivityData] = useState<{
+    period: '7D' | '30D' | '90D' | '1Y';
+    dateRange: string;
+    totalEvents: number;
+    growthRate: string;
+    peakValue: number;
+    isEmpty: boolean;
+    buckets: Array<{
+      label: string;
+      fullDate: string;
+      count: number;
+      breakdown: { audit: number; posts: number; users: number; txns: number };
+    }>;
+  } | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
+
+  const fetchActivityGrowth = async (periodToFetch: '7D' | '30D' | '90D' | '1Y') => {
+    setActivityLoading(true);
+    setActivityError(null);
+    try {
+      const res = await fetch(`/api/admin/activity-growth?period=${periodToFetch}`);
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+      const data = await res.json();
+      setActivityData(data);
+    } catch (err: any) {
+      console.warn('[Activity Chart] Error fetching activity telemetry:', err);
+      setActivityError(err.message || 'Unable to retrieve telemetry');
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActivityGrowth(activityPeriod);
+  }, [activityPeriod]);
+
   // Fetch live users and posts from server API
   const refreshServerData = async () => {
     setLoadingData(true);
@@ -1076,74 +1118,299 @@ export const SuperAdminDashboard: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left Area Chart (8 cols) */}
                 <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-[#B49029]" />
-                      <h3 className="text-sm sm:text-base font-bold text-slate-900 font-display">
-                        Platform Activity & Growth
-                      </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-[#B49029]" />
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 font-display">
+                          Platform Activity & Growth
+                        </h3>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        {activityData?.dateRange ? (
+                          <span>
+                            {activityData.dateRange} · <strong className="text-slate-800">{activityData.totalEvents} actions</strong> ({activityData.growthRate} vs prev)
+                          </span>
+                        ) : (
+                          'Live telemetry & engagement analytics'
+                        )}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-[11px] font-bold">
-                      <span className="px-2.5 py-0.5 rounded-lg bg-[#B49029] text-white shadow-xs">7D</span>
-                      <span className="px-2.5 py-0.5 text-slate-600 hover:text-slate-900 cursor-pointer">30D</span>
-                      <span className="px-2.5 py-0.5 text-slate-600 hover:text-slate-900 cursor-pointer">90D</span>
-                      <span className="px-2.5 py-0.5 text-slate-600 hover:text-slate-900 cursor-pointer">1Y</span>
+
+                    {/* Accessible 7D, 30D, 90D, 1Y Period Controls */}
+                    <div
+                      className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-[11px] font-bold self-start sm:self-auto"
+                      role="group"
+                      aria-label="Activity chart time period"
+                    >
+                      {(['7D', '30D', '90D', '1Y'] as const).map(p => {
+                        const isActive = activityPeriod === p;
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              if (activityPeriod !== p) {
+                                setActivityPeriod(p);
+                                fetchActivityGrowth(p);
+                              }
+                            }}
+                            aria-pressed={isActive}
+                            className={`px-2.5 py-1 rounded-lg transition-all duration-200 cursor-pointer ${
+                              isActive
+                                ? 'bg-[#B49029] text-white shadow-xs font-black'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Area SVG Chart matching Image 2 */}
-                  <div className="relative pt-4">
-                    <div className="h-56 flex items-stretch gap-4">
-                      <div className="flex flex-col justify-between text-[11px] font-mono text-slate-400 text-right pr-2">
-                        <span>20K</span>
-                        <span>15K</span>
-                        <span>10K</span>
-                        <span>5K</span>
-                        <span>0</span>
-                      </div>
-                      <div className="flex-1 relative border-b border-l border-slate-200">
-                        <svg className="absolute inset-0 w-full h-full overflow-visible" viewBox="0 0 600 200" preserveAspectRatio="none">
-                          <defs>
-                            <linearGradient id="adminChartGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#B49029" stopOpacity="0.4" />
-                              <stop offset="100%" stopColor="#B49029" stopOpacity="0.0" />
-                            </linearGradient>
-                          </defs>
-                          <path
-                            d="M 20 160 L 110 145 L 200 120 L 290 125 L 380 95 L 470 90 L 560 30 L 560 200 L 20 200 Z"
-                            fill="url(#adminChartGrad)"
-                          />
-                          <path
-                            d="M 20 160 L 110 145 L 200 120 L 290 125 L 380 95 L 470 90 L 560 30"
-                            fill="none"
-                            stroke="#B49029"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                          />
-                          {[
-                            { cx: 20, cy: 160 },
-                            { cx: 110, cy: 145 },
-                            { cx: 200, cy: 120 },
-                            { cx: 290, cy: 125 },
-                            { cx: 380, cy: 95 },
-                            { cx: 470, cy: 90 },
-                            { cx: 560, cy: 30 }
-                          ].map((pt, i) => (
-                            <circle key={i} cx={pt.cx} cy={pt.cy} r="4" fill="#FFFFFF" stroke="#B49029" strokeWidth="2.5" />
+                  {/* Chart Body: Loading, Error, Empty, or Live Data */}
+                  {activityLoading ? (
+                    <div className="h-56 flex flex-col items-center justify-center space-y-3 bg-slate-50/50 rounded-2xl border border-slate-100 animate-pulse">
+                      <RefreshCw className="w-6 h-6 text-[#B49029] animate-spin" />
+                      <span className="text-xs font-semibold text-slate-500">Loading {activityPeriod} activity telemetry...</span>
+                    </div>
+                  ) : activityError ? (
+                    <div className="h-56 flex flex-col items-center justify-center space-y-2 bg-red-50/40 rounded-2xl border border-red-100 p-6 text-center">
+                      <AlertCircle className="w-6 h-6 text-red-600" />
+                      <p className="text-xs font-bold text-slate-900">Failed to load {activityPeriod} activity</p>
+                      <p className="text-[11px] text-slate-500">{activityError}</p>
+                      <button
+                        type="button"
+                        onClick={() => fetchActivityGrowth(activityPeriod)}
+                        className="mt-2 px-3 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : activityData?.isEmpty || !activityData?.buckets.length ? (
+                    <div className="h-56 flex flex-col items-center justify-center space-y-2 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200 p-6 text-center">
+                      <Activity className="w-8 h-8 text-slate-300" />
+                      <p className="text-xs font-bold text-slate-800">No Activity Recorded For {activityPeriod}</p>
+                      <p className="text-[11px] text-slate-500 max-w-sm">
+                        Zero platform actions, posts, or transactions were logged in this timeframe. As events occur, telemetry graphs update automatically.
+                      </p>
+                    </div>
+                  ) : (() => {
+                    const buckets = activityData.buckets;
+                    const peak = Math.max(1, activityData.peakValue);
+                    const getNiceMax = (val: number) => {
+                      if (val <= 5) return 5;
+                      if (val <= 10) return 10;
+                      if (val <= 20) return 20;
+                      if (val <= 50) return 50;
+                      if (val <= 100) return 100;
+                      if (val <= 500) return Math.ceil(val / 50) * 50;
+                      if (val <= 1000) return Math.ceil(val / 100) * 100;
+                      return Math.ceil(val / 500) * 500;
+                    };
+                    const yMax = getNiceMax(peak);
+                    const yTicks = [
+                      yMax,
+                      Math.round(yMax * 0.75),
+                      Math.round(yMax * 0.5),
+                      Math.round(yMax * 0.25),
+                      0
+                    ];
+                    const formatTick = (val: number) => {
+                      if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
+                      return String(val);
+                    };
+
+                    const svgWidth = 600;
+                    const svgHeight = 200;
+                    const padLeft = 20;
+                    const padRight = 20;
+                    const padTop = 20;
+                    const padBottom = 20;
+                    const usableWidth = svgWidth - padLeft - padRight;
+                    const usableHeight = svgHeight - padTop - padBottom;
+
+                    const points = buckets.map((b, i) => {
+                      const x = buckets.length > 1 ? padLeft + (i / (buckets.length - 1)) * usableWidth : svgWidth / 2;
+                      const y = svgHeight - padBottom - (b.count / yMax) * usableHeight;
+                      return { x, y, bucket: b, index: i };
+                    });
+
+                    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+                    const areaPath = points.length > 0
+                      ? `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${(svgHeight - padBottom).toFixed(1)} L ${points[0].x.toFixed(1)} ${(svgHeight - padBottom).toFixed(1)} Z`
+                      : '';
+
+                    const activePt = hoveredPointIndex !== null && points[hoveredPointIndex] ? points[hoveredPointIndex] : null;
+
+                    return (
+                      <div className="relative pt-2">
+                        <div className="h-56 flex items-stretch gap-3">
+                          {/* Y-Axis Labels */}
+                          <div className="flex flex-col justify-between text-[11px] font-mono text-slate-400 text-right pr-1 min-w-[32px] select-none">
+                            {yTicks.map((t, idx) => (
+                              <span key={idx}>{formatTick(t)}</span>
+                            ))}
+                          </div>
+
+                          {/* Chart SVG Canvas */}
+                          <div className="flex-1 relative border-b border-l border-slate-200">
+                            {/* Gridlines */}
+                            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-40">
+                              <div className="border-b border-dashed border-slate-200 w-full" />
+                              <div className="border-b border-dashed border-slate-200 w-full" />
+                              <div className="border-b border-dashed border-slate-200 w-full" />
+                              <div className="border-b border-dashed border-slate-200 w-full" />
+                              <div />
+                            </div>
+
+                            <svg
+                              className="absolute inset-0 w-full h-full overflow-visible"
+                              viewBox="0 0 600 200"
+                              preserveAspectRatio="none"
+                            >
+                              <defs>
+                                <linearGradient id="adminLiveChartGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#B49029" stopOpacity="0.38" />
+                                  <stop offset="100%" stopColor="#B49029" stopOpacity="0.0" />
+                                </linearGradient>
+                              </defs>
+
+                              {/* Area fill */}
+                              <path
+                                d={areaPath}
+                                fill="url(#adminLiveChartGrad)"
+                                className="transition-all duration-300"
+                              />
+
+                              {/* Trend line */}
+                              <path
+                                d={linePath}
+                                fill="none"
+                                stroke="#B49029"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="transition-all duration-300"
+                              />
+
+                              {/* Crosshair when hovered */}
+                              {activePt && (
+                                <line
+                                  x1={activePt.x}
+                                  y1={padTop}
+                                  x2={activePt.x}
+                                  y2={svgHeight - padBottom}
+                                  stroke="#B49029"
+                                  strokeWidth="1.5"
+                                  strokeDasharray="4 3"
+                                  className="transition-all duration-150"
+                                />
+                              )}
+
+                              {/* Data Points */}
+                              {points.map((pt, i) => {
+                                const isHovered = hoveredPointIndex === i;
+                                return (
+                                  <g key={i}>
+                                    {isHovered && (
+                                      <circle
+                                        cx={pt.x}
+                                        cy={pt.y}
+                                        r="8"
+                                        fill="#B49029"
+                                        fillOpacity="0.25"
+                                        className="animate-ping"
+                                      />
+                                    )}
+                                    <circle
+                                      cx={pt.x}
+                                      cy={pt.y}
+                                      r={isHovered ? 6 : 4}
+                                      fill="#FFFFFF"
+                                      stroke="#B49029"
+                                      strokeWidth={isHovered ? 3 : 2}
+                                      className="transition-all duration-150 cursor-pointer"
+                                      onMouseEnter={() => setHoveredPointIndex(i)}
+                                    />
+                                    {/* Hit-target for seamless touch/hover */}
+                                    <rect
+                                      x={pt.x - usableWidth / (buckets.length * 2)}
+                                      y={0}
+                                      width={usableWidth / buckets.length}
+                                      height={svgHeight}
+                                      fill="transparent"
+                                      className="cursor-pointer"
+                                      onMouseEnter={() => setHoveredPointIndex(i)}
+                                      onTouchStart={() => setHoveredPointIndex(i)}
+                                    />
+                                  </g>
+                                );
+                              })}
+                            </svg>
+
+                            {/* Rich Floating Interactive Tooltip */}
+                            {activePt && (
+                              <div
+                                className="absolute pointer-events-none z-20 bg-[#182A3E] text-white p-2.5 rounded-xl shadow-xl text-left border border-[#B49029]/50 transition-all duration-150"
+                                style={{
+                                  left: `${(activePt.x / svgWidth) * 100}%`,
+                                  top: `${Math.max(10, (activePt.y / svgHeight) * 100 - 45)}%`,
+                                  transform: 'translate(-50%, -100%)',
+                                  minWidth: '150px'
+                                }}
+                              >
+                                <div className="text-[10px] font-mono text-[#CEC8A2] uppercase tracking-wider mb-1">
+                                  {activePt.bucket.fullDate}
+                                </div>
+                                <div className="text-sm font-black text-white flex items-center gap-1.5 font-mono-numbers">
+                                  <span className="w-2 h-2 rounded-full bg-[#B49029]" />
+                                  <span>{activePt.bucket.count} total events</span>
+                                </div>
+                                <div className="mt-1.5 pt-1.5 border-t border-white/10 text-[10px] space-y-0.5 text-slate-300 font-mono">
+                                  <div className="flex justify-between">
+                                    <span>Audit logs:</span>
+                                    <span className="text-white font-bold">{activePt.bucket.breakdown.audit}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Community posts:</span>
+                                    <span className="text-white font-bold">{activePt.bucket.breakdown.posts}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Registrations:</span>
+                                    <span className="text-white font-bold">{activePt.bucket.breakdown.users}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Transactions:</span>
+                                    <span className="text-white font-bold">{activePt.bucket.breakdown.txns}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* X-Axis Labels */}
+                        <div
+                          className="flex justify-between pl-10 pr-2 pt-2.5 text-[11px] font-semibold text-slate-500 select-none overflow-x-hidden"
+                          onMouseLeave={() => setHoveredPointIndex(null)}
+                        >
+                          {buckets.map((b, i) => (
+                            <span
+                              key={i}
+                              className={`transition-colors cursor-pointer text-center ${
+                                hoveredPointIndex === i ? 'text-[#B49029] font-black scale-105' : ''
+                              }`}
+                              onMouseEnter={() => setHoveredPointIndex(i)}
+                            >
+                              {b.label}
+                            </span>
                           ))}
-                        </svg>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex justify-between pl-12 pr-4 pt-2 text-[11px] font-semibold text-slate-500">
-                      <span>Mon</span>
-                      <span>Tue</span>
-                      <span>Wed</span>
-                      <span>Thu</span>
-                      <span>Fri</span>
-                      <span>Sat</span>
-                      <span>Sun</span>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Right Recent Events (4 cols) */}

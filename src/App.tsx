@@ -14,6 +14,7 @@ import { COMPANY_CONTACT_DISPLAY, COMPANY_CONTACT_TEL, COMPANY_SUPPORT_WHATSAPP 
 import { linkedEndUserNavigation, roleUtilityDestinations } from './shared/endUserNavigation';
 import { isCommunityPostId } from './shared/communityEngagement';
 import { prefetchView } from './lib/prefetch';
+import type { ViewType } from './types';
 
 // Ultra-fast Code Splitting: Lazy-load non-critical views and modals
 const LeadMarketplace = React.lazy(() => import('./components/leads/LeadMarketplace').then(m => ({ default: m.LeadMarketplace })));
@@ -106,16 +107,63 @@ const AppContent: React.FC = () => {
   }, [deviceMode]);
 
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const viewParam = params.get('view')?.toLowerCase();
-    const postId = params.get('post') || '';
-    if (viewParam === 'privacy') {
-      setActiveView('PRIVACY');
-    } else if (viewParam === 'terms') {
-      setActiveView('TERMS');
-    } else if (viewParam === 'community' || isCommunityPostId(postId)) {
-      setActiveView('COMMUNITY');
-    }
+    const applyViewFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view')?.toLowerCase();
+      const postId = params.get('post') || '';
+
+      if (viewParam === 'privacy') {
+        setActiveView('PRIVACY');
+        return;
+      }
+      if (viewParam === 'terms') {
+        setActiveView('TERMS');
+        return;
+      }
+
+      const viewMap: Record<string, ViewType> = {
+        home: 'HOME',
+        overview: 'HOME',
+        dashboard: 'DASHBOARD',
+        properties: 'PROPERTIES',
+        projects: 'PROPERTIES',
+        leads_market: 'LEADS_MARKET',
+        leads: 'LEADS_MARKET',
+        media: 'MEDIA',
+        podcast: 'MEDIA',
+        conference: 'CONFERENCE',
+        market_insights: 'MARKET_INSIGHTS',
+        market: 'MARKET_INSIGHTS',
+        trends: 'MARKET_INSIGHTS',
+        community: 'COMMUNITY',
+        qa: 'COMMUNITY',
+        reviews: 'REVIEWS',
+        rating: 'REVIEWS',
+        requirement: 'REQUIREMENT',
+        requirements: 'REQUIREMENT',
+        chat: 'CHAT',
+        support: 'CHAT',
+        admin: 'ADMIN',
+        superadmin: 'ADMIN',
+        developer: 'DEVELOPER',
+        professional: 'PROFESSIONAL',
+        property_admin: 'PROPERTY_ADMIN',
+        studio: 'STUDIO',
+        contact: 'CONTACT',
+        privacy: 'PRIVACY',
+        terms: 'TERMS'
+      };
+
+      if (viewParam && viewMap[viewParam]) {
+        setActiveView(viewMap[viewParam]);
+      } else if (isCommunityPostId(postId)) {
+        setActiveView('COMMUNITY');
+      }
+    };
+
+    applyViewFromUrl();
+    window.addEventListener('popstate', applyViewFromUrl);
+    return () => window.removeEventListener('popstate', applyViewFromUrl);
   }, [setActiveView]);
 
   // If STUDIO_IFP mode or activeView is STUDIO, render Studio Broadcast View

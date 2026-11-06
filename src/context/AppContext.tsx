@@ -213,7 +213,15 @@ function mapApiUser(raw: any): User {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>([]);
-  const [sessionUser, setSessionUser] = useState<User | null>(null);
+  const [sessionUser, setSessionUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('ps_session_user') || localStorage.getItem('ps_auth_user');
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return null;
+  });
   const currentUser = sessionUser ?? GUEST_USER;
   const isLoggedIn = Boolean(sessionUser);
 
@@ -581,6 +589,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (user) {
       const mapped = mapApiUser(user);
       setSessionUser(mapped);
+      try {
+        localStorage.setItem('ps_session_user', JSON.stringify(mapped));
+      } catch {}
       if (isPropertySeeker(mapped.role)) {
         setActiveView('DASHBOARD');
       } else {
@@ -596,12 +607,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const res = await fetch('/api/auth/me');
     if (!res.ok) return;
     const data = await res.json();
-    if (data?.user) setSessionUser(mapApiUser(data.user));
+    if (data?.user) {
+      const mapped = mapApiUser(data.user);
+      setSessionUser(mapped);
+      try {
+        localStorage.setItem('ps_session_user', JSON.stringify(mapped));
+      } catch {}
+    }
   };
 
   const logout = () => {
     fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setSessionUser(null);
+    try {
+      localStorage.removeItem('ps_session_user');
+      localStorage.removeItem('ps_auth_user');
+    } catch {}
     setActiveView('HOME');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast('Signed out. Continuing in guest mode.');
@@ -1360,7 +1381,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         leadPrices,
         updateLeadPrice,
         unlockLead,
-        walletBalance: currentUser.walletBalance,
+        walletBalance: currentUser.walletBalance ?? 0,
         topUpWallet,
         mediaItems,
         selectedMedia,

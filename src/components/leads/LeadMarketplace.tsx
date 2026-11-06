@@ -248,7 +248,7 @@ export const LeadMarketplace: React.FC<LeadMarketplaceProps> = ({ onOpenWalletMo
           </div>
 
           <div className="text-3xl font-black text-[#030508] font-mono-numbers">
-            ₹{currentUser.walletBalance.toLocaleString('en-IN')}
+            ₹{Number(currentUser.walletBalance || 0).toLocaleString('en-IN')}
           </div>
 
           <div className="space-y-2 pt-1">

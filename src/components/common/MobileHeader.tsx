@@ -214,7 +214,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-[11px] font-bold active:scale-95 transition-transform cursor-pointer shrink-0"
             >
               <Wallet className="w-3 h-3 text-amber-600 shrink-0" />
-              <span className="font-mono-numbers">₹{walletBalance.toLocaleString('en-IN')}</span>
+              <span className="font-mono-numbers">₹{(walletBalance ?? currentUser.walletBalance ?? 0).toLocaleString('en-IN')}</span>
             </button>
           )}
 

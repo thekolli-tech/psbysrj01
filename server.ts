@@ -34,6 +34,7 @@ import {
   getSession,
   revokeSession,
   getAuditLogs,
+  getActivityGrowthData,
   getAllPosts,
   getPostById,
   castCommunityVote,
@@ -1453,6 +1454,17 @@ app.get('/api/admin/audit-logs', requireAdmin, async (req: Request, res: Respons
     const action = req.query.action as string | undefined;
     const logs = await getAuditLogs(limit, offset, action);
     res.json({ logs });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Platform Activity & Growth Analytics Endpoint
+app.get('/api/admin/activity-growth', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const period = String(req.query.period || '7D').toUpperCase();
+    const data = await getActivityGrowthData(period);
+    res.json(data);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -4175,7 +4187,7 @@ async function start() {
 }
 
 const entry = process.argv[1] || '';
-if (entry.endsWith('server.ts') || entry.endsWith('server.js')) {
+if (entry.endsWith('server.ts') || entry.endsWith('server.js') || entry.endsWith('index.mjs')) {
   start().catch(err => {
     console.error('[Property Studio] Failed to start server:', err);
     process.exit(1);

@@ -51,7 +51,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
             <div>
               <span className="text-xs text-slate-500 font-medium">Available Balance</span>
               <div className="text-2xl font-extrabold text-slate-900 font-mono-numbers">
-                ₹{currentUser.walletBalance.toLocaleString('en-IN')}
+                ₹{Number(currentUser.walletBalance || 0).toLocaleString('en-IN')}
               </div>
             </div>
             <div className="text-right">
