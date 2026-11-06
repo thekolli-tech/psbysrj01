@@ -288,6 +288,40 @@ test('Property Studio — Production Google OAuth 2.0 & OpenID Connect Integrati
     assert.equal(loginRes.json.user.role, 'SUPER_ADMIN');
   });
 
+  await t.test('13. GET /api/auth/google/authorize builds valid URL containing non-empty client_id', async () => {
+    const res = await api('GET', '/api/auth/google/authorize');
+    assert.equal(res.status, 200);
+    assert.ok(res.json.authUrl);
+    assert.match(res.json.authUrl, /client_id=test-google-client-id\.apps\.googleusercontent\.com/);
+    assert.match(res.json.authUrl, /scope=openid\+email\+profile/);
+    assert.ok(!res.json.authUrl.includes('client_id=&'), 'Must never generate empty client_id parameter');
+  });
+
+  await t.test('14. Missing GOOGLE_CLIENT_ID fails safely with 400 without redirecting to Google', async () => {
+    const originalClientId = process.env.GOOGLE_CLIENT_ID;
+    const originalViteId = process.env.VITE_GOOGLE_CLIENT_ID;
+    delete process.env.GOOGLE_CLIENT_ID;
+    delete process.env.VITE_GOOGLE_CLIENT_ID;
+
+    try {
+      // JSON request mode
+      const res = await api('GET', '/api/auth/google/authorize');
+      assert.equal(res.status, 400);
+      assert.match(res.json.error, /GOOGLE_CLIENT_ID/);
+
+      // Redirect mode: returns friendly HTML rather than Google raw 400 error
+      const htmlRes = await fetch(`${base}/api/auth/google/authorize?mode=redirect`, { redirect: 'manual' });
+      assert.equal(htmlRes.status, 400);
+      const html = await htmlRes.text();
+      assert.match(html, /Google Sign-In Configuration Required/);
+      assert.match(html, /GOOGLE_CLIENT_ID/);
+      assert.ok(!htmlRes.headers.get('location'), 'Must NOT redirect when client_id is missing');
+    } finally {
+      process.env.GOOGLE_CLIENT_ID = originalClientId;
+      if (originalViteId) process.env.VITE_GOOGLE_CLIENT_ID = originalViteId;
+    }
+  });
+
   // Teardown
   server.close();
 });

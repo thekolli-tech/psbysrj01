@@ -67,10 +67,21 @@ export function validateGoogleOAuthState(state?: string): boolean {
 }
 
 /**
+ * Checks whether Google OAuth is configured on this environment.
+ */
+export function isGoogleOAuthConfigured(): boolean {
+  const clientId = (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '').trim();
+  return Boolean(clientId);
+}
+
+/**
  * Generates the full Google OAuth 2.0 authorization URL.
  */
 export function getGoogleOAuthAuthorizeUrl(redirectUri: string, state: string): string {
-  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '';
+  const clientId = (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '').trim();
+  if (!clientId) {
+    throw new Error('Google OAuth Client ID is not configured on the server. Please set GOOGLE_CLIENT_ID or VITE_GOOGLE_CLIENT_ID.');
+  }
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,

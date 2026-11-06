@@ -199,6 +199,7 @@ import {
   authenticateGoogleIdentity,
   createGoogleOAuthState,
   validateGoogleOAuthState,
+  isGoogleOAuthConfigured,
   getGoogleOAuthAuthorizeUrl as getGoogleAuthUrl
 } from './src/server/googleAuth.ts';
 
@@ -551,6 +552,49 @@ app.post('/api/auth/google', async (req: Request, res: Response): Promise<void> 
 
 // 2. GET /api/auth/google/authorize: Starts server-side OAuth 2.0 flow
 app.get('/api/auth/google/authorize', (req: Request, res: Response): void => {
+  if (!isGoogleOAuthConfigured()) {
+    if (req.query.mode === 'redirect') {
+      res.status(400).send(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Property Studio — Google OAuth Configuration</title>
+  </head>
+  <body style="font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:40px;background:#f8fafc;color:#1e293b;">
+    <div style="max-width:480px;margin:40px auto;padding:32px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.06);">
+      <div style="width:48px;height:48px;margin:0 auto 16px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:24px;">⚠️</span>
+      </div>
+      <h3 style="color:#b45309;margin:0 0 12px;font-size:18px;">Google Sign-In Configuration Required</h3>
+      <p style="font-size:13px;color:#475569;line-height:1.6;margin:0 0 16px;">
+        Google Sign-In is not yet activated on this server because <code>GOOGLE_CLIENT_ID</code> is missing from environment variables.
+      </p>
+      <p style="font-size:12px;color:#64748b;margin:0 0 24px;line-height:1.5;">
+        Please configure <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> in your Vercel or server environment variables, or sign in using your account email and password.
+      </p>
+      <button onclick="window.close()" style="padding:10px 24px;background:#182a3e;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Close Window</button>
+    </div>
+    <script>
+      (function() {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({
+            type: 'GOOGLE_AUTH_ERROR',
+            error: 'Google Sign-In is not configured yet (missing GOOGLE_CLIENT_ID). Please configure GOOGLE_CLIENT_ID in your environment, or sign in using your email and password.'
+          }, window.location.origin);
+          setTimeout(function() { window.close(); }, 3500);
+        }
+      })();
+    </script>
+  </body>
+</html>`);
+      return;
+    }
+    res.status(400).json({
+      error: 'Google OAuth Client ID is not configured on the server. Please set GOOGLE_CLIENT_ID or VITE_GOOGLE_CLIENT_ID.'
+    });
+    return;
+  }
+
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
   const host = req.get('host') || 'localhost:3000';
   const defaultRedirectUri = `${protocol}://${host}/api/auth/google/callback`;

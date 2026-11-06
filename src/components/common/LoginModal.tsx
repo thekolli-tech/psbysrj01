@@ -74,7 +74,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
   // Google OAuth 2.0 & GIS Authentication State
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [googleClientId, setGoogleClientId] = useState<string>('');
+  const [googleClientId, setGoogleClientId] = useState<string>(
+    (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || ''
+  );
 
   // Email OTP verification state
   const [otpSent, setOtpSent] = useState(false);
@@ -339,15 +341,30 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const handleGoogleSignIn = async () => {
     if (loading || googleLoading) return;
     setErrorMsg(null);
+
+    const effectiveClientId = (
+      googleClientId ||
+      (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) ||
+      ''
+    ).trim();
+
+    // Guard: Prevent opening Google popup when Client ID is missing (avoids Google Error 400: missing client_id)
+    if (!effectiveClientId) {
+      setErrorMsg(
+        'Google Sign-In is not configured yet (missing Google OAuth Client ID). Please configure GOOGLE_CLIENT_ID in your environment variables, or sign in using your account email and password.'
+      );
+      return;
+    }
+
     setGoogleLoading(true);
 
     const gAccounts = (window as any).google?.accounts;
 
     // Fast path: Google Identity Services Code Client popup
-    if (gAccounts?.oauth2 && googleClientId) {
+    if (gAccounts?.oauth2) {
       try {
         const client = gAccounts.oauth2.initCodeClient({
-          client_id: googleClientId,
+          client_id: effectiveClientId,
           scope: 'openid email profile',
           ux_mode: 'popup',
           callback: async (resp: any) => {
