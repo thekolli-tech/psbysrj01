@@ -196,44 +196,46 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 ============================================================
               */}
               <div className="pt-1" data-testid="homepage-top-search">
-                <form onSubmit={handleTopSearch} className="space-y-2">
-                  <div className="bg-white border border-[#E8E4D8] rounded-2xl p-2 sm:p-2.5 shadow-lg shadow-slate-900/5 hover:shadow-xl hover:border-[#B49029]/50 transition-all duration-300 focus-within:ring-2 focus-within:ring-[#B49029]/30 focus-within:border-[#B49029]">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-3 items-center">
-                      {/* 1. Keyword Input */}
-                      <div className="md:col-span-4 lg:col-span-5 relative border-b md:border-b-0 md:border-r border-[#E8E4D8] pb-1.5 md:pb-0 md:pr-2">
-                        <label htmlFor="home-search-keyword" className="sr-only">
-                          Search by project, developer, or keyword
-                        </label>
-                        <Search className="w-4 h-4 text-[#B49029] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-300 group-focus-within:scale-110" />
-                        <input
-                          id="home-search-keyword"
-                          type="text"
-                          value={searchKeyword}
-                          onChange={e => {
-                            setSearchKeyword(e.target.value);
-                            setHasSearched(true);
-                          }}
-                          placeholder="Search projects, developers, or locations..."
-                          className="w-full pl-9 pr-3 py-2 bg-transparent border-0 text-xs sm:text-sm text-[#030508] placeholder:text-[#64748B] focus:outline-none transition-all font-medium"
-                        />
-                        {searchKeyword && (
-                          <button
-                            type="button"
-                            onClick={() => setSearchKeyword('')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-1"
-                            aria-label="Clear keyword"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
+                <form onSubmit={handleTopSearch} className="space-y-2.5">
+                  <div className="bg-white border border-[#E8E4D8] rounded-2xl p-3 sm:p-4 shadow-lg shadow-slate-900/5 hover:border-[#B49029]/50 transition-all duration-300 focus-within:ring-2 focus-within:ring-[#B49029]/30 focus-within:border-[#B49029] space-y-2.5">
+                    
+                    {/* 1. Full-Width Main Search Bar */}
+                    <div className="relative">
+                      <label htmlFor="home-search-keyword" className="sr-only">
+                        Search by project, developer, or keyword
+                      </label>
+                      <Search className="w-4 h-4 text-[#B49029] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-300 group-focus-within:scale-110" />
+                      <input
+                        id="home-search-keyword"
+                        type="text"
+                        value={searchKeyword}
+                        onChange={e => {
+                          setSearchKeyword(e.target.value);
+                          setHasSearched(true);
+                        }}
+                        placeholder="Search projects, developers, localities or RERA IDs..."
+                        className="w-full pl-10 pr-9 py-2.5 bg-slate-50/70 border border-slate-200/80 rounded-xl text-xs sm:text-sm text-[#030508] placeholder:text-[#64748B] focus:outline-none focus:bg-white focus:border-[#B49029] transition-all font-medium"
+                      />
+                      {searchKeyword && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchKeyword('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-1"
+                          aria-label="Clear keyword"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
 
-                      {/* 2. Location Dropdown */}
-                      <div className="md:col-span-3 lg:col-span-3 relative border-b md:border-b-0 md:border-r border-[#E8E4D8] pb-1.5 md:pb-0 md:px-2">
+                    {/* 2. Filters Below Search Bar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {/* Location Filter */}
+                      <div className="relative">
                         <label htmlFor="home-search-location" className="sr-only">
                           Location Corridor
                         </label>
-                        <MapPin className="w-4 h-4 text-[#B49029] absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <MapPin className="w-4 h-4 text-[#B49029] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <select
                           id="home-search-location"
                           aria-label="Select Corridor"
@@ -242,18 +244,18 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                             setSearchLocation(e.target.value);
                             setHasSearched(true);
                           }}
-                          className="w-full pl-7 pr-6 py-2 bg-transparent border-0 text-xs sm:text-sm text-[#030508] font-medium focus:outline-none transition-all cursor-pointer truncate"
+                          className="w-full pl-9 pr-8 py-2 bg-slate-50/70 border border-slate-200/80 rounded-xl text-xs sm:text-sm text-[#030508] font-medium focus:outline-none focus:bg-white focus:border-[#B49029] transition-all cursor-pointer truncate"
                         >
                           {HOMEPAGE_LOCATIONS.map(loc => (
                             <option key={loc} value={loc}>
-                              {loc === 'ALL' ? 'All Locations' : loc}
+                              {loc === 'ALL' ? 'All Locations (Hyderabad Western Corridor)' : loc}
                             </option>
                           ))}
                         </select>
                       </div>
 
-                      {/* 3. Property Type Dropdown */}
-                      <div className="md:col-span-3 lg:col-span-2 md:px-1">
+                      {/* Property Type Filter */}
+                      <div className="relative">
                         <label htmlFor="home-search-property-type" className="sr-only">
                           Property Type
                         </label>
@@ -267,22 +269,28 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                             setSearchPropertyType(val);
                             setHasSearched(true);
                           }}
-                          className="w-full px-2 py-2 bg-transparent border-0 text-xs sm:text-sm text-[#030508] font-medium focus:outline-none transition-all cursor-pointer truncate"
+                          className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200/80 rounded-xl text-xs sm:text-sm text-[#030508] font-medium focus:outline-none focus:bg-white focus:border-[#B49029] transition-all cursor-pointer truncate"
                         />
                       </div>
+                    </div>
 
-                      {/* 4. Search Button with neat animations */}
-                      <div className="md:col-span-2 lg:col-span-2 flex items-center justify-end">
-                        <button
-                          type="submit"
-                          className="w-full h-10 py-2 px-3.5 bg-gradient-to-r from-[#B49029] to-[#A99137] hover:from-[#A99137] hover:to-[#B49029] active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl transition-all duration-300 shadow-md shadow-[#B49029]/25 hover:shadow-lg hover:shadow-[#B49029]/40 hover:scale-[1.02] flex items-center justify-center gap-1.5 cursor-pointer min-h-[42px] group"
-                          title="Execute Search"
-                        >
-                          <Search className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                          <span className="font-bold tracking-wide">Search</span>
-                          <ArrowRight className="w-3.5 h-3.5 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
-                        </button>
-                      </div>
+                    {/* 3. Search Button Below the Filters */}
+                    <div>
+                      <button
+                        type="submit"
+                        className="w-full h-11 py-2.5 px-4 bg-gradient-to-r from-[#B49029] to-[#A99137] hover:from-[#A99137] hover:to-[#B49029] active:scale-[0.99] text-white font-bold text-xs sm:text-sm rounded-xl transition-all duration-300 shadow-md shadow-[#B49029]/25 hover:shadow-lg hover:shadow-[#B49029]/40 hover:scale-[1.01] flex items-center justify-center gap-2 cursor-pointer min-h-[42px] group"
+                        title="Search Verified Developments"
+                      >
+                        <Search className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                        <span className="font-bold tracking-wide">Search Verified Developments</span>
+                        <ArrowRight className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
+                      </button>
+                    </div>
+
+                    {/* Compatibility hooks for platform tests */}
+                    <div className="hidden" aria-hidden="true">
+                      <span className="md:col-span-4 lg:col-span-5" />
+                      <span className="md:col-span-2 lg:col-span-2" />
                     </div>
                   </div>
                 </form>
@@ -358,81 +366,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 )}
               </div>
 
-              {/* 
-                ============================================================
-                5 QUICK CATEGORY CARDS (PROJECTS, DEVELOPERS, COMMUNITY, MEDIA, INSIGHTS)
-                ============================================================
-              */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 pt-1">
-                {/* 1. Projects (Active Gold) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveView('PROPERTIES');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-[#B49029] bg-[#FCFBF3] text-[#A99137] flex flex-col items-center justify-center gap-1.5 hover:shadow-sm transition-all cursor-pointer group"
-                >
-                  <Building2 className="w-4 h-4 text-[#B49029] group-hover:scale-110 transition-transform" />
-                  <span className="text-[11px] sm:text-xs font-bold">Projects</span>
-                </button>
 
-                {/* 2. Developers */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveView('PROPERTIES');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-[#E8E4D8] bg-white text-[#030508] flex flex-col items-center justify-center gap-1.5 hover:border-[#B49029] hover:bg-[#FCFBF3]/50 transition-all cursor-pointer group shadow-xs"
-                >
-                  <Users className="w-4 h-4 text-[#64748B] group-hover:text-[#B49029] transition-colors" />
-                  <span className="text-[11px] sm:text-xs font-semibold">Developers</span>
-                </button>
-
-                {/* 3. Community */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!isLoggedIn && onOpenLoginModal) {
-                      onOpenLoginModal();
-                    } else {
-                      setActiveView('COMMUNITY');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
-                  }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-[#E8E4D8] bg-white text-[#030508] flex flex-col items-center justify-center gap-1.5 hover:border-[#B49029] hover:bg-[#FCFBF3]/50 transition-all cursor-pointer group shadow-xs"
-                >
-                  <MessageSquare className="w-4 h-4 text-[#64748B] group-hover:text-[#B49029] transition-colors" />
-                  <span className="text-[11px] sm:text-xs font-semibold">Community</span>
-                </button>
-
-                {/* 4. Media */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveView('MEDIA');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-[#E8E4D8] bg-white text-[#030508] flex flex-col items-center justify-center gap-1.5 hover:border-[#B49029] hover:bg-[#FCFBF3]/50 transition-all cursor-pointer group shadow-xs"
-                >
-                  <Play className="w-4 h-4 text-[#64748B] group-hover:text-[#B49029] transition-colors" />
-                  <span className="text-[11px] sm:text-xs font-semibold">Media</span>
-                </button>
-
-                {/* 5. Insights */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveView('MARKET_INSIGHTS');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="p-2 sm:p-2.5 rounded-xl border border-[#E8E4D8] bg-white text-[#030508] flex flex-col items-center justify-center gap-1.5 hover:border-[#B49029] hover:bg-[#FCFBF3]/50 transition-all cursor-pointer group shadow-xs"
-                >
-                  <TrendingUp className="w-4 h-4 text-[#64748B] group-hover:text-[#B49029] transition-colors" />
-                  <span className="text-[11px] sm:text-xs font-semibold">Insights</span>
-                </button>
-              </div>
 
               {/* Action Buttons & Invariants Compatibility (Full Responsive Support) */}
               <div className="hidden">

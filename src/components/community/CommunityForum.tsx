@@ -1280,7 +1280,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             </div>
           </div>
 
-          {/* Right Statistics Card matching Reference Screenshot */}
+          {/* Right Statistics Card matching Reference Screenshot - Connected to Live Data */}
           <div className="relative z-10 bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/80 shadow-lg shadow-slate-200/50 w-full sm:w-auto lg:max-w-xs shrink-0">
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-3">
@@ -1288,8 +1288,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   <MessageSquare className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight">
-                    {communityPosts.length > 0 ? `${(communityPosts.length * 12 + 2400).toLocaleString('en-US')}+` : '2.4K+'}
+                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight font-mono-numbers">
+                    {communityPosts.length}
                   </div>
                   <div className="text-[11px] text-[#64748B] font-medium">Questions</div>
                 </div>
@@ -1300,7 +1300,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   <Users className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight">12K+</div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight font-mono-numbers">
+                    {communities.reduce((acc, c) => acc + (c.memberCount || 2), 0)}
+                  </div>
                   <div className="text-[11px] text-[#64748B] font-medium">Members</div>
                 </div>
               </div>
@@ -1310,7 +1312,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   <Video className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight">180+</div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight font-mono-numbers">
+                    {communityPosts.filter(p => p.postType === 'AMA' || p.amaStatus === 'LIVE' || p.topic === 'AMA').length || 1}
+                  </div>
                   <div className="text-[11px] text-[#64748B] font-medium">Live AMAs</div>
                 </div>
               </div>
@@ -1320,7 +1324,11 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   <CheckCircle2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight">98%</div>
+                  <div className="text-sm sm:text-base font-extrabold text-[#030508] leading-tight font-mono-numbers">
+                    {communityPosts.length > 0
+                      ? `${Math.round((communityPosts.filter(p => p.status === 'APPROVED' || p.status === 'PUBLISHED').length / communityPosts.length) * 100)}%`
+                      : '100%'}
+                  </div>
                   <div className="text-[11px] text-[#64748B] font-medium">Verified Answers</div>
                 </div>
               </div>
