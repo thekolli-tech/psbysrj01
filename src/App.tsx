@@ -202,7 +202,7 @@ const AppContent: React.FC = () => {
       }`}
     >
       {/* Dynamic Header: Mobile shell vs Desktop SaaS portal */}
-      {isForcedMobile ? (
+      {isLoggedIn && activeView === 'DASHBOARD' ? null : isForcedMobile ? (
         <MobileHeader
           onOpenProfileModal={() => setProfileModalOpen(true)}
           onOpenWalletModal={() => setWalletModalOpen(true)}

@@ -4,6 +4,8 @@ import { Property } from '../../types';
 import { PropertyCategorySelect } from '../properties/PropertyCategorySelect';
 import { PropertyDetailModal } from '../properties/PropertyDetailModal';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
+import { AuthenticatedAppLayout } from '../authenticated/AuthenticatedAppLayout';
+import { CommunityFeed } from '../authenticated/CommunityFeed';
 import {
   PROPERTY_CATEGORY_GROUPS,
   ALL_PROPERTY_TYPES,
@@ -41,6 +43,7 @@ import {
   Play,
   Repeat,
   Users,
+  Briefcase,
   Trash2
 } from 'lucide-react';
 
@@ -182,9 +185,24 @@ const PURCHASE_TIMELINES = [
   'After 1 Year'
 ];
 
-export const UserDashboard: React.FC = () => {
-  const { currentUser, setActiveView, walletBalance, showToast, refreshSession, properties, constructionLogs, setSelectedMedia, mediaItems } = useApp();
+export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = ({ initialMode = 'FEED' }) => {
+  const {
+    currentUser,
+    setActiveView,
+    walletBalance,
+    showToast,
+    refreshSession,
+    properties,
+    constructionLogs,
+    setSelectedMedia,
+    mediaItems,
+    communityPosts: liveCommunityPosts,
+    communities,
+    repostDiscussion,
+    refreshPosts
+  } = useApp();
 
+  const [dashboardViewMode, setDashboardViewMode] = useState<'FEED' | 'WORKSPACE'>(initialMode);
   const [activeTab, setActiveTab] = useState<TabType>('OVERVIEW');
 
   // Property search state
@@ -691,21 +709,73 @@ export const UserDashboard: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 animate-in fade-in duration-200">
-      {/* Member Header Card */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-700/50 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+    <AuthenticatedAppLayout
+      initialNav={dashboardViewMode === 'FEED' ? 'HOME' : 'MY_PROFILE'}
+      onOpenSupport={() => setActiveView('CHAT')}
+      onOpenWallet={() => setActiveView('LEADS_MARKET')}
+    >
+      <div className="space-y-4">
+        {/* View Mode Switcher Header Pill */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-1.5 shadow-2xs flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setDashboardViewMode('FEED')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                dashboardViewMode === 'FEED'
+                  ? 'bg-[#182A3E] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+              <span>Community Discussions</span>
+            </button>
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-start sm:items-center gap-4 sm:gap-5">
-            <img
-              src={getSafeAvatar(currentUser.avatar)}
-              alt={currentUser.name}
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-amber-400/40 shadow-lg"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
-              }}
-            />
+            <button
+              type="button"
+              onClick={() => setDashboardViewMode('WORKSPACE')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                dashboardViewMode === 'WORKSPACE'
+                  ? 'bg-[#182A3E] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Briefcase className="w-3.5 h-3.5 text-amber-500" />
+              <span>My Workspace & Enquiries</span>
+            </button>
+          </div>
+
+          <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline px-3">
+            {dashboardViewMode === 'FEED' ? 'Real-Time Intelligence Network' : 'Personal Dashboard'}
+          </span>
+        </div>
+
+        {dashboardViewMode === 'FEED' ? (
+          <CommunityFeed
+            posts={liveCommunityPosts || []}
+            communities={communities || []}
+            currentUser={currentUser}
+            onOpenComposer={() => {}}
+            refreshPosts={refreshPosts}
+            showToast={showToast}
+            repostDiscussion={repostDiscussion}
+          />
+        ) : (
+          <div className="max-w-6xl mx-auto px-1 sm:px-4 py-2 space-y-8 animate-in fade-in duration-150">
+            {/* Member Header Card */}
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-700/50 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-start sm:items-center gap-4 sm:gap-5">
+                  <img
+                    src={getSafeAvatar(currentUser.avatar)}
+                    alt={currentUser.name}
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-amber-400/40 shadow-lg"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                    }}
+                  />
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black font-display text-white">
@@ -2688,6 +2758,9 @@ export const UserDashboard: React.FC = () => {
           onClose={() => setActivePropertyModal(null)}
         />
       )}
-    </div>
+          </div>
+        )}
+      </div>
+    </AuthenticatedAppLayout>
   );
 };

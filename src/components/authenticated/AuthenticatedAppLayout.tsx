@@ -1,0 +1,302 @@
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
+import { TopNavigation } from './TopNavigation';
+import { LeftSidebar, NavItemKey } from './LeftSidebar';
+import { MobileNavigation } from './MobileNavigation';
+import { CommunityFeed } from './CommunityFeed';
+import { PostComposer, ComposerMode } from './PostComposer';
+import { TopicRecommendations } from './TopicRecommendations';
+import { SuggestedCommunities } from './SuggestedCommunities';
+import { TrendingDiscussions } from './TrendingDiscussions';
+import { UpcomingLiveSessions } from './UpcomingLiveSessions';
+import { ProfessionalRecommendations } from './ProfessionalRecommendations';
+import { UniversalSearchModal } from '../common/UniversalSearchModal';
+import { CommunityPost } from '../../types';
+
+interface AuthenticatedAppLayoutProps {
+  initialNav?: NavItemKey;
+  children?: React.ReactNode;
+  onOpenSupport?: () => void;
+  onOpenWallet?: () => void;
+}
+
+export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
+  initialNav = 'HOME',
+  children,
+  onOpenSupport,
+  onOpenWallet
+}) => {
+  const {
+    currentUser,
+    communityPosts,
+    communities,
+    createCommunityPost,
+    createCommunityProposal,
+    joinCommunity,
+    leaveCommunity,
+    upvoteCommunityPost,
+    repostDiscussion,
+    refreshPosts,
+    refreshCommunities,
+    setActiveView,
+    logout,
+    showToast
+  } = useApp();
+
+  const [activeNav, setActiveNav] = useState<NavItemKey>(initialNav);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerMode, setComposerMode] = useState<ComposerMode>('DISCUSSION');
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [selectedTopicFilter, setSelectedTopicFilter] = useState('ALL');
+
+  // Load bookmarks & unread notifications
+  useEffect(() => {
+    fetch('/api/me/bookmarks')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.bookmarkedPostIds && Array.isArray(data.bookmarkedPostIds)) {
+          setBookmarkedIds(new Set(data.bookmarkedPostIds));
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/notifications/unread-count')
+      .then(res => res.json())
+      .then(data => {
+        if (typeof data?.unreadCount === 'number') {
+          setUnreadNotifications(data.unreadCount);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleBookmarkToggle = async (postId: string) => {
+    try {
+      const res = await fetch(`/api/community/posts/${postId}/bookmark`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setBookmarkedIds(prev => {
+          const next = new Set(prev);
+          if (data.bookmarked) {
+            next.add(postId);
+            showToast('Discussion saved to bookmarks!');
+          } else {
+            next.delete(postId);
+            showToast('Bookmark removed.');
+          }
+          return next;
+        });
+      }
+    } catch {}
+  };
+
+  const handleNavSelect = (key: NavItemKey) => {
+    setActiveNav(key);
+    setMobileSidebarOpen(false);
+
+    if (key === 'SUPER_ADMIN_CONSOLE') {
+      setActiveView('ADMIN');
+      return;
+    }
+    if (key === 'DEVELOPER_DASHBOARD') {
+      setActiveView('DEVELOPER');
+      return;
+    }
+    if (key === 'PROPERTY_INSIGHTS') {
+      setActiveView('MARKET_INSIGHTS');
+      return;
+    }
+    if (key === 'LIVE_SESSIONS') {
+      setActiveView('CONFERENCE');
+      return;
+    }
+    if (key === 'COMMUNITIES') {
+      setSelectedTopicFilter('ALL');
+      return;
+    }
+    if (key === 'FIND_PROFESSIONALS' || key === 'DEVELOPERS' || key === 'CHANNEL_PARTNERS' || key === 'RERA_PROFESSIONALS' || key === 'REAL_ESTATE_MEDIA') {
+      setActiveView('LEADS_MARKET');
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const displayedPosts = React.useMemo(() => {
+    if (activeNav === 'SAVED_ITEMS') {
+      return (communityPosts || []).filter(p => bookmarkedIds.has(p.id));
+    }
+    if (activeNav === 'MY_POSTS') {
+      return (communityPosts || []).filter(p => p.authorId === currentUser.id);
+    }
+    if (activeNav === 'MY_QUESTIONS') {
+      return (communityPosts || []).filter(
+        p => p.postType === 'QUESTION' && (p.authorId === currentUser.id || !p.authorId)
+      );
+    }
+    return communityPosts || [];
+  }, [activeNav, communityPosts, bookmarkedIds, currentUser]);
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col font-sans w-full">
+      {/* 1. Sticky Top Navigation */}
+      <TopNavigation
+        currentUser={currentUser}
+        onOpenSearch={() => setSearchModalOpen(true)}
+        onOpenCreate={() => {
+          setComposerMode('DISCUSSION');
+          setComposerOpen(true);
+        }}
+        onOpenSupport={onOpenSupport || (() => setActiveView('CHAT'))}
+        onOpenWallet={onOpenWallet || (() => {})}
+        onLogout={logout}
+        onNavigateHome={() => handleNavSelect('HOME')}
+        onNavigateWorkspace={tab => handleNavSelect(tab === 'SETTINGS' ? 'MY_PROFILE' : 'MY_ENQUIRIES')}
+        onNavigateAdmin={currentUser.role === 'SUPER_ADMIN' ? () => setActiveView('ADMIN') : undefined}
+        onNavigateDeveloper={currentUser.role === 'DEVELOPER' ? () => setActiveView('DEVELOPER') : undefined}
+        unreadCount={unreadNotifications}
+        onToggleMobileMenu={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+      />
+
+      {/* 2. Main Three-Column Application Container */}
+      <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 w-full">
+        <div className="flex items-start justify-center gap-6">
+          {/* Left Navigation Sidebar (Desktop sticky / collapsible) */}
+          <div className="hidden lg:block sticky top-20">
+            <LeftSidebar
+              activeItem={activeNav}
+              onSelectNav={handleNavSelect}
+              userRole={currentUser.role}
+              savedCount={bookmarkedIds.size}
+              onStartCommunity={() => {
+                setComposerMode('COMMUNITY');
+                setComposerOpen(true);
+              }}
+            />
+          </div>
+
+          {/* Center Column: Community Feed or Custom Workspace Content */}
+          <div className="flex-1 min-w-0 max-w-2xl xl:max-w-3xl">
+            {children ? (
+              children
+            ) : (
+              <CommunityFeed
+                posts={displayedPosts}
+                communities={communities}
+                currentUser={currentUser}
+                onOpenComposer={mode => {
+                  setComposerMode(mode);
+                  setComposerOpen(true);
+                }}
+                onUpvotePost={upvoteCommunityPost}
+                onBookmarkPost={handleBookmarkToggle}
+                onSharePost={post => showToast(`Share link copied for "${post.title}"`)}
+                refreshPosts={refreshPosts}
+                showToast={showToast}
+                repostDiscussion={repostDiscussion}
+                bookmarkedPostIds={bookmarkedIds}
+                initialTopicFilter={selectedTopicFilter}
+              />
+            )}
+          </div>
+
+          {/* Right Column: Contextual Discovery Sidebar (Lightweight desktop discovery) */}
+          <div className="hidden xl:flex flex-col gap-4 w-72 2xl:w-80 shrink-0 sticky top-20">
+            <TopicRecommendations
+              userInterests={currentUser.interests}
+              selectedTopic={selectedTopicFilter}
+              onSelectTopic={t => setSelectedTopicFilter(t)}
+            />
+
+            <SuggestedCommunities
+              communities={communities}
+              onSelectCommunity={commId => {
+                const comm = communities.find(c => c.id === commId);
+                if (comm) setSelectedTopicFilter(comm.name);
+              }}
+              onJoinCommunity={joinCommunity}
+              onLeaveCommunity={leaveCommunity}
+              onViewAll={() => handleNavSelect('COMMUNITIES')}
+            />
+
+            <TrendingDiscussions
+              posts={communityPosts || []}
+              onOpenDetail={() => {}}
+            />
+
+            <UpcomingLiveSessions
+              onJoinSession={() => setActiveView('CONFERENCE')}
+            />
+
+            <ProfessionalRecommendations
+              onExploreDirectory={() => setActiveView('LEADS_MARKET')}
+              onConnect={name => showToast(`Connected with ${name}! Enquiries logged in your workspace.`)}
+            />
+          </div>
+        </div>
+      </main>
+
+      {/* 3. Mobile Navigation Bottom Bar */}
+      <MobileNavigation
+        activeItem={activeNav}
+        onSelectNav={handleNavSelect}
+        onOpenCreate={() => {
+          setComposerMode('DISCUSSION');
+          setComposerOpen(true);
+        }}
+      />
+
+      {/* 4. Mobile Off-Canvas Drawer for Left Sidebar */}
+      {mobileSidebarOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 lg:hidden flex bg-slate-900/60 backdrop-blur-xs"
+          onClick={() => setMobileSidebarOpen(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-72 max-w-[85%] bg-white h-full p-4 overflow-y-auto shadow-2xl animate-in slide-in-from-left duration-200"
+          >
+            <LeftSidebar
+              activeItem={activeNav}
+              onSelectNav={handleNavSelect}
+              userRole={currentUser.role}
+              savedCount={bookmarkedIds.size}
+              onStartCommunity={() => {
+                setComposerMode('COMMUNITY');
+                setComposerOpen(true);
+                setMobileSidebarOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 5. Content Composer Modal */}
+      <PostComposer
+        isOpen={composerOpen}
+        initialMode={composerMode}
+        onClose={() => setComposerOpen(false)}
+        communities={communities}
+        currentUser={currentUser}
+        onSubmitPost={createCommunityPost}
+        onSubmitCommunity={createCommunityProposal}
+        onSuccess={msg => {
+          showToast(msg);
+          refreshPosts();
+          refreshCommunities();
+        }}
+      />
+
+      {/* 6. Universal Search Modal */}
+      <UniversalSearchModal
+        isOpen={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onOpenSupport={onOpenSupport}
+      />
+    </div>
+  );
+};
