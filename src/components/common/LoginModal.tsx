@@ -5,7 +5,6 @@ import { isPhoneOtpRequired } from '../../shared/authConfig';
 import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
 import { ANIME_AVATARS, getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
-import { prepareAvatarUpload, validateAvatarFile } from '../../lib/avatarUpload';
 import { GoogleProfileCompletionModal } from './GoogleProfileCompletionModal';
 import {
   LogIn,
@@ -13,26 +12,18 @@ import {
   X,
   ShieldCheck,
   User,
-  KeyRound,
   ArrowRight,
   ArrowLeft,
   AlertCircle,
   Eye,
   EyeOff,
-  UserPlus,
   Mail,
   CheckCircle2,
   RotateCcw,
-  Smartphone,
   MapPin,
-  Check,
   Lock,
   MessageSquare,
   Sparkles,
-  Camera,
-  Trash2,
-  UploadCloud,
-  TrendingUp,
   Loader2
 } from 'lucide-react';
 
@@ -82,21 +73,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || ''
   );
 
-  // Email OTP verification state
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpInput, setOtpInput] = useState('');
-  const [countdown, setCountdown] = useState(0);
-
-  // WhatsApp OTP registration flow state: 'PHONE' -> 'OTP' -> 'PROFILE'
-  const [regStep, setRegStep] = useState<'PHONE' | 'OTP' | 'PROFILE'>('PHONE');
+  // WhatsApp OTP registration flow state: 'FORM' | 'OTP'
+  const [regStep, setRegStep] = useState<'FORM' | 'OTP'>('FORM');
   const [otpDeliveryStatus, setOtpDeliveryStatus] = useState<'SENDING' | 'SUBMITTED' | 'SENT' | 'DELIVERED' | 'FAILED'>('SUBMITTED');
   const [otpMessageId, setOtpMessageId] = useState<string | null>(null);
   const [deliveryFailureReason, setDeliveryFailureReason] = useState<string | null>(null);
   const pollingRef = useRef<any>(null);
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [verifiedPhone, setVerifiedPhone] = useState('');
-  const [verifiedPhoneOtp, setVerifiedPhoneOtp] = useState('');
+  const [phoneCountdown, setPhoneCountdown] = useState(0);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Default avatar selection for registration
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(DEFAULT_AVATAR);
 
   const stopDeliveryPolling = () => {
     if (pollingRef.current) {
@@ -108,19 +97,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   useEffect(() => {
     return () => stopDeliveryPolling();
   }, []);
-
-  // Mobile Phone OTP verification state (configurable via REQUIRE_PHONE_OTP)
-  const [phoneOtpRequired, setPhoneOtpRequired] = useState(isPhoneOtpRequired());
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
-  const [phoneOtpInput, setPhoneOtpInput] = useState('');
-  const [phoneCountdown, setPhoneCountdown] = useState(0);
-
-  // Registration Avatar Selection state (step 3 after OTP verification)
-  const [avatarStep, setAvatarStep] = useState(false);
-  const [selectedAvatar, setSelectedAvatar] = useState<string>(ANIME_AVATARS[0].url);
-  const [customAvatar, setCustomAvatar] = useState<string | null>(null);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Forgot Password State
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
@@ -138,9 +114,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     fetch('/api/auth/config')
       .then(res => res.json())
       .then(data => {
-        if (typeof data?.phoneOtpRequired === 'boolean') {
-          setPhoneOtpRequired(data.phoneOtpRequired);
-        }
         if (data?.googleClientId) {
           setGoogleClientId(data.googleClientId);
         }
@@ -221,14 +194,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       }
     }
   }, [googleClientId]);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (countdown > 0) {
-      timer = setTimeout(() => setCountdown(c => c - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [countdown]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -383,8 +348,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         throw new Error(result.error || 'Authentication failed');
       }
 
-
-
       login(user as Parameters<typeof login>[0]);
       showToast(`Welcome back, ${user.name}!`);
 
@@ -417,8 +380,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       if (!result.ok || !user) {
         throw new Error(result.error || 'Google authentication failed.');
       }
-
-
 
       const isNewUser = Boolean(result.data?.isNewUser);
       const isProfileComplete = Boolean(result.data?.isProfileComplete);
@@ -460,7 +421,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       ''
     ).trim();
 
-    // Guard: Prevent opening Google popup when Client ID is missing (avoids Google Error 400: missing client_id)
     if (!effectiveClientId) {
       setErrorMsg(
         'Google Sign-In is not configured yet (missing Google OAuth Client ID). Please configure GOOGLE_CLIENT_ID in your environment variables, or sign in using your account email and password.'
@@ -472,7 +432,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
     const gAccounts = (window as any).google?.accounts;
 
-    // Fast path: Google Identity Services Code Client popup
     if (gAccounts?.oauth2) {
       try {
         const client = gAccounts.oauth2.initCodeClient({
@@ -509,7 +468,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       }
     }
 
-    // Direct popup flow fallback to server-side OAuth 2.0 authorize
     try {
       const width = 500;
       const height = 620;
@@ -523,7 +481,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       );
 
       if (!popup) {
-        // Fallback to top-level redirect if popup was blocked
         window.location.href = '/api/auth/google/authorize?mode=redirect';
         return;
       }
@@ -535,8 +492,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           clearInterval(pollTimer);
           const user = event.data.user;
           const isNewUser = event.data.isNewUser;
-    
-
           const isProfileComplete = Boolean(event.data?.isProfileComplete);
 
           if (isNewUser || !isProfileComplete) {
@@ -550,7 +505,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           }
 
           login(user as Parameters<typeof login>[0]);
-      showToast(`Welcome back, ${user.name || 'User'}!`);
+          showToast(`Welcome back, ${user.name || 'User'}!`);
           if (isPropertySeeker(user.role)) {
             setActiveView('DASHBOARD');
           } else {
@@ -614,19 +569,37 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     otpRefs.current[nextIdx]?.focus();
   };
 
+  // WhatsApp OTP dispatch handler triggered on "Create Verified Account"
   const handleSendWhatsAppOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (submitting.current) return;
     setErrorMsg(null);
 
-    const cleanDigits = phoneInput.replace(/[^0-9]/g, '');
-    if (cleanDigits.length !== 10) {
-      setErrorMsg('Please enter a valid 10-digit Indian mobile number.');
+    if (!nameInput.trim()) {
+      setErrorMsg('Please enter your full name.');
       return;
     }
 
     if (!emailInput.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim())) {
       setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
+    const cleanDigits = phoneInput.replace(/[^0-9]/g, '');
+    let tenDigits = cleanDigits;
+    if (cleanDigits.length === 12 && cleanDigits.startsWith('91')) {
+      tenDigits = cleanDigits.slice(2);
+    } else if (cleanDigits.length > 10) {
+      tenDigits = cleanDigits.slice(-10);
+    }
+
+    if (tenDigits.length !== 10) {
+      setErrorMsg('Please enter a valid 10-digit Indian mobile number for WhatsApp verification.');
+      return;
+    }
+
+    if (!professionInput.trim()) {
+      setErrorMsg('Please enter your profession.');
       return;
     }
 
@@ -644,7 +617,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
     setOtpDeliveryStatus('SENDING');
     try {
-      const fullPhone = '+91' + cleanDigits;
+      const fullPhone = '+91' + tenDigits;
       const res = await fetch('/api/auth/send-phone-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', accept: 'application/json' },
@@ -708,6 +681,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  // WhatsApp OTP verification & direct registration completion
   const handleVerifyWhatsAppOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (submitting.current) return;
@@ -730,210 +704,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       if (!result.ok || result.data?.verified !== true) {
         throw new Error(result.error || 'Invalid or expired WhatsApp verification code. Please check and try again.');
       }
-      setVerifiedPhoneOtp(enteredOtp);
-      setRegStep('PROFILE');
-      showToast('Mobile number verified! Please complete your profile.');
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Invalid or expired WhatsApp verification code.');
-    } finally {
-      submitting.current = false;
-      setLoading(false);
-    }
-  };
 
-  const handleSendPhoneOtp = async () => {
-    return handleSendWhatsAppOtp();
-  };
-
-  const handleSendEmailOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submitting.current) return;
-    setErrorMsg(null);
-
-    if (!nameInput.trim() || !emailInput.trim() || !passwordInput) {
-      setErrorMsg('Please enter your full name, valid email, and password first.');
-      return;
-    }
-
-    if (!professionInput.trim()) {
-      setErrorMsg('Please enter your profession.');
-      return;
-    }
-
-    if (passwordInput.length < 6) {
-      setErrorMsg('Password must be at least 6 characters.');
-      return;
-    }
-
-    if (passwordInput !== confirmPasswordInput) {
-      setErrorMsg('Passwords do not match. Please ensure both passwords match.');
-      return;
-    }
-
-    // Role-specific validation:
-    // If phone OTP is required, Property Seeker requires phone number.
-    if (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') {
-      if (!phoneInput.trim() || phoneInput.trim().length < 8) {
-        setErrorMsg('Mobile phone number is required for Property Seeker registration.');
-        return;
-      }
-    }
-
-    submitting.current = true;
-    setLoading(true);
-    try {
-      const res = await fetch('/api/auth/send-email-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ email: emailInput.trim() })
-      });
-      const result = await readApiResponse(res);
-      if (!result.ok || result.data?.success !== true) {
-        throw new Error(result.error || 'Failed to send verification code');
-      }
-
-      setOtpSent(true);
-      setCountdown(60);
-      showToast('Property Studio verification code sent. Check the inbox for that address.');
-
-      if (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' && phoneInput.trim()) {
-        const phoneRes = await fetch('/api/auth/send-phone-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify({ phone: phoneInput.trim() })
-        });
-        const phoneResult = await readApiResponse(phoneRes);
-        if (!phoneResult.ok || phoneResult.data?.success !== true) {
-          setPhoneOtpSent(false);
-          setErrorMsg(phoneResult.error || 'WhatsApp verification was not sent. No account was created.');
-        } else {
-          setPhoneOtpSent(true);
-          setPhoneCountdown(60);
-        }
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to send verification code.');
-    } finally {
-      submitting.current = false;
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtpAndProceedToAvatar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submitting.current) return;
-    setErrorMsg(null);
-
-    if (!professionInput.trim()) {
-      setErrorMsg('Please enter your profession.');
-      return;
-    }
-
-    if (!otpInput.trim() || otpInput.trim().length < 4) {
-      setErrorMsg('Please enter the 6-digit email verification code received.');
-      return;
-    }
-
-    // Property Seeker requires Phone OTP verification only when configured
-    if (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') {
-      if (!phoneOtpInput.trim() || phoneOtpInput.trim().length < 4) {
-        setErrorMsg('Please enter the 6-digit WhatsApp code received on your phone.');
-        return;
-      }
-    }
-
-    submitting.current = true;
-    setLoading(true);
-    try {
-      const emailRes = await fetch('/api/auth/verify-email-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ email: emailInput.trim(), otp: otpInput.trim() })
-      });
-      const emailResult = await readApiResponse(emailRes);
-      if (!emailResult.ok || emailResult.data?.verified !== true) {
-        throw new Error(emailResult.error || 'Invalid or expired email verification code');
-      }
-
-      if (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') {
-        const phoneRes = await fetch('/api/auth/verify-phone-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify({ phone: phoneInput.trim(), otp: phoneOtpInput.trim() })
-        });
-        const phoneResult = await readApiResponse(phoneRes);
-        if (!phoneResult.ok || phoneResult.data?.verified !== true) {
-          throw new Error(phoneResult.error || 'Invalid or expired WhatsApp verification code');
-        }
-      }
-
-      setAvatarStep(true);
-      showToast('Email verified! Choose your profile avatar.');
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Verification failed. Please check the OTP code.');
-    } finally {
-      submitting.current = false;
-      setLoading(false);
-    }
-  };
-
-  const handleCustomAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    setErrorMsg(null);
-
-    const check = validateAvatarFile(file);
-    if (!check.valid) {
-      setErrorMsg(check.error || 'Invalid image file');
-      return;
-    }
-
-    setAvatarUploading(true);
-    try {
-      const dataUrl = await prepareAvatarUpload(file);
-      setCustomAvatar(dataUrl);
-      setSelectedAvatar(dataUrl);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to process selected image');
-    } finally {
-      setAvatarUploading(false);
-    }
-  };
-
-  const handleCompleteRegistration = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (submitting.current) return;
-    setErrorMsg(null);
-
-    if (!nameInput.trim()) {
-      setErrorMsg('Please enter your full name.');
-      return;
-    }
-
-    if (!emailInput.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim())) {
-      setErrorMsg('Please enter a valid email address.');
-      return;
-    }
-
-    if (!passwordInput || passwordInput.length < 6) {
-      setErrorMsg('Password must be at least 6 characters.');
-      return;
-    }
-
-    if (passwordInput !== confirmPasswordInput) {
-      setErrorMsg('Passwords do not match. Please ensure both passwords match.');
-      return;
-    }
-
-    if (!professionInput.trim()) {
-      setErrorMsg('Please enter your profession.');
-      return;
-    }
-
-    submitting.current = true;
-    setLoading(true);
-    try {
+      // Code is verified! Directly complete registration with the pre-collected details
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', accept: 'application/json' },
@@ -943,31 +715,37 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           password: passwordInput,
           role: roleInput,
           phone: verifiedPhone,
-          phoneOtp: verifiedPhoneOtp,
+          phoneOtp: enteredOtp,
           organization: organizationInput.trim(),
           profession: professionInput.trim(),
           company: companyInput.trim() || undefined,
           interests: selectedInterests,
           townCity: DEFAULT_SIGNUP_LOCATION,
           location: DEFAULT_SIGNUP_LOCATION,
-          avatar: selectedAvatar
+          avatar: selectedAvatar || DEFAULT_AVATAR
         })
       });
 
-      const result = await readApiResponse(response);
-      const user = result.data?.user as Parameters<typeof login>[0] | undefined;
-      if (!result.ok || !user) {
-        throw new Error(result.error || 'Registration failed');
+      const regResult = await readApiResponse(response);
+      const user = regResult.data?.user as Parameters<typeof login>[0] | undefined;
+      if (!regResult.ok || !user) {
+        throw new Error(regResult.error || 'Registration failed');
       }
 
       login(user);
       showToast(`Welcome to Property Studio, ${user.name}!`);
+      if (isPropertySeeker(user.role)) {
+        setActiveView('DASHBOARD');
+      } else {
+        setActiveView(postLoginDestination(user.role));
+      }
       onClose();
-      setRegStep('PHONE');
+
+      // Reset state
+      setRegStep('FORM');
       setPhoneInput('');
       setOtpDigits(['', '', '', '', '', '']);
       setVerifiedPhone('');
-      setVerifiedPhoneOtp('');
       setNameInput('');
       setEmailInput('');
       setPasswordInput('');
@@ -976,426 +754,53 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       setOrganizationInput('');
       setCompanyInput('');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Registration failed. Please try again.');
+      setErrorMsg(err.message || 'Verification failed. Please check the code.');
     } finally {
       submitting.current = false;
       setLoading(false);
     }
   };
 
-  if (regStep === 'PROFILE') {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E4D8] w-full max-w-3xl lg:max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
-          {/* Modal Header */}
-          <div className="px-5 py-4 border-b border-[#E8E4D8] flex items-center justify-between bg-[#182A3E] text-white shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-9 rounded-xl bg-white border border-white/20 flex items-center justify-center px-1 shrink-0 shadow-sm">
-                <BrandLogo variant="compact" size="sm" />
-              </div>
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-white font-display">
-                  Complete Your Property Studio Profile
-                </h3>
-                <p className="text-xs text-slate-300">
-                  Tell us a little about yourself to personalise your Property Studio experience.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-mono">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{verifiedPhone}</span>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Modal Body */}
-          <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5 text-xs">
-            {errorMsg && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-
-            {/* Mobile Verified Alert Pill on mobile */}
-            <div className="sm:hidden flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="font-bold text-emerald-950 font-mono">{verifiedPhone}</span>
-              </div>
-              <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-100 px-2 py-0.5 rounded-full">
-                ✓ WhatsApp Verified
-              </span>
-            </div>
-
-            {/* Two-Column Responsive Layout on Desktop, Single-Column on Mobile */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
-              {/* Left Column: Personal & Professional Credentials */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={nameInput}
-                      onChange={e => setNameInput(e.target.value)}
-                      placeholder="e.g. Suresh Chandra"
-                      className="w-full pl-9 pr-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
-                    Role / Account Type <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={roleInput}
-                    onChange={e => setRoleInput(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-900 font-medium"
-                  >
-                    <option value="PROPERTY_SEEKER">Property Seeker (Buyer / Investor)</option>
-                    <option value="CHANNEL_PARTNER">Channel Partner / Agent</option>
-                    <option value="LANDOWNER">Landowner / Asset Holder</option>
-                    <option value="RESELLER">Reseller</option>
-                    <option value="RERA_AGENT">RERA Registered Agent</option>
-                    <option value="REAL_ESTATE_MEDIA">Real Estate Media Professional</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="signup-profession" className="block font-bold text-slate-800 text-xs mb-1.5">
-                    Profession *
-                  </label>
-                  <input
-                    id="signup-profession"
-                    name="profession"
-                    type="text"
-                    autoComplete="off"
-                    value={professionInput}
-                    onChange={e => setProfessionInput(e.target.value)}
-                    placeholder="Enter your profession"
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
-                    Organization <span className="text-slate-400 font-normal">(Optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={organizationInput}
-                    onChange={e => setOrganizationInput(e.target.value)}
-                    placeholder="e.g. Acme Realty Pvt Ltd"
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
-                    Company / Practice <span className="text-slate-400 font-normal">(Optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={companyInput}
-                    onChange={e => setCompanyInput(e.target.value)}
-                    placeholder="e.g. Studio Co."
-                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
-                  />
-                </div>
-              </div>
-
-              {/* Right Column: Location, Interests & Avatar Selection */}
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block font-bold text-slate-800 text-xs">
-                      Location / City & State
-                    </label>
-                    <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200/60 inline-flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5 text-amber-700" />
-                      Fixed Territory
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <MapPin className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      id="signup-location"
-                      name="location"
-                      type="text"
-                      value={DEFAULT_SIGNUP_LOCATION}
-                      readOnly
-                      aria-readonly="true"
-                      tabIndex={-1}
-                      className="w-full pl-9 pr-3.5 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-100/90 text-slate-800 font-semibold cursor-not-allowed select-none focus:outline-none"
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-500 mt-1 block font-medium">
-                    Platform location is fixed to Hyderabad, Telangana, India.
-                  </span>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
-                    Interests & Topics <span className="text-slate-400 font-normal">(Select applicable)</span>
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 border border-slate-200 rounded-xl bg-slate-50/50">
-                    {[
-                      'Kokapet & Neopolis',
-                      'High-Rise Construction',
-                      'Legal Due Diligence & RERA',
-                      'Rental Yield & ROI',
-                      'Luxury Villas & Communities',
-                      'Architecture & Vaastu',
-                      'Interior Design & Renovation',
-                      'Land & Plotting Guidelines',
-                      'Price Trends & Market Updates',
-                      'Home Loans & Taxation'
-                    ].map(topic => {
-                      const isSelected = selectedInterests.includes(topic);
-                      return (
-                        <button
-                          key={topic}
-                          type="button"
-                          onClick={() => {
-                            setSelectedInterests(prev =>
-                              isSelected ? prev.filter(t => t !== topic) : [...prev, topic]
-                            );
-                          }}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all flex items-center gap-1 cursor-pointer ${
-                            isSelected
-                              ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span>{isSelected ? '✓' : '+'}</span>
-                          <span>{topic}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Avatar Selection Section */}
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                      Avatar Selection
-                    </label>
-                    <span className="text-[10px] text-slate-400">Circular previews</span>
-                  </div>
-
-                  {/* Predefined Circular Avatars in Responsive Grid */}
-                  <div className="grid grid-cols-6 gap-2 p-2.5 bg-slate-50 rounded-2xl border border-slate-200/80">
-                    {ANIME_AVATARS.map((option) => {
-                      const isSelected = selectedAvatar === option.url && !customAvatar;
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedAvatar(option.url);
-                            setCustomAvatar(null);
-                          }}
-                          title={option.name}
-                          className={`relative rounded-full p-0.5 border-2 transition-all cursor-pointer flex items-center justify-center aspect-square ${
-                            isSelected
-                              ? 'border-[#B49029] ring-2 ring-[#B49029]/50 bg-amber-50 shadow-md scale-105'
-                              : 'border-slate-200 hover:border-slate-300 bg-white hover:scale-105'
-                          }`}
-                        >
-                          <img
-                            src={option.url}
-                            alt={option.name}
-                            className="w-full h-full rounded-full object-cover"
-                            loading="lazy"
-                          />
-                          {isSelected && (
-                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#B49029] text-white rounded-full flex items-center justify-center text-[8px] font-black shadow-xs ring-1 ring-white">
-                              ✓
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Image Upload Option (<= 2MB) */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      ref={avatarInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="hidden"
-                      onChange={handleCustomAvatarSelect}
-                    />
-                    {customAvatar && (
-                      <div className="relative w-9 h-9 rounded-full ring-2 ring-[#B49029] shrink-0 overflow-hidden">
-                        <img src={customAvatar} alt="Custom upload" className="w-full h-full rounded-full object-cover" />
-                        <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#B49029] text-white rounded-full flex items-center justify-center text-[7px] font-black">✓</span>
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => avatarInputRef.current?.click()}
-                      disabled={avatarUploading || loading}
-                      className="flex-1 py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-300 flex items-center justify-center gap-2 text-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-                    >
-                      <Camera className="w-3.5 h-3.5 text-slate-500" />
-                      <span>{avatarUploading ? 'Processing Photo...' : customAvatar ? 'Change Photo (Max 2MB)' : 'Upload Custom Photo (Max 2MB)'}</span>
-                    </button>
-                    {customAvatar && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCustomAvatar(null);
-                          setSelectedAvatar(ANIME_AVATARS[0].url);
-                        }}
-                        className="p-2 text-xs text-red-600 hover:bg-red-50 rounded-xl border border-red-200 cursor-pointer"
-                        title="Revert to preset avatar"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sticky Footer Actions */}
-          <div className="p-4 sm:p-5 bg-slate-50 border-t border-[#E8E4D8] flex items-center justify-between gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setRegStep('OTP');
-                setErrorMsg(null);
-              }}
-              className="px-4 py-2.5 border border-slate-300 hover:bg-white text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCompleteRegistration}
-              disabled={loading || !nameInput.trim() || !professionInput.trim()}
-              className="px-6 py-2.5 bg-[#B49029] hover:bg-[#A99137] text-white font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer flex items-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4 text-white" />
-              <span>{loading ? 'Creating Your Account...' : 'Complete Profile & Launch Platform'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E4D8] w-full max-w-md md:max-w-3xl lg:max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col md:flex-row overflow-hidden my-auto animate-in zoom-in-95 duration-150">
-        {/* Left Side: Desktop Premium Brand & Architecture Showcase (Matching Image 3) */}
-        <div className="hidden md:flex md:w-5/12 lg:w-5/12 flex-col justify-between p-6 lg:p-8 bg-gradient-to-br from-[#182A3E] via-[#182A3E] to-[#030508] text-white relative overflow-hidden shrink-0 border-r border-[#E8E4D8]/20">
-          {/* Architectural Skyline Image Overlay */}
-          <div
-            className="absolute inset-0 opacity-25 bg-cover bg-center pointer-events-none"
-            style={{
-              backgroundImage: "url('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80')"
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#030508] via-[#182A3E]/80 to-transparent pointer-events-none" />
-
-          {/* Top Branding */}
-          <div className="space-y-4 relative z-10">
-            <div className="w-16 h-12 rounded-xl bg-white p-1.5 flex items-center justify-center shadow-lg">
-              <BrandLogo variant="compact" size="sm" />
-            </div>
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E4D8] w-full max-w-lg md:max-w-xl max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+        {/* Modal Header Matching Reference Image */}
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[#E8E4D8] flex items-center justify-between bg-[#182A3E] text-white shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <div>
-              <h2 className="text-2xl lg:text-3xl font-black font-display text-white tracking-tight">
-                Welcome Back
-              </h2>
-              <p className="text-xs text-slate-300 mt-1.5 leading-relaxed font-normal">
-                Access your Property Studio account and continue your real estate journey.
+              <h3 className="text-base sm:text-lg font-bold text-white font-display">
+                {isLoggedIn
+                  ? 'Account Session'
+                  : forgotPasswordMode
+                  ? 'Reset Password'
+                  : mode === 'REGISTER'
+                  ? regStep === 'OTP'
+                    ? 'WhatsApp Verification'
+                    : 'Create Account'
+                  : 'Portal Sign In'}
+              </h3>
+              <p className="text-[11px] sm:text-xs text-slate-400">
+                {isLoggedIn
+                  ? `Active as ${currentUser.name}`
+                  : forgotPasswordMode
+                  ? 'Verify email OTP to set new password'
+                  : mode === 'REGISTER' && regStep === 'OTP'
+                  ? 'Enter the 6-digit code received on WhatsApp'
+                  : 'Live server database authentication'}
               </p>
             </div>
           </div>
-
-          {/* 3 Gold Feature Badges (Matching Image 3) */}
-          <div className="space-y-3 my-6 relative z-10">
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
-              <div className="w-8 h-8 rounded-full bg-[#B49029]/20 text-[#B49029] flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-              <span className="text-xs font-bold text-white">Verified Projects</span>
-            </div>
-
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
-              <div className="w-8 h-8 rounded-full bg-[#B49029]/20 text-[#B49029] flex items-center justify-center shrink-0">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-              <span className="text-xs font-bold text-white">Market Insights</span>
-            </div>
-
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
-              <div className="w-8 h-8 rounded-full bg-[#B49029]/20 text-[#B49029] flex items-center justify-center shrink-0">
-                <MessageSquare className="w-4 h-4" />
-              </div>
-              <span className="text-xs font-bold text-white">Community & Q&A</span>
-            </div>
-          </div>
-
-          {/* Bottom Footnote */}
-          <div className="pt-3 border-t border-white/10 text-[10px] text-slate-400 font-mono tracking-wider relative z-10">
-            Official Secretariat: info@propertystudio.org
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
-        {/* Right Side: Authentication Controls & Active Form */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-white">
-          {/* Header */}
-          <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[#E8E4D8] flex items-center justify-between bg-[#182A3E] text-white shrink-0">
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              <div className="md:hidden w-12 h-9 rounded-lg bg-white border border-white/20 flex items-center justify-center px-1 shrink-0">
-                <BrandLogo variant="compact" size="sm" />
-              </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-white font-display">
-                  {isLoggedIn ? 'Account Session' : forgotPasswordMode ? 'Reset Password' : mode === 'LOGIN' ? 'Portal Sign In' : regStep === 'OTP' ? 'WhatsApp Verification' : 'Join Property Studio'}
-                </h3>
-                <p className="text-[11px] sm:text-xs text-slate-400">
-                  {isLoggedIn ? `Active as ${currentUser.name}` : forgotPasswordMode ? 'Verify email OTP to set new password' : mode === 'LOGIN' ? 'Live server database authentication' : regStep === 'OTP' ? 'Enter the 6-digit code received on WhatsApp' : 'Get started with verified WhatsApp authentication'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onClose}
-                className="p-1 sm:p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-            </div>
-          </div>
-
-        {/* Content */}
+        {/* Modal Body */}
         <div className="p-4 sm:p-5 space-y-3 sm:space-y-3.5 text-xs overflow-y-auto overscroll-contain flex-1">
           {isLoggedIn ? (
             /* Logged in state */
@@ -1429,7 +834,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       setActiveView('ADMIN');
                       onClose();
                     }}
-                    className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all"
+                    className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all cursor-pointer"
                   >
                     Admin Console
                   </button>
@@ -1439,7 +844,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     logout();
                     onClose();
                   }}
-                  className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors"
+                  className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Log Out</span>
@@ -1447,8 +852,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
           ) : (
-            /* Auth Form */
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {errorMsg && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
@@ -1456,8 +860,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                 </div>
               )}
 
-              {/* 3 Tabs matching Page 17 visual reference: Sign in | Register | Forgot */}
-              <div className="flex items-center gap-2 pb-1">
+              {/* Segmented Toggle Pills Matching Screenshot */}
+              <div className="bg-slate-100/90 p-1 rounded-xl flex gap-1 border border-slate-200/80">
                 <button
                   type="button"
                   onClick={() => {
@@ -1465,44 +869,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     setForgotPasswordMode(false);
                     setErrorMsg(null);
                   }}
-                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all text-center cursor-pointer ${
                     mode === 'LOGIN' && !forgotPasswordMode
-                      ? 'bg-[#182A3E] text-white shadow-sm'
-                      : 'bg-white text-[#182A3E] border border-slate-300 hover:bg-slate-50'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Sign in
+                  Sign In
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setMode('REGISTER');
                     setForgotPasswordMode(false);
-                    setRegStep('PHONE');
+                    setRegStep('FORM');
                     setErrorMsg(null);
                   }}
-                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all text-center cursor-pointer ${
                     mode === 'REGISTER' && !forgotPasswordMode
-                      ? 'bg-[#182A3E] text-white shadow-sm'
-                      : 'bg-white text-[#182A3E] border border-slate-300 hover:bg-slate-50'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Register
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotPasswordMode(true);
-                    setErrorMsg(null);
-                    setResetSuccessMsg(null);
-                  }}
-                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                    forgotPasswordMode
-                      ? 'bg-[#182A3E] text-white shadow-sm'
-                      : 'bg-white text-[#182A3E] border border-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  Forgot
+                  Register Account
                 </button>
               </div>
 
@@ -1655,6 +1044,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   )}
                 </div>
               ) : mode === 'LOGIN' ? (
+                /* Sign In Form */
                 <form onSubmit={handleLogin} className="space-y-3.5">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Account Email</label>
@@ -1718,13 +1108,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl sm:rounded-full font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <span>{loading ? 'Authenticating...' : 'Sign In to Account'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
-                  {/* Social Logins Divider (Matching Image 3) */}
+                  {/* Social Logins Divider */}
                   <div className="relative my-4 text-center">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-slate-200" />
@@ -1740,7 +1130,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       type="button"
                       disabled={loading || googleLoading}
                       onClick={handleGoogleSignIn}
-                      className="w-full py-2.5 px-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl sm:rounded-full flex items-center justify-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
+                      className="w-full py-2.5 px-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl flex items-center justify-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
                       title="Sign in with Google"
                       aria-label="Sign in with Google"
                     >
@@ -1763,73 +1153,216 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </button>
                   </div>
                 </form>
-              ) : regStep === 'PHONE' ? (
-                /* Step 1: Registration Credentials & Mobile Number */
+              ) : regStep === 'FORM' ? (
+                /* Registration Form Exactly Matching Reference Image media_1794043027829_f2c0a4c9.jpg */
                 <form onSubmit={handleSendWhatsAppOtp} className="space-y-3">
-                  <div className="bg-emerald-50/90 py-2 px-3 rounded-xl border border-emerald-200/90 text-[11px] text-emerald-950 flex items-start gap-2">
-                    <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold">Instant WhatsApp Verification</p>
-                      <p className="text-[10.5px] text-emerald-700 leading-relaxed">
-                        Enter your mobile number and credentials to receive a secure 6-digit WhatsApp OTP.
-                      </p>
-                    </div>
+                  {/* Alert Banner: WhatsApp OTP verification is mandatory */}
+                  <div className="bg-[#FEFBF2] py-2 px-3 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>WhatsApp OTP verification is mandatory for verified account registration.</span>
                   </div>
 
+                  {/* Full Name */}
                   <div>
-                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                      Mobile Number <span className="text-red-500">*</span>
+                    <label className="block font-bold text-slate-700 text-xs mb-1">
+                      Full Name
                     </label>
-                    <div className="flex rounded-xl border border-slate-300 overflow-hidden focus-within:ring-2 focus-within:ring-amber-500 focus-within:border-amber-500 transition-all">
-                      <span className="bg-slate-100 text-slate-700 font-bold px-3 py-2 text-xs flex items-center border-r border-slate-300 shrink-0">
-                        +91
-                      </span>
+                    <input
+                      type="text"
+                      value={nameInput}
+                      onChange={e => setNameInput(e.target.value)}
+                      placeholder="e.g. Suresh Chandra"
+                      className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                      required
+                    />
+                  </div>
+
+                  {/* Email Address */}
+                  <div>
+                    <label className="block font-bold text-slate-700 text-xs mb-1">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={e => setEmailInput(e.target.value)}
+                      placeholder="admin@propertystudio.org"
+                      className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                      required
+                    />
+                  </div>
+
+                  {/* Role / Account Type */}
+                  <div>
+                    <label className="block font-bold text-slate-700 text-xs mb-1">
+                      Role / Account Type
+                    </label>
+                    <select
+                      value={roleInput}
+                      onChange={e => setRoleInput(e.target.value as any)}
+                      className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-900 font-medium cursor-pointer"
+                    >
+                      <option value="PROPERTY_SEEKER">Property Seeker (HNI / Investor / Buyer)</option>
+                      <option value="LANDOWNER">Landowner / Asset Holder</option>
+                      <option value="CHANNEL_PARTNER">Channel Partner / Agent</option>
+                      <option value="RESELLER">Reseller</option>
+                      <option value="RERA_AGENT">RERA Registered Agent</option>
+                      <option value="REAL_ESTATE_MEDIA">Real Estate Media Professional</option>
+                    </select>
+                  </div>
+
+                  {/* Two-Column Row: Contact Mobile * (Mandatory) & Organization (Optional) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block font-bold text-slate-700 text-xs mb-1">
+                        Contact Mobile <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="tel"
                         inputMode="numeric"
-                        maxLength={10}
                         value={phoneInput}
-                        onChange={e => setPhoneInput(e.target.value.replace(/[^0-9]/g, ''))}
+                        onChange={e => setPhoneInput(e.target.value)}
                         placeholder="e.g. +91 98490 12345"
-                        className="w-full px-3 py-2 text-xs focus:outline-none text-slate-900 font-medium"
+                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
                         required
-                        autoFocus
                       />
                     </div>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">
-                      We'll send your verification code via WhatsApp to this number.
+                    <div>
+                      <label className="block font-bold text-slate-700 text-xs mb-1">
+                        Organization <span className="text-slate-400 font-normal">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={organizationInput}
+                        onChange={e => setOrganizationInput(e.target.value)}
+                        placeholder="Firm or organization"
+                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Two-Column Row: Profession * & Company / Practice (Optional) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label htmlFor="signup-profession" className="block font-bold text-slate-700 text-xs mb-1">
+                        Profession *
+                      </label>
+                      <input
+                        id="signup-profession"
+                        name="profession"
+                        type="text"
+                        autoComplete="off"
+                        value={professionInput}
+                        onChange={e => setProfessionInput(e.target.value)}
+                        placeholder="Enter your profession"
+                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 text-xs mb-1">
+                        Company / Practice <span className="text-slate-400 font-normal">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={companyInput}
+                        onChange={e => setCompanyInput(e.target.value)}
+                        placeholder="e.g. Studio Arc / Firm"
+                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Interests & Topics Chips */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-bold text-slate-700 text-xs">
+                        Interests & Topics
+                      </label>
+                      <span className="text-[11px] text-slate-400 font-normal">
+                        Personalizes your Community Q&A
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-xl bg-slate-50/50">
+                      {[
+                        'Kokapet & Neopolis',
+                        'High-Rise Construction',
+                        'Legal Due Diligence & RERA',
+                        'Rental Yield & ROI',
+                        'Luxury Villas & Communities',
+                        'Architecture & Vaastu',
+                        'Interior Design & Renovation',
+                        'Land & Plotting Guidelines',
+                        'Price Trends & Market Updates',
+                        'Home Loans & Taxation'
+                      ].map(topic => {
+                        const isSelected = selectedInterests.includes(topic);
+                        return (
+                          <button
+                            key={topic}
+                            type="button"
+                            onClick={() => {
+                              setSelectedInterests(prev =>
+                                isSelected ? prev.filter(t => t !== topic) : [...prev, topic]
+                              );
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all flex items-center gap-1 cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#B49029] text-white border-[#B49029] font-bold shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>{isSelected ? '✓' : '+'}</span>
+                            <span>{topic}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Location (City & State) Fixed Territory */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="signup-location" className="block font-bold text-slate-700 text-xs">
+                        Location (City & State)
+                      </label>
+                      <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200/60 inline-flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-amber-700" />
+                        Fixed Territory
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        id="signup-location"
+                        name="location"
+                        type="text"
+                        value={DEFAULT_SIGNUP_LOCATION}
+                        readOnly
+                        aria-readonly="true"
+                        tabIndex={-1}
+                        className="w-full pl-9 pr-9 py-2 text-xs border border-slate-200 rounded-xl bg-slate-100/90 text-slate-800 font-semibold cursor-not-allowed select-none focus:outline-none"
+                      />
+                      <Lock className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block font-medium">
+                      Platform location is fixed to Hyderabad, Telangana, India.
                     </span>
                   </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                      Account Email <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="email"
-                        value={emailInput}
-                        onChange={e => setEmailInput(e.target.value)}
-                        placeholder="e.g. suresh@example.com"
-                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
-                        required
-                      />
-                      <Mail className="w-4 h-4 text-slate-400 absolute right-3 top-2" />
-                    </div>
-                  </div>
-
+                  {/* Choose Password & Confirm Password */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Password <span className="text-red-500">*</span>
+                      <label className="block font-bold text-slate-700 text-xs mb-1">
+                        Choose Password <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
                         <input
                           type={showPassword ? 'text' : 'password'}
                           value={passwordInput}
                           onChange={e => setPasswordInput(e.target.value)}
-                          placeholder="Min 6 chars"
-                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-8"
+                          placeholder="••••••••••••"
+                          className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-9 text-slate-900 font-medium"
                           required
                         />
                         <button
@@ -1841,9 +1374,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         </button>
                       </div>
                     </div>
-
                     <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                      <label className="block font-bold text-slate-700 text-xs mb-1">
                         Confirm Password <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
@@ -1851,8 +1383,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                           type={showConfirmPassword ? 'text' : 'password'}
                           value={confirmPasswordInput}
                           onChange={e => setConfirmPasswordInput(e.target.value)}
-                          placeholder="Repeat password"
-                          className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 pr-8 ${
+                          placeholder="Re-enter your password"
+                          className={`w-full px-3.5 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 pr-9 text-slate-900 font-medium ${
                             confirmPasswordInput && confirmPasswordInput !== passwordInput
                               ? 'border-red-400 focus:ring-red-400 bg-red-50/40 text-red-900'
                               : 'border-slate-300 focus:ring-amber-500'
@@ -1870,7 +1402,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </div>
                   </div>
 
-                  <p className="text-[10px] text-slate-500 text-center leading-tight">
+                  {/* Terms & Privacy Policy */}
+                  <p className="text-[11px] text-slate-500 text-center leading-tight pt-1">
                     By proceeding, you agree to our{' '}
                     <button
                       type="button"
@@ -1879,7 +1412,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         setActiveView('TERMS');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="text-amber-700 hover:underline font-bold cursor-pointer"
+                      className="text-amber-800 hover:underline font-bold cursor-pointer"
                     >
                       Terms & Conditions
                     </button>{' '}
@@ -1891,17 +1424,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         setActiveView('PRIVACY');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="text-amber-700 hover:underline font-bold cursor-pointer"
+                      className="text-amber-800 hover:underline font-bold cursor-pointer"
                     >
                       Privacy Policy
                     </button>
                     .
                   </p>
 
+                  {/* Primary Action Button */}
                   <button
                     type="submit"
-                    disabled={loading || phoneInput.replace(/[^0-9]/g, '').length !== 10 || !emailInput.trim() || passwordInput.length < 6}
-                    className="w-full py-2.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl sm:rounded-full font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
+                    disabled={loading}
+                    className="w-full py-2.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
                   >
                     {loading ? (
                       <>
@@ -1910,37 +1444,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       </>
                     ) : (
                       <>
-                        <MessageSquare className="w-4 h-4 text-white" />
-                        <span>Get WhatsApp OTP</span>
+                        <span>Create Verified Account</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
-                  </button>
-
-                  {/* Social Divider */}
-                  <div className="relative my-2 text-center">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200" />
-                    </div>
-                    <span className="relative px-3 bg-white text-[11px] text-slate-400 font-medium">
-                      or sign up with
-                    </span>
-                  </div>
-
-                  {/* Google OAuth Button */}
-                  <button
-                    type="button"
-                    disabled={loading || googleLoading}
-                    onClick={handleGoogleSignIn}
-                    className="w-full py-2.5 px-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl sm:rounded-full flex items-center justify-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
-                  >
-                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                    </svg>
-                    <span>Continue with Google</span>
                   </button>
                 </form>
               ) : (
@@ -1968,13 +1475,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         ) : (
                           <>
                             <Loader2 className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
-                            <span>OTP request accepted. Waiting for WhatsApp delivery...</span>
+                            <span>OTP request accepted. Dispatched to WhatsApp...</span>
                           </>
                         )}
                       </span>
                       <button
                         type="button"
-                        onClick={() => { stopDeliveryPolling(); setRegStep('PHONE'); setErrorMsg(null); }}
+                        onClick={() => { stopDeliveryPolling(); setRegStep('FORM'); setErrorMsg(null); }}
                         className="text-[11px] text-amber-700 hover:underline font-bold cursor-pointer shrink-0 ml-2"
                       >
                         Change Number
@@ -2052,25 +1559,40 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     )}
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading || otpDigits.join('').length !== 6}
-                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl sm:rounded-full font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-white" />
-                    <span>{loading ? 'Verifying Code...' : 'Verify Code & Set Up Profile'}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        stopDeliveryPolling();
+                        setRegStep('FORM');
+                        setErrorMsg(null);
+                      }}
+                      className="px-3.5 py-3 border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Edit Details</span>
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading || otpDigits.join('').length !== 6}
+                      className="flex-1 py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                      <span>{loading ? 'Verifying Code...' : 'Verify Code & Launch Platform'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </form>
               )}
             </div>
           )}
         </div>
 
-        {/* Footer */}
+        {/* Modal Footer Bar */}
         <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-[#E8E4D8] flex items-center justify-between text-xs text-slate-500 shrink-0">
           <span>Official Secretariat: info@propertystudio.org</span>
           <button
+            type="button"
             onClick={onClose}
             className="font-bold text-[#030508] hover:text-[#B49029] cursor-pointer"
           >
@@ -2079,6 +1601,5 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         </div>
       </div>
     </div>
-  </div>
-);
+  );
 };
