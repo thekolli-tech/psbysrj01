@@ -1,5 +1,6 @@
 import React from 'react';
 import { CommunityPost } from '../../types';
+import { BASELINE_COMMUNITY_POSTS } from './CommunityFeed';
 import { Flame, ArrowUpRight, MessageSquare, ArrowBigUp } from 'lucide-react';
 
 interface TrendingDiscussionsProps {
@@ -13,7 +14,14 @@ export const TrendingDiscussions: React.FC<TrendingDiscussionsProps> = ({
 }) => {
   // Sort posts by engagement (upvotes + comments)
   const trending = React.useMemo(() => {
-    return [...posts]
+    const combined = [...(posts || [])];
+    BASELINE_COMMUNITY_POSTS.forEach(b => {
+      if (!combined.some(p => p.id === b.id || p.title === b.title)) {
+        combined.push(b);
+      }
+    });
+
+    return combined
       .sort((a, b) => {
         const scoreA = (a.upvotes || 0) * 2 + (a.commentsCount || 0);
         const scoreB = (b.upvotes || 0) * 2 + (b.commentsCount || 0);

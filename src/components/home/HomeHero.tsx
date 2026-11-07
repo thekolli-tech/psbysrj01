@@ -467,6 +467,44 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Community Intelligence Network Callout */}
+          <div className="mt-6 bg-gradient-to-r from-[#182A3E] via-[#203750] to-[#182A3E] text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-slate-700/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <MessageSquare className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-bold text-white">
+                    Live Community Intelligence Feed & Discussions
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500 text-slate-950 uppercase">
+                    3-Column Feed
+                  </span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-slate-300 max-w-xl mt-0.5">
+                  Explore buyer sanity checks, Neopolis pricing debates, TG RERA legal checklists, and verified insider community intelligence.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!isLoggedIn && onOpenLoginModal) {
+                  onOpenLoginModal();
+                } else {
+                  setActiveView('COMMUNITY');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+              className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-[#B49029] to-[#D4AF37] hover:from-[#A99137] hover:to-[#B49029] text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all cursor-pointer shrink-0"
+            >
+              <span>Explore Community Discussions</span>
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </section>
 

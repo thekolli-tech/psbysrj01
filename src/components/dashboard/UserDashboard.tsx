@@ -6,6 +6,7 @@ import { PropertyDetailModal } from '../properties/PropertyDetailModal';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { AuthenticatedAppLayout } from '../authenticated/AuthenticatedAppLayout';
 import { CommunityFeed } from '../authenticated/CommunityFeed';
+import { PostComposer, ComposerMode } from '../authenticated/PostComposer';
 import {
   PROPERTY_CATEGORY_GROUPS,
   ALL_PROPERTY_TYPES,
@@ -199,11 +200,49 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
     communityPosts: liveCommunityPosts,
     communities,
     repostDiscussion,
-    refreshPosts
+    refreshPosts,
+    refreshCommunities,
+    upvoteCommunityPost,
+    createCommunityPost,
+    createCommunityProposal
   } = useApp();
 
   const [dashboardViewMode, setDashboardViewMode] = useState<'FEED' | 'WORKSPACE'>(initialMode);
   const [activeTab, setActiveTab] = useState<TabType>('OVERVIEW');
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerMode, setComposerMode] = useState<ComposerMode>('DISCUSSION');
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetch('/api/me/bookmarks')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.bookmarkedPostIds && Array.isArray(data.bookmarkedPostIds)) {
+          setBookmarkedIds(new Set(data.bookmarkedPostIds));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleBookmarkToggle = async (postId: string) => {
+    try {
+      const res = await fetch(`/api/community/posts/${postId}/bookmark`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setBookmarkedIds(prev => {
+          const next = new Set(prev);
+          if (data.bookmarked) {
+            next.add(postId);
+            showToast('Discussion saved to bookmarks!');
+          } else {
+            next.delete(postId);
+            showToast('Bookmark removed.');
+          }
+          return next;
+        });
+      }
+    } catch {}
+  };
 
   // Property search state
   const [dashboardProperties, setDashboardProperties] = useState<Property[]>(properties || []);
@@ -755,7 +794,14 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
             posts={liveCommunityPosts || []}
             communities={communities || []}
             currentUser={currentUser}
-            onOpenComposer={() => {}}
+            onOpenComposer={(mode) => {
+              setComposerMode(mode || 'DISCUSSION');
+              setComposerOpen(true);
+            }}
+            onUpvotePost={upvoteCommunityPost}
+            onBookmarkPost={handleBookmarkToggle}
+            onSharePost={(post) => showToast(`Share link copied for "${post.title}"`)}
+            bookmarkedPostIds={bookmarkedIds}
             refreshPosts={refreshPosts}
             showToast={showToast}
             repostDiscussion={repostDiscussion}
@@ -2761,6 +2807,21 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
           </div>
         )}
       </div>
+
+      <PostComposer
+        isOpen={composerOpen}
+        initialMode={composerMode}
+        onClose={() => setComposerOpen(false)}
+        communities={communities}
+        currentUser={currentUser}
+        onSubmitPost={createCommunityPost}
+        onSubmitCommunity={createCommunityProposal}
+        onSuccess={(msg) => {
+          showToast(msg);
+          refreshPosts();
+          refreshCommunities();
+        }}
+      />
     </AuthenticatedAppLayout>
   );
 };

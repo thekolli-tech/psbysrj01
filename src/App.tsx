@@ -202,7 +202,7 @@ const AppContent: React.FC = () => {
       }`}
     >
       {/* Dynamic Header: Mobile shell vs Desktop SaaS portal */}
-      {isLoggedIn && activeView === 'DASHBOARD' ? null : isForcedMobile ? (
+      {isLoggedIn && (activeView === 'DASHBOARD' || activeView === 'COMMUNITY' || activeView === 'HOME') ? null : isForcedMobile ? (
         <MobileHeader
           onOpenProfileModal={() => setProfileModalOpen(true)}
           onOpenWalletModal={() => setWalletModalOpen(true)}
@@ -245,12 +245,16 @@ const AppContent: React.FC = () => {
       <main className="flex-1 pb-8">
         <React.Suspense fallback={<ViewSkeleton />}>
         {activeView === 'HOME' && (
-          <HomeHero
-            onOpenRoleModal={() => setProfileModalOpen(true)}
-            onOpenAgentModal={() => setAgentModalOpen(true)}
-            onOpenLoginModal={() => setLoginModalOpen(true)}
-            onOpenSupport={() => setSupportOpen(true)}
-          />
+          isLoggedIn ? (
+            <UserDashboard initialMode="FEED" />
+          ) : (
+            <HomeHero
+              onOpenRoleModal={() => setProfileModalOpen(true)}
+              onOpenAgentModal={() => setAgentModalOpen(true)}
+              onOpenLoginModal={() => setLoginModalOpen(true)}
+              onOpenSupport={() => setSupportOpen(true)}
+            />
+          )
         )}
 
         {activeView === 'DASHBOARD' && (
@@ -302,7 +306,7 @@ const AppContent: React.FC = () => {
 
         {activeView === 'COMMUNITY' && (
           isLoggedIn ? (
-            <CommunityForumView onOpenLoginModal={() => setLoginModalOpen(true)} />
+            <UserDashboard initialMode="FEED" />
           ) : (
             <AuthRequiredCard view="COMMUNITY" onOpenLoginModal={() => setLoginModalOpen(true)} />
           )
@@ -470,6 +474,7 @@ const AppContent: React.FC = () => {
       {/* Navigation intercept guard invariant: if (link.view === 'COMMUNITY' && !isLoggedIn) { setLoginModalOpen(true); } */}
       {/* Public navigation registry: linkedEndUserNavigation, roleUtilityDestinations */}
       {/* Verified social media registry: WhatsApp Channel, YouTube Studio, Instagram, LinkedIn Network, Facebook Profile, Facebook Business, Facebook Group, Twitter / X */}
+      {!(isLoggedIn && (activeView === 'DASHBOARD' || activeView === 'COMMUNITY' || activeView === 'HOME')) && (
       <footer className="bg-[#FAFCFD] border-t border-[#E8E4D8] py-6 sm:py-7 lg:py-8 px-4 sm:px-6 lg:px-8 mt-auto">
         <div className="max-w-7xl mx-auto">
           {/* Main 3-Column Responsive Grid: Column 1 (42%), Column 2 (25%), Column 3 (33%) */}
@@ -706,6 +711,7 @@ const AppContent: React.FC = () => {
           </div>
         </div>
       </footer>
+      )}
 
       {/* Official Property Studio Support Desk Drawer & Floating Button */}
       <SupportDeskButton
