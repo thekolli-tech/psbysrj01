@@ -42,8 +42,35 @@ export function whatsAppSettings(): WhatsAppSettings | null {
   return { accessToken, phoneNumberId, templateName, graphApiVersion, templateLanguage };
 }
 
+export interface GupshupSettings {
+  apiKey: string;
+  appId: string;
+  appName: string;
+  whatsappNumber: string;
+  templateId: string;
+}
+
+/**
+ * Returns Gupshup configuration if all required credentials and identifiers are present.
+ * Uses official Property Studio approved authentication template details.
+ */
+export function gupshupSettings(): GupshupSettings | null {
+  const apiKey = envValue('GUPSHUP_API_KEY');
+  const rawNumber = envValue('GUPSHUP_WHATSAPP_NUMBER') || envValue('GUPSHUP_SOURCE_NUMBER');
+  if (!apiKey || !rawNumber) return null;
+  const whatsappNumber = rawNumber.replace(/^\+/, '');
+  if (!/^\d{10,15}$/.test(whatsappNumber)) return null;
+
+  const appId = envValue('GUPSHUP_APP_ID') || 'a6c34645-8cbf-4ca8-b6c7-a2d8f5172c25';
+  const appName = envValue('GUPSHUP_APP_NAME') || 'propertystudio';
+  const templateId = envValue('GUPSHUP_OTP_TEMPLATE_ID') || 'b803ba1e-de34-496c-aa01-71db36cf8343';
+
+  return { apiKey, appId, appName, whatsappNumber, templateId };
+}
+
 export function configuredWhatsAppProviders(): string[] {
-  return whatsAppSettings() ? ['WhatsApp'] : [];
+  if (gupshupSettings() || whatsAppSettings()) return ['WhatsApp'];
+  return [];
 }
 
 export function whatsAppMessagesUrl(settings: WhatsAppSettings): string {
@@ -58,24 +85,84 @@ function acceptedMessageId(data: { error?: unknown; messages?: Array<{ id?: unkn
 }
 
 /**
- * Sends the already generated code with a copy-code authentication template.
- * Meta requires the same code in the body parameter and the URL button parameter.
- * The caller must invoke this only after the user asks for an OTP.
+ * Sends the generated 6-digit OTP code to the recipient via WhatsApp.
+ * Prioritizes the approved Gupshup authentication template (property_studio_authentication).
+ * Falls back to Meta Cloud API if Gupshup is not configured.
+ * Strictly verifies provider acceptance and message ID; returns clear errors on rejection.
  */
 export async function sendWhatsAppOtp(
   toPhone: string,
   otp: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<WhatsAppDispatchResult> {
-  const settings = whatsAppSettings();
-  if (!settings) {
-    return { success: false, provider: 'unconfigured', error: 'WhatsApp provider is not configured.' };
+  const gupshup = gupshupSettings();
+  const meta = whatsAppSettings();
+
+  if (!gupshup && !meta) {
+    return { success: false, provider: "unconfigured", error: "WhatsApp provider is not configured." };
   }
   const mobile = normalizeIndianMobile(toPhone);
   if (!mobile) {
-    return { success: false, provider: 'whatsapp', error: 'A valid Indian mobile number is required.' };
+    return { success: false, provider: "whatsapp", error: "A valid Indian mobile number is required." };
   }
 
+  // 1. Primary: Approved Gupshup Authentication Template Dispatch
+  if (gupshup) {
+    const destination = mobile.replace(/^\+/, ''); // digits only: 91XXXXXXXXXX
+    const source = gupshup.whatsappNumber.replace(/^\+/, '');
+    const bodyParams = new URLSearchParams();
+    bodyParams.set('channel', 'whatsapp');
+    bodyParams.set('source', source);
+    bodyParams.set('destination', destination);
+    bodyParams.set('src.name', gupshup.appName);
+    bodyParams.set('template', JSON.stringify({
+      id: gupshup.templateId,
+      params: [otp]
+    }));
+
+    try {
+      const response = await fetchImpl('https://api.gupshup.io/wa/api/v1/template/msg', {
+        method: 'POST',
+        headers: {
+          'apikey': gupshup.apiKey,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
+        },
+        body: bodyParams.toString(),
+        signal: AbortSignal.timeout(15_000)
+      });
+
+      const data = await response.json().catch(() => null) as {
+        status?: string;
+        messageId?: string;
+        message?: string;
+        error?: unknown;
+      } | null;
+
+      const isAccepted = response.ok && (data?.status === 'submitted' || data?.status === 'success');
+      const messageId = isAccepted && typeof data?.messageId === 'string' && data.messageId.trim()
+        ? data.messageId.trim()
+        : null;
+
+      if (!messageId) {
+        console.warn(`[Property Studio] Gupshup rejected the WhatsApp OTP message with HTTP ${response.status}.`);
+        return {
+          success: false,
+          provider: 'whatsapp',
+          error: data?.message || 'Gupshup did not accept the verification message.'
+        };
+      }
+
+      console.log('[Property Studio] Gupshup accepted the WhatsApp OTP message. Message ID:', messageId);
+      return { success: true, provider: 'whatsapp', messageId };
+    } catch {
+      console.warn('[Property Studio] Gupshup request failed before a response was received.');
+      return { success: false, provider: 'whatsapp', error: 'WhatsApp request failed.' };
+    }
+  }
+
+  // 2. Fallback: Meta Cloud API Dispatch
+  const settings = meta!;
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',

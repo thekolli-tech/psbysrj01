@@ -1200,6 +1200,17 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
       res.status(400).json({ error: 'A valid Indian mobile number is required' });
       return;
     }
+    if (req.body?.intent === 'register') {
+      const { isPhoneTaken } = await import('./src/server/db.js');
+      const taken = await isPhoneTaken(phone);
+      if (taken) {
+        res.status(409).json({
+          error: 'An account with this mobile number already exists. Please sign in instead.',
+          code: 'PHONE_ALREADY_REGISTERED'
+        });
+        return;
+      }
+    }
     if (!String(process.env.OTP_HASH_SECRET || '').trim()) {
       whatsAppUnavailable(res, 'OTP_NOT_CONFIGURED');
       return;
@@ -1279,8 +1290,10 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    if (!otp) {
-      res.status(400).json({ error: 'Email verification code (OTP) is required to register' });
+    const hasPhoneOtp = Boolean(phoneOtp && String(phoneOtp).trim());
+    const hasEmailOtp = Boolean(otp && String(otp).trim());
+    if (!hasPhoneOtp && !hasEmailOtp) {
+      res.status(400).json({ error: 'WhatsApp verification code (OTP) is required to register' });
       return;
     }
 
@@ -1336,9 +1349,9 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       phone: resolvedPhone,
       organization: organization?.trim() || '',
       townCity: resolvedTownCity,
-      otp: String(otp),
-      phoneOtp: phoneOtp ? String(phoneOtp) : undefined,
-      requirePhone: Boolean(phoneRequired && seeker)
+      otp: hasEmailOtp ? String(otp) : undefined,
+      phoneOtp: hasPhoneOtp ? String(phoneOtp) : undefined,
+      requirePhone: Boolean((phoneRequired && seeker) || hasPhoneOtp)
     });
 
     let validatedProfession: string | null = null;
@@ -2352,7 +2365,7 @@ app.post('/api/admin/posts/:id/approve-deletion', requireAdmin, async (req: Auth
       }).catch((err: any) => console.warn('[Property Studio Email] Deletion approval email failed:', err));
     }
 
-    // Broadcast live events
+    // Broadcast live events
     broadcastSseEvent('POST_DELETION_APPROVED', {
       postId: post.id,
       authorId: post.authorId

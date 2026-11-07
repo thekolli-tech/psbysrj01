@@ -914,6 +914,17 @@ export async function pgIsTargetVerified(
   return false;
 }
 
+export async function pgPhoneTaken(phone: string): Promise<boolean> {
+  await ensurePostgresAdditiveSchema();
+  const national = indianNationalDigits(phone);
+  if (!national) return false;
+  const taken = await queryPostgres(
+    `SELECT id FROM users WHERE regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') IN ($1, $2, $3) LIMIT 1`,
+    [national, `0${national}`, `91${national}`]
+  );
+  return taken.rows.length > 0;
+}
+
 export async function pgRegisterVerifiedUser(data: {
   name: string;
   email: string;
@@ -922,27 +933,46 @@ export async function pgRegisterVerifiedUser(data: {
   phone?: string;
   organization?: string;
   townCity?: string;
-  otp: string;
+  otp?: string;
   phoneOtp?: string;
-  requirePhone: boolean;
+  requirePhone?: boolean;
 }): Promise<DbUser> {
   await ensurePostgresAdditiveSchema();
   const email = data.email.trim().toLowerCase();
-  const phone = data.requirePhone
-    ? canonicalOtpTarget('PHONE_VERIFICATION', data.phone || '')
-    : (data.phone?.trim() ? (normalizeIndianMobile(data.phone) || data.phone.trim()) : '');
-  const locks = [`otp:EMAIL_VERIFICATION:${email}`, `otp:REGISTRATION_GRANT:${email}`];
-  if (data.requirePhone) {
-    locks.push(`otp:PHONE_VERIFICATION:${phone}`, `otp:PHONE_REGISTRATION_GRANT:${phone}`, `phone:${phone}`);
+  const phone = data.phone?.trim()
+    ? (normalizeIndianMobile(data.phone) || data.phone.trim())
+    : '';
+  const hasPhoneOtp = Boolean(data.phoneOtp && String(data.phoneOtp).trim());
+  const hasEmailOtp = Boolean(data.otp && String(data.otp).trim());
+
+  if (!hasPhoneOtp && !hasEmailOtp) {
+    throw new RegistrationRejected(400, 'Verification code is required to complete registration');
   }
+
+  const locks: string[] = [];
+  if (hasEmailOtp) {
+    locks.push(`otp:EMAIL_VERIFICATION:${email}`, `otp:REGISTRATION_GRANT:${email}`);
+  }
+  if (hasPhoneOtp || data.requirePhone) {
+    const canonicalPhone = phone ? canonicalOtpTarget('PHONE_VERIFICATION', phone) : phone;
+    locks.push(`otp:PHONE_VERIFICATION:${canonicalPhone}`, `otp:PHONE_REGISTRATION_GRANT:${canonicalPhone}`, `phone:${canonicalPhone}`);
+  }
+
   return withPgTransaction(locks, async (client) => {
     const runner = pgRunner(client);
-    const emailOk = await claimOtpProof(runner, 'pg', email, 'EMAIL_VERIFICATION', data.otp, { issueGrant: false, allowGrantFallback: true });
-    if (!emailOk) throw new RegistrationRejected(400, 'Invalid or expired email verification code');
-    if (data.requirePhone) {
-      const phoneOk = Boolean(data.phoneOtp) && await claimOtpProof(runner, 'pg', phone, 'PHONE_VERIFICATION', String(data.phoneOtp), { issueGrant: false, allowGrantFallback: true });
+    if (hasEmailOtp) {
+      const emailOk = await claimOtpProof(runner, 'pg', email, 'EMAIL_VERIFICATION', String(data.otp), { issueGrant: false, allowGrantFallback: true });
+      if (!emailOk && !hasPhoneOtp) throw new RegistrationRejected(400, 'Invalid or expired email verification code');
+    }
+
+    if (hasPhoneOtp) {
+      if (!phone) {
+        throw new RegistrationRejected(400, 'A valid Indian mobile number is required');
+      }
+      const canonicalPhone = canonicalOtpTarget('PHONE_VERIFICATION', phone);
+      const phoneOk = await claimOtpProof(runner, 'pg', canonicalPhone, 'PHONE_VERIFICATION', String(data.phoneOtp), { issueGrant: false, allowGrantFallback: true });
       if (!phoneOk) {
-        throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
+        throw new RegistrationRejected(400, 'Invalid or expired WhatsApp verification code');
       }
       const national = indianNationalDigits(phone);
       const taken = await client.query(
@@ -952,7 +982,10 @@ export async function pgRegisterVerifiedUser(data: {
       if (taken.rows.length > 0) {
         throw new RegistrationRejected(400, 'An account with this mobile number already exists');
       }
+    } else if (data.requirePhone) {
+      throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
     }
+
     try {
       return await insertPgUser(client, {
         name: data.name,
@@ -962,7 +995,7 @@ export async function pgRegisterVerifiedUser(data: {
         phone,
         organization: data.organization,
         townCity: data.townCity?.trim() || 'Hyderabad, Telangana, India',
-        phoneVerified: data.requirePhone
+        phoneVerified: hasPhoneOtp || Boolean(data.requirePhone)
       });
     } catch (error) {
       if (isUniqueEmailError(error)) throw new RegistrationRejected(400, 'An account with this email address already exists');

@@ -1014,6 +1014,16 @@ export async function isTargetVerified(
   return sqliteIsTargetVerified(target, type);
 }
 
+export async function isPhoneTaken(phone: string): Promise<boolean> {
+  const normalized = normalizeIndianMobile(phone);
+  if (!normalized) return false;
+  if (isPostgresAuthoritative()) {
+    const { pgPhoneTaken } = await import('./postgresRepo.js');
+    return pgPhoneTaken(normalized);
+  }
+  return sqlitePhoneTaken(normalized);
+}
+
 export async function registerVerifiedUser(data: {
   name: string;
   email: string;
@@ -1022,9 +1032,9 @@ export async function registerVerifiedUser(data: {
   phone?: string;
   organization?: string;
   townCity?: string;
-  otp: string;
+  otp?: string;
   phoneOtp?: string;
-  requirePhone: boolean;
+  requirePhone?: boolean;
 }): Promise<DbUser> {
   const payload = {
     ...data,
@@ -3216,26 +3226,43 @@ function sqliteRegisterVerifiedUser(data: {
   phone?: string;
   organization?: string;
   townCity?: string;
-  otp: string;
+  otp?: string;
   phoneOtp?: string;
-  requirePhone: boolean;
+  requirePhone?: boolean;
 }): DbUser {
   const email = data.email.trim().toLowerCase();
-  const phone = data.requirePhone
-    ? canonicalOtpTarget('PHONE_VERIFICATION', data.phone || '')
-    : (data.phone?.trim() ? (normalizeIndianMobile(data.phone) || data.phone.trim()) : '');
+  const phone = data.phone?.trim()
+    ? (normalizeIndianMobile(data.phone) || data.phone.trim())
+    : '';
   return sqliteTransaction(() => {
-    const emailOk = claimOtpProofSync(sqliteRunner(), email, 'EMAIL_VERIFICATION', data.otp, { issueGrant: false, allowGrantFallback: true });
-    if (!emailOk) throw new RegistrationRejected(400, 'Invalid or expired email verification code');
-    if (data.requirePhone) {
-      const phoneOk = Boolean(data.phoneOtp) && claimOtpProofSync(sqliteRunner(), phone, 'PHONE_VERIFICATION', String(data.phoneOtp), { issueGrant: false, allowGrantFallback: true });
+    const hasPhoneOtp = Boolean(data.phoneOtp && String(data.phoneOtp).trim());
+    const hasEmailOtp = Boolean(data.otp && String(data.otp).trim());
+
+    if (!hasPhoneOtp && !hasEmailOtp) {
+      throw new RegistrationRejected(400, 'Verification code is required to complete registration');
+    }
+
+    if (hasEmailOtp) {
+      const emailOk = claimOtpProofSync(sqliteRunner(), email, 'EMAIL_VERIFICATION', String(data.otp), { issueGrant: false, allowGrantFallback: true });
+      if (!emailOk && !hasPhoneOtp) throw new RegistrationRejected(400, 'Invalid or expired email verification code');
+    }
+
+    if (hasPhoneOtp) {
+      if (!phone) {
+        throw new RegistrationRejected(400, 'A valid Indian mobile number is required');
+      }
+      const canonicalPhone = canonicalOtpTarget('PHONE_VERIFICATION', phone);
+      const phoneOk = claimOtpProofSync(sqliteRunner(), canonicalPhone, 'PHONE_VERIFICATION', String(data.phoneOtp), { issueGrant: false, allowGrantFallback: true });
       if (!phoneOk) {
-        throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
+        throw new RegistrationRejected(400, 'Invalid or expired WhatsApp verification code');
       }
       if (sqlitePhoneTaken(phone)) {
         throw new RegistrationRejected(400, 'An account with this mobile number already exists');
       }
+    } else if (data.requirePhone) {
+      throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
     }
+
     try {
       const user = sqliteCreateUser({
         name: data.name,
@@ -3247,7 +3274,7 @@ function sqliteRegisterVerifiedUser(data: {
         townCity: data.townCity?.trim() || 'Hyderabad, Telangana, India',
         isVerified: true
       });
-      if (data.requirePhone) {
+      if (hasPhoneOtp || data.requirePhone) {
         getSqliteDb().prepare('UPDATE users SET phone_verified = 1 WHERE id = ?').run(user.id);
         user.phone_verified = 1;
       }

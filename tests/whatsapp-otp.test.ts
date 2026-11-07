@@ -23,6 +23,12 @@ function clearWhatsApp(): void {
   delete process.env.WHATSAPP_OTP_TEMPLATE_NAME;
   delete process.env.WHATSAPP_GRAPH_API_VERSION;
   delete process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE;
+  delete process.env.GUPSHUP_API_KEY;
+  delete process.env.GUPSHUP_WHATSAPP_NUMBER;
+  delete process.env.GUPSHUP_SOURCE_NUMBER;
+  delete process.env.GUPSHUP_APP_ID;
+  delete process.env.GUPSHUP_APP_NAME;
+  delete process.env.GUPSHUP_OTP_TEMPLATE_ID;
 }
 
 test('Indian mobile numbers still canonicalize to E.164', () => {
@@ -36,7 +42,11 @@ test('WhatsApp Cloud API sends the documented copy-code template only when every
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
     template: process.env.WHATSAPP_OTP_TEMPLATE_NAME,
     version: process.env.WHATSAPP_GRAPH_API_VERSION,
-    language: process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE
+    language: process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE,
+    gupshupKey: process.env.GUPSHUP_API_KEY,
+    gupshupNum: process.env.GUPSHUP_WHATSAPP_NUMBER,
+    gupshupApp: process.env.GUPSHUP_APP_ID,
+    gupshupTpl: process.env.GUPSHUP_OTP_TEMPLATE_ID
   };
   const logs: string[] = [];
   const originalLog = console.log;
@@ -138,6 +148,10 @@ test('WhatsApp Cloud API sends the documented copy-code template only when every
     restore('WHATSAPP_OTP_TEMPLATE_NAME', saved.template);
     restore('WHATSAPP_GRAPH_API_VERSION', saved.version);
     restore('WHATSAPP_OTP_TEMPLATE_LANGUAGE', saved.language);
+    restore('GUPSHUP_API_KEY', saved.gupshupKey);
+    restore('GUPSHUP_WHATSAPP_NUMBER', saved.gupshupNum);
+    restore('GUPSHUP_APP_ID', saved.gupshupApp);
+    restore('GUPSHUP_OTP_TEMPLATE_ID', saved.gupshupTpl);
   }
 });
 

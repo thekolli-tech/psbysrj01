@@ -86,6 +86,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [otpInput, setOtpInput] = useState('');
   const [countdown, setCountdown] = useState(0);
 
+  // WhatsApp OTP registration flow state: 'PHONE' -> 'OTP' -> 'PROFILE'
+  const [regStep, setRegStep] = useState<'PHONE' | 'OTP' | 'PROFILE'>('PHONE');
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [verifiedPhone, setVerifiedPhone] = useState('');
+  const [verifiedPhoneOtp, setVerifiedPhoneOtp] = useState('');
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
   // Mobile Phone OTP verification state (configurable via REQUIRE_PHONE_OTP)
   const [phoneOtpRequired, setPhoneOtpRequired] = useState(isPhoneOtpRequired());
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
@@ -558,35 +565,112 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleSendPhoneOtp = async () => {
+  const handleOtpDigitChange = (index: number, value: string) => {
+    const clean = value.replace(/[^0-9]/g, '');
+    const char = clean.slice(-1);
+    const updated = [...otpDigits];
+    updated[index] = char;
+    setOtpDigits(updated);
+    setErrorMsg(null);
+
+    if (char && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
+    if (!pasted) return;
+    const updated = [...otpDigits];
+    for (let i = 0; i < 6; i++) {
+      updated[i] = pasted[i] || '';
+    }
+    setOtpDigits(updated);
+    setErrorMsg(null);
+    const nextIdx = Math.min(pasted.length, 5);
+    otpRefs.current[nextIdx]?.focus();
+  };
+
+  const handleSendWhatsAppOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (submitting.current) return;
-    if (!phoneInput.trim() || phoneInput.trim().length < 8) {
-      setErrorMsg('Please enter a valid mobile number first.');
+    const cleanDigits = phoneInput.replace(/[^0-9]/g, '');
+    if (cleanDigits.length !== 10) {
+      setErrorMsg('Please enter a valid 10-digit Indian mobile number.');
       return;
     }
     setErrorMsg(null);
     submitting.current = true;
     setLoading(true);
     try {
+      const fullPhone = '+91' + cleanDigits;
       const res = await fetch('/api/auth/send-phone-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ phone: phoneInput.trim() })
+        body: JSON.stringify({ phone: fullPhone, intent: 'register' })
       });
       const result = await readApiResponse(res);
       if (!result.ok || result.data?.success !== true) {
-        setPhoneOtpSent(false);
-        throw new Error(result.error || 'WhatsApp verification was not sent.');
+        if (result.status === 409 || result.data?.code === 'PHONE_ALREADY_REGISTERED') {
+          throw new Error('An account with this mobile number already exists. Please sign in instead.');
+        }
+        throw new Error(result.error || 'WhatsApp verification code was not accepted by provider.');
       }
-      setPhoneOtpSent(true);
+      setVerifiedPhone(fullPhone);
+      setRegStep('OTP');
+      setOtpDigits(['', '', '', '', '', '']);
       setPhoneCountdown(60);
-      showToast('WhatsApp verification code sent. Check WhatsApp on the mobile number you entered.');
+      showToast('WhatsApp verification code sent. Check WhatsApp on your phone.');
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } catch (err: any) {
       setErrorMsg(err.message || 'WhatsApp verification was not sent.');
     } finally {
       submitting.current = false;
       setLoading(false);
     }
+  };
+
+  const handleVerifyWhatsAppOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (submitting.current) return;
+    const enteredOtp = otpDigits.join('');
+    if (enteredOtp.length !== 6) {
+      setErrorMsg('Please enter the full 6-digit WhatsApp verification code.');
+      return;
+    }
+    setErrorMsg(null);
+    submitting.current = true;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/verify-phone-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ phone: verifiedPhone, otp: enteredOtp })
+      });
+      const result = await readApiResponse(res);
+      if (!result.ok || result.data?.verified !== true) {
+        throw new Error(result.error || 'Invalid or expired WhatsApp verification code. Please check and try again.');
+      }
+      setVerifiedPhoneOtp(enteredOtp);
+      setRegStep('PROFILE');
+      showToast('Mobile number verified! Please complete your profile.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Invalid or expired WhatsApp verification code.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
+    }
+  };
+
+  const handleSendPhoneOtp = async () => {
+    return handleSendWhatsAppOtp();
   };
 
   const handleSendEmailOtp = async (e: React.FormEvent) => {
@@ -750,6 +834,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     if (submitting.current) return;
     setErrorMsg(null);
 
+    if (!nameInput.trim()) {
+      setErrorMsg('Please enter your full name.');
+      return;
+    }
+
+    if (!emailInput.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim())) {
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
+    if (!passwordInput || passwordInput.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    if (passwordInput !== confirmPasswordInput) {
+      setErrorMsg('Passwords do not match. Please ensure both passwords match.');
+      return;
+    }
+
     if (!professionInput.trim()) {
       setErrorMsg('Please enter your profession.');
       return;
@@ -763,18 +867,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         headers: { 'Content-Type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
           name: nameInput.trim(),
-          email: emailInput.trim(),
+          email: emailInput.trim().toLowerCase(),
           password: passwordInput,
           role: roleInput,
-          phone: phoneInput.trim(),
+          phone: verifiedPhone,
+          phoneOtp: verifiedPhoneOtp,
           organization: organizationInput.trim(),
           profession: professionInput.trim(),
           company: companyInput.trim() || undefined,
           interests: selectedInterests,
           townCity: DEFAULT_SIGNUP_LOCATION,
           location: DEFAULT_SIGNUP_LOCATION,
-          otp: otpInput.trim(),
-          phoneOtp: (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER') ? phoneOtpInput.trim() : undefined,
           avatar: selectedAvatar
         })
       });
@@ -786,11 +889,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       }
 
       login(user);
-      showToast(`Account successfully registered and verified! Welcome, ${user.name}`);
+      showToast(`Welcome to Property Studio, ${user.name}!`);
       onClose();
-      setLocationInput(DEFAULT_SIGNUP_LOCATION);
-      setAvatarStep(false);
-      setCustomAvatar(null);
+      setRegStep('PHONE');
+      setPhoneInput('');
+      setOtpDigits(['', '', '', '', '', '']);
+      setVerifiedPhone('');
+      setVerifiedPhoneOtp('');
+      setNameInput('');
+      setEmailInput('');
+      setPasswordInput('');
+      setConfirmPasswordInput('');
+      setProfessionInput('');
+      setOrganizationInput('');
+      setCompanyInput('');
     } catch (err: any) {
       setErrorMsg(err.message || 'Registration failed. Please try again.');
     } finally {
@@ -868,10 +980,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               </div>
               <div>
                 <h3 className="text-sm sm:text-base font-bold text-white font-display">
-                  {isLoggedIn ? 'Account Session' : forgotPasswordMode ? 'Reset Password' : mode === 'LOGIN' ? 'Portal Sign In' : avatarStep ? 'Choose Profile Avatar' : 'Create Account'}
+                  {isLoggedIn ? 'Account Session' : forgotPasswordMode ? 'Reset Password' : mode === 'LOGIN' ? 'Portal Sign In' : regStep === 'PROFILE' ? 'Complete Your Profile' : regStep === 'OTP' ? 'WhatsApp Verification' : 'Join Property Studio'}
                 </h3>
                 <p className="text-[11px] sm:text-xs text-slate-400">
-                  {isLoggedIn ? `Active as ${currentUser.name}` : forgotPasswordMode ? 'Verify email OTP to set new password' : avatarStep ? 'Select 2D character avatar or upload your photo' : 'Live server database authentication'}
+                  {isLoggedIn ? `Active as ${currentUser.name}` : forgotPasswordMode ? 'Verify email OTP to set new password' : mode === 'LOGIN' ? 'Live server database authentication' : regStep === 'PROFILE' ? 'Tell us a little about yourself to personalise your experience' : regStep === 'OTP' ? 'Enter the 6-digit code received on WhatsApp' : 'Get started with verified WhatsApp authentication'}
                 </p>
               </div>
             </div>
@@ -947,7 +1059,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               )}
 
               {/* Mode Switcher */}
-              {!avatarStep && !forgotPasswordMode && (
+              {!forgotPasswordMode && (mode === 'LOGIN' || regStep === 'PHONE') && (
                 <div className="flex bg-slate-100 p-1 rounded-xl">
                   <button
                     type="button"
@@ -1226,86 +1338,327 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </button>
                   </div>
                 </form>
-              ) : !otpSent ? (
-                <form onSubmit={handleSendEmailOtp} className="space-y-2.5">
-                  <div className="bg-amber-50/90 py-1.5 px-2.5 rounded-lg border border-amber-200/90 text-[11px] text-amber-900 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>Email OTP verification is mandatory for verified account registration.</span>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">Full Name</label>
-                    <input
-                      type="text"
-                      value={nameInput}
-                      onChange={e => setNameInput(e.target.value)}
-                      placeholder="e.g. Suresh Chandra"
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">Email Address</label>
-                    <input
-                      type="email"
-                      value={emailInput}
-                      onChange={e => setEmailInput(e.target.value)}
-                      placeholder="e.g. suresh@example.com"
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">Role / Account Type</label>
-                    <select
-                      value={roleInput}
-                      onChange={e => setRoleInput(e.target.value as any)}
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                    >
-                      <option value="PROPERTY_SEEKER">Property Seeker (HNI / Investor / Buyer)</option>
-                      <option value="LANDOWNER">Landowner</option>
-                      <option value="CHANNEL_PARTNER">Channel Partner</option>
-                      <option value="RESELLER">Reseller</option>
-                      <option value="RERA_AGENT">RERA Agent</option>
-                      <option value="REAL_ESTATE_MEDIA">Real Estate Media</option>
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
+              ) : regStep === 'PHONE' ? (
+                /* Step 1: Mobile Number Entry */
+                <form onSubmit={handleSendWhatsAppOtp} className="space-y-3.5">
+                  <div className="bg-emerald-50/90 py-2 px-3 rounded-xl border border-emerald-200/90 text-[11px] text-emerald-950 flex items-start gap-2">
+                    <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Contact Mobile {phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' ? (
-                          <span className="text-red-500 font-bold text-[10px]">* Required</span>
-                        ) : (
-                          <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
-                        )}
-                      </label>
+                      <p className="font-bold">Instant WhatsApp Verification</p>
+                      <p className="text-[10.5px] text-emerald-700 leading-relaxed">
+                        Enter your mobile number to receive a secure 6-digit WhatsApp OTP. No email OTP required to register.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                      Mobile Number <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex rounded-xl border border-slate-300 overflow-hidden focus-within:ring-2 focus-within:ring-amber-500 focus-within:border-amber-500 transition-all">
+                      <span className="bg-slate-100 text-slate-700 font-bold px-3 py-2.5 text-xs flex items-center border-r border-slate-300 shrink-0">
+                        +91
+                      </span>
                       <input
                         type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
                         value={phoneInput}
-                        onChange={e => setPhoneInput(e.target.value)}
+                        onChange={e => setPhoneInput(e.target.value.replace(/[^0-9]/g, ''))}
                         placeholder="e.g. +91 98490 12345"
-                        required={phoneOtpRequired && roleInput === 'PROPERTY_SEEKER'}
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-full px-3 py-2.5 text-xs focus:outline-none text-slate-900 font-medium"
+                        required
+                        autoFocus
                       />
                     </div>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      We'll send your verification code via WhatsApp to this number.
+                    </span>
+                  </div>
+
+                  <p className="text-[10px] text-slate-500 text-center leading-tight">
+                    By proceeding, you agree to our{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        setActiveView('TERMS');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="text-amber-700 hover:underline font-bold cursor-pointer"
+                    >
+                      Terms & Conditions
+                    </button>{' '}
+                    and acknowledge our{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        setActiveView('PRIVACY');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="text-amber-700 hover:underline font-bold cursor-pointer"
+                    >
+                      Privacy Policy
+                    </button>
+                    .
+                  </p>
+
+                  <button
+                    type="submit"
+                    disabled={loading || phoneInput.replace(/[^0-9]/g, '').length !== 10}
+                    className="w-full py-2.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
+                  >
+                    <MessageSquare className="w-4 h-4 text-white" />
+                    <span>{loading ? 'Sending WhatsApp Code...' : 'Get WhatsApp OTP'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+
+                  {/* Social Divider */}
+                  <div className="relative my-3 text-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200" />
+                    </div>
+                    <span className="relative px-3 bg-white text-[11px] text-slate-400 font-medium">
+                      or sign up with
+                    </span>
+                  </div>
+
+                  {/* Google OAuth Button */}
+                  <button
+                    type="button"
+                    disabled={loading || googleLoading}
+                    onClick={handleGoogleSignIn}
+                    className="w-full py-2.5 px-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl flex items-center justify-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
+                  >
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                    </svg>
+                    <span>Continue with Google</span>
+                  </button>
+                </form>
+              ) : regStep === 'OTP' ? (
+                /* Step 2: 6-Digit WhatsApp OTP Verification */
+                <form onSubmit={handleVerifyWhatsAppOtp} className="space-y-4">
+                  <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-3 text-center space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-emerald-950 flex items-center gap-1.5 text-xs">
+                        <MessageSquare className="w-4 h-4 text-emerald-600" />
+                        WhatsApp Code Dispatched
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setRegStep('PHONE'); setErrorMsg(null); }}
+                        className="text-[11px] text-amber-700 hover:underline font-bold cursor-pointer"
+                      >
+                        Change Number
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-emerald-800 leading-relaxed text-left pt-1">
+                      An official 6-digit code has been delivered via WhatsApp to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits below:
+                    </p>
+                    <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between text-[11px]">
+                      <span className="flex items-center gap-1 text-slate-600">
+                        <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Location:
+                      </span>
+                      <span className="font-semibold text-slate-800">{DEFAULT_SIGNUP_LOCATION} (Fixed Territory)</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 text-center mb-2 text-xs">
+                      Enter 6-Digit WhatsApp Verification Code
+                    </label>
+                    <div className="flex justify-center gap-2 sm:gap-2.5">
+                      {otpDigits.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          ref={el => { otpRefs.current[idx] = el; }}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={1}
+                          value={digit}
+                          onChange={e => handleOtpDigitChange(idx, e.target.value)}
+                          onKeyDown={e => handleOtpDigitKeyDown(idx, e)}
+                          onPaste={handleOtpPaste}
+                          className="w-10 h-12 sm:w-11 sm:h-12 text-center text-lg sm:text-xl font-mono font-bold border-2 rounded-xl border-slate-300 focus:border-[#B49029] focus:ring-2 focus:ring-[#B49029]/20 focus:outline-none transition-all bg-white"
+                          autoFocus={idx === 0}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                    <span>Didn't receive the WhatsApp code?</span>
+                    {phoneCountdown > 0 ? (
+                      <span className="font-mono text-slate-400">Resend in {phoneCountdown}s</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSendWhatsAppOtp()}
+                        className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Resend WhatsApp OTP</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || otpDigits.join('').length !== 6}
+                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                    <span>{loading ? 'Verifying Code...' : 'Verify Code & Set Up Profile'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              ) : (
+                /* Step 3: Registration Profile Completion Modal */
+                <form onSubmit={handleCompleteRegistration} className="space-y-3.5">
+                  {/* Verified Mobile Pill */}
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div>
+                        <span className="font-bold text-emerald-950 font-mono">{verifiedPhone}</span>
+                        <span className="ml-2 text-[10px] text-emerald-700 font-semibold bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200">
+                          ✓ Verified via WhatsApp
+                        </span>
+                      </div>
+                    </div>
+                    <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                  </div>
+
+                  {/* Profile Completion Header */}
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 font-display">
+                      Complete Your Property Studio Profile
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Tell us a little about yourself to personalise your Property Studio experience.
+                    </p>
+                  </div>
+
+                  {/* Full Name & Account Role */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        {roleInput === 'LANDOWNER' ? 'Land Parcel' : roleInput === 'RERA_AGENT' || roleInput === 'CHANNEL_PARTNER' ? 'Agency / RERA' : 'Organization'} <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
+                        Full Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        value={organizationInput}
-                        onChange={e => setOrganizationInput(e.target.value)}
-                        placeholder={roleInput === 'LANDOWNER' ? 'Land description' : roleInput === 'RERA_AGENT' ? 'RERA registration number' : 'Firm or organization'}
+                        value={nameInput}
+                        onChange={e => setNameInput(e.target.value)}
+                        placeholder="e.g. Suresh Chandra"
                         className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        required
                       />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                        Account Role <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={roleInput}
+                        onChange={e => setRoleInput(e.target.value as any)}
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                      >
+                        <option value="PROPERTY_SEEKER">Property Seeker (Buyer / Investor)</option>
+                        <option value="CHANNEL_PARTNER">Channel Partner / Agent</option>
+                        <option value="LANDOWNER">Landowner / Asset Holder</option>
+                        <option value="RESELLER">Reseller</option>
+                        <option value="RERA_AGENT">RERA Registered Agent</option>
+                        <option value="REAL_ESTATE_MEDIA">Real Estate Media Professional</option>
+                      </select>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* Email Address */}
+                  <div>
+                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        value={emailInput}
+                        onChange={e => setEmailInput(e.target.value)}
+                        placeholder="e.g. suresh@example.com"
+                        className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        required
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      Used for official notifications, transaction receipts, and workspace security.
+                    </span>
+                  </div>
+
+                  {/* Password & Confirm Password */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                        Choose Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={passwordInput}
+                          onChange={e => setPasswordInput(e.target.value)}
+                          placeholder="Minimum 6 characters"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-9"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                        Confirm Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPasswordInput}
+                          onChange={e => setConfirmPasswordInput(e.target.value)}
+                          placeholder="Re-enter password"
+                          className={`w-full px-3 py-2 text-xs border rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 pr-9 ${
+                            confirmPasswordInput && confirmPasswordInput !== passwordInput
+                              ? 'border-red-400 focus:ring-red-400 bg-red-50/40 text-red-900'
+                              : 'border-slate-300 focus:ring-amber-500'
+                          }`}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      {confirmPasswordInput && confirmPasswordInput !== passwordInput && (
+                        <span className="text-[10px] text-red-500 mt-0.5 block font-medium">Passwords do not match</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Profession, Organization & Company */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <div>
                       <label htmlFor="signup-profession" className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
                         Profession *
@@ -1314,38 +1667,48 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         id="signup-profession"
                         name="profession"
                         type="text"
-                        required
+                        autoComplete="off"
                         value={professionInput}
                         onChange={e => setProfessionInput(e.target.value)}
                         placeholder="Enter your profession"
-                        autoComplete="off"
-                        maxLength={80}
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        required
                       />
                     </div>
+
                     <div>
-                      <label htmlFor="signup-company" className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Company / Practice <span className="font-normal text-[10px] text-slate-400">(Optional)</span>
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                        Organization
                       </label>
                       <input
-                        id="signup-company"
+                        type="text"
+                        value={organizationInput}
+                        onChange={e => setOrganizationInput(e.target.value)}
+                        placeholder="e.g. Firm name"
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                        Company / Practice
+                      </label>
+                      <input
                         type="text"
                         value={companyInput}
                         onChange={e => setCompanyInput(e.target.value)}
-                        placeholder="e.g. Studio Arc / Firm"
+                        placeholder="e.g. Studio Co."
                         className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
                     </div>
                   </div>
 
+                  {/* Interests and Topics */}
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs">
-                        Interests & Topics
-                      </label>
-                      <span className="text-[10px] text-slate-400">Personalizes your Community Q&A</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1 p-1.5 bg-slate-50 border border-slate-200/80 rounded-lg max-h-24 sm:max-h-28 overflow-y-auto">
+                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                      Interests & Specialisations
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 border border-slate-200 rounded-xl bg-slate-50/50">
                       {[
                         'Kokapet & Neopolis',
                         'High-Rise Construction',
@@ -1382,10 +1745,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </div>
                   </div>
 
+                  {/* Location (Fixed Territory) */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label htmlFor="signup-location" className="block font-bold text-slate-700 text-[11px] sm:text-xs">
-                        Location (City & State)
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs">
+                        Location / Territory
                       </label>
                       <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200/60 inline-flex items-center gap-1">
                         <Lock className="w-2.5 h-2.5 text-amber-700" />
@@ -1404,289 +1768,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         tabIndex={-1}
                         className="w-full pl-9 pr-8 py-2 text-xs border border-slate-200 rounded-lg sm:rounded-xl bg-slate-100/90 text-slate-800 font-semibold cursor-not-allowed select-none focus:outline-none"
                       />
-                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
                     <span className="text-[10px] text-slate-500 mt-1 block font-medium">
                       Platform location is fixed to Hyderabad, Telangana, India.
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Choose Password <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={passwordInput}
-                          onChange={e => setPasswordInput(e.target.value)}
-                          placeholder="Minimum 6 characters"
-                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-9"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Confirm Password <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={confirmPasswordInput}
-                          onChange={e => setConfirmPasswordInput(e.target.value)}
-                          placeholder="Re-enter your password"
-                          className={`w-full px-3 py-2 text-xs border rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 pr-9 ${
-                            confirmPasswordInput && confirmPasswordInput !== passwordInput
-                              ? 'border-red-400 focus:ring-red-400 bg-red-50/40 text-red-900'
-                              : 'border-slate-300 focus:ring-amber-500'
-                          }`}
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                      {confirmPasswordInput && confirmPasswordInput !== passwordInput && (
-                        <span className="text-[10px] text-red-500 mt-0.5 block font-medium">Passwords do not match</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] text-slate-500 text-center leading-tight">
-                    By proceeding, you agree to our{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        setActiveView('TERMS');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className="text-amber-700 hover:underline font-bold cursor-pointer"
-                    >
-                      Terms & Conditions
-                    </button>{' '}
-                    and acknowledge our{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        setActiveView('PRIVACY');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className="text-amber-700 hover:underline font-bold cursor-pointer"
-                    >
-                      Privacy Policy
-                    </button>
-                    .
-                  </p>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-2.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-lg sm:rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
-                  >
-                    <span>{loading ? 'Sending Code...' : 'Create Verified Account'}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </form>
-              ) : !avatarStep ? (
-                <form onSubmit={handleVerifyOtpAndProceedToAvatar} className="space-y-4">
-                  <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-blue-900 flex items-center gap-1.5">
-                        <Mail className="w-4 h-4 text-blue-600" />
-                        Property Studio OTP Sent
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => { setOtpSent(false); setErrorMsg(null); }}
-                        className="text-[11px] text-blue-700 hover:underline font-bold"
-                      >
-                        Change Email
-                      </button>
-                    </div>
-                    <p className="text-blue-800 text-[11px] leading-relaxed">
-                      A real-time 6-digit verification code has been dispatched from <strong>Property Studio</strong> to <strong className="font-mono text-blue-950">{emailInput}</strong>. Please check your inbox for the email from Property Studio and enter the code below to complete registration.
-                    </p>
-                    <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-[11px]">
-                      <span className="flex items-center gap-1 text-slate-600">
-                        <MapPin className="w-3.5 h-3.5 text-blue-600" /> Location:
-                      </span>
-                      <span className="font-semibold text-slate-800">{DEFAULT_SIGNUP_LOCATION} (Fixed Territory)</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">
-                      Enter 6-Digit Email Verification Code
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={otpInput}
-                      onChange={e => setOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="• • • • • •"
-                      className="w-full text-center text-lg tracking-[0.3em] font-mono font-bold px-3.5 py-3 border-2 border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                      required
-                      autoFocus
-                    />
-                  </div>
-
-                  {phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' && (
-                    <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-2xl text-xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-amber-950 flex items-center gap-1.5">
-                          <Smartphone className="w-4 h-4 text-amber-600" />
-                          Property Seeker WhatsApp Verification
-                        </span>
-                        {phoneCountdown > 0 ? (
-                          <span className="text-[10px] text-amber-700 font-mono">Resend WhatsApp code in {phoneCountdown}s</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleSendPhoneOtp}
-                            className="text-[11px] text-amber-800 hover:underline font-bold"
-                          >
-                            {phoneOtpSent ? 'Resend WhatsApp code' : 'Send WhatsApp code'}
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-amber-900 text-[11px] leading-relaxed">
-                        {phoneOtpSent
-                          ? 'WhatsApp code sent to the mobile number you entered. The account is created only after both codes are verified.'
-                          : 'A WhatsApp verification code is required. It is sent only when WhatsApp accepts it.'}
-                      </p>
-                      <div>
-                        <label className="block font-bold text-amber-950 mb-1">
-                          Enter 6-Digit WhatsApp Code <span className="text-red-500">* Required</span>
-                        </label>
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={phoneOtpInput}
-                          onChange={e => setPhoneOtpInput(e.target.value.replace(/[^0-9]/g, ''))}
-                          placeholder="• • • • • •"
-                          className="w-full text-center text-md tracking-[0.25em] font-mono font-bold px-3 py-2.5 bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between text-[11px] text-slate-500">
-                    <span>Didn't receive the email from Property Studio?</span>
-                    {countdown > 0 ? (
-                      <span className="font-mono text-slate-400">Resend in {countdown}s</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleSendEmailOtp}
-                        className="text-amber-700 hover:underline font-bold flex items-center gap-1"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Resend Email OTP</span>
-                      </button>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading || otpInput.length < 4 || (phoneOtpRequired && roleInput === 'PROPERTY_SEEKER' && phoneOtpInput.length < 4)}
-                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>{loading ? 'Verifying OTP...' : 'Verify Code & Choose Avatar'}</span>
-                    <ArrowRight className="w-4 h-4 text-slate-300" />
-                  </button>
-                </form>
-              ) : (
-                /* Step 3: Avatar Selection Screen */
-                <div className="space-y-4">
-                  {/* Verified Banner */}
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="font-bold text-emerald-950 leading-tight">Email Verified</p>
-                        <p className="text-[11px] text-emerald-700 truncate">{emailInput}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setAvatarStep(false); setErrorMsg(null); }}
-                      className="text-[11px] text-emerald-800 hover:underline font-bold flex items-center gap-1 shrink-0 ml-2"
-                    >
-                      <ArrowLeft className="w-3 h-3" />
-                      Back to OTP
-                    </button>
-                  </div>
-
-                  {/* Profile Preview Card */}
-                  <div className="p-3.5 bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200/80 rounded-2xl flex items-center gap-3.5">
-                    <div className="relative shrink-0">
-                      <img
-                        src={getSafeAvatar(selectedAvatar)}
-                        alt="Profile Preview"
-                        className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 bg-white shadow-sm"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
-                        }}
-                      />
-                      <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] font-black rounded-md shadow-xs">
-                        PREVIEW
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-bold text-slate-900 truncate">{nameInput || 'Your Name'}</h4>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-200">
-                          {roleInput.replace(/_/g, ' ')}
-                        </span>
-                        <span className="text-[11px] text-slate-600 truncate font-medium">
-                          {professionInput || 'Professional'}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-amber-800 font-semibold mt-1 flex items-center gap-1 truncate">
-                        {customAvatar && selectedAvatar === customAvatar ? (
-                          <>
-                            <Camera className="w-3 h-3 text-emerald-700" />
-                            Custom photo selected
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-3 h-3 text-amber-600" />
-                            {ANIME_AVATARS.find(a => a.url === selectedAvatar)?.name || 'Anime'} avatar selected
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* 2D Anime Character Collection */}
-                  <div className="space-y-2">
+                  {/* Profile Avatar Selection */}
+                  <div className="space-y-2 pt-1 border-t border-slate-100">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                        Choose a 2D Character Avatar
+                        Select Avatar or Upload Photo
                       </label>
-                      <span className="text-[10px] text-slate-400">12 stylized profiles</span>
+                      <span className="text-[10px] text-slate-400">12 character avatars or custom upload</span>
                     </div>
 
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    <div className="grid grid-cols-6 sm:grid-cols-6 gap-1.5 max-h-28 overflow-y-auto p-1 bg-slate-50 rounded-xl border border-slate-200/80">
                       {ANIME_AVATARS.map((option) => {
                         const isSelected = selectedAvatar === option.url;
                         return (
@@ -1695,31 +1793,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                             type="button"
                             onClick={() => {
                               setSelectedAvatar(option.url);
-                              setErrorMsg(null);
+                              setCustomAvatar(null);
                             }}
-                            title={`${option.name} (${option.roleHint})`}
-                            className={`relative group p-1.5 rounded-xl border text-center transition-all cursor-pointer ${
+                            title={option.name}
+                            className={`relative p-0.5 rounded-lg border text-center transition-all cursor-pointer ${
                               isSelected
                                 ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-400 shadow-sm'
-                                : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                                : 'border-slate-200 hover:border-slate-300 bg-white'
                             }`}
                           >
                             <img
                               src={option.url}
                               alt={option.name}
-                              className="w-full aspect-square rounded-lg object-cover"
+                              className="w-full aspect-square rounded-md object-cover"
                               loading="lazy"
                             />
-                            <div className="mt-1 text-center">
-                              <span className="text-[10px] font-bold text-slate-800 block truncate leading-tight">
-                                {option.name}
-                              </span>
-                              <span className="text-[8px] text-slate-400 block truncate leading-none mt-0.5">
-                                {option.roleHint}
-                              </span>
-                            </div>
                             {isSelected && (
-                              <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-[9px] font-black shadow-xs">
+                              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-[8px] font-black shadow-xs">
                                 ✓
                               </span>
                             )}
@@ -1727,37 +1817,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         );
                       })}
                     </div>
-                  </div>
 
-                  {/* Upload Your Photo Option */}
-                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                        <Camera className="w-3.5 h-3.5 text-slate-600" />
-                        Or Upload Your Photo
-                      </label>
-                      <span className="text-[10px] text-slate-400">JPG, PNG, WebP (Max 2MB)</span>
-                    </div>
-
-                    <input
-                      ref={avatarInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="hidden"
-                      onChange={handleCustomAvatarSelect}
-                    />
-
+                    {/* Custom Avatar Upload Button */}
                     <div className="flex items-center gap-2">
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={handleCustomAvatarSelect}
+                      />
                       <button
                         type="button"
                         onClick={() => avatarInputRef.current?.click()}
                         disabled={avatarUploading || loading}
-                        className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 text-slate-800 font-bold rounded-xl border border-slate-300 flex items-center justify-center gap-2 text-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                        className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-lg border border-slate-300 flex items-center justify-center gap-1.5 text-[11px] transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                       >
-                        <UploadCloud className="w-4 h-4 text-slate-600" />
-                        <span>{avatarUploading ? 'Processing Image...' : customAvatar ? 'Choose Different Photo' : 'Upload Your Photo'}</span>
+                        <Camera className="w-3.5 h-3.5 text-slate-500" />
+                        <span>{avatarUploading ? 'Processing Photo...' : customAvatar ? 'Photo Uploaded (Click to Change)' : 'Upload Custom Photo (Max 2MB)'}</span>
                       </button>
-
                       {customAvatar && (
                         <button
                           type="button"
@@ -1765,37 +1843,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                             setCustomAvatar(null);
                             setSelectedAvatar(ANIME_AVATARS[0].url);
                           }}
-                          className="px-2.5 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl border border-red-200 transition-colors cursor-pointer"
-                          title="Revert to 2D anime character avatar"
+                          className="px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg border border-red-200 cursor-pointer"
+                          title="Revert to default avatar"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="pt-2 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAvatarStep(false)}
-                      disabled={loading}
-                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>Back</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCompleteRegistration}
-                      disabled={loading || !selectedAvatar}
-                      className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <span>{loading ? 'Finalizing Account...' : 'Confirm & Complete Registration'}</span>
-                    </button>
-                  </div>
-                </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm mt-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                    <span>{loading ? 'Creating Your Account...' : 'Complete Registration & Launch Platform'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
               )}
             </div>
           )}
