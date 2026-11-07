@@ -183,6 +183,7 @@ import {
 } from './src/server/emailNotificationService.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
 import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
+import { getOtpDeliveryStatus, processGupshupWebhookEvent } from './src/server/otpDeliveryTracker.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
@@ -1231,7 +1232,9 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
     }
     res.json({
       success: true,
-      message: 'WhatsApp verification code dispatched. Check WhatsApp on the mobile number you entered.',
+      status: 'SUBMITTED',
+      messageId: dispatchResult.messageId || null,
+      message: 'OTP request accepted. Waiting for WhatsApp delivery...',
       expiresAt,
       deliveredVia: 'whatsapp'
     });
@@ -1254,6 +1257,40 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
     res.status(500).json({ error: 'Unable to send a verification code.' });
   }
 });
+
+// Query the real-time WhatsApp OTP delivery status
+app.get('/api/auth/phone-otp-status', async (req: Request, res: Response): Promise<void> => {
+  const phone = normalizeIndianMobile(String(req.query.phone || ''));
+  const messageId = String(req.query.messageId || '').trim();
+  if (!phone && !messageId) {
+    res.status(400).json({ error: 'Valid phone number or message ID is required' });
+    return;
+  }
+  const record = getOtpDeliveryStatus(messageId || phone || '');
+  res.json({
+    ok: true,
+    status: record?.status || 'SUBMITTED',
+    messageId: record?.providerMessageId || messageId || null,
+    deliveredAt: record?.deliveredAt || null,
+    failureReason: record?.failureReason || null
+  });
+});
+
+// Gupshup webhook & WhatsApp DLR callback endpoint (acknowledges synchronously < 50ms)
+const handleGupshupCallback = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const event = processGupshupWebhookEvent(req.body);
+    if (event.handled) {
+      console.log(`[Property Studio] WhatsApp status callback processed: status=${event.status}, msgId=${event.messageId || 'unknown'}`);
+    }
+  } catch (err: any) {
+    console.warn('[Property Studio] Webhook processing warning:', err?.message || err);
+  }
+  res.status(200).json({ success: true });
+};
+
+app.post('/api/webhooks/gupshup', handleGupshupCallback);
+app.post('/api/auth/whatsapp-callback', handleGupshupCallback);
 
 // Verify Phone OTP. The resulting grant is bound to this normalized number.
 app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Promise<void> => {

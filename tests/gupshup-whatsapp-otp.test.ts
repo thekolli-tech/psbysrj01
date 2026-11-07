@@ -111,7 +111,7 @@ test('Gupshup dispatches approved authentication template with correct headers a
 
     const templateData = JSON.parse(bodyParams.get('template') || '{}');
     assert.equal(templateData.id, MOCK_TEMPLATE_ID);
-    assert.deepEqual(templateData.params, ['482910']);
+    assert.deepEqual(templateData.params, ['482910', '482910']);
   } finally {
     restoreEnv(saved);
   }

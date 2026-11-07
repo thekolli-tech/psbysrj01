@@ -32,7 +32,8 @@ import {
   Camera,
   Trash2,
   UploadCloud,
-  TrendingUp
+  TrendingUp,
+  Loader2
 } from 'lucide-react';
 
 const DEFAULT_SIGNUP_LOCATION = 'Hyderabad, Telangana, India';
@@ -88,10 +89,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
   // WhatsApp OTP registration flow state: 'PHONE' -> 'OTP' -> 'PROFILE'
   const [regStep, setRegStep] = useState<'PHONE' | 'OTP' | 'PROFILE'>('PHONE');
+  const [otpDeliveryStatus, setOtpDeliveryStatus] = useState<'SENDING' | 'SUBMITTED' | 'SENT' | 'DELIVERED' | 'FAILED'>('SUBMITTED');
+  const [otpMessageId, setOtpMessageId] = useState<string | null>(null);
+  const [deliveryFailureReason, setDeliveryFailureReason] = useState<string | null>(null);
+  const pollingRef = useRef<any>(null);
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [verifiedPhone, setVerifiedPhone] = useState('');
   const [verifiedPhoneOtp, setVerifiedPhoneOtp] = useState('');
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const stopDeliveryPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => stopDeliveryPolling();
+  }, []);
 
   // Mobile Phone OTP verification state (configurable via REQUIRE_PHONE_OTP)
   const [phoneOtpRequired, setPhoneOtpRequired] = useState(isPhoneOtpRequired());
@@ -626,6 +642,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
     submitting.current = true;
     setLoading(true);
+    setOtpDeliveryStatus('SENDING');
     try {
       const fullPhone = '+91' + cleanDigits;
       const res = await fetch('/api/auth/send-phone-otp', {
@@ -644,9 +661,46 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       setRegStep('OTP');
       setOtpDigits(['', '', '', '', '', '']);
       setPhoneCountdown(60);
-      showToast('WhatsApp verification code sent. Check WhatsApp on your phone.');
+      setOtpDeliveryStatus('SUBMITTED');
+      setDeliveryFailureReason(null);
+      const msgId = (result.data?.messageId as string) || null;
+      setOtpMessageId(msgId);
+      showToast('OTP request accepted. Waiting for WhatsApp delivery...');
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
+
+      // Active status polling: queries /api/auth/phone-otp-status every 2.5 seconds
+      stopDeliveryPolling();
+      let pollCount = 0;
+      pollingRef.current = setInterval(async () => {
+        pollCount++;
+        if (pollCount > 24) {
+          stopDeliveryPolling();
+          return;
+        }
+        try {
+          const params = new URLSearchParams({ phone: fullPhone });
+          if (msgId) params.set('messageId', msgId);
+          const stRes = await fetch(`/api/auth/phone-otp-status?${params.toString()}`);
+          if (stRes.ok) {
+            const stData = await stRes.json();
+            if (stData.status === 'DELIVERED') {
+              setOtpDeliveryStatus('DELIVERED');
+              stopDeliveryPolling();
+            } else if (stData.status === 'SENT') {
+              setOtpDeliveryStatus('SENT');
+            } else if (stData.status === 'FAILED') {
+              setOtpDeliveryStatus('FAILED');
+              setDeliveryFailureReason(stData.failureReason || 'Provider reported delivery failure.');
+              stopDeliveryPolling();
+            }
+          }
+        } catch {
+          // ignore transient poll errors
+        }
+      }, 2500);
     } catch (err: any) {
+      setOtpDeliveryStatus('FAILED');
+      setDeliveryFailureReason(err.message || 'WhatsApp verification was not sent.');
       setErrorMsg(err.message || 'WhatsApp verification was not sent.');
     } finally {
       submitting.current = false;
@@ -662,6 +716,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       setErrorMsg('Please enter the full 6-digit WhatsApp verification code.');
       return;
     }
+    stopDeliveryPolling();
     setErrorMsg(null);
     submitting.current = true;
     setLoading(true);
@@ -1848,9 +1903,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     disabled={loading || phoneInput.replace(/[^0-9]/g, '').length !== 10 || !emailInput.trim() || passwordInput.length < 6}
                     className="w-full py-2.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl sm:rounded-full font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
                   >
-                    <MessageSquare className="w-4 h-4 text-white" />
-                    <span>{loading ? 'Sending WhatsApp Code...' : 'Get WhatsApp OTP'}</span>
-                    <ArrowRight className="w-4 h-4" />
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 text-white animate-spin" />
+                        <span>Sending your WhatsApp verification code...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="w-4 h-4 text-white" />
+                        <span>Get WhatsApp OTP</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
 
                   {/* Social Divider */}
@@ -1882,26 +1946,67 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               ) : (
                 /* Step 2: 6-Digit WhatsApp OTP Verification */
                 <form onSubmit={handleVerifyWhatsAppOtp} className="space-y-4">
-                  <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-3 text-center space-y-1">
+                  <div className={`rounded-2xl p-3 text-center space-y-1 border transition-all ${
+                    otpDeliveryStatus === 'DELIVERED'
+                      ? 'bg-emerald-50/90 border-emerald-200/90 text-emerald-950'
+                      : otpDeliveryStatus === 'FAILED'
+                      ? 'bg-red-50/90 border-red-200/90 text-red-950'
+                      : 'bg-amber-50/90 border-amber-200/90 text-amber-950'
+                  }`}>
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-emerald-950 flex items-center gap-1.5 text-xs">
-                        <MessageSquare className="w-4 h-4 text-emerald-600" />
-                        WhatsApp Code Dispatched
+                      <span className="font-bold flex items-center gap-1.5 text-xs text-left">
+                        {otpDeliveryStatus === 'DELIVERED' ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span>WhatsApp message delivered. Enter your code.</span>
+                          </>
+                        ) : otpDeliveryStatus === 'FAILED' ? (
+                          <>
+                            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                            <span>Unable to send OTP. Please try again.</span>
+                          </>
+                        ) : (
+                          <>
+                            <Loader2 className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
+                            <span>OTP request accepted. Waiting for WhatsApp delivery...</span>
+                          </>
+                        )}
                       </span>
                       <button
                         type="button"
-                        onClick={() => { setRegStep('PHONE'); setErrorMsg(null); }}
-                        className="text-[11px] text-amber-700 hover:underline font-bold cursor-pointer"
+                        onClick={() => { stopDeliveryPolling(); setRegStep('PHONE'); setErrorMsg(null); }}
+                        className="text-[11px] text-amber-700 hover:underline font-bold cursor-pointer shrink-0 ml-2"
                       >
                         Change Number
                       </button>
                     </div>
-                    <p className="text-[11px] text-emerald-800 leading-relaxed text-left pt-1">
-                      An official 6-digit code has been delivered via WhatsApp to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits below:
-                    </p>
-                    <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between text-[11px]">
+
+                    <div className="text-[11px] leading-relaxed text-left pt-1">
+                      {otpDeliveryStatus === 'DELIVERED' ? (
+                        <p className="text-emerald-800">
+                          Official code delivered via WhatsApp to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits below:
+                        </p>
+                      ) : otpDeliveryStatus === 'FAILED' ? (
+                        <div className="flex items-center justify-between gap-2 pt-0.5">
+                          <span className="text-red-700 text-[11px]">{deliveryFailureReason || 'Unable to deliver message to this mobile number.'}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsAppOtp()}
+                            className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-[10px] cursor-pointer shrink-0 shadow-xs"
+                          >
+                            Try Again
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-amber-800">
+                          Dispatched to WhatsApp network for <strong className="font-mono text-amber-950">{verifiedPhone}</strong>. Waiting for carrier delivery confirmation...
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
                       <span className="flex items-center gap-1 text-slate-600">
-                        <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Location:
+                        <MapPin className="w-3.5 h-3.5 text-amber-600" /> Location:
                       </span>
                       <span className="font-semibold text-slate-800">{DEFAULT_SIGNUP_LOCATION} (Fixed Territory)</span>
                     </div>

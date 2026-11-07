@@ -1,4 +1,5 @@
 import { normalizeIndianMobile } from '../shared/indianMobile.ts';
+import { recordOtpQueued, recordOtpSubmitted, recordOtpFailed } from './otpDeliveryTracker.ts';
 
 export interface WhatsAppDispatchResult {
   success: boolean;
@@ -106,6 +107,9 @@ export async function sendWhatsAppOtp(
     return { success: false, provider: "whatsapp", error: "A valid Indian mobile number is required." };
   }
 
+  // Record queued status immediately
+  recordOtpQueued(mobile, 'whatsapp');
+
   // 1. Primary: Approved Gupshup Authentication Template Dispatch
   if (gupshup) {
     const destination = mobile.replace(/^\+/, ''); // digits only: 91XXXXXXXXXX
@@ -115,9 +119,10 @@ export async function sendWhatsAppOtp(
     bodyParams.set('source', source);
     bodyParams.set('destination', destination);
     bodyParams.set('src.name', gupshup.appName);
+    // Gupshup Authentication templates with COPY_CODE button require OTP code twice (body + button)
     bodyParams.set('template', JSON.stringify({
       id: gupshup.templateId,
-      params: [otp]
+      params: [otp, otp]
     }));
 
     try {
@@ -129,7 +134,7 @@ export async function sendWhatsAppOtp(
           'Accept': 'application/json'
         },
         body: bodyParams.toString(),
-        signal: AbortSignal.timeout(15_000)
+        signal: AbortSignal.timeout(8_000)
       });
 
       const data = await response.json().catch(() => null) as {
@@ -145,17 +150,21 @@ export async function sendWhatsAppOtp(
         : null;
 
       if (!messageId) {
+        const errorDetail = data?.message || 'Gupshup did not accept the verification message.';
+        recordOtpFailed(mobile, errorDetail);
         console.warn(`[Property Studio] Gupshup rejected the WhatsApp OTP message with HTTP ${response.status}.`);
         return {
           success: false,
           provider: 'whatsapp',
-          error: data?.message || 'Gupshup did not accept the verification message.'
+          error: errorDetail
         };
       }
 
+      recordOtpSubmitted(mobile, messageId, 'whatsapp');
       console.log('[Property Studio] Gupshup accepted the WhatsApp OTP message. Message ID:', messageId);
       return { success: true, provider: 'whatsapp', messageId };
-    } catch {
+    } catch (err: any) {
+      recordOtpFailed(mobile, err?.message || 'Network request timeout');
       console.warn('[Property Studio] Gupshup request failed before a response was received.');
       return { success: false, provider: 'whatsapp', error: 'WhatsApp request failed.' };
     }
