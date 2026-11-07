@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { CommunityPost, CommentItem } from '../../types';
 import { AudioStoryPlayer } from '../common/AudioStoryPlayer';
 import { communityPostShareUrl } from '../../shared/communityEngagement';
+import { parseYouTubeUrl } from '../../shared/mediaParser';
 import {
   ArrowLeft,
   Clock,
@@ -27,7 +28,8 @@ import {
   Globe,
   User,
   AlertTriangle,
-  ChevronDown
+  ChevronDown,
+  ExternalLink
 } from 'lucide-react';
 
 interface DiscussionDetailViewProps {
@@ -882,20 +884,65 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
           </div>
         )}
 
-        {/* Attached Media: Video Player */}
-        {post.mediaType === 'VIDEO' && post.mediaUrl && (
+        {/* Attached Media: Video Player (YouTube iframe or Direct HTML5 Player) */}
+        {post.mediaUrl && (post.mediaType === 'VIDEO' || parseYouTubeUrl(post.mediaUrl).isValid) && (
           <div className="pt-2">
-            <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-950 shadow-md">
-              <video
-                src={post.mediaUrl}
-                controls
-                playsInline
-                poster={post.thumbnailUrl}
-                className="w-full h-full object-cover"
-              >
-                Video playback not supported.
-              </video>
-            </div>
+            {(() => {
+              const yt = parseYouTubeUrl(post.mediaUrl);
+              if (yt?.isValid && yt.embedUrl) {
+                return (
+                  <div className="relative aspect-video rounded-2xl overflow-hidden bg-black shadow-md border border-slate-200">
+                    <iframe
+                      src={yt.embedUrl}
+                      title={post.title}
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                );
+              }
+              return (
+                <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-950 shadow-md">
+                  <video
+                    src={post.mediaUrl}
+                    controls
+                    playsInline
+                    poster={post.thumbnailUrl}
+                    className="w-full h-full object-contain"
+                  >
+                    Video playback not supported.
+                  </video>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Attached Links Preview */}
+        {post.links && post.links.length > 0 && post.links[0]?.url && (
+          <div className="pt-2">
+            <a
+              href={post.links[0].url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between gap-3 p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-2xl transition-colors group/link"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-slate-500 group-hover/link:text-blue-600 transition-colors">
+                  <ExternalLink className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="block text-xs font-bold text-slate-800 group-hover/link:text-blue-700 truncate">
+                    {post.links[0].title || post.title}
+                  </span>
+                  <span className="block text-[11px] text-slate-400 font-mono truncate">
+                    {post.links[0].url}
+                  </span>
+                </div>
+              </div>
+              <ExternalLink className="w-4 h-4 text-slate-400 group-hover/link:text-blue-600 shrink-0" />
+            </a>
           </div>
         )}
 

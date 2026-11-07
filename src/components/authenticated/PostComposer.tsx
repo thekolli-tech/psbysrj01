@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { CommunityHub } from '../../types';
+import { parseYouTubeUrl } from '../../shared/mediaParser';
 import {
   X,
   HelpCircle,
@@ -12,12 +13,17 @@ import {
   Loader2,
   Send,
   Shield,
-  Layers,
   Image as ImageIcon,
-  Link2
+  Link2,
+  Video,
+  FileVideo,
+  Globe,
+  Lock,
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 
-export type ComposerMode = 'QUESTION' | 'DISCUSSION' | 'UPDATE' | 'COMMUNITY';
+export type ComposerMode = 'POST' | 'QUESTION' | 'IMAGE' | 'VIDEO' | 'LINK' | 'COMMUNITY' | 'DISCUSSION' | 'UPDATE';
 
 interface PostComposerProps {
   isOpen: boolean;
@@ -43,9 +49,11 @@ const TOPIC_OPTIONS = [
   'Price Trends & Market Updates'
 ];
 
+type PostTab = 'POST' | 'IMAGE' | 'VIDEO' | 'LINK' | 'COMMUNITY';
+
 export const PostComposer: React.FC<PostComposerProps> = ({
   isOpen,
-  initialMode = 'DISCUSSION',
+  initialMode = 'POST',
   onClose,
   communities,
   currentUser,
@@ -53,14 +61,40 @@ export const PostComposer: React.FC<PostComposerProps> = ({
   onSubmitCommunity,
   onSuccess
 }) => {
-  const [mode, setMode] = useState<ComposerMode>(initialMode);
+  // Map legacy initial modes to the standard tabs
+  const getInitialTab = (mode: ComposerMode): PostTab => {
+    if (mode === 'COMMUNITY') return 'COMMUNITY';
+    if (mode === 'IMAGE') return 'IMAGE';
+    if (mode === 'VIDEO') return 'VIDEO';
+    if (mode === 'LINK') return 'LINK';
+    return 'POST';
+  };
+
+  const [activeTab, setActiveTab] = useState<PostTab>(getInitialTab(initialMode));
+  const [isQuestionMode, setIsQuestionMode] = useState(initialMode === 'QUESTION');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedTopic, setSelectedTopic] = useState(TOPIC_OPTIONS[0]);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string>('');
-  const [mediaUrl, setMediaUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Image Upload state (for all users)
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [imageFileName, setImageFileName] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Video Link state (for all users)
+  const [videoLinkUrl, setVideoLinkUrl] = useState('');
+  const [videoSubTab, setVideoSubTab] = useState<'LINK' | 'UPLOAD'>('LINK');
+
+  // Video File Upload state (SUPER_ADMIN only)
+  const [videoDataUrl, setVideoDataUrl] = useState<string | null>(null);
+  const [videoFileName, setVideoFileName] = useState<string | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
+  // Link Post state (for all users)
+  const [linkUrl, setLinkUrl] = useState('');
 
   // Community creation state
   const [commName, setCommName] = useState('');
@@ -70,14 +104,69 @@ export const PostComposer: React.FC<PostComposerProps> = ({
 
   if (!isOpen) return null;
 
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
   const approvedCommunities = (communities || []).filter(c => c.status === 'APPROVED');
+
+  // Handle image file selection
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('Please select a valid image file (PNG, JPG, WEBP, GIF).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('Image size cannot exceed 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageDataUrl(reader.result as string);
+      setImageFileName(file.name);
+      setErrorMsg(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle direct video file selection (Super Admin only)
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isSuperAdmin) {
+      setErrorMsg('Direct video file upload is exclusively reserved for Super Admin platform broadcasts.');
+      return;
+    }
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      setErrorMsg('Please select a valid video file (MP4, WebM, MOV).');
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      setErrorMsg('Video file size cannot exceed 50MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setVideoDataUrl(reader.result as string);
+      setVideoFileName(file.name);
+      setErrorMsg(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // YouTube live embed helper
+  const parsedYouTube = videoLinkUrl ? parseYouTubeUrl(videoLinkUrl) : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
     setErrorMsg(null);
 
-    if (mode === 'COMMUNITY') {
+    // 1. COMMUNITY CREATION SUBMISSION
+    if (activeTab === 'COMMUNITY') {
       if (!commName.trim() || commName.trim().length < 3) {
         setErrorMsg('Community name must be at least 3 characters.');
         return;
@@ -107,40 +196,108 @@ export const PostComposer: React.FC<PostComposerProps> = ({
       return;
     }
 
-    // Post / Question / Update
+    // 2. STANDARD POST VALIDATION
     const cleanTitle = title.trim();
-    const cleanContent = content.trim();
-
     if (!cleanTitle || cleanTitle.length < 5) {
-      setErrorMsg('Please enter a descriptive title of at least 5 characters.');
+      setErrorMsg('Please enter a descriptive post title of at least 5 characters.');
       return;
     }
-    if (!cleanContent || cleanContent.length < 10) {
-      setErrorMsg('Please write at least 10 characters in the description.');
-      return;
+
+    // Tab-specific validation
+    if (activeTab === 'POST') {
+      if (!content.trim() || content.trim().length < 10) {
+        setErrorMsg('Please write at least 10 characters in the post body.');
+        return;
+      }
+    } else if (activeTab === 'IMAGE') {
+      if (!imageDataUrl) {
+        setErrorMsg('Please select or upload an image.');
+        return;
+      }
+    } else if (activeTab === 'VIDEO') {
+      if (videoSubTab === 'LINK') {
+        if (!videoLinkUrl.trim()) {
+          setErrorMsg('Please enter a video link URL (YouTube, Vimeo, etc.).');
+          return;
+        }
+      } else {
+        if (!isSuperAdmin) {
+          setErrorMsg('Direct video file upload is exclusively reserved for Super Admin accounts.');
+          return;
+        }
+        if (!videoDataUrl) {
+          setErrorMsg('Please upload a video file.');
+          return;
+        }
+      }
+    } else if (activeTab === 'LINK') {
+      if (!linkUrl.trim() || !/^https?:\/\//i.test(linkUrl.trim())) {
+        setErrorMsg('Please enter a valid link URL starting with http:// or https://');
+        return;
+      }
     }
 
     setSubmitting(true);
     try {
       const chosenComm = approvedCommunities.find(c => c.id === selectedCommunityId);
-      const postPayload = {
+
+      const postPayload: any = {
         title: cleanTitle,
-        content: cleanContent,
         topic: selectedTopic,
-        postType: mode === 'QUESTION' ? 'QUESTION' : 'POST',
+        postType: isQuestionMode ? 'QUESTION' : 'POST',
         communityId: selectedCommunityId || undefined,
         communityName: chosenComm?.name || undefined,
         authorName: currentUser.name || 'Member',
         authorRole: currentUser.role || 'PROPERTY_SEEKER',
-        authorProfession: currentUser.profession || undefined,
-        mediaUrl: mediaUrl.trim() || undefined
+        authorProfession: currentUser.profession || undefined
       };
+
+      if (activeTab === 'POST') {
+        postPayload.content = content.trim();
+        postPayload.mediaType = 'POST';
+      } else if (activeTab === 'IMAGE') {
+        postPayload.content = content.trim() || cleanTitle;
+        postPayload.mediaType = 'IMAGE';
+        postPayload.mediaUrl = imageDataUrl;
+        postPayload.attachments = [
+          {
+            type: 'image',
+            url: imageDataUrl,
+            name: imageFileName || 'Uploaded Image'
+          }
+        ];
+      } else if (activeTab === 'VIDEO') {
+        postPayload.content = content.trim() || cleanTitle;
+        postPayload.mediaType = 'VIDEO';
+        if (videoSubTab === 'LINK') {
+          postPayload.mediaUrl = videoLinkUrl.trim();
+        } else {
+          // Direct file upload by Super Admin
+          postPayload.mediaUrl = videoDataUrl;
+        }
+      } else if (activeTab === 'LINK') {
+        postPayload.content = content.trim() || `Link: ${linkUrl.trim()}`;
+        postPayload.mediaType = 'POST';
+        postPayload.links = [
+          {
+            url: linkUrl.trim(),
+            title: cleanTitle
+          }
+        ];
+      }
 
       const res = await onSubmitPost(postPayload);
       if (!res.success) throw new Error(res.error || 'Failed to publish post.');
+
       onSuccess(
-        mode === 'QUESTION'
-          ? 'Question posted successfully!'
+        isQuestionMode
+          ? 'Question published to community feed!'
+          : activeTab === 'IMAGE'
+          ? 'Image post published!'
+          : activeTab === 'VIDEO'
+          ? 'Video post published!'
+          : activeTab === 'LINK'
+          ? 'Link post published!'
           : 'Discussion published to community feed!'
       );
       onClose();
@@ -165,26 +322,36 @@ export const PostComposer: React.FC<PostComposerProps> = ({
         >
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 bg-white/10 rounded-xl text-amber-400">
-              {mode === 'QUESTION' ? (
-                <HelpCircle className="w-5 h-5" />
-              ) : mode === 'COMMUNITY' ? (
+              {activeTab === 'COMMUNITY' ? (
                 <Building className="w-5 h-5" />
+              ) : activeTab === 'IMAGE' ? (
+                <ImageIcon className="w-5 h-5" />
+              ) : activeTab === 'VIDEO' ? (
+                <Video className="w-5 h-5" />
+              ) : activeTab === 'LINK' ? (
+                <Link2 className="w-5 h-5" />
+              ) : isQuestionMode ? (
+                <HelpCircle className="w-5 h-5" />
               ) : (
                 <MessageSquare className="w-5 h-5" />
               )}
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold font-display text-white">
-                {mode === 'QUESTION'
+                {activeTab === 'COMMUNITY'
+                  ? 'Start a Community Hub'
+                  : activeTab === 'IMAGE'
+                  ? 'Upload Image Post'
+                  : activeTab === 'VIDEO'
+                  ? 'Share Video'
+                  : activeTab === 'LINK'
+                  ? 'Share Link'
+                  : isQuestionMode
                   ? 'Ask the Community'
-                  : mode === 'COMMUNITY'
-                  ? 'Start a New Community Hub'
-                  : mode === 'UPDATE'
-                  ? 'Share Industry Update'
-                  : 'Start a Discussion'}
+                  : 'Create a Post'}
               </h2>
               <p className="text-[11px] text-slate-300">
-                Engage with Hyderabad real estate experts, investors, and homeowners.
+                Property Studio Verified Community Platform
               </p>
             </div>
           </div>
@@ -198,25 +365,26 @@ export const PostComposer: React.FC<PostComposerProps> = ({
           </button>
         </div>
 
-        {/* Mode Selector Tabs */}
-        <div className="flex items-center gap-1 px-4 py-2 bg-slate-50 border-b border-slate-200/80 overflow-x-auto text-xs">
+        {/* Reddit-Style Format Tabs */}
+        <div className="flex items-center gap-1 px-4 py-2 bg-slate-50 border-b border-slate-200 overflow-x-auto text-xs">
           {[
-            { id: 'DISCUSSION' as const, label: 'Discussion', icon: MessageSquare },
-            { id: 'QUESTION' as const, label: 'Ask Question', icon: HelpCircle },
-            { id: 'UPDATE' as const, label: 'Industry Update', icon: Sparkles },
+            { id: 'POST' as const, label: 'Post', icon: MessageSquare },
+            { id: 'IMAGE' as const, label: 'Images', icon: ImageIcon },
+            { id: 'VIDEO' as const, label: 'Video', icon: Video },
+            { id: 'LINK' as const, label: 'Link', icon: Link2 },
             { id: 'COMMUNITY' as const, label: 'Start Community', icon: Building }
           ].map(tab => {
             const Icon = tab.icon;
-            const isActive = mode === tab.id;
+            const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => {
-                  setMode(tab.id);
+                  setActiveTab(tab.id);
                   setErrorMsg(null);
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer shrink-0 ${
                   isActive
                     ? 'bg-[#182A3E] text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -232,13 +400,13 @@ export const PostComposer: React.FC<PostComposerProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
           {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-start gap-2">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-start gap-2 animate-in fade-in">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {mode === 'COMMUNITY' ? (
+          {activeTab === 'COMMUNITY' ? (
             /* Community Hub Creation Form */
             <div className="space-y-3.5">
               <div>
@@ -257,9 +425,7 @@ export const PostComposer: React.FC<PostComposerProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Hub Category
-                  </label>
+                  <label className="block font-bold text-slate-700 mb-1">Hub Category</label>
                   <select
                     value={commCategory}
                     onChange={e => setCommCategory(e.target.value)}
@@ -268,16 +434,14 @@ export const PostComposer: React.FC<PostComposerProps> = ({
                     <option value="Micro-Market Hub">Micro-Market Hub</option>
                     <option value="Residential">Residential</option>
                     <option value="Commercial">Commercial</option>
-                    <option value="Luxury Villas & Gated Communities">Luxury Villas & Communities</option>
+                    <option value="Luxury Villas & Communities">Luxury Villas & Communities</option>
                     <option value="Legal & RERA">Legal & RERA Advisory</option>
                     <option value="Investor Syndicate">Investor Syndicate</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Operating Micro-Market
-                  </label>
+                  <label className="block font-bold text-slate-700 mb-1">Operating Micro-Market</label>
                   <input
                     type="text"
                     value={commLocation}
@@ -303,13 +467,13 @@ export const PostComposer: React.FC<PostComposerProps> = ({
               </div>
             </div>
           ) : (
-            /* Discussion / Question / Update Form */
+            /* Post / Image / Video / Link Form */
             <div className="space-y-3.5">
-              {/* Community & Topic Dropdowns */}
+              {/* Community & Topic Flair */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Community (Optional)
+                    Select Community <span className="text-slate-400 font-normal">(Optional)</span>
                   </label>
                   <select
                     value={selectedCommunityId}
@@ -327,7 +491,7 @@ export const PostComposer: React.FC<PostComposerProps> = ({
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Topic Category <span className="text-red-500">*</span>
+                    Topic Flair <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={selectedTopic}
@@ -345,55 +509,346 @@ export const PostComposer: React.FC<PostComposerProps> = ({
 
               {/* Title */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  {mode === 'QUESTION' ? 'Your Question' : 'Discussion Title'}{' '}
-                  <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">
+                    Title <span className="text-red-500">*</span>
+                  </label>
+                  {activeTab === 'POST' && (
+                    <label className="flex items-center gap-1.5 text-[11px] text-slate-500 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isQuestionMode}
+                        onChange={e => setIsQuestionMode(e.target.checked)}
+                        className="rounded text-[#B49029] focus:ring-amber-500"
+                      />
+                      <span>Mark as Question</span>
+                    </label>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   placeholder={
-                    mode === 'QUESTION'
-                      ? 'e.g. What is the latest update on Neopolis trumpet road connectivity?'
-                      : 'e.g. High-Rise vs Villa livability in West Hyderabad: Price trends and RERA check'
+                    activeTab === 'IMAGE'
+                      ? 'Descriptive title for your image post...'
+                      : activeTab === 'VIDEO'
+                      ? 'Descriptive title for your video...'
+                      : activeTab === 'LINK'
+                      ? 'Title for the shared link...'
+                      : isQuestionMode
+                      ? 'What is your real estate question? (e.g. Kokapet vs Tellapur ROI)'
+                      : 'Interesting title for your discussion...'
                   }
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-semibold text-slate-900"
+                  className="w-full px-3 py-2.5 text-xs font-semibold text-slate-900 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   required
                 />
               </div>
 
-              {/* Body Content */}
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Content Details <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  rows={5}
-                  value={content}
-                  onChange={e => setContent(e.target.value)}
-                  placeholder="Share details, questions, verified data, or insights..."
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none resize-none leading-relaxed"
-                  required
-                />
-              </div>
-
-              {/* Optional Media URL */}
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Media / Image URL <span className="text-slate-400 font-normal">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <ImageIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="url"
-                    value={mediaUrl}
-                    onChange={e => setMediaUrl(e.target.value)}
-                    placeholder="https://example.com/site-plan.jpg"
-                    className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              {/* TAB 1: TEXT POST */}
+              {activeTab === 'POST' && (
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Content Details <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows={6}
+                    value={content}
+                    onChange={e => setContent(e.target.value)}
+                    placeholder="Share insights, numbers, analysis, or questions with the community..."
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none resize-none leading-relaxed"
+                    required
                   />
                 </div>
-              </div>
+              )}
+
+              {/* TAB 2: IMAGE UPLOAD (EVERYONE) */}
+              {activeTab === 'IMAGE' && (
+                <div className="space-y-3">
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Upload Image <span className="text-red-500">*</span>
+                  </label>
+
+                  {imageDataUrl ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 max-h-72 flex items-center justify-center">
+                      <img
+                        src={imageDataUrl}
+                        alt="Uploaded preview"
+                        className="max-h-72 w-full object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageDataUrl(null);
+                          setImageFileName(null);
+                          if (imageInputRef.current) imageInputRef.current.value = '';
+                        }}
+                        className="absolute top-3 right-3 p-1.5 bg-slate-900/80 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                        title="Remove Image"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => imageInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-300 hover:border-[#B49029] bg-slate-50/70 hover:bg-amber-50/20 rounded-2xl p-8 text-center cursor-pointer transition-all space-y-2"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-[#B49029] border border-amber-200 flex items-center justify-center mx-auto">
+                        <UploadCloud className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800 text-xs">
+                          Click to upload or drag & drop image
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          PNG, JPG, WEBP, GIF up to 5MB (Open to all members)
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageFileChange}
+                    className="hidden"
+                  />
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Caption / Commentary <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={content}
+                      onChange={e => setContent(e.target.value)}
+                      placeholder="Add context, site visit details, or explanation for the image..."
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: VIDEO (LINKS FOR EVERYONE; UPLOAD FOR SUPER_ADMIN) */}
+              {activeTab === 'VIDEO' && (
+                <div className="space-y-3">
+                  {/* Video Sub-selector */}
+                  <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl w-fit">
+                    <button
+                      type="button"
+                      onClick={() => setVideoSubTab('LINK')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        videoSubTab === 'LINK'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Globe className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Video Link (Everyone)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setVideoSubTab('UPLOAD')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        videoSubTab === 'UPLOAD'
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {isSuperAdmin ? (
+                        <FileVideo className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <Lock className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                      <span>Upload Video File {isSuperAdmin ? '(Super Admin)' : '(Locked)'}</span>
+                    </button>
+                  </div>
+
+                  {videoSubTab === 'LINK' ? (
+                    /* Video Link for everyone */
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">
+                          Video Link URL <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Globe className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="url"
+                            value={videoLinkUrl}
+                            onChange={e => setVideoLinkUrl(e.target.value)}
+                            placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
+                            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                            required
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Everyone can share video links from YouTube, Vimeo, Loom, or direct video streams.
+                        </p>
+                      </div>
+
+                      {/* YouTube Live Embed Preview */}
+                      {parsedYouTube?.isValid && parsedYouTube.embedUrl && (
+                        <div className="rounded-2xl overflow-hidden border border-slate-200 bg-black aspect-video max-h-64">
+                          <iframe
+                            src={parsedYouTube.embedUrl}
+                            title="Video Preview"
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Direct Video Upload */
+                    <div className="space-y-3">
+                      {!isSuperAdmin ? (
+                        <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl text-amber-900 space-y-2">
+                          <div className="flex items-center gap-2 font-bold text-xs">
+                            <Lock className="w-4 h-4 text-amber-700" />
+                            <span>Direct Video File Upload is Super Admin Only</span>
+                          </div>
+                          <p className="text-[11px] text-amber-800 leading-relaxed">
+                            Direct video file uploads are exclusively reserved for Super Admin platform broadcasts.
+                            You can share video links (YouTube, Vimeo, etc.) anytime using the <strong>Video Link</strong> tab!
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setVideoSubTab('LINK')}
+                            className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Switch to Video Link
+                          </button>
+                        </div>
+                      ) : (
+                        /* Super Admin video upload */
+                        <div className="space-y-3">
+                          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-center gap-2">
+                            <Shield className="w-4 h-4 text-emerald-700 shrink-0" />
+                            <span className="font-semibold">
+                              Super Admin Privileged Broadcast: Direct Video Upload Enabled
+                            </span>
+                          </div>
+
+                          {videoDataUrl ? (
+                            <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-black max-h-64">
+                              <video
+                                src={videoDataUrl}
+                                controls
+                                className="w-full max-h-64 object-contain"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setVideoDataUrl(null);
+                                  setVideoFileName(null);
+                                  if (videoInputRef.current) videoInputRef.current.value = '';
+                                }}
+                                className="absolute top-3 right-3 p-1.5 bg-slate-900/80 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                                title="Remove Video"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div
+                              onClick={() => videoInputRef.current?.click()}
+                              className="border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/30 hover:bg-emerald-50/60 rounded-2xl p-8 text-center cursor-pointer transition-all space-y-2"
+                            >
+                              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                                <FileVideo className="w-6 h-6" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800 text-xs">
+                                  Select direct broadcast video file (Super Admin)
+                                </p>
+                                <p className="text-[11px] text-slate-400">
+                                  MP4, WebM, MOV up to 50MB
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          <input
+                            ref={videoInputRef}
+                            type="file"
+                            accept="video/*"
+                            onChange={handleVideoFileChange}
+                            className="hidden"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Description / Notes <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={content}
+                      onChange={e => setContent(e.target.value)}
+                      placeholder="Add commentary or summary of the video content..."
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: LINK (EVERYONE) */}
+              {activeTab === 'LINK' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Link URL <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Link2 className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        value={linkUrl}
+                        onChange={e => setLinkUrl(e.target.value)}
+                        placeholder="https://example.com/article-or-report"
+                        className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                        required
+                      />
+                    </div>
+                    {linkUrl && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-slate-500">
+                        <ExternalLink className="w-3 h-3 text-slate-400" />
+                        <span>Source domain: </span>
+                        <strong className="text-slate-700">
+                          {(() => {
+                            try {
+                              return new URL(linkUrl).hostname;
+                            } catch {
+                              return 'Invalid URL';
+                            }
+                          })()}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Your Analysis / Commentary <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={content}
+                      onChange={e => setContent(e.target.value)}
+                      placeholder="Why is this link relevant to Hyderabad real estate? Share your takeaway..."
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none resize-none"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -432,10 +887,16 @@ export const PostComposer: React.FC<PostComposerProps> = ({
             ) : (
               <>
                 <span>
-                  {mode === 'COMMUNITY'
+                  {activeTab === 'COMMUNITY'
                     ? 'Submit Community Proposal'
-                    : mode === 'QUESTION'
+                    : isQuestionMode
                     ? 'Post Question'
+                    : activeTab === 'IMAGE'
+                    ? 'Publish Image Post'
+                    : activeTab === 'VIDEO'
+                    ? 'Publish Video Post'
+                    : activeTab === 'LINK'
+                    ? 'Share Link Post'
                     : 'Publish to Feed'}
                 </span>
                 <Send className="w-3.5 h-3.5 text-amber-400" />

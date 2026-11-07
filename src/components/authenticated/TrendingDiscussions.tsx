@@ -15,11 +15,6 @@ export const TrendingDiscussions: React.FC<TrendingDiscussionsProps> = ({
   // Sort posts by engagement (upvotes + comments)
   const trending = React.useMemo(() => {
     const combined = [...(posts || [])];
-    BASELINE_COMMUNITY_POSTS.forEach(b => {
-      if (!combined.some(p => p.id === b.id || p.title === b.title)) {
-        combined.push(b);
-      }
-    });
 
     return combined
       .sort((a, b) => {

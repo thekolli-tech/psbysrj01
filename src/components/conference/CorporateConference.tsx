@@ -37,9 +37,19 @@ export const CorporateConferenceView: React.FC = () => {
 
   if (!conference?.id) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center space-y-3">
-        <h1 className="text-2xl font-black text-slate-900 font-display">No conference is scheduled</h1>
-        <p className="text-sm text-slate-600">When an administrator publishes a summit, it will appear here.</p>
+      <div className="max-w-2xl mx-auto my-8 p-8 sm:p-12 text-center space-y-4 bg-white border border-slate-200/80 rounded-3xl shadow-xs">
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center mx-auto text-[#B49029]">
+          <Radio className="w-7 h-7" />
+        </div>
+        <div className="space-y-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
+            Live Stream Standby
+          </span>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 font-display">No conference is scheduled</h1>
+          <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+            When an administrator publishes a summit, it will appear here.
+          </p>
+        </div>
       </div>
     );
   }

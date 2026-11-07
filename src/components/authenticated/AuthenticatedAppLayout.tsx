@@ -27,6 +27,7 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
   onOpenWallet
 }) => {
   const {
+    activeView,
     currentUser,
     communityPosts,
     communities,
@@ -51,6 +52,18 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [selectedTopicFilter, setSelectedTopicFilter] = useState('ALL');
+  // Synchronize activeNav with activeView from AppContext
+  useEffect(() => {
+    if (activeView === 'CONFERENCE') setActiveNav('LIVE_SESSIONS');
+    else if (activeView === 'MARKET_INSIGHTS') setActiveNav('PROPERTY_INSIGHTS');
+    else if (activeView === 'PROPERTIES') setActiveNav('DISCOVER');
+    else if (activeView === 'ADMIN') setActiveNav('SUPER_ADMIN_CONSOLE');
+    else if (activeView === 'DEVELOPER') setActiveNav('DEVELOPER_DASHBOARD');
+    else if (activeView === 'LEADS_MARKET') setActiveNav('FIND_PROFESSIONALS');
+    else if (activeView === 'MEDIA') setActiveNav('REAL_ESTATE_MEDIA');
+    else if (activeView === 'HOME' || activeView === 'COMMUNITY') setActiveNav('HOME');
+  }, [activeView]);
+
 
   // Load bookmarks & unread notifications
   useEffect(() => {
@@ -178,32 +191,37 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
           </div>
 
           {/* Center Column: Community Feed or Custom Workspace Content */}
-          <div className="flex-1 min-w-0 max-w-2xl xl:max-w-3xl">
-            {children ? (
-              children
-            ) : (
-              <CommunityFeed
-                posts={displayedPosts}
-                communities={communities}
-                currentUser={currentUser}
-                onOpenComposer={mode => {
-                  setComposerMode(mode);
-                  setComposerOpen(true);
-                }}
-                onUpvotePost={upvoteCommunityPost}
-                onBookmarkPost={handleBookmarkToggle}
-                onSharePost={post => showToast(`Share link copied for "${post.title}"`)}
-                refreshPosts={refreshPosts}
-                showToast={showToast}
-                repostDiscussion={repostDiscussion}
-                bookmarkedPostIds={bookmarkedIds}
-                initialTopicFilter={selectedTopicFilter}
-              />
-            )}
-          </div>
+          {(() => {
+            const isWideView = activeView && !['HOME', 'COMMUNITY', 'DASHBOARD'].includes(activeView);
+            return (
+              <>
+                <div className={isWideView ? "flex-1 min-w-0 w-full" : "flex-1 min-w-0 max-w-2xl xl:max-w-3xl"}>
+                  {children ? (
+                    children
+                  ) : (
+                    <CommunityFeed
+                      posts={displayedPosts}
+                      communities={communities}
+                      currentUser={currentUser}
+                      onOpenComposer={mode => {
+                        setComposerMode(mode);
+                        setComposerOpen(true);
+                      }}
+                      onUpvotePost={upvoteCommunityPost}
+                      onBookmarkPost={handleBookmarkToggle}
+                      onSharePost={post => showToast(`Share link copied for "${post.title}"`)}
+                      refreshPosts={refreshPosts}
+                      showToast={showToast}
+                      repostDiscussion={repostDiscussion}
+                      bookmarkedPostIds={bookmarkedIds}
+                      initialTopicFilter={selectedTopicFilter}
+                    />
+                  )}
+                </div>
 
-          {/* Right Column: Contextual Discovery Sidebar (Lightweight desktop discovery) */}
-          <div className="hidden xl:flex flex-col gap-4 w-72 2xl:w-80 shrink-0 sticky top-20">
+                {/* Right Column: Contextual Discovery Sidebar (Lightweight desktop discovery) */}
+                {!isWideView && (
+                  <div className="hidden xl:flex flex-col gap-4 w-72 2xl:w-80 shrink-0 sticky top-20">
             <TopicRecommendations
               userInterests={currentUser.interests}
               selectedTopic={selectedTopicFilter}
@@ -235,6 +253,10 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
               onConnect={name => showToast(`Connected with ${name}! Enquiries logged in your workspace.`)}
             />
           </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </main>
 

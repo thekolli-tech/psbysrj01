@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CommunityPost } from '../../types';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { communityPostShareUrl } from '../../shared/communityEngagement';
+import { parseYouTubeUrl } from '../../shared/mediaParser';
 import {
   ArrowBigUp,
   ArrowBigDown,
@@ -11,6 +12,8 @@ import {
   MoreHorizontal,
   CheckCircle2,
   ExternalLink,
+  Link2,
+  Play,
   ShieldCheck,
   Building,
   Clock,
@@ -229,16 +232,94 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
         </p>
       )}
 
-      {/* Attached Media Preview (Image or Video) */}
-      {(post.mediaUrl || post.thumbnailUrl) && (
-        <div className="relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 max-h-72 mt-1">
-          <img
-            src={post.mediaUrl || post.thumbnailUrl}
-            alt={post.title}
-            className="w-full h-auto max-h-72 object-cover hover:scale-[1.01] transition-transform duration-200"
-            loading="lazy"
-          />
-        </div>
+      {/* Attached Media: YouTube Video / Vimeo / Direct Video / Image */}
+      {(() => {
+        const media = post.mediaUrl || post.thumbnailUrl;
+        if (!media) return null;
+
+        // 1. YouTube Video
+        const yt = parseYouTubeUrl(media);
+        if (yt?.isValid && yt.embedUrl) {
+          return (
+            <div
+              onClick={e => e.stopPropagation()}
+              className="relative rounded-2xl overflow-hidden bg-black border border-slate-200 aspect-video max-h-80 mt-1 shadow-sm"
+            >
+              <iframe
+                src={yt.embedUrl}
+                title={post.title}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          );
+        }
+
+        // 2. Direct Video (Super Admin upload or .mp4 URL)
+        const isDirectVideo = media.startsWith('data:video/') || media.endsWith('.mp4') || media.endsWith('.webm') || post.mediaType === 'VIDEO';
+        if (isDirectVideo) {
+          return (
+            <div
+              onClick={e => e.stopPropagation()}
+              className="relative rounded-2xl overflow-hidden bg-black border border-slate-200 max-h-80 mt-1 shadow-sm"
+            >
+              <video
+                src={media}
+                controls
+                playsInline
+                poster={post.thumbnailUrl}
+                className="w-full max-h-80 object-contain mx-auto"
+              >
+                Video playback not supported.
+              </video>
+            </div>
+          );
+        }
+
+        // 3. Image
+        return (
+          <div className="relative rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 max-h-80 mt-1">
+            <img
+              src={media}
+              alt={post.title}
+              className="w-full h-auto max-h-80 object-cover hover:scale-[1.01] transition-transform duration-200"
+              loading="lazy"
+            />
+          </div>
+        );
+      })()}
+
+      {/* Reddit-Style External Link Card Preview */}
+      {post.links && post.links.length > 0 && post.links[0]?.url && (
+        <a
+          href={post.links[0].url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          className="flex items-center justify-between gap-3 p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-2xl transition-colors group/link mt-0.5"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-slate-500 group-hover/link:text-blue-600 transition-colors">
+              <Link2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <span className="block text-xs font-bold text-slate-800 group-hover/link:text-blue-700 truncate">
+                {post.links[0].title || post.title}
+              </span>
+              <span className="block text-[11px] text-slate-400 font-mono truncate">
+                {(() => {
+                  try {
+                    return new URL(post.links[0].url).hostname;
+                  } catch {
+                    return post.links[0].url;
+                  }
+                })()}
+              </span>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-slate-400 group-hover/link:text-blue-600 shrink-0" />
+        </a>
       )}
 
       {/* Topic Tags */}

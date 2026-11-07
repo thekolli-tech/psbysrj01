@@ -10,73 +10,7 @@ interface SuggestedCommunitiesProps {
   onViewAll?: () => void;
 }
 
-const BASELINE_COMMUNITIES: CommunityHub[] = [
-  {
-    id: 'comm-hyd-re',
-    name: 'ps/HyderabadRealEstate',
-    slug: 'hyderabad-real-estate',
-    description: 'Hyderabad primary corridor updates, price trends & builder reviews',
-    category: 'Micro-Market Hub',
-    memberCount: 1420,
-    status: 'APPROVED',
-    visibility: 'PUBLIC',
-    membershipStatus: 'ACTIVE',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'comm-kokapet',
-    name: 'ps/KokapetLuxury',
-    slug: 'kokapet-luxury',
-    description: 'Neopolis, Golden Mile & high-rise skyscraper community discussions',
-    category: 'Luxury & High-Rise',
-    memberCount: 890,
-    status: 'APPROVED',
-    visibility: 'PUBLIC',
-    membershipStatus: 'NONE',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'comm-legal',
-    name: 'ps/LegalCompliance',
-    slug: 'legal-compliance',
-    description: 'TG RERA sanction audits, title search & encumbrance guidance',
-    category: 'Legal & RERA',
-    memberCount: 1150,
-    status: 'APPROVED',
-    visibility: 'PUBLIC',
-    membershipStatus: 'NONE',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'comm-construction',
-    name: 'ps/ConstructionWatch',
-    slug: 'construction-watch',
-    description: 'Monthly civil progress, flyover timelines & infrastructure tracking',
-    category: 'Construction Updates',
-    memberCount: 740,
-    status: 'APPROVED',
-    visibility: 'PUBLIC',
-    membershipStatus: 'NONE',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'comm-nri',
-    name: 'ps/NRIInvestments',
-    slug: 'nri-investments',
-    description: 'Repatriation, FEMA compliance, capital gains & high-ticket luxury assets',
-    category: 'NRI & Global Investors',
-    memberCount: 620,
-    status: 'APPROVED',
-    visibility: 'PUBLIC',
-    membershipStatus: 'NONE',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z'
-  }
-];
+const BASELINE_COMMUNITIES: CommunityHub[] = [];
 
 export const SuggestedCommunities: React.FC<SuggestedCommunitiesProps> = ({
   communities,
@@ -87,15 +21,7 @@ export const SuggestedCommunities: React.FC<SuggestedCommunitiesProps> = ({
 }) => {
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  const combinedCommunities = React.useMemo(() => {
-    const list = [...(communities || [])];
-    BASELINE_COMMUNITIES.forEach(b => {
-      if (!list.some(c => c.id === b.id || c.name === b.name)) {
-        list.push(b);
-      }
-    });
-    return list;
-  }, [communities]);
+  const combinedCommunities = React.useMemo(() => (communities || []).filter(c => c.status === 'APPROVED'), [communities]);
 
   const displayCommunities = combinedCommunities.slice(0, 5);
 

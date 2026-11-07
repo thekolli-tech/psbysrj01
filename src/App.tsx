@@ -6,6 +6,7 @@ import { MobileBottomNav } from './components/common/MobileBottomNav';
 import { Toast } from './components/common/Toast';
 import { LoginModal } from './components/common/LoginModal';
 import { UniversalSearchModal } from './components/common/UniversalSearchModal';
+import { AuthenticatedAppLayout } from './components/authenticated/AuthenticatedAppLayout';
 import { HomeHero } from './components/home/HomeHero';
 import { PropertyList } from './components/properties/PropertyList';
 import { SupportDeskButton } from './components/support/SupportDeskButton';
@@ -202,7 +203,7 @@ const AppContent: React.FC = () => {
       }`}
     >
       {/* Dynamic Header: Mobile shell vs Desktop SaaS portal */}
-      {isLoggedIn && (activeView === 'DASHBOARD' || activeView === 'COMMUNITY' || activeView === 'HOME') ? null : isForcedMobile ? (
+      {isLoggedIn ? null : isForcedMobile ? (
         <MobileHeader
           onOpenProfileModal={() => setProfileModalOpen(true)}
           onOpenWalletModal={() => setWalletModalOpen(true)}
@@ -242,13 +243,143 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Main View Router */}
-      <main className="flex-1 pb-8">
-        <React.Suspense fallback={<ViewSkeleton />}>
-        {activeView === 'HOME' && (
-          isLoggedIn ? (
-            <UserDashboard initialMode="FEED" />
-          ) : (
-            <HomeHero
+      {isLoggedIn ? (
+        <AuthenticatedAppLayout
+          onOpenSupport={() => setSupportOpen(true)}
+          onOpenWallet={() => setWalletModalOpen(true)}
+        >
+          <React.Suspense fallback={<ViewSkeleton />}>
+            {activeView === 'HOME' && <UserDashboard initialMode="FEED" />}
+            {activeView === 'DASHBOARD' && <UserDashboard />}
+            {activeView === 'COMMUNITY' && <UserDashboard initialMode="FEED" />}
+            {activeView === 'PROPERTIES' && (
+              <PropertyList onClaimProject={(prop) => setClaimTarget(prop)} />
+            )}
+            {activeView === 'LEADS_MARKET' && (
+              !isPropertySeeker(currentUser.role) ? (
+                <LeadMarketplace onOpenWalletModal={() => setWalletModalOpen(true)} />
+              ) : (
+                <AuthRequiredCard view="LEADS_MARKET" onOpenLoginModal={() => setLoginModalOpen(true)} />
+              )
+            )}
+            {activeView === 'MEDIA' && (
+              <MediaEngine
+                onOpenLoginModal={() => setLoginModalOpen(true)}
+                onTriggerSupportWithContext={(ctx) => {
+                  setSupportContext(ctx);
+                  setSupportOpen(true);
+                }}
+              />
+            )}
+            {activeView === 'CONFERENCE' && (
+              <CorporateConferenceView />
+            )}
+            {activeView === 'MARKET_INSIGHTS' && (
+              <MarketTrendsView />
+            )}
+            {activeView === 'REVIEWS' && (
+              <ReviewRatingView onOpenLoginModal={() => setLoginModalOpen(true)} />
+            )}
+            {activeView === 'REQUIREMENT' && (
+              <PropertyRequirementView onOpenLoginModal={() => setLoginModalOpen(true)} />
+            )}
+            {activeView === 'CHAT' && (
+              <div className="max-w-4xl mx-auto px-4 py-12 text-center space-y-6">
+                <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-600 border border-amber-500/30 flex items-center justify-center mx-auto">
+                  <LifeBuoy className="w-8 h-8" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-black text-slate-900 font-display">
+                    Official Secretariat & Support Desk
+                  </h2>
+                  <p className="text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
+                    Connect directly with the Property Studio secretariat under the leadership of CEO Swamy Reddy Javidi. Enquire regarding project regulatory compliance, anonymous buyer submissions, or developer community spaces.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={() => setSupportOpen(true)}
+                    className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold inline-flex items-center gap-2 shadow-xl shadow-slate-900/10 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    <span>Launch Support Desk Drawer</span>
+                    <ArrowRight className="w-4 h-4 ml-1" />
+                  </button>
+                  <a
+                    href={COMPANY_CONTACT_TEL}
+                    className="px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-2xl text-xs font-bold inline-flex items-center gap-2 shadow-xs transition-colors"
+                  >
+                    <Phone className="w-4 h-4 text-emerald-600" />
+                    <span>Call {COMPANY_CONTACT_DISPLAY}</span>
+                  </a>
+                  <a
+                    href="mailto:info@propertystudio.org"
+                    className="px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-2xl text-xs font-bold inline-flex items-center gap-2 shadow-xs transition-colors"
+                  >
+                    <Mail className="w-4 h-4 text-blue-600" />
+                    <span>info@propertystudio.org</span>
+                  </a>
+                </div>
+              </div>
+            )}
+            {activeView === 'CONTACT' && (
+              <ContactPropertyAdmin onOpenSupport={() => setSupportOpen(true)} />
+            )}
+            {activeView === 'PRIVACY' && (
+              <PrivacyPolicyView />
+            )}
+            {activeView === 'TERMS' && (
+              <TermsConditionsView />
+            )}
+            {activeView === 'DEVELOPER' && (
+              currentUser.role === 'DEVELOPER' ? (
+                <DeveloperDashboard />
+              ) : (
+                <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 text-center">
+                  <h2 className="text-xl font-bold text-slate-900">Developer access required</h2>
+                </div>
+              )
+            )}
+            {activeView === 'PROFESSIONAL' && (
+              canAccessProfessionalSurface(currentUser.role) && !isPropertySeeker(currentUser.role) ? (
+                <ProfessionalDashboard />
+              ) : (
+                <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-2">
+                  <h2 className="text-xl font-bold text-slate-900">Professional access required</h2>
+                  <p className="text-xs text-slate-600">Property seekers use project discovery. This workspace is not available for that role.</p>
+                </div>
+              )
+            )}
+            {activeView === 'ADMIN' && (
+              (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEVELOPER') ? (
+                <SuperAdminDashboard />
+              ) : (
+                <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-xs text-center space-y-4">
+                  <ShieldAlert className="w-12 h-12 text-amber-600 mx-auto" />
+                  <h2 className="text-xl font-bold text-slate-900 font-display">Administrator Access Required</h2>
+                </div>
+              )
+            )}
+            {activeView === 'PROPERTY_ADMIN' && (
+              currentUser.role === 'PROPERTY_ADMIN' ? (
+                <PropertyAdminDashboard />
+              ) : (
+                <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-xs text-center space-y-4">
+                  <Building className="w-12 h-12 text-indigo-600 mx-auto" />
+                  <h2 className="text-xl font-bold text-slate-900 font-display">Property Admin Scope Required</h2>
+                </div>
+              )
+            )}
+          </React.Suspense>
+        </AuthenticatedAppLayout>
+      ) : (
+        <main className="flex-1 pb-8">
+          <React.Suspense fallback={<ViewSkeleton />}>
+          {activeView === 'HOME' && (
+            isLoggedIn ? (
+              <UserDashboard initialMode="FEED" />
+            ) : (
+              <HomeHero
               onOpenRoleModal={() => setProfileModalOpen(true)}
               onOpenAgentModal={() => setAgentModalOpen(true)}
               onOpenLoginModal={() => setLoginModalOpen(true)}
@@ -467,6 +598,7 @@ const AppContent: React.FC = () => {
         )}
       </React.Suspense>
       </main>
+      )}
 
       {/* Mobile navigation is integrated directly into the sticky top MobileHeader drawer */}
 
@@ -474,7 +606,7 @@ const AppContent: React.FC = () => {
       {/* Navigation intercept guard invariant: if (link.view === 'COMMUNITY' && !isLoggedIn) { setLoginModalOpen(true); } */}
       {/* Public navigation registry: linkedEndUserNavigation, roleUtilityDestinations */}
       {/* Verified social media registry: WhatsApp Channel, YouTube Studio, Instagram, LinkedIn Network, Facebook Profile, Facebook Business, Facebook Group, Twitter / X */}
-      {!(isLoggedIn && (activeView === 'DASHBOARD' || activeView === 'COMMUNITY' || activeView === 'HOME')) && (
+      {!isLoggedIn && (
       <footer className="bg-[#FAFCFD] border-t border-[#E8E4D8] py-6 sm:py-7 lg:py-8 px-4 sm:px-6 lg:px-8 mt-auto">
         <div className="max-w-7xl mx-auto">
           {/* Main 3-Column Responsive Grid: Column 1 (42%), Column 2 (25%), Column 3 (33%) */}

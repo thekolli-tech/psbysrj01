@@ -4,7 +4,6 @@ import { Property } from '../../types';
 import { PropertyCategorySelect } from '../properties/PropertyCategorySelect';
 import { PropertyDetailModal } from '../properties/PropertyDetailModal';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
-import { AuthenticatedAppLayout } from '../authenticated/AuthenticatedAppLayout';
 import { CommunityFeed } from '../authenticated/CommunityFeed';
 import { PostComposer, ComposerMode } from '../authenticated/PostComposer';
 import {
@@ -748,12 +747,7 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
   };
 
   return (
-    <AuthenticatedAppLayout
-      initialNav={dashboardViewMode === 'FEED' ? 'HOME' : 'MY_PROFILE'}
-      onOpenSupport={() => setActiveView('CHAT')}
-      onOpenWallet={() => setActiveView('LEADS_MARKET')}
-    >
-      <div className="space-y-4">
+    <div className="space-y-4">
         {/* View Mode Switcher Header Pill */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-1.5 shadow-2xs flex items-center justify-between">
           <div className="flex items-center gap-1">
@@ -2806,7 +2800,6 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
       )}
           </div>
         )}
-      </div>
 
       <PostComposer
         isOpen={composerOpen}
@@ -2822,6 +2815,6 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
           refreshCommunities();
         }}
       />
-    </AuthenticatedAppLayout>
+    </div>
   );
 };

@@ -2028,6 +2028,26 @@ app.post('/api/community/posts', requireAuth, requireUnrestricted, async (req: A
       return;
     }
 
+    // Role-gated video upload security:
+    // Only Super Admin accounts can upload raw direct video files (data:video/ or blob:).
+    // All other users are restricted from raw video file upload, but are fully permitted to share video links (YouTube, Vimeo, etc.), image files, and links.
+    const isDirectVideoUpload = (url?: string) => {
+      if (!url) return false;
+      const str = String(url).trim().toLowerCase();
+      return str.startsWith('data:video/') || str.startsWith('blob:');
+    };
+
+    const hasDirectVideoUpload =
+      isDirectVideoUpload(mediaUrl) ||
+      (Array.isArray(attachments) && attachments.some((a: any) => isDirectVideoUpload(typeof a === 'string' ? a : a?.url)));
+
+    if (hasDirectVideoUpload && req.user.role !== 'SUPER_ADMIN') {
+      res.status(403).json({
+        error: 'Direct video file upload is exclusively reserved for Super Admin accounts. You can share video links (YouTube, Vimeo, etc.).'
+      });
+      return;
+    }
+
     if (communityId) {
       const canPost = await canUserPostInCommunity(communityId, req.user.id, req.user.role);
       if (!canPost) {

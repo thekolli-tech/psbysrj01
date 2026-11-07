@@ -35,88 +35,7 @@ interface CommunityFeedProps {
   initialTopicFilter?: string;
 }
 
-export const BASELINE_COMMUNITY_POSTS: CommunityPost[] = [
-  {
-    id: 'intel-post-kokapet-dilemma',
-    title: 'Both 32, combined in-hand ₹6.5L/month. Looking at 3BHKs in Kokapet/Financial District (~₹3-3.8Cr) vs continuing to rent in Gachibowli. Need a sanity check',
-    content: "Hi folks, My wife and I are hitting that classic Hyderabad dilemma and could really use a grounded perspective from buyers who have either pulled the trigger or decided against it.\n\nWe're currently renting in Gachibowli (₹65,000/month). Our office commute is ~15 minutes to Financial District. We are eyeing 3BHK units (2,400 to 2,800 sft) in Kokapet near the Golden Mile / Neopolis access road.\n\nQuoted prices are ~₹11,000 - ₹12,500/sft plus amenities, car parking, and GST. Total outgo touches ₹3.5 Cr. At an 80% loan, monthly EMI is ~₹2.4L.\n\nOur financial snapshot:\n- Combined monthly in-hand: ₹6.5L\n- Fixed investments & equity: ₹1.4 Cr\n- Anticipated kid expenses in 2 years.\n\nIs Kokapet still fundamentally undervalued with the Neopolis commercial absorption timeline, or are we overextending at a local cycle peak?",
-    topic: 'Kokapet & Neopolis',
-    communityName: 'ps/HyderabadRealEstate',
-    communityId: 'comm-hyd-re',
-    authorId: 'u-praveen-v',
-    authorName: 'Praveen Varma',
-    authorRole: 'PROPERTY_SEEKER',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    upvotes: 218,
-    commentsCount: 42,
-    repostsCount: 14,
-    replies: [],
-    postType: 'POST',
-    status: 'APPROVED',
-    createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
-    visibility: 'PUBLIC'
-  },
-  {
-    id: 'intel-post-rera-checklist',
-    title: 'RERA Telangana Project Registration & Tower Phase Verification: Critical legal checklist before signing Agreement of Sale (AOS)',
-    content: "Essential legal checklist for high-ticket apartment purchases across Hyderabad:\n\n1. **Tower-Level Sanction Check**: Verify the TG RERA registration number applies specifically to your tower and floor range, not merely an earlier phase.\n2. **Encumbrance Certificate (EC)**: Pull 30-year search on the survey number. Verify zero mortgage liens from construction financing unless the bank provides a specific partial release NOC.\n3. **Sanctioned vs Marketing Layout**: Compare HMDA approved architectural drawings against the developer marketing brochure. Under RERA Section 14, structural modifications require 2/3rd allottee consent.\n4. **Car Parking Demarcation**: Ensure basement parking slot numbering is explicitly scheduled in the AOS schedule.",
-    topic: 'Legal & RERA',
-    communityName: 'ps/LegalCompliance',
-    communityId: 'comm-legal',
-    authorId: 'u-adv-satya',
-    authorName: 'Adv. K. Satyanarayana',
-    authorRole: 'RERA_AGENT',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    upvotes: 345,
-    commentsCount: 68,
-    repostsCount: 31,
-    replies: [],
-    postType: 'POST',
-    status: 'APPROVED',
-    createdAt: new Date(Date.now() - 3600000 * 36).toISOString(),
-    visibility: 'PUBLIC'
-  },
-  {
-    id: 'intel-post-neopolis-vs-tellapur',
-    title: 'Neopolis Kokapet High-Rise (4BHK) vs Tellapur Gated Community Independent Villa: 10-Year Horizon Comparison',
-    content: "Relocating from Singapore next year with a budget of ₹4.5 - ₹5.5 Cr. Exploring two contrasting asset classes:\n\n1. **Option A**: 4,200 sft high-rise apartment in Neopolis Kokapet (Sky club, 50+ floors, walking distance to SEZ).\n2. **Option B**: 350 sq.yd duplex villa (3,800 sft built-up) in a 40-acre gated enclave in Tellapur / Kollur corridor.\n\nLooking for community insights regarding:\n- Long-term capital appreciation differential\n- Rental yield and ease of high-ticket tenant placement\n- Monthly maintenance overhead (villa vs ultra-high-rise clubhouse)",
-    topic: 'Luxury Villas & Communities',
-    communityName: 'ps/LuxuryEstates',
-    communityId: 'comm-luxury',
-    authorId: 'u-rajeshwar-r',
-    authorName: 'Dr. Rajeshwar Rao',
-    authorRole: 'PROPERTY_SEEKER',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    upvotes: 164,
-    commentsCount: 53,
-    repostsCount: 9,
-    replies: [],
-    postType: 'QUESTION',
-    status: 'APPROVED',
-    createdAt: new Date(Date.now() - 3600000 * 52).toISOString(),
-    visibility: 'PUBLIC'
-  },
-  {
-    id: 'intel-post-infrastructure-report',
-    title: 'Real-time Field Report: Kokapet Trumpet Interchange & Neopolis 100ft Link Road Connectivity (November 2026 Status)',
-    content: "Ground inspection summary for Western Corridor buyers:\n\n- The trumpet interchange connecting Kokapet SEZ directly to the Outer Ring Road (ORR) is at 85% physical completion.\n- 36-meter master plan link roads connecting Financial District to Golden Mile have base asphalt completed.\n- Stormwater trunk conduits and underground electrical ducts are being commissioned ahead of commercial IT tower occupancy targeted for late 2027.\n\nTraffic friction around Gachibowli junction should reduce by ~35% once the trumpet flyover opens for bidirectional traffic.",
-    topic: 'Construction Updates',
-    communityName: 'ps/ConstructionWatch',
-    communityId: 'comm-construction',
-    authorId: 'u-venkat-s',
-    authorName: 'Civil Eng. S. Venkat',
-    authorRole: 'AGENT',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80',
-    upvotes: 112,
-    commentsCount: 24,
-    repostsCount: 7,
-    replies: [],
-    postType: 'POST',
-    status: 'APPROVED',
-    createdAt: new Date(Date.now() - 3600000 * 70).toISOString(),
-    visibility: 'PUBLIC'
-  }
-];
+export const BASELINE_COMMUNITY_POSTS: CommunityPost[] = [];
 
 export const CommunityFeed: React.FC<CommunityFeedProps> = ({
   posts,
@@ -159,11 +78,6 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({
   // Filter & sort logic
   const filteredPosts = useMemo(() => {
     const combined = [...(posts || [])];
-    BASELINE_COMMUNITY_POSTS.forEach(b => {
-      if (!combined.some(p => p.id === b.id || p.title === b.title)) {
-        combined.push(b);
-      }
-    });
 
     let result = combined.filter(p => {
       // Must not be deleted or rejected
