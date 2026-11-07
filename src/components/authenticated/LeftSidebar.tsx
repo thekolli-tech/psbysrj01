@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserRole } from '../../types';
+import { UserRole, NavItemKey } from '../../types';
 import {
   Home,
   Compass,
@@ -21,27 +21,7 @@ import {
   ShieldCheck,
   Plus
 } from 'lucide-react';
-
-export type NavItemKey =
-  | 'HOME'
-  | 'DISCOVER'
-  | 'COMMUNITIES'
-  | 'DISCUSSIONS'
-  | 'PROPERTY_INSIGHTS'
-  | 'LIVE_SESSIONS'
-  | 'SAVED_ITEMS'
-  | 'MY_PROFILE'
-  | 'MY_POSTS'
-  | 'MY_QUESTIONS'
-  | 'MY_COMMUNITIES'
-  | 'MY_ENQUIRIES'
-  | 'FIND_PROFESSIONALS'
-  | 'DEVELOPERS'
-  | 'CHANNEL_PARTNERS'
-  | 'RERA_PROFESSIONALS'
-  | 'REAL_ESTATE_MEDIA'
-  | 'SUPER_ADMIN_CONSOLE'
-  | 'DEVELOPER_DASHBOARD';
+export type { NavItemKey };
 
 interface LeftSidebarProps {
   activeItem: NavItemKey;
@@ -64,6 +44,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   const isSuperAdmin = userRole === 'SUPER_ADMIN';
   const isDeveloper = userRole === 'DEVELOPER';
+  const isAgent = userRole === 'AGENT' || userRole === 'CHANNEL_PARTNER' || userRole === 'RERA_AGENT';
 
   return (
     <aside className="w-60 xl:w-64 shrink-0 flex flex-col gap-4 text-xs select-none">
@@ -206,8 +187,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         )}
       </div>
 
-      {/* 4. Privileged Consoles (Super Admin & Developer ONLY) */}
-      {(isSuperAdmin || isDeveloper) && (
+      {/* 4. Privileged Consoles (Super Admin, Developer & Channel Partners) */}
+      {(isSuperAdmin || isDeveloper || isAgent) && (
         <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 shadow-xs space-y-1">
           <span className="block px-2 text-[10px] font-extrabold uppercase tracking-widest text-amber-900">
             Privileged Management
@@ -216,9 +197,13 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             <button
               type="button"
               onClick={() => onSelectNav('SUPER_ADMIN_CONSOLE')}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold text-amber-900 hover:bg-amber-100 transition-colors cursor-pointer"
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold transition-colors cursor-pointer ${
+                activeItem === 'SUPER_ADMIN_CONSOLE'
+                  ? 'bg-[#182A3E] text-white shadow-xs'
+                  : 'text-amber-900 hover:bg-amber-100'
+              }`}
             >
-              <ShieldCheck className="w-4 h-4 text-amber-700" />
+              <ShieldCheck className={`w-4 h-4 ${activeItem === 'SUPER_ADMIN_CONSOLE' ? 'text-[#B49029]' : 'text-amber-700'}`} />
               <span>Super Admin Console</span>
             </button>
           )}
@@ -226,10 +211,28 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             <button
               type="button"
               onClick={() => onSelectNav('DEVELOPER_DASHBOARD')}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold text-blue-900 hover:bg-blue-100 transition-colors cursor-pointer"
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold transition-colors cursor-pointer ${
+                activeItem === 'DEVELOPER_DASHBOARD'
+                  ? 'bg-[#182A3E] text-white shadow-xs'
+                  : 'text-blue-900 hover:bg-blue-100'
+              }`}
             >
-              <Building className="w-4 h-4 text-blue-700" />
+              <Building className={`w-4 h-4 ${activeItem === 'DEVELOPER_DASHBOARD' ? 'text-[#B49029]' : 'text-blue-700'}`} />
               <span>Developer Dashboard</span>
+            </button>
+          )}
+          {isAgent && (
+            <button
+              type="button"
+              onClick={() => onSelectNav('LEADS_MARKET')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold transition-colors cursor-pointer ${
+                activeItem === 'LEADS_MARKET'
+                  ? 'bg-[#182A3E] text-white shadow-xs'
+                  : 'text-amber-900 hover:bg-amber-100'
+              }`}
+            >
+              <Briefcase className={`w-4 h-4 ${activeItem === 'LEADS_MARKET' ? 'text-[#B49029]' : 'text-amber-700'}`} />
+              <span>B2B Leads Marketplace</span>
             </button>
           )}
         </div>

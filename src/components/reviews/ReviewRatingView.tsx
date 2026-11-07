@@ -45,9 +45,26 @@ const DEFAULT_REVIEW_ENTITIES: Listing[] = [
   { id: 'entity_stakeholder_sumadhura', title: 'Sumadhura Infracon (High-Rise Residential Developer)', category: 'STAKEHOLDERS' }
 ];
 
-export const ReviewRatingView: React.FC<{ onOpenLoginModal?: () => void }> = ({ onOpenLoginModal }) => {
-  const { isLoggedIn, currentUser, showToast } = useApp();
-  const [activeTab, setActiveTab] = useState<ReviewTab>('ALL');
+export const ReviewRatingView: React.FC<{ onOpenLoginModal?: () => void; initialTab?: ReviewTab }> = ({
+  onOpenLoginModal,
+  initialTab
+}) => {
+  const { isLoggedIn, currentUser, showToast, activeNav } = useApp();
+  const [activeTab, setActiveTab] = useState<ReviewTab>(() => {
+    if (initialTab) return initialTab;
+    if (activeNav === 'DEVELOPERS' || activeNav === 'CHANNEL_PARTNERS' || activeNav === 'RERA_PROFESSIONALS') {
+      return 'STAKEHOLDERS';
+    }
+    return 'ALL';
+  });
+
+  useEffect(() => {
+    if (activeNav === 'DEVELOPERS' || activeNav === 'CHANNEL_PARTNERS' || activeNav === 'RERA_PROFESSIONALS') {
+      setActiveTab('STAKEHOLDERS');
+    } else if (activeNav === 'FIND_PROFESSIONALS') {
+      setActiveTab('ALL');
+    }
+  }, [activeNav]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [listingId, setListingId] = useState('');
   const [loadingListings, setLoadingListings] = useState(true);

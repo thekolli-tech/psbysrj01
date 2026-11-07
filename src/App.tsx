@@ -250,7 +250,7 @@ const AppContent: React.FC = () => {
         >
           <React.Suspense fallback={<ViewSkeleton />}>
             {activeView === 'HOME' && <UserDashboard initialMode="FEED" />}
-            {activeView === 'DASHBOARD' && <UserDashboard />}
+            {activeView === 'DASHBOARD' && <UserDashboard initialMode="WORKSPACE" />}
             {activeView === 'COMMUNITY' && <UserDashboard initialMode="FEED" />}
             {activeView === 'PROPERTIES' && (
               <PropertyList onClaimProject={(prop) => setClaimTarget(prop)} />

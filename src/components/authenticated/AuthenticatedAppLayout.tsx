@@ -41,10 +41,12 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
     refreshCommunities,
     setActiveView,
     logout,
-    showToast
+    showToast,
+    activeNav,
+    setActiveNav,
+    navigateToNav
   } = useApp();
 
-  const [activeNav, setActiveNav] = useState<NavItemKey>(initialNav);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -52,18 +54,6 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [selectedTopicFilter, setSelectedTopicFilter] = useState('ALL');
-  // Synchronize activeNav with activeView from AppContext
-  useEffect(() => {
-    if (activeView === 'CONFERENCE') setActiveNav('LIVE_SESSIONS');
-    else if (activeView === 'MARKET_INSIGHTS') setActiveNav('PROPERTY_INSIGHTS');
-    else if (activeView === 'PROPERTIES') setActiveNav('DISCOVER');
-    else if (activeView === 'ADMIN') setActiveNav('SUPER_ADMIN_CONSOLE');
-    else if (activeView === 'DEVELOPER') setActiveNav('DEVELOPER_DASHBOARD');
-    else if (activeView === 'LEADS_MARKET') setActiveNav('FIND_PROFESSIONALS');
-    else if (activeView === 'MEDIA') setActiveNav('REAL_ESTATE_MEDIA');
-    else if (activeView === 'HOME' || activeView === 'COMMUNITY') setActiveNav('HOME');
-  }, [activeView]);
-
 
   // Load bookmarks & unread notifications
   useEffect(() => {
@@ -107,34 +97,8 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
   };
 
   const handleNavSelect = (key: NavItemKey) => {
-    setActiveNav(key);
+    navigateToNav(key);
     setMobileSidebarOpen(false);
-
-    if (key === 'SUPER_ADMIN_CONSOLE') {
-      setActiveView('ADMIN');
-      return;
-    }
-    if (key === 'DEVELOPER_DASHBOARD') {
-      setActiveView('DEVELOPER');
-      return;
-    }
-    if (key === 'PROPERTY_INSIGHTS') {
-      setActiveView('MARKET_INSIGHTS');
-      return;
-    }
-    if (key === 'LIVE_SESSIONS') {
-      setActiveView('CONFERENCE');
-      return;
-    }
-    if (key === 'COMMUNITIES') {
-      setSelectedTopicFilter('ALL');
-      return;
-    }
-    if (key === 'FIND_PROFESSIONALS' || key === 'DEVELOPERS' || key === 'CHANNEL_PARTNERS' || key === 'RERA_PROFESSIONALS' || key === 'REAL_ESTATE_MEDIA') {
-      setActiveView('LEADS_MARKET');
-      return;
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const displayedPosts = React.useMemo(() => {
@@ -192,7 +156,11 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
 
           {/* Center Column: Community Feed or Custom Workspace Content */}
           {(() => {
-            const isWideView = activeView && !['HOME', 'COMMUNITY', 'DASHBOARD'].includes(activeView);
+            const isWorkspace =
+              activeView === 'DASHBOARD' ||
+              ['MY_PROFILE', 'MY_POSTS', 'MY_QUESTIONS', 'MY_COMMUNITIES', 'MY_ENQUIRIES'].includes(activeNav);
+            const isWideView =
+              Boolean(activeView && !['HOME', 'COMMUNITY'].includes(activeView)) || isWorkspace;
             return (
               <>
                 <div className={isWideView ? "flex-1 min-w-0 w-full" : "flex-1 min-w-0 max-w-2xl xl:max-w-3xl"}>

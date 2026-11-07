@@ -512,6 +512,36 @@ export interface ChatMessage {
   leadContextId?: string;
 }
 
+export type NavItemKey =
+  | 'HOME'
+  | 'DISCOVER'
+  | 'COMMUNITIES'
+  | 'DISCUSSIONS'
+  | 'PROPERTY_INSIGHTS'
+  | 'LIVE_SESSIONS'
+  | 'SAVED_ITEMS'
+  | 'MY_PROFILE'
+  | 'MY_POSTS'
+  | 'MY_QUESTIONS'
+  | 'MY_COMMUNITIES'
+  | 'MY_ENQUIRIES'
+  | 'FIND_PROFESSIONALS'
+  | 'DEVELOPERS'
+  | 'CHANNEL_PARTNERS'
+  | 'RERA_PROFESSIONALS'
+  | 'REAL_ESTATE_MEDIA'
+  | 'SUPER_ADMIN_CONSOLE'
+  | 'DEVELOPER_DASHBOARD'
+  | 'LEADS_MARKET';
+
+export type WorkspaceTabType =
+  | 'OVERVIEW'
+  | 'REQUIREMENTS'
+  | 'REVIEWS'
+  | 'NOTIFICATIONS'
+  | 'COMMUNITY'
+  | 'SETTINGS';
+
 export type ViewType =
   | 'HOME'
   | 'DASHBOARD'

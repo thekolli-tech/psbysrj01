@@ -16,7 +16,9 @@ import {
   PropertyAdminAssignment,
   ChatMessage,
   ViewType,
-  DeviceMode
+  DeviceMode,
+  NavItemKey,
+  WorkspaceTabType
 } from '../types';
 import {
   MICRO_MARKET_TRENDS
@@ -32,6 +34,11 @@ interface AppContextType {
   setActiveView: (view: ViewType) => void;
   deviceMode: DeviceMode;
   setDeviceMode: (mode: DeviceMode) => void;
+  activeNav: NavItemKey;
+  setActiveNav: (key: NavItemKey) => void;
+  activeWorkspaceTab: WorkspaceTabType;
+  setActiveWorkspaceTab: (tab: WorkspaceTabType) => void;
+  navigateToNav: (key: NavItemKey) => void;
 
   // Properties
   properties: Property[];
@@ -227,6 +234,97 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [activeView, setActiveView] = useState<ViewType>('HOME');
   const [deviceMode, setDeviceMode] = useState<DeviceMode>('AUTO');
+  const [activeNav, setActiveNav] = useState<NavItemKey>('HOME');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabType>('OVERVIEW');
+
+  const navigateToNav = (key: NavItemKey) => {
+    setActiveNav(key);
+    switch (key) {
+      case 'HOME':
+      case 'DISCUSSIONS':
+        setActiveView('HOME');
+        break;
+      case 'DISCOVER':
+        setActiveView('PROPERTIES');
+        break;
+      case 'COMMUNITIES':
+        setActiveView('COMMUNITY');
+        break;
+      case 'PROPERTY_INSIGHTS':
+        setActiveView('MARKET_INSIGHTS');
+        break;
+      case 'LIVE_SESSIONS':
+        setActiveView('CONFERENCE');
+        break;
+      case 'SAVED_ITEMS':
+        setActiveView('HOME');
+        break;
+      case 'MY_PROFILE':
+        setActiveView('DASHBOARD');
+        setActiveWorkspaceTab('SETTINGS');
+        break;
+      case 'MY_POSTS':
+      case 'MY_QUESTIONS':
+      case 'MY_COMMUNITIES':
+        setActiveView('DASHBOARD');
+        setActiveWorkspaceTab('COMMUNITY');
+        break;
+      case 'MY_ENQUIRIES':
+        setActiveView('DASHBOARD');
+        setActiveWorkspaceTab('REQUIREMENTS');
+        break;
+      case 'FIND_PROFESSIONALS':
+      case 'DEVELOPERS':
+      case 'CHANNEL_PARTNERS':
+      case 'RERA_PROFESSIONALS':
+        setActiveView('REVIEWS');
+        break;
+      case 'REAL_ESTATE_MEDIA':
+        setActiveView('MEDIA');
+        break;
+      case 'SUPER_ADMIN_CONSOLE':
+        setActiveView('ADMIN');
+        break;
+      case 'DEVELOPER_DASHBOARD':
+        setActiveView('DEVELOPER');
+        break;
+      case 'LEADS_MARKET':
+        setActiveView('LEADS_MARKET');
+        break;
+      default:
+        setActiveView('HOME');
+        break;
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    if (activeView === 'CONFERENCE') setActiveNav('LIVE_SESSIONS');
+    else if (activeView === 'MARKET_INSIGHTS') setActiveNav('PROPERTY_INSIGHTS');
+    else if (activeView === 'PROPERTIES') setActiveNav('DISCOVER');
+    else if (activeView === 'ADMIN') setActiveNav('SUPER_ADMIN_CONSOLE');
+    else if (activeView === 'DEVELOPER') setActiveNav('DEVELOPER_DASHBOARD');
+    else if (activeView === 'MEDIA') setActiveNav('REAL_ESTATE_MEDIA');
+    else if (activeView === 'REVIEWS') {
+      setActiveNav(prev =>
+        ['FIND_PROFESSIONALS', 'DEVELOPERS', 'CHANNEL_PARTNERS', 'RERA_PROFESSIONALS'].includes(prev)
+          ? prev
+          : 'FIND_PROFESSIONALS'
+      );
+    } else if (activeView === 'DASHBOARD') {
+      setActiveNav(prev =>
+        ['MY_PROFILE', 'MY_POSTS', 'MY_QUESTIONS', 'MY_COMMUNITIES', 'MY_ENQUIRIES'].includes(prev)
+          ? prev
+          : 'MY_PROFILE'
+      );
+    } else if (activeView === 'HOME' || activeView === 'COMMUNITY') {
+      setActiveNav(prev =>
+        ['HOME', 'DISCUSSIONS', 'SAVED_ITEMS', 'COMMUNITIES'].includes(prev) ? prev : 'HOME'
+      );
+    }
+  }, [activeView]);
 
   const [properties, setProperties] = useState<Property[]>(() => {
     if (typeof window !== 'undefined') {
@@ -1380,6 +1478,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveView,
         deviceMode,
         setDeviceMode,
+        activeNav,
+        setActiveNav,
+        activeWorkspaceTab,
+        setActiveWorkspaceTab,
+        navigateToNav,
         properties,
         selectedProperty,
         setSelectedProperty,

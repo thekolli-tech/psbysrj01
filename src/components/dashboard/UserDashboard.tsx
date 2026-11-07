@@ -203,11 +203,43 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
     refreshCommunities,
     upvoteCommunityPost,
     createCommunityPost,
-    createCommunityProposal
+    createCommunityProposal,
+    activeNav,
+    activeWorkspaceTab,
+    setActiveNav,
+    setActiveWorkspaceTab
   } = useApp();
 
   const [dashboardViewMode, setDashboardViewMode] = useState<'FEED' | 'WORKSPACE'>(initialMode);
   const [activeTab, setActiveTab] = useState<TabType>('OVERVIEW');
+
+  // Synchronize dashboard mode and tab when activeNav changes
+  useEffect(() => {
+    if (activeNav === 'MY_PROFILE') {
+      setDashboardViewMode('WORKSPACE');
+      setActiveTab('SETTINGS');
+    } else if (activeNav === 'MY_ENQUIRIES') {
+      setDashboardViewMode('WORKSPACE');
+      setActiveTab('REQUIREMENTS');
+    } else if (activeNav === 'MY_POSTS' || activeNav === 'MY_QUESTIONS' || activeNav === 'MY_COMMUNITIES') {
+      setDashboardViewMode('WORKSPACE');
+      setActiveTab('COMMUNITY');
+    } else if (activeNav === 'HOME' || activeNav === 'DISCUSSIONS' || activeNav === 'SAVED_ITEMS') {
+      setDashboardViewMode('FEED');
+    }
+  }, [activeNav]);
+
+  // Synchronize when activeWorkspaceTab changes
+  useEffect(() => {
+    if (activeWorkspaceTab) {
+      setActiveTab(activeWorkspaceTab);
+      setDashboardViewMode('WORKSPACE');
+    }
+  }, [activeWorkspaceTab]);
+
+  useEffect(() => {
+    setDashboardViewMode(initialMode);
+  }, [initialMode]);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerMode, setComposerMode] = useState<ComposerMode>('DISCUSSION');
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
@@ -753,7 +785,10 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setDashboardViewMode('FEED')}
+              onClick={() => {
+                setDashboardViewMode('FEED');
+                setActiveNav('HOME');
+              }}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 dashboardViewMode === 'FEED'
                   ? 'bg-[#182A3E] text-white shadow-xs'
@@ -766,7 +801,10 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
 
             <button
               type="button"
-              onClick={() => setDashboardViewMode('WORKSPACE')}
+              onClick={() => {
+                setDashboardViewMode('WORKSPACE');
+                setActiveNav(activeTab === 'SETTINGS' ? 'MY_PROFILE' : activeTab === 'REQUIREMENTS' ? 'MY_ENQUIRIES' : 'MY_PROFILE');
+              }}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 dashboardViewMode === 'WORKSPACE'
                   ? 'bg-[#182A3E] text-white shadow-xs'
@@ -785,7 +823,15 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
 
         {dashboardViewMode === 'FEED' ? (
           <CommunityFeed
-            posts={liveCommunityPosts || []}
+            posts={
+              activeNav === 'SAVED_ITEMS'
+                ? (liveCommunityPosts || []).filter(p => bookmarkedIds.has(p.id))
+                : activeNav === 'MY_POSTS'
+                ? (liveCommunityPosts || []).filter(p => p.authorId === currentUser.id)
+                : activeNav === 'MY_QUESTIONS'
+                ? (liveCommunityPosts || []).filter(p => p.postType === 'QUESTION')
+                : (liveCommunityPosts || [])
+            }
             communities={communities || []}
             currentUser={currentUser}
             onOpenComposer={(mode) => {
@@ -861,7 +907,11 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
             </div>
 
             <button
-              onClick={() => setActiveTab('SETTINGS')}
+              onClick={() => {
+                setActiveTab('SETTINGS');
+                setActiveNav('MY_PROFILE');
+                setActiveWorkspaceTab('SETTINGS');
+              }}
               className="p-3 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 hover:text-white border border-slate-700 rounded-2xl transition-colors cursor-pointer"
               title="Account Settings"
               aria-label="Account Settings"
@@ -875,7 +925,11 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
       {/* Navigation Tabs */}
       <div className="flex border-b border-slate-200 overflow-x-auto no-scrollbar gap-2 sm:gap-4">
         <button
-          onClick={() => setActiveTab('OVERVIEW')}
+          onClick={() => {
+            setActiveTab('OVERVIEW');
+            setActiveNav('MY_PROFILE');
+            setActiveWorkspaceTab('OVERVIEW');
+          }}
           className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
             activeTab === 'OVERVIEW'
               ? 'border-amber-500 text-amber-800 bg-amber-50/50 rounded-t-xl'
@@ -887,7 +941,11 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
         </button>
 
         <button
-          onClick={() => setActiveTab('REQUIREMENTS')}
+          onClick={() => {
+            setActiveTab('REQUIREMENTS');
+            setActiveNav('MY_ENQUIRIES');
+            setActiveWorkspaceTab('REQUIREMENTS');
+          }}
           className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
             activeTab === 'REQUIREMENTS'
               ? 'border-amber-500 text-amber-800 bg-amber-50/50 rounded-t-xl'
@@ -904,7 +962,11 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
         </button>
 
         <button
-          onClick={() => setActiveTab('REVIEWS')}
+          onClick={() => {
+            setActiveTab('REVIEWS');
+            setActiveNav('MY_PROFILE');
+            setActiveWorkspaceTab('REVIEWS');
+          }}
           className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
             activeTab === 'REVIEWS'
               ? 'border-amber-500 text-amber-800 bg-amber-50/50 rounded-t-xl'
@@ -921,7 +983,11 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
         </button>
 
         <button
-          onClick={() => setActiveTab('NOTIFICATIONS')}
+          onClick={() => {
+            setActiveTab('NOTIFICATIONS');
+            setActiveNav('MY_PROFILE');
+            setActiveWorkspaceTab('NOTIFICATIONS');
+          }}
           className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
             activeTab === 'NOTIFICATIONS'
               ? 'border-amber-500 text-amber-800 bg-amber-50/50 rounded-t-xl'
@@ -938,7 +1004,11 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
         </button>
 
         <button
-          onClick={() => setActiveTab('COMMUNITY')}
+          onClick={() => {
+            setActiveTab('COMMUNITY');
+            setActiveNav('MY_COMMUNITIES');
+            setActiveWorkspaceTab('COMMUNITY');
+          }}
           className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
             activeTab === 'COMMUNITY'
               ? 'border-amber-500 text-amber-800 bg-amber-50/50 rounded-t-xl'
@@ -950,7 +1020,11 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
         </button>
 
         <button
-          onClick={() => setActiveTab('SETTINGS')}
+          onClick={() => {
+            setActiveTab('SETTINGS');
+            setActiveNav('MY_PROFILE');
+            setActiveWorkspaceTab('SETTINGS');
+          }}
           className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
             activeTab === 'SETTINGS'
               ? 'border-amber-500 text-amber-800 bg-amber-50/50 rounded-t-xl'
