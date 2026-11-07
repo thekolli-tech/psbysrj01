@@ -7,7 +7,7 @@ import test from 'node:test';
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = '';
 process.env.DB_ENGINE = 'sqlite';
-process.env.SQLITE_PATH = `/tmp/ps-profile-${process.pid}.db`;
+process.env.SQLITE_PATH = `/tmp/ps-profile-${process.pid}-${Date.now()}.db`;
 delete process.env.PAYMENT_PROVIDER;
 delete process.env.PAYMENT_WEBHOOK_SECRET;
 

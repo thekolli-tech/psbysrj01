@@ -135,6 +135,9 @@ const AppContent: React.FC = () => {
         setActiveView('TERMS');
         return;
       }
+      if (params.get('auth') === '1' || params.get('auth') === 'register' || params.get('login') === '1') {
+        setLoginModalOpen(true);
+      }
 
       const viewMap: Record<string, ViewType> = {
         home: 'HOME',

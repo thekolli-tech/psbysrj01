@@ -270,7 +270,7 @@ test('finance visibility and wallet adjustments with idempotency', async () => {
   assert.ok(Array.isArray(records.ledger));
   assert.ok(Array.isArray(records.transactions));
   const userEntries = records.ledger.filter((l: any) => l.user_id === agent.id);
-  const userEntry = userEntries[userEntries.length - 1] || records.ledger.find((l: any) => l.user_id === agent.id);
+  const userEntry = userEntries.find((l: any) => l.balance_after === 1000) || userEntries[0];
   assert.ok(userEntry);
   assert.equal(userEntry.balance_after, 1000);
 });

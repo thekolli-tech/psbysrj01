@@ -601,12 +601,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const handleSendWhatsAppOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (submitting.current) return;
+    setErrorMsg(null);
+
     const cleanDigits = phoneInput.replace(/[^0-9]/g, '');
     if (cleanDigits.length !== 10) {
       setErrorMsg('Please enter a valid 10-digit Indian mobile number.');
       return;
     }
-    setErrorMsg(null);
+
+    if (!emailInput.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim())) {
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
+    if (!passwordInput || passwordInput.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    if (passwordInput !== confirmPasswordInput) {
+      setErrorMsg('Passwords do not match. Please ensure both passwords match.');
+      return;
+    }
+
     submitting.current = true;
     setLoading(true);
     try {
@@ -911,6 +928,332 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  if (regStep === 'PROFILE') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E4D8] w-full max-w-3xl lg:max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+          {/* Modal Header */}
+          <div className="px-5 py-4 border-b border-[#E8E4D8] flex items-center justify-between bg-[#182A3E] text-white shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-9 rounded-xl bg-white border border-white/20 flex items-center justify-center px-1 shrink-0 shadow-sm">
+                <BrandLogo variant="compact" size="sm" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white font-display">
+                  Complete Your Property Studio Profile
+                </h3>
+                <p className="text-xs text-slate-300">
+                  Tell us a little about yourself to personalise your Property Studio experience.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-mono">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{verifiedPhone}</span>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Modal Body */}
+          <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5 text-xs">
+            {errorMsg && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {/* Mobile Verified Alert Pill on mobile */}
+            <div className="sm:hidden flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="font-bold text-emerald-950 font-mono">{verifiedPhone}</span>
+              </div>
+              <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-100 px-2 py-0.5 rounded-full">
+                ✓ WhatsApp Verified
+              </span>
+            </div>
+
+            {/* Two-Column Responsive Layout on Desktop, Single-Column on Mobile */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
+              {/* Left Column: Personal & Professional Credentials */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={nameInput}
+                      onChange={e => setNameInput(e.target.value)}
+                      placeholder="e.g. Suresh Chandra"
+                      className="w-full pl-9 pr-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
+                    Role / Account Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={roleInput}
+                    onChange={e => setRoleInput(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-900 font-medium"
+                  >
+                    <option value="PROPERTY_SEEKER">Property Seeker (Buyer / Investor)</option>
+                    <option value="CHANNEL_PARTNER">Channel Partner / Agent</option>
+                    <option value="LANDOWNER">Landowner / Asset Holder</option>
+                    <option value="RESELLER">Reseller</option>
+                    <option value="RERA_AGENT">RERA Registered Agent</option>
+                    <option value="REAL_ESTATE_MEDIA">Real Estate Media Professional</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="signup-profession" className="block font-bold text-slate-800 text-xs mb-1.5">
+                    Profession *
+                  </label>
+                  <input
+                    id="signup-profession"
+                    name="profession"
+                    type="text"
+                    autoComplete="off"
+                    value={professionInput}
+                    onChange={e => setProfessionInput(e.target.value)}
+                    placeholder="Enter your profession"
+                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
+                    Organization <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={organizationInput}
+                    onChange={e => setOrganizationInput(e.target.value)}
+                    placeholder="e.g. Acme Realty Pvt Ltd"
+                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
+                    Company / Practice <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={companyInput}
+                    onChange={e => setCompanyInput(e.target.value)}
+                    placeholder="e.g. Studio Co."
+                    className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Right Column: Location, Interests & Avatar Selection */}
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block font-bold text-slate-800 text-xs">
+                      Location / City & State
+                    </label>
+                    <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200/60 inline-flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5 text-amber-700" />
+                      Fixed Territory
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      id="signup-location"
+                      name="location"
+                      type="text"
+                      value={DEFAULT_SIGNUP_LOCATION}
+                      readOnly
+                      aria-readonly="true"
+                      tabIndex={-1}
+                      className="w-full pl-9 pr-3.5 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-100/90 text-slate-800 font-semibold cursor-not-allowed select-none focus:outline-none"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1 block font-medium">
+                    Platform location is fixed to Hyderabad, Telangana, India.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-800 text-xs mb-1.5">
+                    Interests & Topics <span className="text-slate-400 font-normal">(Select applicable)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 border border-slate-200 rounded-xl bg-slate-50/50">
+                    {[
+                      'Kokapet & Neopolis',
+                      'High-Rise Construction',
+                      'Legal Due Diligence & RERA',
+                      'Rental Yield & ROI',
+                      'Luxury Villas & Communities',
+                      'Architecture & Vaastu',
+                      'Interior Design & Renovation',
+                      'Land & Plotting Guidelines',
+                      'Price Trends & Market Updates',
+                      'Home Loans & Taxation'
+                    ].map(topic => {
+                      const isSelected = selectedInterests.includes(topic);
+                      return (
+                        <button
+                          key={topic}
+                          type="button"
+                          onClick={() => {
+                            setSelectedInterests(prev =>
+                              isSelected ? prev.filter(t => t !== topic) : [...prev, topic]
+                            );
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all flex items-center gap-1 cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>{isSelected ? '✓' : '+'}</span>
+                          <span>{topic}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Avatar Selection Section */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      Avatar Selection
+                    </label>
+                    <span className="text-[10px] text-slate-400">Circular previews</span>
+                  </div>
+
+                  {/* Predefined Circular Avatars in Responsive Grid */}
+                  <div className="grid grid-cols-6 gap-2 p-2.5 bg-slate-50 rounded-2xl border border-slate-200/80">
+                    {ANIME_AVATARS.map((option) => {
+                      const isSelected = selectedAvatar === option.url && !customAvatar;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAvatar(option.url);
+                            setCustomAvatar(null);
+                          }}
+                          title={option.name}
+                          className={`relative rounded-full p-0.5 border-2 transition-all cursor-pointer flex items-center justify-center aspect-square ${
+                            isSelected
+                              ? 'border-[#B49029] ring-2 ring-[#B49029]/50 bg-amber-50 shadow-md scale-105'
+                              : 'border-slate-200 hover:border-slate-300 bg-white hover:scale-105'
+                          }`}
+                        >
+                          <img
+                            src={option.url}
+                            alt={option.name}
+                            className="w-full h-full rounded-full object-cover"
+                            loading="lazy"
+                          />
+                          {isSelected && (
+                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#B49029] text-white rounded-full flex items-center justify-center text-[8px] font-black shadow-xs ring-1 ring-white">
+                              ✓
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Image Upload Option (<= 2MB) */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      onChange={handleCustomAvatarSelect}
+                    />
+                    {customAvatar && (
+                      <div className="relative w-9 h-9 rounded-full ring-2 ring-[#B49029] shrink-0 overflow-hidden">
+                        <img src={customAvatar} alt="Custom upload" className="w-full h-full rounded-full object-cover" />
+                        <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#B49029] text-white rounded-full flex items-center justify-center text-[7px] font-black">✓</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={avatarUploading || loading}
+                      className="flex-1 py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-300 flex items-center justify-center gap-2 text-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{avatarUploading ? 'Processing Photo...' : customAvatar ? 'Change Photo (Max 2MB)' : 'Upload Custom Photo (Max 2MB)'}</span>
+                    </button>
+                    {customAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomAvatar(null);
+                          setSelectedAvatar(ANIME_AVATARS[0].url);
+                        }}
+                        className="p-2 text-xs text-red-600 hover:bg-red-50 rounded-xl border border-red-200 cursor-pointer"
+                        title="Revert to preset avatar"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sticky Footer Actions */}
+          <div className="p-4 sm:p-5 bg-slate-50 border-t border-[#E8E4D8] flex items-center justify-between gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setRegStep('OTP');
+                setErrorMsg(null);
+              }}
+              className="px-4 py-2.5 border border-slate-300 hover:bg-white text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCompleteRegistration}
+              disabled={loading || !nameInput.trim() || !professionInput.trim()}
+              className="px-6 py-2.5 bg-[#B49029] hover:bg-[#A99137] text-white font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer flex items-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4 text-white" />
+              <span>{loading ? 'Creating Your Account...' : 'Complete Profile & Launch Platform'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
       <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E4D8] w-full max-w-md md:max-w-3xl lg:max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col md:flex-row overflow-hidden my-auto animate-in zoom-in-95 duration-150">
@@ -980,10 +1323,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               </div>
               <div>
                 <h3 className="text-sm sm:text-base font-bold text-white font-display">
-                  {isLoggedIn ? 'Account Session' : forgotPasswordMode ? 'Reset Password' : mode === 'LOGIN' ? 'Portal Sign In' : regStep === 'PROFILE' ? 'Complete Your Profile' : regStep === 'OTP' ? 'WhatsApp Verification' : 'Join Property Studio'}
+                  {isLoggedIn ? 'Account Session' : forgotPasswordMode ? 'Reset Password' : mode === 'LOGIN' ? 'Portal Sign In' : regStep === 'OTP' ? 'WhatsApp Verification' : 'Join Property Studio'}
                 </h3>
                 <p className="text-[11px] sm:text-xs text-slate-400">
-                  {isLoggedIn ? `Active as ${currentUser.name}` : forgotPasswordMode ? 'Verify email OTP to set new password' : mode === 'LOGIN' ? 'Live server database authentication' : regStep === 'PROFILE' ? 'Tell us a little about yourself to personalise your experience' : regStep === 'OTP' ? 'Enter the 6-digit code received on WhatsApp' : 'Get started with verified WhatsApp authentication'}
+                  {isLoggedIn ? `Active as ${currentUser.name}` : forgotPasswordMode ? 'Verify email OTP to set new password' : mode === 'LOGIN' ? 'Live server database authentication' : regStep === 'OTP' ? 'Enter the 6-digit code received on WhatsApp' : 'Get started with verified WhatsApp authentication'}
                 </p>
               </div>
             </div>
@@ -1058,29 +1401,55 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                 </div>
               )}
 
-              {/* Mode Switcher */}
-              {!forgotPasswordMode && (mode === 'LOGIN' || regStep === 'PHONE') && (
-                <div className="flex bg-slate-100 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => { setMode('LOGIN'); setErrorMsg(null); }}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      mode === 'LOGIN' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setMode('REGISTER'); setErrorMsg(null); }}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      mode === 'REGISTER' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    Register Account
-                  </button>
-                </div>
-              )}
+              {/* 3 Tabs matching Page 17 visual reference: Sign in | Register | Forgot */}
+              <div className="flex items-center gap-2 pb-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('LOGIN');
+                    setForgotPasswordMode(false);
+                    setErrorMsg(null);
+                  }}
+                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                    mode === 'LOGIN' && !forgotPasswordMode
+                      ? 'bg-[#182A3E] text-white shadow-sm'
+                      : 'bg-white text-[#182A3E] border border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('REGISTER');
+                    setForgotPasswordMode(false);
+                    setRegStep('PHONE');
+                    setErrorMsg(null);
+                  }}
+                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                    mode === 'REGISTER' && !forgotPasswordMode
+                      ? 'bg-[#182A3E] text-white shadow-sm'
+                      : 'bg-white text-[#182A3E] border border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  Register
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotPasswordMode(true);
+                    setErrorMsg(null);
+                    setResetSuccessMsg(null);
+                  }}
+                  className={`px-5 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                    forgotPasswordMode
+                      ? 'bg-[#182A3E] text-white shadow-sm'
+                      : 'bg-white text-[#182A3E] border border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  Forgot
+                </button>
+              </div>
 
               {forgotPasswordMode ? (
                 /* Forgot Password Form */
@@ -1094,6 +1463,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       type="button"
                       onClick={() => {
                         setForgotPasswordMode(false);
+                        setMode('LOGIN');
                         setErrorMsg(null);
                         setResetSuccessMsg(null);
                       }}
@@ -1293,7 +1663,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl sm:rounded-full font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <span>{loading ? 'Authenticating...' : 'Sign In to Account'}</span>
                     <ArrowRight className="w-4 h-4" />
@@ -1309,13 +1679,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </span>
                   </div>
 
-                  {/* Single Google Social Button (LinkedIn & Microsoft Removed) */}
+                  {/* Single Google Social Button */}
                   <div className="w-full">
                     <button
                       type="button"
                       disabled={loading || googleLoading}
                       onClick={handleGoogleSignIn}
-                      className="w-full py-2.5 px-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl flex items-center justify-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
+                      className="w-full py-2.5 px-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl sm:rounded-full flex items-center justify-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
                       title="Sign in with Google"
                       aria-label="Sign in with Google"
                     >
@@ -1339,14 +1709,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </form>
               ) : regStep === 'PHONE' ? (
-                /* Step 1: Mobile Number Entry */
-                <form onSubmit={handleSendWhatsAppOtp} className="space-y-3.5">
+                /* Step 1: Registration Credentials & Mobile Number */
+                <form onSubmit={handleSendWhatsAppOtp} className="space-y-3">
                   <div className="bg-emerald-50/90 py-2 px-3 rounded-xl border border-emerald-200/90 text-[11px] text-emerald-950 flex items-start gap-2">
                     <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold">Instant WhatsApp Verification</p>
                       <p className="text-[10.5px] text-emerald-700 leading-relaxed">
-                        Enter your mobile number to receive a secure 6-digit WhatsApp OTP. No email OTP required to register.
+                        Enter your mobile number and credentials to receive a secure 6-digit WhatsApp OTP.
                       </p>
                     </div>
                   </div>
@@ -1356,7 +1726,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       Mobile Number <span className="text-red-500">*</span>
                     </label>
                     <div className="flex rounded-xl border border-slate-300 overflow-hidden focus-within:ring-2 focus-within:ring-amber-500 focus-within:border-amber-500 transition-all">
-                      <span className="bg-slate-100 text-slate-700 font-bold px-3 py-2.5 text-xs flex items-center border-r border-slate-300 shrink-0">
+                      <span className="bg-slate-100 text-slate-700 font-bold px-3 py-2 text-xs flex items-center border-r border-slate-300 shrink-0">
                         +91
                       </span>
                       <input
@@ -1366,14 +1736,83 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         value={phoneInput}
                         onChange={e => setPhoneInput(e.target.value.replace(/[^0-9]/g, ''))}
                         placeholder="e.g. +91 98490 12345"
-                        className="w-full px-3 py-2.5 text-xs focus:outline-none text-slate-900 font-medium"
+                        className="w-full px-3 py-2 text-xs focus:outline-none text-slate-900 font-medium"
                         required
                         autoFocus
                       />
                     </div>
-                    <span className="text-[10px] text-slate-500 mt-1 block">
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">
                       We'll send your verification code via WhatsApp to this number.
                     </span>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                      Account Email <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        value={emailInput}
+                        onChange={e => setEmailInput(e.target.value)}
+                        placeholder="e.g. suresh@example.com"
+                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
+                        required
+                      />
+                      <Mail className="w-4 h-4 text-slate-400 absolute right-3 top-2" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                        Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={passwordInput}
+                          onChange={e => setPasswordInput(e.target.value)}
+                          placeholder="Min 6 chars"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-8"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
+                        Confirm Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPasswordInput}
+                          onChange={e => setConfirmPasswordInput(e.target.value)}
+                          placeholder="Repeat password"
+                          className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 pr-8 ${
+                            confirmPasswordInput && confirmPasswordInput !== passwordInput
+                              ? 'border-red-400 focus:ring-red-400 bg-red-50/40 text-red-900'
+                              : 'border-slate-300 focus:ring-amber-500'
+                          }`}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <p className="text-[10px] text-slate-500 text-center leading-tight">
@@ -1406,8 +1845,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
                   <button
                     type="submit"
-                    disabled={loading || phoneInput.replace(/[^0-9]/g, '').length !== 10}
-                    className="w-full py-2.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
+                    disabled={loading || phoneInput.replace(/[^0-9]/g, '').length !== 10 || !emailInput.trim() || passwordInput.length < 6}
+                    className="w-full py-2.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl sm:rounded-full font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
                   >
                     <MessageSquare className="w-4 h-4 text-white" />
                     <span>{loading ? 'Sending WhatsApp Code...' : 'Get WhatsApp OTP'}</span>
@@ -1415,7 +1854,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   </button>
 
                   {/* Social Divider */}
-                  <div className="relative my-3 text-center">
+                  <div className="relative my-2 text-center">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-slate-200" />
                     </div>
@@ -1429,7 +1868,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     type="button"
                     disabled={loading || googleLoading}
                     onClick={handleGoogleSignIn}
-                    className="w-full py-2.5 px-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl flex items-center justify-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
+                    className="w-full py-2.5 px-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl sm:rounded-full flex items-center justify-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
                   >
                     <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -1440,7 +1879,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <span>Continue with Google</span>
                   </button>
                 </form>
-              ) : regStep === 'OTP' ? (
+              ) : (
                 /* Step 2: 6-Digit WhatsApp OTP Verification */
                 <form onSubmit={handleVerifyWhatsAppOtp} className="space-y-4">
                   <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-3 text-center space-y-1">
@@ -1511,354 +1950,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <button
                     type="submit"
                     disabled={loading || otpDigits.join('').length !== 6}
-                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
+                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl sm:rounded-full font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
                   >
                     <CheckCircle2 className="w-4 h-4 text-white" />
                     <span>{loading ? 'Verifying Code...' : 'Verify Code & Set Up Profile'}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </form>
-              ) : (
-                /* Step 3: Registration Profile Completion Modal */
-                <form onSubmit={handleCompleteRegistration} className="space-y-3.5">
-                  {/* Verified Mobile Pill */}
-                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <div>
-                        <span className="font-bold text-emerald-950 font-mono">{verifiedPhone}</span>
-                        <span className="ml-2 text-[10px] text-emerald-700 font-semibold bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200">
-                          ✓ Verified via WhatsApp
-                        </span>
-                      </div>
-                    </div>
-                    <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                  </div>
-
-                  {/* Profile Completion Header */}
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 font-display">
-                      Complete Your Property Studio Profile
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Tell us a little about yourself to personalise your Property Studio experience.
-                    </p>
-                  </div>
-
-                  {/* Full Name & Account Role */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Full Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={nameInput}
-                        onChange={e => setNameInput(e.target.value)}
-                        placeholder="e.g. Suresh Chandra"
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Account Role <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={roleInput}
-                        onChange={e => setRoleInput(e.target.value as any)}
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                      >
-                        <option value="PROPERTY_SEEKER">Property Seeker (Buyer / Investor)</option>
-                        <option value="CHANNEL_PARTNER">Channel Partner / Agent</option>
-                        <option value="LANDOWNER">Landowner / Asset Holder</option>
-                        <option value="RESELLER">Reseller</option>
-                        <option value="RERA_AGENT">RERA Registered Agent</option>
-                        <option value="REAL_ESTATE_MEDIA">Real Estate Media Professional</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Email Address */}
-                  <div>
-                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                      Email Address <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="email"
-                        value={emailInput}
-                        onChange={e => setEmailInput(e.target.value)}
-                        placeholder="e.g. suresh@example.com"
-                        className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        required
-                      />
-                    </div>
-                    <span className="text-[10px] text-slate-500 mt-1 block">
-                      Used for official notifications, transaction receipts, and workspace security.
-                    </span>
-                  </div>
-
-                  {/* Password & Confirm Password */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Choose Password <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={passwordInput}
-                          onChange={e => setPasswordInput(e.target.value)}
-                          placeholder="Minimum 6 characters"
-                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-9"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Confirm Password <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={confirmPasswordInput}
-                          onChange={e => setConfirmPasswordInput(e.target.value)}
-                          placeholder="Re-enter password"
-                          className={`w-full px-3 py-2 text-xs border rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 pr-9 ${
-                            confirmPasswordInput && confirmPasswordInput !== passwordInput
-                              ? 'border-red-400 focus:ring-red-400 bg-red-50/40 text-red-900'
-                              : 'border-slate-300 focus:ring-amber-500'
-                          }`}
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                      {confirmPasswordInput && confirmPasswordInput !== passwordInput && (
-                        <span className="text-[10px] text-red-500 mt-0.5 block font-medium">Passwords do not match</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Profession, Organization & Company */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <div>
-                      <label htmlFor="signup-profession" className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Profession *
-                      </label>
-                      <input
-                        id="signup-profession"
-                        name="profession"
-                        type="text"
-                        autoComplete="off"
-                        value={professionInput}
-                        onChange={e => setProfessionInput(e.target.value)}
-                        placeholder="Enter your profession"
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Organization
-                      </label>
-                      <input
-                        type="text"
-                        value={organizationInput}
-                        onChange={e => setOrganizationInput(e.target.value)}
-                        placeholder="e.g. Firm name"
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                        Company / Practice
-                      </label>
-                      <input
-                        type="text"
-                        value={companyInput}
-                        onChange={e => setCompanyInput(e.target.value)}
-                        placeholder="e.g. Studio Co."
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Interests and Topics */}
-                  <div>
-                    <label className="block font-bold text-slate-700 text-[11px] sm:text-xs mb-1">
-                      Interests & Specialisations
-                    </label>
-                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 border border-slate-200 rounded-xl bg-slate-50/50">
-                      {[
-                        'Kokapet & Neopolis',
-                        'High-Rise Construction',
-                        'Legal Due Diligence & RERA',
-                        'Rental Yield & ROI',
-                        'Luxury Villas & Communities',
-                        'Architecture & Vaastu',
-                        'Interior Design & Renovation',
-                        'Land & Plotting Guidelines',
-                        'Price Trends & Market Updates',
-                        'Home Loans & Taxation'
-                      ].map(topic => {
-                        const isSelected = selectedInterests.includes(topic);
-                        return (
-                          <button
-                            key={topic}
-                            type="button"
-                            onClick={() => {
-                              setSelectedInterests(prev =>
-                                isSelected ? prev.filter(t => t !== topic) : [...prev, topic]
-                              );
-                            }}
-                            className={`px-2 py-0.5 rounded-md text-[10.5px] font-medium border transition-all flex items-center gap-1 cursor-pointer ${
-                              isSelected
-                                ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-xs'
-                                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100'
-                            }`}
-                          >
-                            <span>{isSelected ? '✓' : '+'}</span>
-                            <span>{topic}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Location (Fixed Territory) */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block font-bold text-slate-700 text-[11px] sm:text-xs">
-                        Location / Territory
-                      </label>
-                      <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-semibold border border-amber-200/60 inline-flex items-center gap-1">
-                        <Lock className="w-2.5 h-2.5 text-amber-700" />
-                        Fixed Territory
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <MapPin className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        id="signup-location"
-                        name="location"
-                        type="text"
-                        value={DEFAULT_SIGNUP_LOCATION}
-                        readOnly
-                        aria-readonly="true"
-                        tabIndex={-1}
-                        className="w-full pl-9 pr-8 py-2 text-xs border border-slate-200 rounded-lg sm:rounded-xl bg-slate-100/90 text-slate-800 font-semibold cursor-not-allowed select-none focus:outline-none"
-                      />
-                    </div>
-                    <span className="text-[10px] text-slate-500 mt-1 block font-medium">
-                      Platform location is fixed to Hyderabad, Telangana, India.
-                    </span>
-                  </div>
-
-                  {/* Profile Avatar Selection */}
-                  <div className="space-y-2 pt-1 border-t border-slate-100">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                        Select Avatar or Upload Photo
-                      </label>
-                      <span className="text-[10px] text-slate-400">12 character avatars or custom upload</span>
-                    </div>
-
-                    <div className="grid grid-cols-6 sm:grid-cols-6 gap-1.5 max-h-28 overflow-y-auto p-1 bg-slate-50 rounded-xl border border-slate-200/80">
-                      {ANIME_AVATARS.map((option) => {
-                        const isSelected = selectedAvatar === option.url;
-                        return (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedAvatar(option.url);
-                              setCustomAvatar(null);
-                            }}
-                            title={option.name}
-                            className={`relative p-0.5 rounded-lg border text-center transition-all cursor-pointer ${
-                              isSelected
-                                ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-400 shadow-sm'
-                                : 'border-slate-200 hover:border-slate-300 bg-white'
-                            }`}
-                          >
-                            <img
-                              src={option.url}
-                              alt={option.name}
-                              className="w-full aspect-square rounded-md object-cover"
-                              loading="lazy"
-                            />
-                            {isSelected && (
-                              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-[8px] font-black shadow-xs">
-                                ✓
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Custom Avatar Upload Button */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={avatarInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
-                        className="hidden"
-                        onChange={handleCustomAvatarSelect}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => avatarInputRef.current?.click()}
-                        disabled={avatarUploading || loading}
-                        className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-lg border border-slate-300 flex items-center justify-center gap-1.5 text-[11px] transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-                      >
-                        <Camera className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{avatarUploading ? 'Processing Photo...' : customAvatar ? 'Photo Uploaded (Click to Change)' : 'Upload Custom Photo (Max 2MB)'}</span>
-                      </button>
-                      {customAvatar && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCustomAvatar(null);
-                            setSelectedAvatar(ANIME_AVATARS[0].url);
-                          }}
-                          className="px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg border border-red-200 cursor-pointer"
-                          title="Revert to default avatar"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm mt-2"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-white" />
-                    <span>{loading ? 'Creating Your Account...' : 'Complete Registration & Launch Platform'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </form>
