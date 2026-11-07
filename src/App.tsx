@@ -41,6 +41,7 @@ const ProfileControlPanelModal = React.lazy(() => import('./components/common/Pr
 const WalletModal = React.lazy(() => import('./components/modals/WalletModal').then(m => ({ default: m.WalletModal })));
 const AgentOnboardModal = React.lazy(() => import('./components/modals/AgentOnboardModal').then(m => ({ default: m.AgentOnboardModal })));
 const ClaimProjectModal = React.lazy(() => import('./components/modals/ClaimProjectModal').then(m => ({ default: m.ClaimProjectModal })));
+const ProfessionalDirectoryView = React.lazy(() => import('./components/network/ProfessionalDirectoryView').then(m => ({ default: m.ProfessionalDirectoryView })));
 
 const ViewSkeleton: React.FC = () => (
   <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse space-y-6">
@@ -165,6 +166,9 @@ const AppContent: React.FC = () => {
         superadmin: 'ADMIN',
         developer: 'DEVELOPER',
         professional: 'PROFESSIONAL',
+        professionals: 'PROFESSIONALS',
+        network: 'PROFESSIONALS',
+        directory: 'PROFESSIONALS',
         property_admin: 'PROPERTY_ADMIN',
         studio: 'STUDIO',
         contact: 'CONTACT',
@@ -254,7 +258,10 @@ const AppContent: React.FC = () => {
           <React.Suspense fallback={<ViewSkeleton />}>
             {activeView === 'HOME' && <UserDashboard initialMode="FEED" />}
             {activeView === 'DASHBOARD' && <UserDashboard initialMode="WORKSPACE" />}
-            {activeView === 'COMMUNITY' && <UserDashboard initialMode="FEED" />}
+            {activeView === 'COMMUNITY' && <CommunityForumView onOpenLoginModal={() => setLoginModalOpen(true)} />}
+            {activeView === 'PROFESSIONALS' && (
+              <ProfessionalDirectoryView onOpenSupport={() => setSupportOpen(true)} />
+            )}
             {activeView === 'PROPERTIES' && (
               <PropertyList onClaimProject={(prop) => setClaimTarget(prop)} />
             )}
@@ -448,6 +455,10 @@ const AppContent: React.FC = () => {
 
         {activeView === 'REVIEWS' && (
           <ReviewRatingView onOpenLoginModal={() => setLoginModalOpen(true)} />
+        )}
+
+        {activeView === 'PROFESSIONALS' && (
+          <ProfessionalDirectoryView onOpenSupport={() => setSupportOpen(true)} />
         )}
 
         {activeView === 'REQUIREMENT' && (

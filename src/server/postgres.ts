@@ -72,7 +72,7 @@ export function getPostgresPool(): pg.Pool | null {
 
   if (!poolInstance) {
     const isSslDisabled = process.env.PGSSLMODE === 'disable' || process.env.DATABASE_URL.includes('sslmode=disable');
-    const serverlessPool = process.env.VERCEL ? 1 : 10;
+    const serverlessPool = process.env.VERCEL ? 5 : 10;
     poolInstance = new Pool({
       connectionString: process.env.DATABASE_URL,
       max: Number(process.env.PG_POOL_MAX) || serverlessPool,
@@ -568,6 +568,7 @@ export async function queryPostgres<T extends pg.QueryResultRow = any>(
 
 
 let additiveSchemaEnsured = false;
+let schemaReconciliationPromise: Promise<void> | null = null;
 
 /**
  * Reconciles non-destructive additive columns and tables on PostgreSQL.
@@ -575,32 +576,40 @@ let additiveSchemaEnsured = false;
  */
 export async function ensurePostgresAdditiveSchema(): Promise<void> {
   if (additiveSchemaEnsured || !process.env.DATABASE_URL) return;
-  const pool = getPostgresPool();
-  if (!pool) return;
+  if (schemaReconciliationPromise) return schemaReconciliationPromise;
 
-  try {
-    const client = await pool.connect();
+  schemaReconciliationPromise = (async () => {
+    const pool = getPostgresPool();
+    if (!pool) return;
+
     try {
-      // 1. Critical user columns first to guarantee immediate availability
-      await client.query(`
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS town_city TEXT;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS profession TEXT;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities TEXT DEFAULT '[]';
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT DEFAULT '[]';
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted SMALLINT DEFAULT 0;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted_reason TEXT;
-        ALTER TABLE communities ADD COLUMN IF NOT EXISTS visibility VARCHAR(32) DEFAULT 'PUBLIC';
-      `);
-      // 2. Full additive schema statements
-      await client.query(POSTGRES_ADDITIVE_SQL);
-      await client.query("UPDATE media_items SET status = 'DELETED' WHERE id IN ('media_01', 'media_02')");
-      additiveSchemaEnsured = true;
-      console.log('[PostgreSQL Schema] Additive schema reconciled successfully.');
+      const client = await pool.connect();
+      try {
+        // 1. Critical user columns first to guarantee immediate availability
+        await client.query(`
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS town_city TEXT;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS profession TEXT;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities TEXT DEFAULT '[]';
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT DEFAULT '[]';
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted SMALLINT DEFAULT 0;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted_reason TEXT;
+          ALTER TABLE communities ADD COLUMN IF NOT EXISTS visibility VARCHAR(32) DEFAULT 'PUBLIC';
+        `);
+        // 2. Full additive schema statements
+        await client.query(POSTGRES_ADDITIVE_SQL);
+        await client.query("UPDATE media_items SET status = 'DELETED' WHERE id IN ('media_01', 'media_02')");
+        additiveSchemaEnsured = true;
+        console.log('[PostgreSQL Schema] Additive schema reconciled successfully.');
+      } finally {
+        client.release();
+      }
+    } catch (err: any) {
+      console.error('[PostgreSQL Schema] Warning reconciling additive schema:', redactDatabaseError(err?.message || 'schema error'));
     } finally {
-      client.release();
+      schemaReconciliationPromise = null;
     }
-  } catch (err: any) {
-    console.error('[PostgreSQL Schema] Warning reconciling additive schema:', redactDatabaseError(err?.message || 'schema error'));
-  }
+  })();
+
+  return schemaReconciliationPromise;
 }

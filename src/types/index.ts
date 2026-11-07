@@ -557,6 +557,7 @@ export type ViewType =
   | 'ADMIN'
   | 'DEVELOPER'
   | 'PROFESSIONAL'
+  | 'PROFESSIONALS'
   | 'PROPERTY_ADMIN'
   | 'STUDIO'
   | 'CONTACT'

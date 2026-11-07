@@ -1806,6 +1806,11 @@ function sqliteInitDatabase(): void {
       attempt_count INTEGER DEFAULT 0,
       is_verified INTEGER DEFAULT 0,
       consumed_at TEXT,
+      delivery_status TEXT DEFAULT 'SUBMITTED',
+      provider_message_id TEXT,
+      failure_reason TEXT,
+      delivered_at TEXT,
+      updated_at TEXT,
       created_at TEXT NOT NULL
     );
 

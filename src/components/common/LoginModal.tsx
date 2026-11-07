@@ -78,6 +78,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [otpDeliveryStatus, setOtpDeliveryStatus] = useState<'SENDING' | 'SUBMITTED' | 'SENT' | 'DELIVERED' | 'FAILED'>('SUBMITTED');
   const [otpMessageId, setOtpMessageId] = useState<string | null>(null);
   const [deliveryFailureReason, setDeliveryFailureReason] = useState<string | null>(null);
+  const [isCarrierDelayed, setIsCarrierDelayed] = useState(false);
   const pollingRef = useRef<any>(null);
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [verifiedPhone, setVerifiedPhone] = useState('');
@@ -665,6 +666,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               setOtpDeliveryStatus('FAILED');
               setDeliveryFailureReason(stData.failureReason || 'Provider reported delivery failure.');
               stopDeliveryPolling();
+            }
+            if (stData.isCarrierPending) {
+              setIsCarrierDelayed(true);
             }
           }
         } catch {
@@ -1506,7 +1510,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         </div>
                       ) : (
                         <p className="text-amber-800">
-                          Dispatched to WhatsApp network for <strong className="font-mono text-amber-950">{verifiedPhone}</strong>. Waiting for carrier delivery confirmation...
+                          {isCarrierDelayed
+                            ? <>Carrier network is taking a moment to deliver to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>. Check your WhatsApp app or request a new code if not received.</>
+                            : <>Dispatched to WhatsApp network for <strong className="font-mono text-amber-950">{verifiedPhone}</strong>. Waiting for carrier delivery confirmation...</>
+                          }
                         </p>
                       )}
                     </div>

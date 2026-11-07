@@ -183,7 +183,7 @@ import {
 } from './src/server/emailNotificationService.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
 import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
-import { getOtpDeliveryStatus, processGupshupWebhookEvent } from './src/server/otpDeliveryTracker.ts';
+import { getOtpDeliveryStatus, getAsyncOtpDeliveryStatus, processGupshupWebhookEvent } from './src/server/otpDeliveryTracker.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
@@ -1266,13 +1266,18 @@ app.get('/api/auth/phone-otp-status', async (req: Request, res: Response): Promi
     res.status(400).json({ error: 'Valid phone number or message ID is required' });
     return;
   }
-  const record = getOtpDeliveryStatus(messageId || phone || '');
+  const record = await getAsyncOtpDeliveryStatus(messageId || phone || '');
+  const now = Date.now();
+  const queuedAt = record?.queuedAt || now;
+  const elapsedSeconds = Math.max(0, Math.floor((now - queuedAt) / 1000));
   res.json({
     ok: true,
     status: record?.status || 'SUBMITTED',
     messageId: record?.providerMessageId || messageId || null,
     deliveredAt: record?.deliveredAt || null,
-    failureReason: record?.failureReason || null
+    failureReason: record?.failureReason || null,
+    elapsedSeconds,
+    isCarrierPending: (record?.status || 'SUBMITTED') === 'SUBMITTED' && elapsedSeconds > 15
   });
 });
 

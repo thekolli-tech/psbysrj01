@@ -277,7 +277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       case 'DEVELOPERS':
       case 'CHANNEL_PARTNERS':
       case 'RERA_PROFESSIONALS':
-        setActiveView('REVIEWS');
+        setActiveView('PROFESSIONALS');
         break;
       case 'REAL_ESTATE_MEDIA':
         setActiveView('MEDIA');
@@ -542,7 +542,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
 
-    const interval = setInterval(syncAuthoritativeFeed, 3000);
+    const interval = setInterval(syncAuthoritativeFeed, 30000);
 
     const handleFocusSync = () => {
       if (document.visibilityState === 'visible') {
@@ -678,19 +678,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [marketTrends] = useState<MicroMarketTrend[]>(MICRO_MARKET_TRENDS);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Track global scroll progress (0 to 1) for the smooth image-to-logo morphing animation
+  // Track global scroll progress (0 to 1) throttled via requestAnimationFrame
   const [scrollProgress, setScrollProgress] = useState<number>(0);
 
   useEffect(() => {
+    let ticking = false;
+    let lastProgress = 0;
+
     const handleScroll = () => {
-      const scrollY = window.scrollY || document.documentElement.scrollTop;
-      // Progress over first 280px of scrolling
-      const progress = Math.min(1, Math.max(0, scrollY / 280));
-      setScrollProgress(progress);
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const scrollY = window.scrollY || document.documentElement.scrollTop;
+          const progress = Math.min(1, Math.max(0, scrollY / 280));
+          if (Math.abs(progress - lastProgress) >= 0.05 || progress === 0 || progress === 1) {
+            lastProgress = progress;
+            setScrollProgress(progress);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 

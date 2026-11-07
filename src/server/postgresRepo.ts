@@ -87,7 +87,6 @@ function mapUserRow(row: any): DbUser {
 // ==============================================================================
 
 export async function pgFindUserByEmail(email: string): Promise<DbUser | null> {
-  await ensurePostgresAdditiveSchema();
   if (!email) return null;
   const res = await queryPostgres(
     'SELECT * FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
@@ -295,7 +294,6 @@ export async function pgCompleteUserProfile(
     isVerified?: number;
   }
 ): Promise<DbUser | null> {
-  await ensurePostgresAdditiveSchema();
   const sets: string[] = [];
   const values: Array<any> = [];
   let paramIdx = 1;
@@ -915,7 +913,6 @@ export async function pgIsTargetVerified(
 }
 
 export async function pgPhoneTaken(phone: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   const national = indianNationalDigits(phone);
   if (!national) return false;
   const taken = await queryPostgres(
@@ -2617,7 +2614,6 @@ export async function pgEnsureInitialCommunities(): Promise<void> {
 }
 
 export async function pgGetAllCommunities(status?: string, currentUserId?: string): Promise<DbCommunity[]> {
-  await ensurePostgresAdditiveSchema();
   let query = 'SELECT * FROM communities';
   const params: any[] = [];
   if (status) {
@@ -2688,7 +2684,6 @@ export async function pgGetAllCommunities(status?: string, currentUserId?: strin
 }
 
 export async function pgGetCommunityById(id: string, currentUserId?: string): Promise<DbCommunity | null> {
-  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres('SELECT * FROM communities WHERE id = $1', [id]);
   if (res.rows.length === 0) return null;
   const c = res.rows[0];
@@ -2743,7 +2738,6 @@ export async function pgCreateCommunity(community: {
   rules?: string;
   status?: string;
 }): Promise<DbCommunity> {
-  await ensurePostgresAdditiveSchema();
   const id = `comm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const slug = community.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + `-${Date.now().toString().slice(-4)}`;
   const now = new Date().toISOString();
@@ -2798,7 +2792,6 @@ export async function pgUpdateCommunity(id: string, updates: {
   visibility?: 'PUBLIC' | 'PRIVATE';
   rules?: string;
 }): Promise<DbCommunity | null> {
-  await ensurePostgresAdditiveSchema();
   const existing = await pgGetCommunityById(id);
   if (!existing) return null;
   const now = new Date().toISOString();
@@ -2855,7 +2848,6 @@ export async function pgRecountCommunityMembers(communityId: string): Promise<vo
 }
 
 export async function pgJoinCommunity(communityId: string, userId: string): Promise<{ status: 'ACTIVE' | 'PENDING'; message: string }> {
-  await ensurePostgresAdditiveSchema();
   const comm = await pgGetCommunityById(communityId);
   if (!comm) throw new Error('Community not found');
   const now = new Date().toISOString();
@@ -2899,7 +2891,6 @@ export async function pgJoinCommunity(communityId: string, userId: string): Prom
 }
 
 export async function pgLeaveCommunity(communityId: string, userId: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   const comm = await pgGetCommunityById(communityId);
   if (!comm) return false;
   if (comm.created_by_id === userId) {
@@ -2911,7 +2902,6 @@ export async function pgLeaveCommunity(communityId: string, userId: string): Pro
 }
 
 export async function pgGetCommunityMembership(communityId: string, userId: string): Promise<{ isMember: boolean; status?: 'ACTIVE' | 'PENDING' | 'REJECTED'; role?: 'CREATOR' | 'MODERATOR' | 'MEMBER' }> {
-  await ensurePostgresAdditiveSchema();
   const comm = await pgGetCommunityById(communityId);
   if (comm?.created_by_id === userId) {
     return { isMember: true, status: 'ACTIVE', role: 'CREATOR' };
@@ -2927,7 +2917,6 @@ export async function pgGetCommunityMembership(communityId: string, userId: stri
 }
 
 export async function pgListCommunityMembers(communityId: string, statusFilter?: string): Promise<DbCommunityMember[]> {
-  await ensurePostgresAdditiveSchema();
   let query = `
     SELECT cm.id, cm.community_id, cm.user_id, cm.role, cm.status, cm.created_at, cm.updated_at,
            u.name as user_name, u.email as user_email, u.avatar as user_avatar, u.profession as user_profession, u.role as user_role
@@ -2959,7 +2948,6 @@ export async function pgListCommunityMembers(communityId: string, statusFilter?:
 }
 
 export async function pgUpdateCommunityMemberStatus(communityId: string, userId: string, newStatus: 'ACTIVE' | 'REJECTED'): Promise<DbCommunityMember | null> {
-  await ensurePostgresAdditiveSchema();
   const now = new Date().toISOString();
   await queryPostgres('UPDATE community_members SET status = $1, updated_at = $2 WHERE community_id = $3 AND user_id = $4', [newStatus, now, communityId, userId]);
   await pgRecountCommunityMembers(communityId);
@@ -2968,7 +2956,6 @@ export async function pgUpdateCommunityMemberStatus(communityId: string, userId:
 }
 
 export async function pgUpdateCommunityMemberRole(communityId: string, userId: string, newRole: 'MODERATOR' | 'MEMBER'): Promise<DbCommunityMember | null> {
-  await ensurePostgresAdditiveSchema();
   const now = new Date().toISOString();
   await queryPostgres('UPDATE community_members SET role = $1, updated_at = $2 WHERE community_id = $3 AND user_id = $4', [newRole, now, communityId, userId]);
   const members = await pgListCommunityMembers(communityId);
@@ -2976,14 +2963,12 @@ export async function pgUpdateCommunityMemberRole(communityId: string, userId: s
 }
 
 export async function pgRemoveCommunityMember(communityId: string, userId: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres('DELETE FROM community_members WHERE community_id = $1 AND user_id = $2', [communityId, userId]);
   await pgRecountCommunityMembers(communityId);
   return true;
 }
 
 export async function pgGetUserJoinedCommunities(userId: string): Promise<DbCommunity[]> {
-  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres(`
     SELECT c.*, cm.role as membership_role, cm.status as membership_status
     FROM communities c
@@ -3015,7 +3000,6 @@ export async function pgGetUserJoinedCommunities(userId: string): Promise<DbComm
 }
 
 export async function pgCanUserViewCommunityPosts(communityId: string, userId?: string, userRole?: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   const comm = await pgGetCommunityById(communityId);
   if (!comm) return false;
   if (comm.visibility !== 'PRIVATE') return true;
@@ -3027,7 +3011,6 @@ export async function pgCanUserViewCommunityPosts(communityId: string, userId?: 
 }
 
 export async function pgCanUserPostInCommunity(communityId: string, userId: string, userRole?: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   const comm = await pgGetCommunityById(communityId);
   if (!comm) return false;
   if (userRole === 'SUPER_ADMIN' || userRole === 'DEVELOPER') return true;
@@ -3038,7 +3021,6 @@ export async function pgCanUserPostInCommunity(communityId: string, userId: stri
 }
 
 export async function pgToggleDiscussionRepost(postId: string, userId: string, userName?: string, note?: string): Promise<{ reposted: boolean; count: number }> {
-  await ensurePostgresAdditiveSchema();
   const postRes = await queryPostgres('SELECT id FROM community_posts WHERE id = $1', [postId]);
   if (postRes.rows.length === 0) throw new Error('Post not found');
 
@@ -3062,7 +3044,6 @@ export async function pgToggleDiscussionRepost(postId: string, userId: string, u
 }
 
 export async function pgGetUserDiscussionReposts(userId: string): Promise<DbUserDiscussionRepostItem[]> {
-  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres(`
     SELECT r.id as repost_id, r.post_id, r.note, r.created_at as reposted_at,
            p.title, p.content, p.topic, p.author_id, p.author_name, p.author_role,
@@ -3100,7 +3081,6 @@ export async function pgUpdateCommunityStatus(
   status: 'APPROVED' | 'REJECTED',
   reason?: string
 ): Promise<DbCommunity | null> {
-  await ensurePostgresAdditiveSchema();
   const now = new Date().toISOString();
   await queryPostgres(`
     UPDATE communities 
@@ -3111,7 +3091,6 @@ export async function pgUpdateCommunityStatus(
 }
 
 export async function pgDeleteCommunity(id: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres('DELETE FROM communities WHERE id = $1', [id]);
   return true;
 }
@@ -3211,7 +3190,6 @@ export async function pgGetAllMedia(params?: {
   contentType?: string;
   broadcastStatus?: string;
 }): Promise<DbMediaItem[]> {
-  await ensurePostgresAdditiveSchema();
   let query = "SELECT * FROM media_items WHERE 1=1 AND id NOT IN ('media_01', 'media_02') AND status != 'DELETED'";
   const args: any[] = [];
   let idx = 1;
@@ -3263,7 +3241,6 @@ export async function pgGetAllMedia(params?: {
 }
 
 export async function pgGetMediaById(id: string): Promise<DbMediaItem | null> {
-  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres('SELECT * FROM media_items WHERE id = $1', [id]);
   if (res.rows.length === 0) {
     const fallback = DEFAULT_MEDIA_ITEMS.find(m => m.id === id);
@@ -3304,7 +3281,6 @@ export async function pgCreateMedia(item: {
   provider_video_id?: string;
   content_type?: string;
 }): Promise<string> {
-  await ensurePostgresAdditiveSchema();
   const id = "media_" + Date.now() + "_" + crypto.randomBytes(3).toString('hex');
   const now = new Date().toISOString();
   await queryPostgres(
@@ -3352,7 +3328,6 @@ export async function pgUpdateMedia(
   id: string,
   updates: Record<string, any>
 ): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   const fields = [];
   const args = [];
   let idx = 1;
@@ -3371,20 +3346,17 @@ export async function pgUpdateMedia(
 }
 
 export async function pgDeleteMedia(id: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres('DELETE FROM media_items WHERE id = $1', [id]);
   return true;
 }
 
 export async function pgPublishMedia(id: string, published: boolean): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   const status = published ? 'PUBLISHED' : 'DRAFT';
   await queryPostgres("UPDATE media_items SET status = $1, updated_at = NOW() WHERE id = $2", [status, id]);
   return true;
 }
 
 export async function pgArchiveMedia(id: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres("UPDATE media_items SET status = 'ARCHIVED', updated_at = NOW() WHERE id = $1", [id]);
   return true;
 }
@@ -3402,7 +3374,6 @@ export async function pgCreateUploadIntentRecord(intent: {
   created_at?: string;
   updated_at?: string;
 }): Promise<void> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres(
     `INSERT INTO media_upload_intents (
       id, user_id, storage_key, storage_provider, expected_mime_type,
@@ -3425,7 +3396,6 @@ export async function pgCreateUploadIntentRecord(intent: {
 }
 
 export async function pgGetUploadIntentById(id: string): Promise<any | null> {
-  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres(
     `SELECT * FROM media_upload_intents WHERE id = $1`,
     [id]
@@ -3453,7 +3423,6 @@ export async function pgUpdateUploadIntentStatus(
   status: 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
   completedAt?: string
 ): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   if (completedAt) {
     await queryPostgres(
       `UPDATE media_upload_intents SET status = $1, completed_at = $2, updated_at = NOW() WHERE id = $3`,
@@ -3473,7 +3442,6 @@ export async function pgUpdateUploadIntentStorageKey(
   storageKey: string,
   storageProvider: string = 'GOOGLE_DRIVE'
 ): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres(
     `UPDATE media_upload_intents SET storage_key = $1, storage_provider = $2, updated_at = NOW() WHERE id = $3`,
     [storageKey, storageProvider, id]
@@ -3494,7 +3462,6 @@ export async function pgCreateStudioBroadcast(item: {
   provider?: string;
   created_by?: string;
 }): Promise<string> {
-  await ensurePostgresAdditiveSchema();
   const id = item.id || ("sb_" + Date.now() + "_" + crypto.randomBytes(3).toString('hex'));
   const scheduledAt = item.scheduled_at ? new Date(item.scheduled_at).toISOString() : new Date().toISOString();
   await queryPostgres(
@@ -3517,14 +3484,12 @@ export async function pgCreateStudioBroadcast(item: {
 }
 
 export async function pgGetStudioBroadcastById(id: string): Promise<DbStudioBroadcast | null> {
-  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres('SELECT * FROM studio_broadcasts WHERE id = $1', [id]);
   if (res.rows.length === 0) return null;
   return mapPgStudioBroadcast(res.rows[0]);
 }
 
 export async function pgGetAllStudioBroadcasts(includeArchived = false): Promise<DbStudioBroadcast[]> {
-  await ensurePostgresAdditiveSchema();
   const sql = includeArchived
     ? 'SELECT * FROM studio_broadcasts ORDER BY scheduled_at DESC'
     : "SELECT * FROM studio_broadcasts WHERE status != 'ARCHIVED' ORDER BY scheduled_at DESC";
@@ -3533,7 +3498,6 @@ export async function pgGetAllStudioBroadcasts(includeArchived = false): Promise
 }
 
 export async function pgUpdateStudioBroadcast(id: string, updates: Record<string, any>): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   const fields = [];
   const args = [];
   let idx = 1;
@@ -3552,31 +3516,26 @@ export async function pgUpdateStudioBroadcast(id: string, updates: Record<string
 }
 
 export async function pgStartStudioBroadcast(id: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres("UPDATE studio_broadcasts SET status = 'LIVE', started_at = NOW(), updated_at = NOW() WHERE id = $1", [id]);
   return true;
 }
 
 export async function pgEndStudioBroadcast(id: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres("UPDATE studio_broadcasts SET status = 'ENDED', ended_at = NOW(), updated_at = NOW() WHERE id = $1", [id]);
   return true;
 }
 
 export async function pgPublishBroadcastReplay(id: string, replayUrl: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres("UPDATE studio_broadcasts SET status = 'REPLAY_AVAILABLE', replay_url = $1, updated_at = NOW() WHERE id = $2", [replayUrl, id]);
   return true;
 }
 
 export async function pgDeleteStudioBroadcast(id: string): Promise<boolean> {
-  await ensurePostgresAdditiveSchema();
   await queryPostgres('DELETE FROM studio_broadcasts WHERE id = $1', [id]);
   return true;
 }
 
 export async function pgToggleMediaLike(mediaId: string, userId: string): Promise<{ liked: boolean; count: number }> {
-  await ensurePostgresAdditiveSchema();
   const existingItem = await pgGetMediaById(mediaId);
   if (existingItem) {
     try {
@@ -3607,7 +3566,6 @@ export async function pgToggleMediaLike(mediaId: string, userId: string): Promis
 }
 
 export async function pgSetMediaReaction(mediaId: string, userId: string, reactionType = 'THUMBS_UP'): Promise<{ reaction: string | null; count: number }> {
-  await ensurePostgresAdditiveSchema();
   const existing = await queryPostgres('SELECT id, reaction_type FROM media_reactions WHERE media_id = $1 AND user_id = $2', [mediaId, userId]);
   let reaction: string | null = null;
   if (existing.rows.length > 0) {
@@ -3640,7 +3598,6 @@ export async function pgAddMediaComment(comment: {
   authorAvatar?: string;
   text: string;
 }): Promise<DbMediaComment> {
-  await ensurePostgresAdditiveSchema();
   const id = `mcomm_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const now = new Date().toISOString();
   await queryPostgres(`
@@ -3671,7 +3628,6 @@ export async function pgAddMediaComment(comment: {
 }
 
 export async function pgGetMediaComments(mediaId: string): Promise<DbMediaComment[]> {
-  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres('SELECT * FROM media_comments WHERE media_id = $1 ORDER BY created_at DESC', [mediaId]);
   return res.rows.map((c: any) => ({
     id: c.id,
@@ -3687,7 +3643,6 @@ export async function pgGetMediaComments(mediaId: string): Promise<DbMediaCommen
 }
 
 export async function pgRecordMediaShare(mediaId: string, userId?: string, platform = 'DIRECT_LINK'): Promise<{ count: number }> {
-  await ensurePostgresAdditiveSchema();
   const id = `mshare_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   await queryPostgres(`
     INSERT INTO media_shares (id, media_id, user_id, platform, created_at)
@@ -3703,7 +3658,6 @@ export async function pgToggleMediaRepost(
   userName?: string,
   note?: string
 ): Promise<{ reposted: boolean; count: number }> {
-  await ensurePostgresAdditiveSchema();
   const existingItem = await pgGetMediaById(mediaId);
   if (existingItem) {
     try {
@@ -3734,7 +3688,6 @@ export async function pgToggleMediaRepost(
 }
 
 export async function pgGetMediaEngagement(mediaId: string, userId?: string): Promise<DbMediaEngagement> {
-  await ensurePostgresAdditiveSchema();
   const likesRes = await queryPostgres('SELECT COUNT(*) as count FROM media_likes WHERE media_id = $1', [mediaId]);
   const reactsRes = await queryPostgres('SELECT COUNT(*) as count FROM media_reactions WHERE media_id = $1', [mediaId]);
   const commsRes = await queryPostgres('SELECT COUNT(*) as count FROM media_comments WHERE media_id = $1', [mediaId]);
@@ -3768,7 +3721,6 @@ export async function pgGetMediaEngagement(mediaId: string, userId?: string): Pr
 }
 
 export async function pgGetUserReposts(userId: string): Promise<DbUserRepostItem[]> {
-  await ensurePostgresAdditiveSchema();
   const res = await queryPostgres(`
     SELECT r.id as repost_id, r.media_id, r.note, r.created_at as reposted_at,
            m.title, m.summary, m.video_url, m.thumbnail, m.type, m.duration, m.views, m.author_name as original_creator
