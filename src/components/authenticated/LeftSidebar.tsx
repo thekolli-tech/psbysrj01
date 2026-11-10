@@ -84,11 +84,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   return (
     <aside className="w-60 xl:w-64 shrink-0 flex flex-col gap-3 text-xs select-none">
-      {/* Universal 2-Section Nav Card Matching PDF Pages 7-25 */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-xs">
+      {/* Universal 2-Section Nav Card Matching Luxury Conglomerate Identity */}
+      <div className="bg-[#121214] border border-[#333337] rounded-3xl p-3 shadow-lg">
         {/* SECTION 1: FEEDS */}
         <div className="mb-3">
-          <div className="px-3 py-1 text-[11px] font-bold font-display uppercase tracking-wider text-slate-400">
+          <div className="px-3 py-1 text-[11px] font-bold font-mono uppercase tracking-wider text-[#C5A880]">
             FEEDS
           </div>
           <nav className="space-y-0.5 mt-1">
@@ -102,12 +102,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   onClick={() => onSelectNav(item.key)}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-all duration-150 cursor-pointer ${
                     active
-                      ? 'bg-[#FEF8EC] text-[#B49029] font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-[#1B1B1E] text-[#C5A880] font-bold border border-[#C5A880]/30 shadow-xs'
+                      : 'text-[#A5A5AA] hover:text-white hover:bg-[#1B1B1E]'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${active ? 'text-[#B49029]' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 ${active ? 'text-[#C5A880]' : 'text-[#A5A5AA]'}`} />
                     <span className="truncate">{item.label}</span>
                   </div>
                 </button>
@@ -117,8 +117,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         </div>
 
         {/* SECTION 2: WORKSPACES */}
-        <div className="pt-2 border-t border-slate-100">
-          <div className="px-3 py-1 text-[11px] font-bold font-display uppercase tracking-wider text-slate-400">
+        <div className="pt-2 border-t border-[#333337]">
+          <div className="px-3 py-1 text-[11px] font-bold font-mono uppercase tracking-wider text-[#C5A880]">
             WORKSPACES
           </div>
           <nav className="space-y-0.5 mt-1">
@@ -132,12 +132,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   onClick={() => onSelectNav(item.key)}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-all duration-150 cursor-pointer ${
                     active
-                      ? 'bg-[#FEF8EC] text-[#B49029] font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-[#1B1B1E] text-[#C5A880] font-bold border border-[#C5A880]/30 shadow-xs'
+                      : 'text-[#A5A5AA] hover:text-white hover:bg-[#1B1B1E]'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${active ? 'text-[#B49029]' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 ${active ? 'text-[#C5A880]' : 'text-[#A5A5AA]'}`} />
                     <span className="truncate">{item.label}</span>
                   </div>
                 </button>
@@ -152,9 +152,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         <button
           type="button"
           onClick={onStartCommunity}
-          className="w-full py-2.5 px-3 rounded-2xl border border-dashed border-[#B49029] bg-amber-50/40 hover:bg-amber-50 text-[#182A3E] font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer text-xs"
+          className="w-full py-2.5 px-3 rounded-2xl border border-dashed border-[#C5A880]/70 bg-[#121214] hover:bg-[#1B1B1E] text-white font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer text-xs"
         >
-          <Plus className="w-4 h-4 text-[#B49029]" />
+          <Plus className="w-4 h-4 text-[#C5A880]" />
           <span>Ask Question / Create Post</span>
         </button>
       )}

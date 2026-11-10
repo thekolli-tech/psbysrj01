@@ -7,7 +7,7 @@ import {
   Handshake,
   Layers,
   Zap,
-  CheckCircle,
+  CheckCircle2,
   Rocket,
   Search,
   Tv,
@@ -19,21 +19,20 @@ import {
   Building,
   Landmark,
   ShieldCheck,
-  Eye,
-  ArrowRight,
-  ExternalLink,
-  ChevronRight,
-  Share2,
-  Lock,
-  Clock,
   Briefcase,
   TrendingUp,
-  MapPin,
-  Check
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ArrowRight,
+  User,
+  Target,
+  Eye,
+  Info
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
 
-interface AboutUsViewProps {
+export interface AboutUsViewProps {
   onNavigateHome?: () => void;
   onNavigateCommunity?: () => void;
   onNavigateProperties?: () => void;
@@ -41,277 +40,66 @@ interface AboutUsViewProps {
   onOpenLogin?: () => void;
 }
 
-interface DnaItem {
-  id: string;
+export type AboutNodeId = 'founder' | 'pillars' | 'stakeholders' | 'vision' | 'mission' | 'core-dna';
+
+interface NodeDefinition {
+  id: AboutNodeId;
   number: string;
   title: string;
-  headline: string;
-  explanation: string;
-  details: string;
+  subtitle: string;
+  angleDeg: number; // 180 to 0 across semicircle
   icon: React.ComponentType<{ className?: string }>;
-  badge: string;
-  isReserved?: boolean;
 }
 
-// The 6 I's of PropTech Architecture
-const SIX_IS: DnaItem[] = [
+const NODES: NodeDefinition[] = [
   {
-    id: 'interactive',
+    id: 'founder',
     number: '01',
-    title: 'Interactive',
-    headline: 'Visual & Participatory Discovery',
-    explanation:
-      'Explore property layouts, architectural elevations, and project walkthroughs through interactive smart displays, digital touch screens, and live presentations.',
-    details:
-      'Replacing static brochures with dynamic touch-enabled visual navigation, virtual site walks, and live Q&A sessions.',
-    icon: Sparkles,
-    badge: 'Experience'
+    title: 'Founder Profile',
+    subtitle: 'Leadership & Philosophy',
+    angleDeg: 180,
+    icon: User
   },
   {
-    id: 'informative',
+    id: 'pillars',
     number: '02',
-    title: 'Informative',
-    headline: 'Unfiltered Truth Over Marketing Hype',
-    explanation:
-      'Real information, validated RERA filings, unedited cost schedules, and deep micro-market ground reports rather than promotional hype.',
-    details:
-      'Granular data on carpet area ratios, municipal water feasibility, traffic patterns, corpus funds, and actual registry timelines.',
-    icon: FileCheck,
-    badge: 'Integrity'
+    title: 'Five Integrated Pillars',
+    subtitle: 'PropTech Architecture',
+    angleDeg: 144,
+    icon: Building
   },
   {
-    id: 'intelligent',
+    id: 'stakeholders',
     number: '03',
-    title: 'Intelligent',
-    headline: 'Data-Driven Telemetry & Analytics',
-    explanation:
-      'Deep market analytics, price trends, comparative infrastructure indices, and intelligent property insights powered by local telemetry.',
-    details:
-      'Tracking micro-market price movements across Kokapet, Neopolis, Financial District, Tellapur, and emerging high-growth corridors.',
-    icon: Cpu,
-    badge: 'Analytics'
+    title: 'Who We Serve',
+    subtitle: '14 Ecosystem Stakeholders',
+    angleDeg: 108,
+    icon: Users
   },
   {
-    id: 'interview',
+    id: 'vision',
     number: '04',
-    title: 'Interview',
-    headline: 'Direct Voice of Industry Stakeholders',
-    explanation:
-      'Studio debriefs, podcasts, video interviews, and town-hall discussions with developers, structural engineers, urban planners, and residents.',
-    details:
-      'Unscripted conversations addressing regulatory approvals, construction quality standards, and real-world livability challenges.',
-    icon: Mic,
-    badge: 'Media'
+    title: 'Vision',
+    subtitle: 'Global PropTech Benchmark',
+    angleDeg: 72,
+    icon: Eye
   },
   {
-    id: 'intermediary',
+    id: 'mission',
     number: '05',
-    title: 'Intermediary',
-    headline: 'Neutral, Conflict-Free Institutional Bridge',
-    explanation:
-      'A trusted, neutral bridge connecting property seekers, landowners, developers, and certified professionals with total privacy and zero spam.',
-    details:
-      'Eliminating cold-call brokers and aggressive spam through cryptographically masked, opt-in lead transactions and verified matchmaking.',
-    icon: Handshake,
-    badge: 'Trust'
+    title: 'Mission',
+    subtitle: 'Unified Media Architecture',
+    angleDeg: 36,
+    icon: Target
   },
   {
-    id: 'integrated',
+    id: 'core-dna',
     number: '06',
-    title: 'All Integrated',
-    headline: 'Complete PropTech Ecosystem Under One Roof',
-    explanation:
-      'Bringing the entire real estate journey together: search aggregator, broadcast video, unedited community forums, reviews, and network.',
-    details:
-      'A unified platform where seekers discover, verify, discuss, and transact with absolute transparency and institutional rigor.',
-    icon: Layers,
-    badge: 'Ecosystem'
+    title: "6 I's & 6 R's – Core DNA",
+    subtitle: 'Institutional Principles',
+    angleDeg: 0,
+    icon: Sparkles
   }
-];
-
-// The 6 R's of Institutional Trust (3 supplied principles + 3 reserved flexible slots)
-const SIX_RS: DnaItem[] = [
-  {
-    id: 'real-time',
-    number: '01',
-    title: 'Real-time',
-    headline: 'Live Field Telemetry & Ground Updates',
-    explanation:
-      'Live field reports, verified drone inspections, and the latest property updates directly from the ground across Hyderabad corridors.',
-    details:
-      'Real-time construction progress tracking, concrete slab milestones, and instantaneous municipal approval alerts.',
-    icon: Zap,
-    badge: 'Active Tenet',
-    isReserved: false
-  },
-  {
-    id: 'realistic',
-    number: '02',
-    title: 'Realistic',
-    headline: 'Balanced, Objective Evaluation',
-    explanation:
-      'Honest, objective insights highlighting both advantages and disadvantages for every project and locality without bias.',
-    details:
-      'Transparent disclosure of high-tension lines, access road widths, groundwater depth, traffic bottlenecks, and delivery risks.',
-    icon: CheckCircle,
-    badge: 'Active Tenet',
-    isReserved: false
-  },
-  {
-    id: 'revolutionary',
-    number: '03',
-    title: 'Revolutionary',
-    headline: 'Re-engineering Property Discovery',
-    explanation:
-      'Re-engineering the way people discover, verify, and evaluate properties through encrypted data masking and spam-free matchmaking.',
-    details:
-      'Pioneering a privacy-first lead architecture where seeker phone numbers and personal emails are never shared without explicit permission.',
-    icon: Rocket,
-    badge: 'Active Tenet',
-    isReserved: false
-  },
-  {
-    id: 'reserved-04',
-    number: '04',
-    title: 'Tenet IV',
-    headline: 'Institutional Operational Principle',
-    explanation:
-      'Reserved operational tenet in the 6 R governance charter. Flexible architectural slot reserved for ongoing institutional expansion.',
-    details:
-      'Configured within Property Studio’s modular governance matrix for upcoming policy and compliance standards.',
-    icon: ShieldCheck,
-    badge: 'Charter Reserved',
-    isReserved: true
-  },
-  {
-    id: 'reserved-05',
-    number: '05',
-    title: 'Tenet V',
-    headline: 'Stakeholder Governance Principle',
-    explanation:
-      'Reserved operational tenet in the 6 R governance charter. Flexible architectural slot reserved for ongoing institutional expansion.',
-    details:
-      'Designed to adapt to new regulatory disclosures, green building standards, and verified performance benchmarks.',
-    icon: Award,
-    badge: 'Charter Reserved',
-    isReserved: true
-  },
-  {
-    id: 'reserved-06',
-    number: '06',
-    title: 'Tenet VI',
-    headline: 'Ecosystem Performance Principle',
-    explanation:
-      'Reserved operational tenet in the 6 R governance charter. Flexible architectural slot reserved for ongoing institutional expansion.',
-    details:
-      'Reserved slot for future ecosystem indices and community accreditation mechanisms.',
-    icon: Users,
-    badge: 'Charter Reserved',
-    isReserved: true
-  }
-];
-
-// The Five Pillars
-const FIVE_PILLARS = [
-  {
-    id: 'aggregator',
-    number: '01',
-    title: 'Aggregator Engine',
-    subtitle: 'Property Search & Discovery',
-    description:
-      'Comprehensive property search and discovery across Residential, Commercial, Farm Land, and Plotting ventures with zero duplicate clutter.',
-    icon: Search,
-    highlight: 'Zero Duplicate Clutter'
-  },
-  {
-    id: 'broadcast',
-    number: '02',
-    title: 'Broadcast Network',
-    subtitle: 'Studio Media & Video Telemetry',
-    description:
-      'Studio presentations, stakeholder interviews, video walkthroughs, and ground reports capturing real construction realities.',
-    icon: Tv,
-    highlight: 'Visual Ground Intelligence'
-  },
-  {
-    id: 'community',
-    number: '03',
-    title: 'Community Hive',
-    subtitle: 'Discussion & Project Q&A',
-    description:
-      'Authentic community discussions, questions, and project-level ground realities answered by verified local residents and industry peers.',
-    icon: MessageSquare,
-    highlight: 'Uncensored Peer Insight'
-  },
-  {
-    id: 'performance',
-    number: '04',
-    title: 'Performance Index',
-    subtitle: 'Ratings, Audits & Verification',
-    description:
-      'Developer and professional verification, compliance audits, and multi-dimensional rating insights assessing delivery integrity.',
-    icon: Award,
-    highlight: 'Audited Track Records'
-  },
-  {
-    id: 'townhall',
-    number: '05',
-    title: 'Town Hall Arena',
-    subtitle: 'Live Summits & Networking',
-    description:
-      'Live virtual summits, podcast debriefs, and stakeholder networking connecting seekers, builders, and experts with encrypted privacy.',
-    icon: Radio,
-    highlight: 'Collaborative Governance'
-  }
-];
-
-// Target Audiences (Who We Serve)
-const STAKEHOLDERS = [
-  {
-    title: 'Property Seekers & Investors',
-    description:
-      'Discover verified properties and submit confidential requirements with full phone and email privacy protection against spam.',
-    icon: Compass,
-    tag: 'Buyers & HNIs'
-  },
-  {
-    title: 'Developers & Builders',
-    description:
-      'Connect with genuine, high-intent buyers, manage official project community hubs, and publish audited construction updates.',
-    icon: Building,
-    tag: 'Builders & Promoters'
-  },
-  {
-    title: 'Verified Agents & Channel Partners',
-    description:
-      'Build verifiable RERA credibility, access qualified buyer requirements, and collaborate with transparent commission protection.',
-    icon: Briefcase,
-    tag: 'RERA Professionals'
-  },
-  {
-    title: 'Landowners',
-    description:
-      'Connect directly with verified developers and property professionals for joint ventures, plotting, and structured development.',
-    icon: Landmark,
-    tag: 'Land & Estates'
-  },
-  {
-    title: 'Real Estate Media & Industry Experts',
-    description:
-      'Share market insights, host studio debriefs, and participate in authoritative industry debates across Hyderabad corridors.',
-    icon: Users,
-    tag: 'Media & Analysts'
-  }
-];
-
-// 6C Philosophy Steps
-const PHILOSOPHY_STEPS = [
-  { step: '01', word: 'Content', desc: 'Authoritative ground intelligence & verified data' },
-  { step: '02', word: 'Courage', desc: 'Disclosing objective truths and regulatory compliance' },
-  { step: '03', word: 'Confidence', desc: 'Empowering seekers with transparent analysis' },
-  { step: '04', word: 'Communication', desc: 'Clear broadcast media and unscripted dialogues' },
-  { step: '05', word: 'Contacts', desc: 'Connecting seekers, builders & verified stakeholders' },
-  { step: '06', word: 'Convincing', desc: 'Facilitating informed, trust-backed decisions' }
 ];
 
 export const AboutUsView: React.FC<AboutUsViewProps> = ({
@@ -321,768 +109,823 @@ export const AboutUsView: React.FC<AboutUsViewProps> = ({
   onOpenRegister,
   onOpenLogin
 }) => {
-  // Semicircle framework selection: '6I' or '6R'
-  const [activeDnaFramework, setActiveDnaFramework] = useState<'6I' | '6R'>('6I');
-  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState<number>(0);
-  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const [activeNode, setActiveNode] = useState<AboutNodeId | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<AboutNodeId | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Set page title for SEO & accessibility
+  // Keyboard navigation & accessibility
+  useEffect(() => {
+    setMounted(true);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveNode(null);
+      } else if (activeNode !== null) {
+        const currentIndex = NODES.findIndex(n => n.id === activeNode);
+        if (e.key === 'ArrowRight' && currentIndex < NODES.length - 1) {
+          setActiveNode(NODES[currentIndex + 1].id);
+        } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
+          setActiveNode(NODES[currentIndex - 1].id);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeNode]);
+
+  // Set document title
   useEffect(() => {
     const originalTitle = document.title;
     document.title = 'About Us | Property Studio — Real Estate Media Network & PropTech Platform';
-
-    // Meta description update
-    let metaDesc = document.querySelector('meta[name="description"]');
-    const originalDesc = metaDesc ? metaDesc.getAttribute('content') : '';
-    if (!metaDesc) {
-      metaDesc = document.createElement('meta');
-      metaDesc.setAttribute('name', 'description');
-      document.head.appendChild(metaDesc);
-    }
-    metaDesc.setAttribute(
-      'content',
-      'Learn about Property Studio, the integrated Real Estate Media Network & Community PropTech Platform founded by Swamy Reddy Javidi. Explore our Core DNA (6 I’s & 6 R’s), five pillars, and vision.'
-    );
-
     return () => {
       document.title = originalTitle;
-      if (metaDesc && originalDesc) {
-        metaDesc.setAttribute('content', originalDesc);
-      }
     };
   }, []);
 
-  const currentDataset = activeDnaFramework === '6I' ? SIX_IS : SIX_RS;
-  const activeSegment = currentDataset[selectedSegmentIndex] || currentDataset[0];
+  const activeNodeData = NODES.find(n => n.id === activeNode);
+  const activeNodeIndex = activeNodeData ? NODES.indexOf(activeNodeData) : -1;
 
-  // Semicircle parameters
-  // Angles span from 180° (left) to 0° (right) across 6 items
-  // Segment i angle: 180 - i * (180 / 5) -> i=0: 180°, i=1: 144°, i=2: 108°, i=3: 72°, i=4: 36°, i=5: 0°
-  const centerX = 320;
-  const centerY = 300;
-  const arcRadius = 220;
+  // Semicircle calculation (viewBox 0 0 900 560)
+  // Center is at (450, 480) with radius 340
+  const cx = 450;
+  const cy = 480;
+  const r = 340;
 
-  const getCoordinates = (index: number) => {
-    const total = 6;
-    // Angle in degrees: 180 to 0
-    const angleDeg = 180 - (index * 180) / (total - 1);
-    const angleRad = (angleDeg * Math.PI) / 180;
-    const x = centerX + arcRadius * Math.cos(angleRad);
-    const y = centerY - arcRadius * Math.sin(angleRad);
-    return { x, y, angleDeg };
+  const getNodeCoords = (angleDeg: number) => {
+    const rad = (angleDeg * Math.PI) / 180;
+    const x = cx + r * Math.cos(rad);
+    const y = cy - r * Math.sin(rad);
+    return { x, y };
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 antialiased pb-20 select-none">
-      {/* 1. HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#182A3E] via-[#1E344D] to-[#182A3E] text-white pt-16 pb-20 md:pt-24 md:pb-28">
-        {/* Subtle decorative glow & grid */}
-        <div className="absolute inset-0 bg-[radial-gradient(#B49029_1px,transparent_1px)] [background-size:32px_32px] opacity-10 pointer-events-none" />
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-[#B49029]/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="relative min-h-[calc(100vh-4rem)] w-full bg-[#0A0A0B] text-white flex flex-col items-center justify-center px-4 py-8 sm:py-12 overflow-hidden select-none">
+      {/* Subtle luxury ambient lighting */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-[#C5A880]/5 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[900px] h-[300px] bg-[#121214] rounded-t-full border-t border-[#333337]/40 pointer-events-none" />
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          {/* Institutional Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-[#B49029]/40 text-[#ECC968] text-xs font-mono font-bold tracking-wider uppercase mb-6 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-[#B49029] animate-pulse" />
-            <span>PropTech Ecosystem · Broadcast Network · Market Intelligence</span>
-          </div>
-
-          {/* Main Headline */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-display tracking-tight text-white leading-tight max-w-4xl mx-auto">
-            Beyond Property Discovery.{' '}
-            <span className="bg-gradient-to-r from-[#ECC968] via-[#B49029] to-[#ECC968] bg-clip-text text-transparent">
-              Towards Absolute Market Intelligence.
-            </span>
-          </h1>
-
-          {/* Supporting Text */}
-          <p className="mt-6 text-sm sm:text-base md:text-lg text-slate-300 leading-relaxed max-w-3xl mx-auto font-normal">
-            Property Studio is an integrated Real Estate Media Network and Community PropTech Platform connecting
-            property seekers, developers, landowners, and verified real estate professionals through intelligent discovery,
-            broadcast media, ground telemetry, and verified community engagement.
-          </p>
-
-          {/* CTA Row */}
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
-            <a
-              href="#core-dna"
-              className="px-6 py-3 rounded-xl bg-[#B49029] hover:bg-[#A38122] text-[#182A3E] font-bold text-xs sm:text-sm transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer active:scale-95"
-            >
-              <span>Explore Core DNA (6 I’s & 6 R’s)</span>
-              <ArrowRight className="w-4 h-4" />
-            </a>
-
-            <button
-              type="button"
-              onClick={onNavigateProperties || onNavigateHome}
-              className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/20 font-bold text-xs sm:text-sm backdrop-blur-sm transition-all duration-200 cursor-pointer active:scale-95"
-            >
-              Discover Properties
-            </button>
-
-            {onOpenRegister && (
-              <button
-                type="button"
-                onClick={onOpenRegister}
-                className="px-6 py-3 rounded-xl bg-white text-[#182A3E] hover:bg-slate-100 font-bold text-xs sm:text-sm transition-all duration-200 shadow-md cursor-pointer active:scale-95"
-              >
-                Join Property Studio
-              </button>
-            )}
-          </div>
-
-          {/* Metrics Bar */}
-          <div className="mt-14 pt-8 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto">
-            <div className="p-3 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
-              <div className="text-xl sm:text-2xl font-black font-mono text-[#ECC968]">24+ Yrs</div>
-              <div className="text-[11px] text-slate-300 font-medium mt-0.5">Corporate & Advisory Pedigree</div>
-            </div>
-            <div className="p-3 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
-              <div className="text-xl sm:text-2xl font-black font-mono text-white">5 Pillars</div>
-              <div className="text-[11px] text-slate-300 font-medium mt-0.5">Integrated Architecture</div>
-            </div>
-            <div className="p-3 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
-              <div className="text-xl sm:text-2xl font-black font-mono text-white">14 Roles</div>
-              <div className="text-[11px] text-slate-300 font-medium mt-0.5">Ecosystem Stakeholders</div>
-            </div>
-            <div className="p-3 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
-              <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400">100% Privacy</div>
-              <div className="text-[11px] text-slate-300 font-medium mt-0.5">Encrypted Data Masking</div>
-            </div>
-          </div>
+      {/* Main Semicircle Infographic Container */}
+      <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center">
+        {/* Top Instruction Pill */}
+        <div className="mb-4 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#121214] border border-[#333337] text-xs font-mono text-[#C5A880] shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-[#C5A880] animate-pulse" />
+          <span>Click any of the 6 nodes to explore Property Studio identity</span>
         </div>
-      </section>
 
-      {/* 2. INTERACTIVE CORE DNA – 6 I’s & 6 R’s (MAIN VISUAL HIGHLIGHT) */}
-      <section id="core-dna" className="py-16 md:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B49029]/10 border border-[#B49029]/30 text-[#B49029] text-[11px] font-mono font-bold tracking-widest uppercase mb-3">
-            <span>Visual Highlight · Foundational Framework</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#182A3E] font-display">
-            Interactive Core DNA
-          </h2>
-          <p className="mt-2 text-sm sm:text-base text-slate-600 leading-relaxed">
-            Property Studio is anchored on two foundational strategic frameworks: the{' '}
-            <strong className="text-slate-900">6 I’s of PropTech Architecture</strong> and the{' '}
-            <strong className="text-slate-900">6 R’s of Institutional Trust</strong>.
-            Select any node on the interactive arc to inspect its principles.
-          </p>
+        {/* The Semicircle Infographic Stage */}
+        <div className="relative w-full aspect-[900/540] max-w-[860px]">
+          {/* SVG Canvas for Arcs and Connecting Lines */}
+          <svg
+            viewBox="0 0 900 540"
+            className="w-full h-full overflow-visible"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient id="arcGoldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#C5A880" stopOpacity="0.4" />
+                <stop offset="50%" stopColor="#C5A880" stopOpacity="1" />
+                <stop offset="100%" stopColor="#C5A880" stopOpacity="0.4" />
+              </linearGradient>
+              <linearGradient id="emblemGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#1B1B1E" />
+                <stop offset="100%" stopColor="#121214" />
+              </linearGradient>
+            </defs>
 
-          {/* Framework Toggle Switch */}
-          <div className="mt-6 inline-flex p-1.5 bg-slate-200/80 rounded-2xl border border-slate-300 shadow-inner">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveDnaFramework('6I');
-                setSelectedSegmentIndex(0);
-              }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${
-                activeDnaFramework === '6I'
-                  ? 'bg-[#182A3E] text-white shadow-md'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            {/* Outer Subtle Guide Arc */}
+            <path
+              d={`M ${cx - r - 20} ${cy} A ${r + 20} ${r + 20} 0 0 1 ${cx + r + 20} ${cy}`}
+              fill="none"
+              stroke="#333337"
+              strokeWidth="1"
+              strokeDasharray="4 6"
+              className="opacity-40"
+            />
+
+            {/* Main Primary Semicircular Arc */}
+            <path
+              d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+              fill="none"
+              stroke="url(#arcGoldGrad)"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              className={`transition-all duration-1000 ${
+                mounted ? 'stroke-dasharray-full' : ''
               }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-[#B49029]" />
-              <span>The 6 I’s (Architecture)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveDnaFramework('6R');
-                setSelectedSegmentIndex(0);
-              }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 cursor-pointer ${
-                activeDnaFramework === '6R'
-                  ? 'bg-[#182A3E] text-white shadow-md'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              <span>The 6 R’s (Institutional Trust)</span>
-            </button>
-          </div>
-        </div>
+            />
 
-        {/* Large Semicircular Interactive Card */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl overflow-hidden p-6 sm:p-8 lg:p-10 relative">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Left/Top: Semicircular Graphic Arc */}
-            <div className="lg:col-span-7 flex flex-col items-center justify-center relative select-none">
-              <div className="w-full max-w-[580px] aspect-[640/360] relative flex items-center justify-center">
-                <svg
-                  viewBox="0 0 640 360"
-                  className="w-full h-full overflow-visible"
-                  aria-label="Core DNA Semicircle Visualization"
-                >
-                  <defs>
-                    {/* Glowing gold arc gradient */}
-                    <linearGradient id="arcGlow" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#182A3E" />
-                      <stop offset="50%" stopColor="#B49029" />
-                      <stop offset="100%" stopColor="#182A3E" />
-                    </linearGradient>
-                    <filter id="shadowFilter" x="-20%" y="-20%" width="140%" height="140%">
-                      <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#182A3E" floodOpacity="0.15" />
-                    </filter>
-                  </defs>
+            {/* Inner Concentric Glow Arc */}
+            <path
+              d={`M ${cx - 200} ${cy} A 200 200 0 0 1 ${cx + 200} ${cy}`}
+              fill="none"
+              stroke="#C5A880"
+              strokeWidth="1"
+              strokeOpacity="0.25"
+            />
 
-                  {/* Outer subtle guide arc */}
-                  <path
-                    d="M 100 300 A 220 220 0 0 1 540 300"
-                    fill="none"
-                    stroke="#E2E8F0"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                  />
-
-                  {/* Active glowing arc */}
-                  <path
-                    d="M 100 300 A 220 220 0 0 1 540 300"
-                    fill="none"
-                    stroke="url(#arcGlow)"
-                    strokeWidth="4"
-                    strokeDasharray="4 8"
-                    className="opacity-70"
-                  />
-
-                  {/* Inner baseline chord */}
-                  <line
-                    x1="100"
-                    y1="300"
-                    x2="540"
-                    y2="300"
-                    stroke="#CBD5E1"
-                    strokeWidth="1.5"
-                    strokeDasharray="3 3"
-                  />
-
-                  {/* Radial rays connecting center to each node */}
-                  {currentDataset.map((_, index) => {
-                    const { x, y } = getCoordinates(index);
-                    const isSelected = selectedSegmentIndex === index;
-                    return (
-                      <line
-                        key={`ray-${index}`}
-                        x1={centerX}
-                        y1={centerY}
-                        x2={x}
-                        y2={y}
-                        stroke={isSelected ? '#B49029' : '#E2E8F0'}
-                        strokeWidth={isSelected ? '2.5' : '1'}
-                        strokeDasharray={isSelected ? 'none' : '2 4'}
-                        className="transition-all duration-300"
-                      />
-                    );
-                  })}
-
-                  {/* Central Property Studio Emblem */}
-                  <g transform={`translate(${centerX}, ${centerY})`}>
-                    {/* Pulsing halo */}
-                    <circle r="46" fill="#FEF8EC" stroke="#B49029" strokeWidth="2" opacity="0.8" />
-                    <circle r="38" fill="#182A3E" filter="url(#shadowFilter)" />
-                    {/* Emblem text / crest */}
-                    <text
-                      textAnchor="middle"
-                      dy="-4"
-                      fill="#ECC968"
-                      fontSize="14"
-                      fontWeight="900"
-                      fontFamily="monospace"
-                      letterSpacing="2"
-                    >
-                      PS
-                    </text>
-                    <text
-                      textAnchor="middle"
-                      dy="12"
-                      fill="#FFFFFF"
-                      fontSize="7"
-                      fontWeight="700"
-                      fontFamily="sans-serif"
-                      letterSpacing="1"
-                    >
-                      CORE DNA
-                    </text>
-                  </g>
-
-                  {/* 6 Interactive Semicircular Nodes */}
-                  {currentDataset.map((item, index) => {
-                    const { x, y } = getCoordinates(index);
-                    const isSelected = selectedSegmentIndex === index;
-
-                    return (
-                      <g
-                        key={item.id}
-                        transform={`translate(${x}, ${y})`}
-                        onClick={() => setSelectedSegmentIndex(index)}
-                        className="cursor-pointer group"
-                      >
-                        {/* Outer selection ring */}
-                        {isSelected && (
-                          <circle
-                            r="28"
-                            fill="none"
-                            stroke="#B49029"
-                            strokeWidth="3"
-                            className="animate-pulse"
-                          />
-                        )}
-
-                        {/* Node circle */}
-                        <circle
-                          r="22"
-                          fill={isSelected ? '#182A3E' : '#FFFFFF'}
-                          stroke={isSelected ? '#B49029' : '#CBD5E1'}
-                          strokeWidth={isSelected ? '3' : '2'}
-                          filter="url(#shadowFilter)"
-                          className="transition-all duration-200 group-hover:scale-110"
-                        />
-
-                        {/* Number text */}
-                        <text
-                          textAnchor="middle"
-                          dy="4"
-                          fill={isSelected ? '#ECC968' : '#182A3E'}
-                          fontSize="11"
-                          fontWeight="800"
-                          fontFamily="monospace"
-                        >
-                          {item.number}
-                        </text>
-
-                        {/* Label underneath node */}
-                        <text
-                          textAnchor="middle"
-                          dy={y > 280 ? '38' : '-28'}
-                          fill={isSelected ? '#B49029' : '#475569'}
-                          fontSize="11"
-                          fontWeight={isSelected ? '800' : '600'}
-                          className="transition-colors duration-200"
-                        >
-                          {item.title}
-                        </text>
-                      </g>
-                    );
-                  })}
-                </svg>
-              </div>
-
-              {/* Mobile / Quick Pill Selector */}
-              <div className="mt-4 flex flex-wrap justify-center gap-1.5 sm:gap-2">
-                {currentDataset.map((item, index) => {
-                  const isSelected = selectedSegmentIndex === index;
-                  return (
-                    <button
-                      key={`btn-${item.id}`}
-                      type="button"
-                      onClick={() => setSelectedSegmentIndex(index)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        isSelected
-                          ? 'bg-[#182A3E] text-[#ECC968] shadow-sm ring-2 ring-[#B49029]'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      <span className="font-mono text-[10px] opacity-75">{item.number}</span>
-                      <span>{item.title}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Right/Bottom: Selected Principle Information Panel */}
-            <div className="lg:col-span-5 bg-gradient-to-br from-slate-50 to-amber-50/30 rounded-2xl p-6 sm:p-7 border border-slate-200 shadow-sm relative">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#182A3E] text-white">
-                  {activeDnaFramework === '6I' ? '6 I’s Architecture' : '6 R’s Tenet'} · Pillar {activeSegment.number}
-                </span>
-
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                    activeSegment.isReserved
-                      ? 'bg-slate-200 text-slate-600'
-                      : 'bg-[#B49029]/15 text-[#8F711C] border border-[#B49029]/30'
-                  }`}
-                >
-                  {activeSegment.badge}
-                </span>
-              </div>
-
-              {/* Icon & Title */}
-              <div className="flex items-center gap-3.5 mb-3">
-                <div className="w-12 h-12 rounded-2xl bg-[#182A3E] text-[#ECC968] flex items-center justify-center shrink-0 shadow-sm">
-                  {React.createElement(activeSegment.icon, { className: 'w-6 h-6' })}
-                </div>
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-[#182A3E] font-display">
-                    {activeSegment.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium">{activeSegment.headline}</p>
-                </div>
-              </div>
-
-              {/* Explanation */}
-              <div className="mt-4 pt-4 border-t border-slate-200/80 space-y-3">
-                <p className="text-sm font-semibold text-slate-800 leading-relaxed">
-                  {activeSegment.explanation}
-                </p>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {activeSegment.details}
-                </p>
-              </div>
-
-              {/* Navigation within DNA */}
-              <div className="mt-6 pt-4 border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-500">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedSegmentIndex(prev => (prev > 0 ? prev - 1 : currentDataset.length - 1))
-                  }
-                  className="font-bold text-[#182A3E] hover:text-[#B49029] transition-colors cursor-pointer"
-                >
-                  ← Previous Node
-                </button>
-                <span className="font-mono text-[11px] font-bold">
-                  {selectedSegmentIndex + 1} of {currentDataset.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedSegmentIndex(prev => (prev < currentDataset.length - 1 ? prev + 1 : 0))
-                  }
-                  className="font-bold text-[#182A3E] hover:text-[#B49029] transition-colors cursor-pointer"
-                >
-                  Next Node →
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. THE FIVE PILLARS OF PROPERTY STUDIO */}
-      <section className="py-16 bg-white border-y border-slate-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-12">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-300 text-slate-700 text-[11px] font-mono font-bold tracking-widest uppercase mb-3">
-              <span>Platform Core Pillars</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#182A3E] font-display">
-              The Five Integrated Pillars
-            </h2>
-            <p className="mt-2 text-sm sm:text-base text-slate-600 leading-relaxed">
-              Property Studio converges media production, search aggregation, community discourse, performance ratings,
-              and live networking into a seamless PropTech platform.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {FIVE_PILLARS.map(pillar => {
-              const Icon = pillar.icon;
+            {/* Connecting Radial Lines from Central Emblem to each Node */}
+            {NODES.map((node) => {
+              const { x, y } = getNodeCoords(node.angleDeg);
+              const isSelected = activeNode === node.id;
+              const isHovered = hoveredNode === node.id;
               return (
-                <div
-                  key={pillar.id}
-                  className="group relative bg-[#F8FAFC] hover:bg-white rounded-2xl p-5 border border-slate-200 hover:border-[#B49029]/60 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#182A3E] group-hover:bg-[#B49029] text-[#ECC968] group-hover:text-white flex items-center justify-center transition-colors duration-200 shadow-2xs">
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <span className="text-[10px] font-mono font-bold text-slate-400 group-hover:text-[#B49029]">
-                        {pillar.number}
-                      </span>
-                    </div>
-
-                    <h3 className="text-base font-bold text-[#182A3E] font-display">
-                      {pillar.title}
-                    </h3>
-                    <p className="text-[11px] font-bold text-[#B49029] mt-0.5 mb-2">
-                      {pillar.subtitle}
-                    </p>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      {pillar.description}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md">
-                      {pillar.highlight}
-                    </span>
-                    <span className="text-slate-300 group-hover:text-[#B49029] transition-colors">→</span>
-                  </div>
-                </div>
+                <line
+                  key={`line-${node.id}`}
+                  x1={cx}
+                  y1={cy}
+                  x2={x}
+                  y2={y}
+                  stroke={isSelected || isHovered ? '#C5A880' : '#333337'}
+                  strokeWidth={isSelected ? '2.5' : isHovered ? '2' : '1.2'}
+                  strokeDasharray={isSelected ? 'none' : '3 4'}
+                  className="transition-all duration-300"
+                />
               );
             })}
-          </div>
-        </div>
-      </section>
+          </svg>
 
-      {/* 4. WHO WE SERVE (TARGET AUDIENCES) */}
-      <section className="py-16 md:py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B49029]/10 border border-[#B49029]/30 text-[#B49029] text-[11px] font-mono font-bold tracking-widest uppercase mb-3">
-            <span>Ecosystem Matrix</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#182A3E] font-display">
-            Who We Serve
-          </h2>
-          <p className="mt-2 text-sm sm:text-base text-slate-600 leading-relaxed">
-            Uniting property seekers, developers, channel partners, landowners, and media into one spam-free ecosystem.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {STAKEHOLDERS.map((item, idx) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={idx}
-                className="bg-white rounded-2xl p-6 border border-slate-200/90 hover:border-slate-300 shadow-xs hover:shadow-md transition-all space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                    {item.tag}
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-slate-900 font-display">
-                  {item.title}
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {item.description}
-                </p>
+          {/* Central Property Studio Core Identity Emblem */}
+          <div
+            className="absolute left-1/2 -translate-x-1/2 bottom-0 translate-y-2 flex flex-col items-center justify-center text-center z-10"
+            style={{ width: '240px', height: '170px' }}
+          >
+            <div className="relative w-36 h-36 rounded-full bg-gradient-to-b from-[#1B1B1E] to-[#121214] border-2 border-[#C5A880] shadow-[0_0_30px_rgba(197,168,128,0.25)] flex flex-col items-center justify-center p-3 text-center transition-all duration-300 hover:border-[#D7B991] hover:scale-105">
+              <div className="w-8 h-8 mb-1 rounded-full bg-[#0A0A0B] border border-[#C5A880]/60 flex items-center justify-center shadow-inner">
+                <Sparkles className="w-4 h-4 text-[#C5A880]" />
               </div>
+              <span className="font-serif font-black text-xs sm:text-sm tracking-wider text-white">
+                PROPERTY STUDIO
+              </span>
+              <span className="font-mono text-[9px] font-bold text-[#C5A880] tracking-widest mt-0.5 uppercase">
+                CORE IDENTITY
+              </span>
+              <span className="text-[8px] text-[#A5A5AA] mt-0.5 font-medium">
+                Six-Node Architecture
+              </span>
+            </div>
+          </div>
+
+          {/* Six Circular Interactive Nodes along the Semicircular Arc */}
+          {NODES.map((node, index) => {
+            const { x, y } = getNodeCoords(node.angleDeg);
+            const leftPct = (x / 900) * 100;
+            const topPct = (y / 540) * 100;
+            const isSelected = activeNode === node.id;
+            const isMuted = activeNode !== null && !isSelected;
+            const Icon = node.icon;
+
+            return (
+              <button
+                key={node.id}
+                type="button"
+                onClick={() => setActiveNode(node.id)}
+                onMouseEnter={() => setHoveredNode(node.id)}
+                onMouseLeave={() => setHoveredNode(null)}
+                aria-label={`Node ${node.number}: ${node.title}`}
+                className={`absolute -translate-x-1/2 -translate-y-1/2 group flex flex-col items-center focus:outline-none transition-all duration-300 cursor-pointer ${
+                  isMuted ? 'opacity-40 scale-90' : 'opacity-100 scale-100'
+                }`}
+                style={{
+                  left: `${leftPct}%`,
+                  top: `${topPct}%`,
+                  zIndex: isSelected ? 30 : 20
+                }}
+              >
+                {/* Node Circular Indicator */}
+                <div
+                  className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
+                    isSelected
+                      ? 'bg-[#C5A880] text-[#0A0A0B] ring-4 ring-[#C5A880]/30 scale-110 shadow-[0_0_25px_rgba(197,168,128,0.6)]'
+                      : 'bg-[#121214] text-[#C5A880] border-2 border-[#333337] group-hover:border-[#C5A880] group-hover:scale-105'
+                  }`}
+                >
+                  <span className="font-mono font-black text-xs sm:text-sm tracking-wider">
+                    {node.number}
+                  </span>
+
+                  {/* Pulsing Highlight Dot for Selected State */}
+                  {isSelected && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-white ring-2 ring-[#C5A880] animate-ping" />
+                  )}
+                </div>
+
+                {/* Node Label Card */}
+                <div
+                  className={`mt-2 px-2.5 py-1 rounded-xl text-center transition-all duration-200 backdrop-blur-sm pointer-events-none max-w-[130px] sm:max-w-[150px] ${
+                    isSelected
+                      ? 'bg-[#1B1B1E] border border-[#C5A880] shadow-md'
+                      : 'bg-[#121214]/90 border border-[#333337]/80 group-hover:border-[#C5A880]/60'
+                  }`}
+                >
+                  <div
+                    className={`font-serif font-bold text-[11px] sm:text-xs leading-tight ${
+                      isSelected ? 'text-[#C5A880]' : 'text-white group-hover:text-[#D7B991]'
+                    }`}
+                  >
+                    {node.title}
+                  </div>
+                  <div className="text-[9px] text-[#A5A5AA] truncate font-medium mt-0.5">
+                    {node.subtitle}
+                  </div>
+                </div>
+              </button>
             );
           })}
+        </div>
+      </div>
 
-          {/* 6th Card: All 14 Roles Standardized */}
-          <div className="bg-gradient-to-br from-[#182A3E] to-[#203750] text-white rounded-2xl p-6 border border-[#B49029]/40 shadow-sm space-y-3 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#ECC968]">
-                  Standardized Taxonomy
+      {/* 
+        ========================================================================
+        INTERACTIVE POPUP MODAL (SEMI-TRANSPARENT BACKDROP RETAINS VISIBLE ARC)
+        ========================================================================
+      */}
+      {activeNode && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setActiveNode(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-[#0A0A0B]/75 backdrop-blur-xs animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`relative w-full bg-[#121214] border border-[#C5A880]/40 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 ${
+              activeNode === 'core-dna' ? 'max-w-4xl' : 'max-w-2xl'
+            }`}
+          >
+            {/* Modal Header Bar with Node Number & Stepper */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#333337] bg-[#1B1B1E]/80">
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 rounded-full bg-[#C5A880] text-[#0A0A0B] font-mono font-black text-xs">
+                  NODE {activeNodeData?.number}
                 </span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              </div>
-              <h3 className="text-base font-bold text-white font-display">
-                14 Certified Platform Roles
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed mt-1">
-                From RERA-certified individual realtors to developers, architects, and working sales professionals, each role has dedicated workspace tools and permission isolation.
-              </p>
-            </div>
-            {onOpenRegister && (
-              <button
-                type="button"
-                onClick={onOpenRegister}
-                className="w-full py-2.5 rounded-xl bg-[#B49029] hover:bg-[#A38122] text-[#182A3E] text-xs font-bold transition-all text-center cursor-pointer"
-              >
-                Register with Your Stakeholder Role →
-              </button>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. VISION & MISSION */}
-      <section className="py-16 bg-slate-100 border-y border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Vision Panel */}
-            <div className="bg-[#182A3E] text-white rounded-3xl p-8 border-2 border-[#B49029]/40 shadow-xl relative overflow-hidden flex flex-col justify-between">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-[#B49029]/10 rounded-full blur-2xl pointer-events-none" />
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#B49029] text-[#182A3E] flex items-center justify-center font-black">
-                    <Eye className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xl font-bold font-display text-white">Our Vision</h3>
-                </div>
-                <blockquote className="text-base sm:text-lg font-medium text-slate-200 leading-relaxed italic border-l-4 border-[#B49029] pl-4 my-4">
-                  &ldquo;To become a global benchmark for trusted, informative and interactive real estate discovery by integrating multiple platforms into one intelligent ecosystem.&rdquo;
-                </blockquote>
-              </div>
-              <p className="text-xs text-slate-400 mt-4 leading-normal">
-                Anchored on absolute transparency, zero promotional misrepresentation, and cryptographic data protection.
-              </p>
-            </div>
-
-            {/* Mission Panel */}
-            <div className="bg-white text-slate-900 rounded-3xl p-8 border border-slate-200 shadow-xl flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#182A3E] text-white flex items-center justify-center font-black">
-                    <Compass className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xl font-bold font-display text-[#182A3E]">Our Mission</h3>
-                </div>
-                <blockquote className="text-base sm:text-lg font-medium text-slate-800 leading-relaxed italic border-l-4 border-[#182A3E] pl-4 my-4">
-                  &ldquo;To unify property search, broadcast media, community discussions, live updates and stakeholder engagement into one seamless platform.&rdquo;
-                </blockquote>
-              </div>
-              <p className="text-xs text-slate-500 mt-4 leading-normal">
-                Eliminating asymmetrical information and replacing cold broker spam with verified, opt-in lead transactions.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. ABOUT THE FOUNDER & CEO */}
-      <section className="py-16 md:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden p-6 sm:p-8 lg:p-12">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-            {/* Left Column: Authentic Founder Image & Credentials */}
-            <div className="lg:col-span-5 flex flex-col items-center">
-              <div className="w-full max-w-sm rounded-2xl bg-gradient-to-b from-amber-50 via-white to-slate-50 p-3.5 border border-amber-300/60 shadow-md">
-                <div className="relative aspect-[4/5] w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shadow-inner flex items-center justify-center">
-                  <img
-                    src="/brand/swamy-reddy-portrait.jpg"
-                    alt="Property Studio Founder & CEO - Swamy Reddy Javidi"
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      // Fallback to founder poster if portrait is unavailable
-                      (e.currentTarget as HTMLImageElement).src = '/brand/property-studio-founder-poster.png';
-                    }}
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 text-white">
-                    <span className="inline-block px-2 py-0.5 bg-[#B49029] text-[#182A3E] font-mono text-[9px] font-black uppercase rounded tracking-wider">
-                      FOUNDER & CEO
-                    </span>
-                    <h4 className="text-base font-bold mt-1">Swamy Reddy Javidi</h4>
-                    <p className="text-[11px] text-slate-300">Property Studio · Sadguna Properties</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Leadership Profile & Corporate Pedigree */}
-            <div className="lg:col-span-7 space-y-5">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B49029]/10 border border-[#B49029]/30 text-[#B49029] text-[11px] font-mono font-bold tracking-widest uppercase mb-2">
-                  <span>Executive Leadership</span>
-                </div>
-                <h3 className="text-2xl sm:text-3xl font-black text-[#182A3E] font-display">
-                  Swamy Reddy Javidi
-                </h3>
-                <p className="text-sm font-bold text-[#B49029]">
-                  Founder & CEO — Property Studio · Real Estate Strategist | PropTech Entrepreneur
-                </p>
+                <span className="text-xs font-mono text-[#A5A5AA]">
+                  {activeNodeIndex + 1} of {NODES.length}
+                </span>
+                <span className="text-xs font-serif font-bold text-white hidden sm:inline">
+                  {activeNodeData?.title}
+                </span>
               </div>
 
-              <p className="text-sm text-slate-700 leading-relaxed">
-                Swamy Reddy Javidi holds a postgraduate <strong>MBA in Marketing</strong> and brings over{' '}
-                <strong>24+ years of corporate experience</strong> across corporate governance, sales distribution, and telecom operations leadership to
-                Property Studio.
-              </p>
-
-              {/* Corporate Track Record */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                <h4 className="text-xs font-bold text-[#182A3E] font-display uppercase tracking-wider">
-                  Corporate Track Record & Scale Operations:
-                </h4>
-                <ul className="text-xs text-slate-600 space-y-1.5 list-disc pl-5">
-                  <li>
-                    <strong>Reliance Jio / Jio Fiber (2014–2023):</strong> Served nearly a decade as JCM / Area Home Lead, steering high-intensity market rollouts across Hyderabad and Warangal.
-                  </li>
-                  <li>
-                    <strong>Tata Teleservices / Tata Docomo (2010–2014):</strong> Zonal Manager directing corporate sales, channel frameworks, and telecommunications expansion.
-                  </li>
-                  <li>
-                    <strong>Idea Cellular Ltd. (2008–2010):</strong> Territory Manager directing micro-market distribution networks and subscriber acquisition.
-                  </li>
-                  <li>
-                    <strong>Hindustan Unilever Ltd. (2004–2008):</strong> Cluster Sales Officer for FMCG distribution, managing high-stakes consumer trade channels.
-                  </li>
-                  <li>
-                    <strong>PepsiCo (2002–2004):</strong> Customer Executive establishing corporate sales distribution in Hyderabad.
-                  </li>
-                </ul>
-              </div>
-
-              <p className="text-sm text-slate-700 leading-relaxed">
-                As founder of <strong>Sadguna Properties</strong>, he directed high-value advisory operations across Hyderabad’s premium residential and commercial sectors. Establishing <strong>Property Studio</strong> represents his forward-looking PropTech vision: moving beyond traditional broker models to build a transparent, multi-stakeholder ecosystem with encrypted data masking, broadcast visual intelligence, and rigorous project compliance audits.
-              </p>
-
-              {/* Founder Philosophy: 6C */}
-              <div className="mt-6 pt-5 border-t border-slate-200">
-                <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#B49029] mb-3">
-                  Foundational Leadership Philosophy (The 6 C’s)
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {PHILOSOPHY_STEPS.map(p => (
-                    <div
-                      key={p.step}
-                      className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-left space-y-1 hover:border-[#B49029]/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-mono font-bold text-[#B49029]">{p.step}.</span>
-                        <span className="text-xs font-bold text-slate-900">{p.word}</span>
-                      </div>
-                      <p className="text-[10px] text-slate-500 leading-tight">{p.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. FINAL CALL TO ACTION */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        <div className="rounded-3xl bg-gradient-to-r from-[#182A3E] via-[#203750] to-[#182A3E] text-white p-8 sm:p-12 text-center border-2 border-[#B49029]/40 shadow-2xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(#B49029_1px,transparent_1px)] [background-size:24px_24px] opacity-15 pointer-events-none" />
-
-          <div className="relative z-10 max-w-2xl mx-auto space-y-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-[#B49029]/40 text-[#ECC968] text-xs font-mono font-bold uppercase tracking-wider">
-              <span>Next Generation PropTech</span>
-            </div>
-
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black font-display text-white">
-              Discover Real Estate Beyond Listings.
-            </h2>
-
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-              Explore a smarter property ecosystem built around information, transparency, interaction, and trust.
-            </p>
-
-            <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={onNavigateCommunity}
-                className="px-5 py-2.5 rounded-xl bg-white text-[#182A3E] font-bold text-xs sm:text-sm hover:bg-slate-100 transition-all shadow-md cursor-pointer active:scale-95"
-              >
-                Explore Communities
-              </button>
-
-              <button
-                type="button"
-                onClick={onNavigateProperties}
-                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/30 font-bold text-xs sm:text-sm transition-all cursor-pointer active:scale-95"
-              >
-                Discover Properties
-              </button>
-
-              {onOpenRegister && (
+              <div className="flex items-center gap-2">
+                {/* Previous Node */}
                 <button
                   type="button"
-                  onClick={onOpenRegister}
-                  className="px-5 py-2.5 rounded-xl bg-[#B49029] hover:bg-[#A38122] text-[#182A3E] font-bold text-xs sm:text-sm transition-all shadow-md cursor-pointer active:scale-95"
+                  disabled={activeNodeIndex <= 0}
+                  onClick={() => {
+                    if (activeNodeIndex > 0) {
+                      setActiveNode(NODES[activeNodeIndex - 1].id);
+                    }
+                  }}
+                  className="p-1.5 rounded-xl text-[#A5A5AA] hover:text-white hover:bg-[#121214] border border-transparent hover:border-[#333337] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  title="Previous Node"
                 >
-                  Join Property Studio
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
+
+                {/* Next Node */}
+                <button
+                  type="button"
+                  disabled={activeNodeIndex >= NODES.length - 1}
+                  onClick={() => {
+                    if (activeNodeIndex < NODES.length - 1) {
+                      setActiveNode(NODES[activeNodeIndex + 1].id);
+                    }
+                  }}
+                  className="p-1.5 rounded-xl text-[#A5A5AA] hover:text-white hover:bg-[#121214] border border-transparent hover:border-[#333337] disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  title="Next Node"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setActiveNode(null)}
+                  className="p-1.5 rounded-xl text-[#A5A5AA] hover:text-white hover:bg-[#121214] border border-transparent hover:border-[#333337] cursor-pointer ml-2"
+                  aria-label="Close popup"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="p-6 sm:p-8 overflow-y-auto space-y-6">
+              {/* NODE 01: FOUNDER PROFILE */}
+              {activeNode === 'founder' && (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 pb-6 border-b border-[#333337]">
+                    <img
+                      src="/brand/swamy-reddy-portrait.jpg"
+                      alt="Swamy Reddy Javidi"
+                      className="w-28 h-36 sm:w-32 sm:h-40 rounded-2xl object-cover border-2 border-[#C5A880]/60 shadow-xl shrink-0"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/brand/property-studio-hero.jpg';
+                      }}
+                    />
+                    <div className="space-y-2 text-center sm:text-left">
+                      <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#1B1B1E] border border-[#C5A880]/40 text-[#C5A880] text-[10px] font-mono font-bold uppercase tracking-wider">
+                        Founder & CEO – Property Studio
+                      </div>
+                      <h2 className="text-2xl sm:text-3xl font-serif font-black text-white">
+                        Swamy Reddy Javidi
+                      </h2>
+                      <p className="text-xs text-[#A5A5AA] leading-relaxed">
+                        MBA in Marketing with 24+ years of distinguished corporate and real estate leadership.
+                      </p>
+                      <div className="text-xs text-slate-300 space-y-1 pt-1">
+                        <div>
+                          Corporate experience with <strong className="text-white">Reliance Jio, Tata Teleservices, Idea Cellular, Hindustan Unilever</strong> and <strong className="text-white">PepsiCo</strong>.
+                        </div>
+                        <div>
+                          Founder of <strong className="text-[#C5A880]">Sadguna Properties</strong>.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-mono font-bold text-[#C5A880] uppercase tracking-wider">
+                      Core Strategic Focus
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                      Focus on real estate intelligence, market analytics, compliance and absolute transparency. Eliminating misleading claims through verified telemetry and honest reporting.
+                    </p>
+                  </div>
+
+                  {/* Founder Philosophy: 6C Step Sequence */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-mono font-bold text-[#C5A880] uppercase tracking-wider">
+                        Founder Philosophy
+                      </h3>
+                      <span className="text-[10px] font-mono text-[#A5A5AA]">The 6C Trust Continuum</span>
+                    </div>
+
+                    <div className="p-4 bg-[#1B1B1E] rounded-2xl border border-[#333337] text-xs font-semibold text-white tracking-wide flex flex-wrap items-center justify-center gap-2 text-center">
+                      <span className="text-[#C5A880]">Content</span>
+                      <span className="text-[#A5A5AA]">→</span>
+                      <span className="text-[#C5A880]">Courage</span>
+                      <span className="text-[#A5A5AA]">→</span>
+                      <span className="text-[#C5A880]">Confidence</span>
+                      <span className="text-[#A5A5AA]">→</span>
+                      <span className="text-[#C5A880]">Communication</span>
+                      <span className="text-[#A5A5AA]">→</span>
+                      <span className="text-[#C5A880]">Contacts</span>
+                      <span className="text-[#A5A5AA]">→</span>
+                      <span className="text-[#C5A880]">Convincing</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 text-[11px]">
+                      <div className="p-2.5 bg-[#0A0A0B] rounded-xl border border-[#333337]/80">
+                        <span className="font-mono text-[#C5A880] font-bold">01. Content:</span> Verified market intelligence
+                      </div>
+                      <div className="p-2.5 bg-[#0A0A0B] rounded-xl border border-[#333337]/80">
+                        <span className="font-mono text-[#C5A880] font-bold">02. Courage:</span> Disclosing honest realities
+                      </div>
+                      <div className="p-2.5 bg-[#0A0A0B] rounded-xl border border-[#333337]/80">
+                        <span className="font-mono text-[#C5A880] font-bold">03. Confidence:</span> Empowering seeker decisions
+                      </div>
+                      <div className="p-2.5 bg-[#0A0A0B] rounded-xl border border-[#333337]/80">
+                        <span className="font-mono text-[#C5A880] font-bold">04. Communication:</span> Clear broadcast media
+                      </div>
+                      <div className="p-2.5 bg-[#0A0A0B] rounded-xl border border-[#333337]/80">
+                        <span className="font-mono text-[#C5A880] font-bold">05. Contacts:</span> Connecting genuine stakeholders
+                      </div>
+                      <div className="p-2.5 bg-[#0A0A0B] rounded-xl border border-[#333337]/80">
+                        <span className="font-mono text-[#C5A880] font-bold">06. Convincing:</span> Trust-backed transactions
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
+
+              {/* NODE 02: FIVE INTEGRATED PILLARS */}
+              {activeNode === 'pillars' && (
+                <div className="space-y-4">
+                  <div className="space-y-1 pb-2">
+                    <h2 className="text-xl sm:text-2xl font-serif font-black text-white">
+                      Five Integrated Pillars
+                    </h2>
+                    <p className="text-xs text-[#A5A5AA]">
+                      The multi-dimensional architecture powering Property Studio discovery and verification.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Pillar 01 */}
+                    <div className="p-4 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/50 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <Search className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-[#C5A880]">01</span>
+                          <h3 className="font-serif font-bold text-sm text-white">Aggregator Engine</h3>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Property search and discovery, bringing property opportunities together across residential, commercial, farm lands, and plots.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Pillar 02 */}
+                    <div className="p-4 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/50 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <Tv className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-[#C5A880]">02</span>
+                          <h3 className="font-serif font-bold text-sm text-white">Broadcast Network</h3>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Studio presentations, podcasts, interviews and live ground reports capturing authentic construction milestones and infrastructure updates.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Pillar 03 */}
+                    <div className="p-4 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/50 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <MessageSquare className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-[#C5A880]">03</span>
+                          <h3 className="font-serif font-bold text-sm text-white">Community Hive</h3>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Community discussions, questions and project-level feedback answered by verified local residents and industry peers.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Pillar 04 */}
+                    <div className="p-4 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/50 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <Award className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-[#C5A880]">04</span>
+                          <h3 className="font-serif font-bold text-sm text-white">Performance Index</h3>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Developer and professional verification, ratings and performance insights assessing delivery timelines, compliance, and build quality.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Pillar 05 */}
+                    <div className="p-4 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/50 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <Radio className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-[#C5A880]">05</span>
+                          <h3 className="font-serif font-bold text-sm text-white">Town Hall Arena</h3>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Live summits, podcasts and direct stakeholder discussions connecting seekers, builders, and experts with encrypted privacy.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* NODE 03: WHO WE SERVE */}
+              {activeNode === 'stakeholders' && (
+                <div className="space-y-4">
+                  <div className="space-y-1 pb-2">
+                    <h2 className="text-xl sm:text-2xl font-serif font-black text-white">
+                      Who We Serve
+                    </h2>
+                    <p className="text-xs text-[#A5A5AA]">
+                      Connecting five key stakeholder groups into one verified real estate ecosystem.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="p-3.5 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/40 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <Compass className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <h3 className="font-serif font-bold text-xs sm:text-sm text-white">
+                          Property Seekers & Investors
+                        </h3>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Discover properties, compare opportunities and submit requirements with privacy protection.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/40 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <Building className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <h3 className="font-serif font-bold text-xs sm:text-sm text-white">
+                          Developers & Builders
+                        </h3>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Connect with buyers, manage project communities and share official project updates.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/40 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <Landmark className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <h3 className="font-serif font-bold text-xs sm:text-sm text-white">
+                          Landowners
+                        </h3>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Connect with developers and verified real estate professionals for joint ventures and structured developments.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/40 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <Briefcase className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <h3 className="font-serif font-bold text-xs sm:text-sm text-white">
+                          Verified Agents & Channel Partners
+                        </h3>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Build credibility, access genuine requirements and expand professional networks.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-[#1B1B1E] rounded-2xl border border-[#333337] flex items-start gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#0A0A0B] border border-[#C5A880]/40 flex items-center justify-center shrink-0 text-[#C5A880]">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <h3 className="font-serif font-bold text-xs sm:text-sm text-white">
+                          Real Estate Media & Industry Experts
+                        </h3>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Share market intelligence, participate in interviews and contribute to industry discussions.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* NODE 04: OUR VISION */}
+              {activeNode === 'vision' && (
+                <div className="space-y-6 text-center py-4">
+                  <div className="w-16 h-16 rounded-full bg-[#1B1B1E] border-2 border-[#C5A880] flex items-center justify-center mx-auto text-[#C5A880] shadow-[0_0_30px_rgba(197,168,128,0.25)]">
+                    <Eye className="w-8 h-8" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="font-mono text-xs font-bold text-[#C5A880] tracking-widest uppercase">
+                      Our Vision
+                    </span>
+                    <h2 className="text-2xl sm:text-3xl font-serif font-black text-white">
+                      Beyond Property Discovery.{' '}
+                      <span className="text-[#C5A880]">Towards Absolute Market Intelligence.</span>
+                    </h2>
+                  </div>
+
+                  <blockquote className="p-6 bg-[#1B1B1E] rounded-3xl border border-[#333337] text-sm sm:text-base text-slate-200 leading-relaxed italic max-w-xl mx-auto shadow-inner">
+                    "To become a global benchmark for trusted, informative and interactive real estate discovery by integrating multiple platforms into one intelligent ecosystem."
+                  </blockquote>
+
+                  <p className="text-xs text-[#A5A5AA] max-w-lg mx-auto leading-relaxed">
+                    Property Studio is an integrated Real Estate Media Network and Community PropTech Platform connecting property seekers, developers, landowners and verified real estate professionals through intelligent discovery, market insights, broadcast media and community engagement.
+                  </p>
+                </div>
+              )}
+
+              {/* NODE 05: OUR MISSION */}
+              {activeNode === 'mission' && (
+                <div className="space-y-6 text-center py-4">
+                  <div className="w-16 h-16 rounded-full bg-[#1B1B1E] border-2 border-[#C5A880] flex items-center justify-center mx-auto text-[#C5A880] shadow-[0_0_30px_rgba(197,168,128,0.25)]">
+                    <Target className="w-8 h-8" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="font-mono text-xs font-bold text-[#C5A880] tracking-widest uppercase">
+                      Our Mission
+                    </span>
+                    <h2 className="text-2xl sm:text-3xl font-serif font-black text-white">
+                      Unifying Real Estate Architecture
+                    </h2>
+                  </div>
+
+                  <blockquote className="p-6 bg-[#1B1B1E] rounded-3xl border border-[#333337] text-sm sm:text-base text-slate-200 leading-relaxed italic max-w-xl mx-auto shadow-inner">
+                    "To unify property search, broadcast media, community discussions, live updates and stakeholder engagement into one seamless global architecture."
+                  </blockquote>
+
+                  <p className="text-xs text-[#A5A5AA] max-w-lg mx-auto leading-relaxed">
+                    Uniting verified telemetry, broadcast studio dialogues, unedited peer Q&A, and authenticated regulatory audits into one global standard of transparency.
+                  </p>
+                </div>
+              )}
+
+              {/* NODE 06: THE 6 I'S & 6 R'S – CORE DNA */}
+              {activeNode === 'core-dna' && (
+                <div className="space-y-6">
+                  <div className="space-y-1 pb-2 border-b border-[#333337]">
+                    <span className="font-mono text-xs font-bold text-[#C5A880] tracking-widest uppercase">
+                      Interactive Core DNA
+                    </span>
+                    <h2 className="text-xl sm:text-2xl font-serif font-black text-white">
+                      The 6 I's & The 6 R's
+                    </h2>
+                    <p className="text-xs text-[#A5A5AA]">
+                      The foundational PropTech principles governing Property Studio's operations and compliance.
+                    </p>
+                  </div>
+
+                  {/* Two Visually Distinct Columns: 6 I's and 6 R's */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* GROUP 1: THE 6 I'S */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 pb-1 border-b border-[#333337]">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#C5A880]" />
+                        <h3 className="font-serif font-bold text-sm text-[#C5A880] uppercase tracking-wider">
+                          The 6 I's of PropTech Architecture
+                        </h3>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        <div className="p-3 bg-[#1B1B1E] rounded-xl border border-[#333337]">
+                          <span className="font-mono font-bold text-xs text-[#C5A880] mr-2">01.</span>
+                          <strong className="text-xs text-white">Interactive</strong>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            Explore property layouts and presentations through Interactive Flat Panels, digital and smart boards.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-[#1B1B1E] rounded-xl border border-[#333337]">
+                          <span className="font-mono font-bold text-xs text-[#C5A880] mr-2">02.</span>
+                          <strong className="text-xs text-white">Informative</strong>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            Data over hype. Reliable information over promotional claims.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-[#1B1B1E] rounded-xl border border-[#333337]">
+                          <span className="font-mono font-bold text-xs text-[#C5A880] mr-2">03.</span>
+                          <strong className="text-xs text-white">Intelligent</strong>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            Deep market analytics and data-driven property insights.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-[#1B1B1E] rounded-xl border border-[#333337]">
+                          <span className="font-mono font-bold text-xs text-[#C5A880] mr-2">04.</span>
+                          <strong className="text-xs text-white">Interview</strong>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            Podcasts, presentations and discussions with real estate stakeholders.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-[#1B1B1E] rounded-xl border border-[#333337]">
+                          <span className="font-mono font-bold text-xs text-[#C5A880] mr-2">05.</span>
+                          <strong className="text-xs text-white">Intermediary</strong>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            A trusted, neutral bridge connecting all real estate stakeholders.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-[#1B1B1E] rounded-xl border border-[#333337]">
+                          <span className="font-mono font-bold text-xs text-[#C5A880] mr-2">06.</span>
+                          <strong className="text-xs text-white">All Integrated</strong>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            Bringing all stakeholders of the real estate ecosystem together.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* GROUP 2: THE 6 R'S */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 pb-1 border-b border-[#333337]">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#C5A880]" />
+                        <h3 className="font-serif font-bold text-sm text-[#C5A880] uppercase tracking-wider">
+                          The 6 R's of Institutional Trust
+                        </h3>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        <div className="p-3 bg-[#1B1B1E] rounded-xl border border-[#333337]">
+                          <span className="font-mono font-bold text-xs text-[#C5A880] mr-2">01.</span>
+                          <strong className="text-xs text-white">Real-time</strong>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            Live field reports and the latest property updates.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-[#1B1B1E] rounded-xl border border-[#333337]">
+                          <span className="font-mono font-bold text-xs text-[#C5A880] mr-2">02.</span>
+                          <strong className="text-xs text-white">Realistic</strong>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            Honest insights covering both advantages and disadvantages.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-[#1B1B1E] rounded-xl border border-[#333337]">
+                          <span className="font-mono font-bold text-xs text-[#C5A880] mr-2">03.</span>
+                          <strong className="text-xs text-white">Revolutionary</strong>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            Re-engineering the property discovery model with privacy-first data masking.
+                          </p>
+                        </div>
+
+                        {/* Reserved slots flexible for upcoming policy standards */}
+                        <div className="p-3 bg-[#0A0A0B]/80 rounded-xl border border-[#333337]/50 opacity-60">
+                          <span className="font-mono font-bold text-xs text-[#A5A5AA] mr-2">04.</span>
+                          <strong className="text-xs text-[#A5A5AA]">Tenet IV (Reserved)</strong>
+                          <p className="text-[11px] text-[#A5A5AA] mt-1 leading-relaxed">
+                            Architectural slot reserved for upcoming governance benchmarks.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-[#0A0A0B]/80 rounded-xl border border-[#333337]/50 opacity-60">
+                          <span className="font-mono font-bold text-xs text-[#A5A5AA] mr-2">05.</span>
+                          <strong className="text-xs text-[#A5A5AA]">Tenet V (Reserved)</strong>
+                          <p className="text-[11px] text-[#A5A5AA] mt-1 leading-relaxed">
+                            Configured for green building disclosures and sustainability metrics.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-[#0A0A0B]/80 rounded-xl border border-[#333337]/50 opacity-60">
+                          <span className="font-mono font-bold text-xs text-[#A5A5AA] mr-2">06.</span>
+                          <strong className="text-xs text-[#A5A5AA]">Tenet VI (Reserved)</strong>
+                          <p className="text-[11px] text-[#A5A5AA] mt-1 leading-relaxed">
+                            Reserved slot for community accreditation and ecosystem indexes.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons inside Popup */}
+              <div className="pt-4 border-t border-[#333337] flex flex-wrap items-center justify-between gap-3 text-xs">
+                <span className="text-[#A5A5AA] font-mono text-[11px]">
+                  Discover Real Estate Beyond Listings.
+                </span>
+
+                <div className="flex items-center gap-2">
+                  {onNavigateCommunity && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveNode(null);
+                        onNavigateCommunity();
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-[#1B1B1E] hover:bg-[#26262b] text-[#C5A880] border border-[#333337] font-semibold transition-colors cursor-pointer"
+                    >
+                      Explore Communities
+                    </button>
+                  )}
+
+                  {onNavigateProperties && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveNode(null);
+                        onNavigateProperties();
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-[#1B1B1E] hover:bg-[#26262b] text-white border border-[#333337] font-semibold transition-colors cursor-pointer"
+                    >
+                      Discover Properties
+                    </button>
+                  )}
+
+                  {onOpenRegister && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveNode(null);
+                        onOpenRegister();
+                      }}
+                      className="px-4 py-1.5 rounded-xl bg-[#C5A880] hover:bg-[#D7B991] text-[#0A0A0B] font-bold transition-all shadow-sm cursor-pointer"
+                    >
+                      Join Property Studio
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </section>
+      )}
     </div>
   );
 };

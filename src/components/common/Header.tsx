@@ -147,12 +147,12 @@ export const Header: React.FC<HeaderProps> = ({
   }, [activeView]);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs transition-all duration-300">
+    <header className="sticky top-0 z-40 bg-[#0A0A0B]/95 backdrop-blur-md border-b border-[#333337] shadow-lg transition-all duration-300 text-white">
       {/* Executive Tagline & Production Secretariat Bar Matching PDF */}
-      <div className="bg-[#182A3E] text-white px-4 sm:px-6 lg:px-8 py-1.5 text-[11px] font-medium tracking-wide flex items-center justify-between">
+      <div className="bg-[#0A0A0B] text-white px-4 sm:px-6 lg:px-8 py-1.5 text-[11px] font-medium tracking-wide flex items-center justify-between border-b border-[#333337]/60">
         <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
-          <span className="text-[#B49029] font-bold tracking-wider">PROPERTY STUDIO</span>
-          <span className="text-slate-400" aria-hidden="true">|</span>
+          <span className="text-[#C5A880] font-bold tracking-wider font-serif">PROPERTY STUDIO</span>
+          <span className="text-slate-500" aria-hidden="true">|</span>
           <span className="text-slate-300 tracking-widest text-[10px] uppercase font-semibold">
             REAL ESTATE · VISUAL STORIES · MARKET TRENDS & INSIGHTS
           </span>
@@ -160,8 +160,8 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
           {/* City Option beside Secretariat */}
-          <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 rounded-md bg-[#030508]/60 border border-[#CEC8A2]/30 text-[11px]">
-            <MapPin className="w-3 h-3 text-[#B49029] shrink-0" />
+          <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 rounded-md bg-[#121214] border border-[#333337] text-[11px]">
+            <MapPin className="w-3 h-3 text-[#C5A880] shrink-0" />
             <span className="text-slate-400 font-medium hidden xs:inline">City:</span>
             <select
               value={selectedCity}
@@ -172,15 +172,15 @@ export const Header: React.FC<HeaderProps> = ({
                   localStorage.setItem('ps_selected_city', newCity);
                 } catch {}
               }}
-              className="bg-transparent text-[#B49029] font-bold text-[11px] focus:outline-none cursor-pointer"
+              className="bg-transparent text-[#C5A880] font-bold text-[11px] focus:outline-none cursor-pointer"
               aria-label="Select City"
             >
-              <option value="Hyderabad" className="bg-[#182A3E] text-white">Hyderabad</option>
-              <option value="Bengaluru" className="bg-[#182A3E] text-white">Bengaluru</option>
-              <option value="Mumbai" className="bg-[#182A3E] text-white">Mumbai</option>
-              <option value="Chennai" className="bg-[#182A3E] text-white">Chennai</option>
-              <option value="Delhi-NCR" className="bg-[#182A3E] text-white">Delhi-NCR</option>
-              <option value="Pune" className="bg-[#182A3E] text-white">Pune</option>
+              <option value="Hyderabad" className="bg-[#121214] text-white">Hyderabad</option>
+              <option value="Bengaluru" className="bg-[#121214] text-white">Bengaluru</option>
+              <option value="Mumbai" className="bg-[#121214] text-white">Mumbai</option>
+              <option value="Chennai" className="bg-[#121214] text-white">Chennai</option>
+              <option value="Delhi-NCR" className="bg-[#121214] text-white">Delhi-NCR</option>
+              <option value="Pune" className="bg-[#121214] text-white">Pune</option>
             </select>
           </div>
 
@@ -191,7 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenSupport && (
             <button
               onClick={onOpenSupport}
-              className="text-[#B49029] hover:text-[#A99137] font-semibold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-[#C5A880] hover:text-[#D7B991] font-semibold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
             >
               <HelpCircle className="w-3.5 h-3.5" />
               <span>Support Desk</span>
@@ -222,14 +222,14 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenSearchModal}
-              className="w-full flex items-center justify-between pl-4 pr-3 py-2 bg-slate-100 hover:bg-slate-50 border border-slate-200 hover:border-[#B49029] rounded-full text-xs text-slate-400 text-left transition-all cursor-pointer shadow-inner group"
+              className="w-full flex items-center justify-between pl-4 pr-3 py-2 bg-[#121214] hover:bg-[#1B1B1E] border border-[#333337] hover:border-[#C5A880] rounded-full text-xs text-slate-300 text-left transition-all cursor-pointer shadow-inner group"
               title="Universal Search (Ctrl+K)"
             >
               <div className="flex items-center gap-2.5 truncate">
-                <Search className="w-4 h-4 text-slate-400 group-hover:text-[#B49029] transition-colors shrink-0" />
+                <Search className="w-4 h-4 text-[#A5A5AA] group-hover:text-[#C5A880] transition-colors shrink-0" />
                 <span className="truncate">Search projects, communities, questions...</span>
               </div>
-              <div className="hidden sm:flex items-center gap-0.5 text-[10px] font-mono font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs shrink-0">
+              <div className="hidden sm:flex items-center gap-0.5 text-[10px] font-mono font-bold text-[#A5A5AA] bg-[#1B1B1E] px-2 py-0.5 rounded-full border border-[#333337] shadow-2xs shrink-0">
                 <Command className="w-2.5 h-2.5" />
                 <span>K</span>
               </div>
@@ -249,10 +249,10 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* City Selector Pill */}
-          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-bold text-slate-700 shrink-0">
-            <MapPin className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
+          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121214] border border-[#333337] text-xs font-bold text-slate-200 shrink-0">
+            <MapPin className="w-3.5 h-3.5 text-[#C5A880] shrink-0" />
             <span className="font-bold">{selectedCity}</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
+            <ChevronDown className="w-3 h-3 text-[#A5A5AA]" />
           </div>
 
           {/* Quick Buyer Leads Shortcut (for Agents & Partners) */}
@@ -264,13 +264,13 @@ export const Header: React.FC<HeaderProps> = ({
               }}
               className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'LEADS_MARKET'
-                  ? 'bg-[#182A3E] text-white border-[#182A3E] shadow-sm'
-                  : 'bg-white text-[#030508] border-slate-200 hover:bg-slate-50'
+                  ? 'bg-[#C5A880] text-[#0A0A0B] border-[#C5A880] shadow-sm font-bold'
+                  : 'bg-[#121214] text-white border-[#333337] hover:border-[#C5A880]'
               }`}
               title="Buyer Leads"
               aria-label="Buyer Leads"
             >
-              <Users className="w-4 h-4 text-[#B49029] shrink-0" />
+              <Users className="w-4 h-4 text-[#C5A880] shrink-0" />
               <span className="sr-only">Buyer Leads</span>
             </button>
           )}
@@ -284,13 +284,13 @@ export const Header: React.FC<HeaderProps> = ({
               }}
               className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'PROFESSIONAL'
-                  ? 'bg-[#182A3E] text-white border-[#182A3E] shadow-sm'
-                  : 'bg-white text-[#030508] border-slate-200 hover:bg-slate-50'
+                  ? 'bg-[#C5A880] text-[#0A0A0B] border-[#C5A880] shadow-sm font-bold'
+                  : 'bg-[#121214] text-white border-[#333337] hover:border-[#C5A880]'
               }`}
               title="Workspace"
               aria-label="Workspace"
             >
-              <Briefcase className="w-4 h-4 text-[#B49029] shrink-0" />
+              <Briefcase className="w-4 h-4 text-[#C5A880] shrink-0" />
               <span className="sr-only">Workspace</span>
             </button>
           )}
@@ -302,10 +302,10 @@ export const Header: React.FC<HeaderProps> = ({
                 setActiveView('ADMIN');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="p-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl border border-[#C5A880]/40 bg-[#1B1B1E] hover:bg-[#26262b] text-[#C5A880] transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer shadow-2xs"
               title="Super Admin Console"
             >
-              <ShieldCheck className="w-4 h-4 text-[#B49029] shrink-0" />
+              <ShieldCheck className="w-4 h-4 text-[#C5A880] shrink-0" />
               <span className="sr-only">
                 <span className="min-[1680px]:hidden">Admin Console</span>
                 <span className="hidden min-[1680px]:inline">Super Admin Console</span>
@@ -322,13 +322,13 @@ export const Header: React.FC<HeaderProps> = ({
             }}
             className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 ${
               activeView === 'ABOUT'
-                ? 'bg-[#182A3E] text-white border-[#182A3E] shadow-sm'
-                : 'bg-white text-slate-700 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900'
+                ? 'bg-[#C5A880] text-[#0A0A0B] border-[#C5A880] shadow-sm'
+                : 'bg-[#121214] text-slate-200 border-[#333337] hover:border-[#C5A880] hover:text-white'
             }`}
             title="About Property Studio"
             aria-label="About Property Studio"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#B49029]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#C5A880]" />
             <span>About Us</span>
           </button>
 
@@ -336,22 +336,22 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={onOpenWalletModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[#B49029] text-xs font-bold transition-colors cursor-pointer shadow-2xs shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121214] hover:bg-[#1B1B1E] border border-[#333337] text-[#C5A880] text-xs font-bold transition-colors cursor-pointer shadow-2xs shrink-0"
             title="Wallet Balance & Top Up"
             aria-label="Wallet Credit Balance"
           >
-            <Wallet className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
+            <Wallet className="w-3.5 h-3.5 text-[#C5A880] shrink-0" />
             <span className="font-mono">
               ₹ {isLoggedIn ? walletBalance.toLocaleString('en-IN') : '0'}
             </span>
-            <span className="text-[11px] font-black text-amber-700">+</span>
+            <span className="text-[11px] font-black text-[#D7B991]">+</span>
           </button>
 
           {/* User Sign In / Profile Avatar */}
           {!isLoggedIn ? (
             <button
               onClick={onOpenLoginModal}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer shrink-0"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#C5A880] hover:bg-[#D7B991] text-[#0A0A0B] rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer shrink-0"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>Login / Sign Up</span>
@@ -473,9 +473,9 @@ export const Header: React.FC<HeaderProps> = ({
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-navigation-drawer"
             aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            className="xl:hidden p-2 rounded-xl text-slate-700 hover:text-[#030508] hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#B49029] focus:ring-offset-1 transition-all cursor-pointer shrink-0"
+            className="xl:hidden p-2 rounded-xl text-white hover:text-[#C5A880] hover:bg-[#121214] border border-[#333337] focus:outline-none focus:ring-2 focus:ring-[#C5A880] transition-all cursor-pointer shrink-0"
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {mobileMenuOpen ? <X className="w-5 h-5 text-[#C5A880]" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
@@ -484,26 +484,26 @@ export const Header: React.FC<HeaderProps> = ({
       {mobileMenuOpen && (
         <div
           id="mobile-navigation-drawer"
-          className="xl:hidden border-t border-slate-200 bg-white shadow-2xl px-4 py-5 animate-in slide-in-from-top-2 duration-200 max-h-[calc(100vh-120px)] overflow-y-auto"
+          className="xl:hidden border-t border-slate-200 dark:border-[#333337] border-[#333337] bg-[#0A0A0B] shadow-2xl px-4 py-5 animate-in slide-in-from-top-2 duration-200 max-h-[calc(100vh-120px)] overflow-y-auto text-white"
         >
           <div className="space-y-4">
             {isLoggedIn && currentUser && (
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-[#121214] border border-[#333337]">
                 <div className="flex items-center gap-2.5">
                   <img
                     src={getSafeAvatar(currentUser.avatar)}
                     alt={currentUser.name}
-                    className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                    className="w-9 h-9 rounded-full object-cover border border-[#C5A880]/50 shrink-0"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                     }}
                   />
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-900">{currentUser.name}</span>
+                      <span className="text-xs font-bold text-white">{currentUser.name}</span>
                       {getRoleIcon(currentUser.role)}
                     </div>
-                    <span className="text-[10px] text-slate-500 uppercase font-semibold font-mono">
+                    <span className="text-[10px] text-[#A5A5AA] uppercase font-semibold font-mono">
                       {currentUser.role.replace(/_/g, ' ')}
                     </span>
                   </div>
@@ -514,16 +514,16 @@ export const Header: React.FC<HeaderProps> = ({
                     setMobileMenuOpen(false);
                     onOpenProfileModal();
                   }}
-                  className="px-2.5 py-1 text-[11px] font-semibold text-[#182A3E] bg-[#FCFBF3] hover:bg-[#FCFBF3]/80 border border-[#E8E4D8] rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                  className="px-2.5 py-1 text-[11px] font-semibold text-white bg-[#1B1B1E] hover:bg-[#26262b] border border-[#333337] rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
                 >
-                  <KeyRound className="w-3 h-3 text-[#B49029]" />
+                  <KeyRound className="w-3 h-3 text-[#C5A880]" />
                   <span>Security</span>
                 </button>
               </div>
             )}
 
             <div>
-              <span className="text-[10px] font-mono font-bold text-[#A99137] uppercase tracking-widest block mb-2">
+              <span className="text-[10px] font-mono font-bold text-[#C5A880] uppercase tracking-widest block mb-2">
                 Platform Navigation
               </span>
               <div className="flex flex-col gap-1">
@@ -545,12 +545,12 @@ export const Header: React.FC<HeaderProps> = ({
                       }}
                       className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center justify-between cursor-pointer ${
                         isActive
-                          ? 'bg-[#FCFBF3] text-[#182A3E] font-bold border-l-4 border-[#B49029]'
-                          : 'text-slate-700 hover:bg-slate-50 hover:text-[#030508]'
+                          ? 'bg-[#1B1B1E] text-[#C5A880] font-bold border-l-4 border-[#C5A880]'
+                          : 'text-slate-300 hover:bg-[#121214] hover:text-white'
                       }`}
                     >
                       <span>{getDisplayLabel(link)}</span>
-                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#B49029]" />}
+                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#C5A880]" />}
                     </button>
                   );
                 })}
@@ -559,8 +559,8 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Role Workspaces & Consoles */}
             {(utilityLinks.length > 0 || (isLoggedIn && isPropertySeeker(currentUser.role)) || (isLoggedIn && currentUser.role === 'DEVELOPER') || (isLoggedIn && isPlatformAdmin(currentUser.role))) && (
-              <div className="pt-3 border-t border-slate-100">
-                <span className="text-[10px] font-mono font-bold text-[#64748B] uppercase tracking-widest block mb-2">
+              <div className="pt-3 border-t border-[#333337]">
+                <span className="text-[10px] font-mono font-bold text-[#A5A5AA] uppercase tracking-widest block mb-2">
                   Workspaces & Consoles
                 </span>
                 <div className="flex flex-wrap gap-x-2.5 gap-y-2">

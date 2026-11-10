@@ -1,42 +1,48 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ps-navy: #182a3e;
-  --color-ps-deep-navy: #182a3e;
-  --color-ps-gold: #b49029;
-  --color-ps-gold-classic: #b49029;
-  --color-ps-gold-antique: #a99137;
-  --color-ps-black: #030508;
+  --color-ps-primary-black: #0a0a0b;
+  --color-ps-surface-black: #121214;
+  --color-ps-elevated: #1b1b1e;
+  --color-ps-border-grey: #333337;
+  --color-ps-muted: #a5a5aa;
+  --color-ps-navy: #0a0a0b;
+  --color-ps-deep-navy: #121214;
+  --color-ps-gold: #c5a880;
+  --color-ps-gold-classic: #c5a880;
+  --color-ps-gold-hover: #d7b991;
+  --color-ps-gold-antique: #c5a880;
+  --color-ps-black: #0a0a0b;
   --color-ps-white: #ffffff;
   --color-ps-off-white: #fafcfd;
-  --color-ps-champagne: #cec8a2;
-  --color-ps-champagne-light: #fcfbf3;
-  --color-ps-amber: #b49029;
-  --color-ps-light-gold: #fcfbf3;
-  --color-ps-bg: #fafcfd;
-  --color-ps-surface: #ffffff;
-  --color-ps-border: #e8e4d8;
-  --color-ps-text-primary: #030508;
-  --color-ps-text-secondary: #64748b;
+  --color-ps-champagne: #c5a880;
+  --color-ps-champagne-light: #1b1b1e;
+  --color-ps-amber: #c5a880;
+  --color-ps-light-gold: #1b1b1e;
+  --color-ps-bg: #0a0a0b;
+  --color-ps-surface: #121214;
+  --color-ps-border: #333337;
+  --color-ps-text-primary: #ffffff;
+  --color-ps-text-secondary: #a5a5aa;
   --color-ps-success: #16a34a;
   --color-ps-danger: #dc2626;
 
-  /* Remap standard amber scale to official classic and antique gold */
-  --color-amber-50: #fcfbf3;
-  --color-amber-100: #fcfbf3;
-  --color-amber-200: #e8e4d8;
-  --color-amber-300: #cec8a2;
-  --color-amber-400: #b49029;
-  --color-amber-500: #b49029;
-  --color-amber-600: #a99137;
-  --color-amber-700: #8c7320;
-  --color-amber-800: #6f5b19;
-  --color-amber-900: #524312;
-  --color-amber-950: #382c0b;
+  /* Remap standard amber scale to official luxury conglomerate gold */
+  --color-amber-50: #1b1b1e;
+  --color-amber-100: #26262b;
+  --color-amber-200: #3a362f;
+  --color-amber-300: #8c785c;
+  --color-amber-400: #c5a880;
+  --color-amber-500: #c5a880;
+  --color-amber-600: #d7b991;
+  --color-amber-700: #e3caa7;
+  --color-amber-800: #f0dec5;
+  --color-amber-900: #f7ede0;
+  --color-amber-950: #fbf6f0;
 
-  /* Remap slate scale so dark slate uses Deep Navy and Black */
-  --color-slate-900: #182a3e;
-  --color-slate-950: #030508;
+  /* Remap slate scale so dark slate uses Luxury Black and Surfaces */
+  --color-slate-900: #0a0a0b;
+  --color-slate-950: #050506;
 }
 
 :root {
@@ -45,24 +51,30 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
 
-  /* Property Studio Official Brand Design Tokens */
-  --ps-navy: #182A3E;
-  --ps-deep-navy: #182A3E;
-  --ps-gold: #B49029;
-  --ps-gold-classic: #B49029;
-  --ps-gold-antique: #A99137;
-  --ps-black: #030508;
+  /* Property Studio Luxury Conglomerate Brand Design Tokens */
+  --ps-primary-black: #0A0A0B;
+  --ps-gold: #C5A880;
+  --ps-gold-hover: #D7B991;
+  --ps-surface-black: #121214;
+  --ps-elevated-surface: #1B1B1E;
+  --ps-border-grey: #333337;
+  --ps-muted-text: #A5A5AA;
   --ps-white: #FFFFFF;
-  --ps-off-white: #FAFCFD;
-  --ps-champagne: #CEC8A2;
-  --ps-champagne-light: #FCFBF3;
-  --ps-amber: #B49029;
-  --ps-light-gold: #FCFBF3;
-  --ps-bg: #FAFCFD;
-  --ps-surface: #FFFFFF;
-  --ps-border: #E8E4D8;
-  --ps-text-primary: #030508;
-  --ps-text-secondary: #64748B;
+
+  --ps-navy: #0A0A0B;
+  --ps-deep-navy: #121214;
+  --ps-gold-classic: #C5A880;
+  --ps-gold-antique: #C5A880;
+  --ps-black: #0A0A0B;
+  --ps-champagne: #C5A880;
+  --ps-champagne-light: #1B1B1E;
+  --ps-amber: #C5A880;
+  --ps-light-gold: #1B1B1E;
+  --ps-bg: #0A0A0B;
+  --ps-surface: #121214;
+  --ps-border: #333337;
+  --ps-text-primary: #FFFFFF;
+  --ps-text-secondary: #A5A5AA;
   --ps-success: #16A34A;
   --ps-danger: #DC2626;
 }
@@ -85,11 +97,13 @@
 
 @layer base {
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Plus Jakarta Sans', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #0a0a0b;
+    color: #ffffff;
   }
   
-  h1, h2, h3, .font-display {
-    font-family: 'Cabinet Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif;
+  h1, h2, h3, .font-display, .font-serif {
+    font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
   }
 
   .font-mono-numbers {
@@ -99,19 +113,19 @@
 
   /* Accessible focus indicators */
   *:focus-visible {
-    outline: 2px solid #b49029;
+    outline: 2px solid #c5a880;
     outline-offset: 2px;
   }
 }
 
 /* ==============================================================================
-   PROPERTY STUDIO DESIGN SYSTEM UTILITIES
+   PROPERTY STUDIO LUXURY DESIGN SYSTEM UTILITIES
    ============================================================================== */
 .ps-card {
-  background-color: #ffffff;
-  border: 1px solid #e8e4d8;
-  border-radius: 1rem;
-  box-shadow: 0 1px 3px 0 rgba(24, 42, 62, 0.04);
+  background-color: #121214;
+  border: 1px solid #333337;
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
 }
 
 .ps-card-hover {
