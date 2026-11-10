@@ -137,22 +137,24 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
         onToggleMobileMenu={() => setMobileSidebarOpen(!mobileSidebarOpen)}
       />
 
-      {/* 2. Main Three-Column Application Container */}
-      <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 w-full">
+      {/* 2. Main Three-Column Application Container (Full width when viewing Super Admin Console) */}
+      <main className={`flex-1 mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 w-full ${activeView === 'ADMIN' ? 'max-w-[1600px]' : 'max-w-7xl'}`}>
         <div className="flex items-start justify-center gap-6">
-          {/* Left Navigation Sidebar (Desktop sticky / collapsible) */}
-          <div className="hidden lg:block sticky top-20">
-            <LeftSidebar
-              activeItem={activeNav}
-              onSelectNav={handleNavSelect}
-              userRole={currentUser.role}
-              savedCount={bookmarkedIds.size}
-              onStartCommunity={() => {
-                setComposerMode('COMMUNITY');
-                setComposerOpen(true);
-              }}
-            />
-          </div>
+          {/* Left Navigation Sidebar (Desktop sticky / collapsible; hidden in full-width Admin Console) */}
+          {activeView !== 'ADMIN' && (
+            <div className="hidden lg:block sticky top-20">
+              <LeftSidebar
+                activeItem={activeNav}
+                onSelectNav={handleNavSelect}
+                userRole={currentUser.role}
+                savedCount={bookmarkedIds.size}
+                onStartCommunity={() => {
+                  setComposerMode('COMMUNITY');
+                  setComposerOpen(true);
+                }}
+              />
+            </div>
+          )}
 
           {/* Center Column: Community Feed or Custom Workspace Content */}
           {(() => {

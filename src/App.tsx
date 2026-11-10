@@ -42,6 +42,7 @@ const WalletModal = React.lazy(() => import('./components/modals/WalletModal').t
 const AgentOnboardModal = React.lazy(() => import('./components/modals/AgentOnboardModal').then(m => ({ default: m.AgentOnboardModal })));
 const ClaimProjectModal = React.lazy(() => import('./components/modals/ClaimProjectModal').then(m => ({ default: m.ClaimProjectModal })));
 const ProfessionalDirectoryView = React.lazy(() => import('./components/network/ProfessionalDirectoryView').then(m => ({ default: m.ProfessionalDirectoryView })));
+const PublicRedditHome = React.lazy(() => import('./components/home/PublicRedditHome').then(m => ({ default: m.PublicRedditHome })));
 
 const ViewSkeleton: React.FC = () => (
   <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse space-y-6">
@@ -389,14 +390,12 @@ const AppContent: React.FC = () => {
             isLoggedIn ? (
               <UserDashboard initialMode="FEED" />
             ) : (
-              <HomeHero
-              onOpenRoleModal={() => setProfileModalOpen(true)}
-              onOpenAgentModal={() => setAgentModalOpen(true)}
-              onOpenLoginModal={() => setLoginModalOpen(true)}
-              onOpenSupport={() => setSupportOpen(true)}
-            />
-          )
-        )}
+              <PublicRedditHome
+                onOpenLoginModal={() => setLoginModalOpen(true)}
+                onOpenSupport={() => setSupportOpen(true)}
+              />
+            )
+          )}
 
         {activeView === 'DASHBOARD' && (
           isLoggedIn ? (

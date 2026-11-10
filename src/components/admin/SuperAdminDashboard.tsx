@@ -37,7 +37,9 @@ import {
   MapPin,
   CreditCard,
   History,
-  ArrowRight
+  ArrowRight,
+  ChevronDown,
+  ArrowLeft
 } from 'lucide-react';
 
 interface ManagedUser {
@@ -127,6 +129,8 @@ export const SuperAdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
     'OVERVIEW' | 'MODERATION' | 'USERS_DIRECTORY' | 'REQUIREMENTS' | 'AUDIT_LOGS' | 'FINANCE' | 'COMMUNITIES' | 'ALL_POSTS' | 'CREDENTIALS' | 'AGENTS_QUEUE' | 'DEV_CLAIMS' | 'LEAD_PRICING' | 'PROVISION_PMO'
   >('OVERVIEW');
+
+  const [consoleDropdownOpen, setConsoleDropdownOpen] = useState(false);
 
   // Moderation Queue State
   const [moderationListings, setModerationListings] = useState<any[]>([]);
@@ -739,208 +743,284 @@ export const SuperAdminDashboard: React.FC = () => {
     return matchesSearch && matchesTopic;
   });
 
+  const consoleNavItems = [
+    { id: 'OVERVIEW', label: 'Dashboard', icon: ShieldAlert },
+    { id: 'OVERVIEW', label: 'Platform Metrics', icon: TrendingUp },
+    { id: 'USERS_DIRECTORY', label: 'Users & Accounts', icon: Users, badge: liveUsers.length || users.length },
+    { id: 'MODERATION', label: 'Content & Media', icon: Layers },
+    { id: 'MODERATION', label: 'Projects & Listings', icon: Building, badge: properties.length },
+    { id: 'REQUIREMENTS', label: 'Buyer Requirements', icon: Tag, badge: adminRequirements.length },
+    { id: 'COMMUNITIES', label: 'Community & Q&A', icon: MessageSquare },
+    { id: 'AUDIT_LOGS', label: 'Audits & Compliance', icon: ShieldCheck },
+    { id: 'FINANCE', label: 'Finance & Ledger', icon: CreditCard },
+    {
+      id: 'MODERATION',
+      label: 'Approvals & Queue',
+      icon: CheckCircle2,
+      badge: moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length + moderationDeletionRequests.length,
+      badgeColor: 'bg-[#B49029] text-white'
+    },
+    { id: 'CREDENTIALS', label: 'Settings', icon: KeyRound }
+  ];
+
+  const activeLabel = (() => {
+    switch (activeTab) {
+      case 'OVERVIEW': return 'Dashboard & Metrics';
+      case 'USERS_DIRECTORY': return 'Users & Accounts';
+      case 'MODERATION': return 'Content, Listings & Queue';
+      case 'REQUIREMENTS': return 'Buyer Requirements';
+      case 'COMMUNITIES': return 'Community & Q&A';
+      case 'AUDIT_LOGS': return 'Audits & Compliance';
+      case 'FINANCE': return 'Finance & Ledger';
+      case 'CREDENTIALS': return 'Platform Settings';
+      default: return 'Super Admin Console';
+    }
+  })();
+
   return (
-    <div className="min-h-screen bg-[#FAFCFD] flex">
+    <div className="min-h-screen bg-[#FAFCFD] flex flex-col w-full">
       {/* 
         ====================================================================
-        LEFT SIDEBAR: SUPER ADMIN NAVIGATION (MATCHING IMAGE 2)
+        TOP BAR: SUPER ADMIN CONSOLE HEADER WITH PROFILE DROPDOWN
+        (Console navigation moved to top-right under profile)
         ====================================================================
       */}
-      <aside className="hidden lg:flex w-64 flex-col justify-between bg-white border-r border-[#E8E4D8] p-5 shrink-0 sticky top-0 h-screen overflow-y-auto">
-        <div className="space-y-6">
-          {/* Logo & Super Admin Pill */}
-          <div className="space-y-3">
+      <header className="bg-white border-b border-[#E8E4D8] px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-40 shadow-xs w-full">
+        {/* Left: Branding & Back to Community Feed */}
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveView('HOME');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="text-left focus:outline-none cursor-pointer flex items-center gap-2 group"
+            title="Return to Community Feed"
+          >
+            <div className="w-8 h-8 rounded-xl bg-[#182A3E] text-white flex items-center justify-center border border-[#B49029]/40 shadow-xs group-hover:scale-105 transition-transform">
+              <ShieldAlert className="w-5 h-5 text-[#B49029]" />
+            </div>
+            <div className="hidden sm:block">
+              <span className="font-extrabold text-xs tracking-tight text-[#030508] block font-display leading-tight">
+                PROPERTY STUDIO
+              </span>
+              <span className="text-[8px] font-mono text-[#B49029] font-bold tracking-widest uppercase block">
+                BY SWAMY REDDY JAVIDI
+              </span>
+            </div>
+          </button>
+
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FCFBF3] text-[#A99137] border border-[#B49029]/40 text-[10px] font-bold">
+            <span>👑</span>
+            <span className="uppercase font-mono">SUPER ADMIN</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveView('HOME')}
+            className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70 rounded-xl transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Community Feed</span>
+          </button>
+        </div>
+
+        {/* Center Search Input with Ctrl K */}
+        <div className="hidden md:flex items-center flex-1 max-w-md mx-4 relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search users, projects, posts, or requirements..."
+            value={userSearch}
+            onChange={e => {
+              setUserSearch(e.target.value);
+              if (activeTab === 'OVERVIEW') setActiveTab('USERS_DIRECTORY');
+            }}
+            className="w-full pl-9 pr-14 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
+          />
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+            Ctrl K
+          </span>
+        </div>
+
+        {/* Right Status & Super Admin Control Panel Profile Dropdown */}
+        <div className="flex items-center gap-3 shrink-0 relative">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+            <MapPin className="w-3.5 h-3.5 text-amber-600" />
+            <span>Hyderabad</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={refreshServerData}
+            className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 cursor-pointer transition-colors relative"
+            title="Force Live Data Re-sync"
+          >
+            <RefreshCw className={`w-4 h-4 text-slate-600 ${loadingData ? 'animate-spin' : ''}`} />
+            <span className="w-2 h-2 rounded-full bg-emerald-500 absolute top-2 right-2 ring-2 ring-white" />
+          </button>
+
+          {/* Super Admin Control Options Profile Dropdown (Explicit User Directive) */}
+          <div className="relative">
             <button
               type="button"
-              onClick={() => {
-                setActiveView('HOME');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="text-left focus:outline-none cursor-pointer"
+              onClick={() => setConsoleDropdownOpen(prev => !prev)}
+              className={`flex items-center gap-2.5 px-3 py-1.5 rounded-2xl border transition-all cursor-pointer ${
+                consoleDropdownOpen
+                  ? 'bg-[#FCFBF3] border-[#B49029] shadow-md ring-2 ring-[#B49029]/20'
+                  : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 shadow-xs'
+              }`}
+              title="Super Admin Control Panel Options"
             >
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="w-6 h-6 text-[#B49029]" />
-                <div>
-                  <span className="font-extrabold text-sm tracking-tight text-[#030508] block font-display leading-tight">
-                    PROPERTY STUDIO
-                  </span>
-                  <span className="text-[9px] font-mono text-[#B49029] font-bold tracking-widest uppercase block">
-                    BY SWAMY REDDY JAVIDI
-                  </span>
-                </div>
-              </div>
-            </button>
-
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FCFBF3] text-[#A99137] border border-[#B49029]/40 text-[11px] font-bold">
-              <span>👑</span>
-              <span className="uppercase font-mono">SUPER ADMIN</span>
-            </div>
-          </div>
-
-          {/* Navigation Links List */}
-          <nav className="space-y-1">
-            {[
-              { id: 'OVERVIEW', label: 'Dashboard', icon: ShieldAlert },
-              { id: 'OVERVIEW', label: 'Platform Metrics', icon: TrendingUp },
-              { id: 'USERS_DIRECTORY', label: 'Users & Accounts', icon: Users, badge: liveUsers.length || users.length },
-              { id: 'MODERATION', label: 'Content & Media', icon: Layers },
-              { id: 'MODERATION', label: 'Projects & Listings', icon: Building, badge: properties.length },
-              { id: 'REQUIREMENTS', label: 'Buyer Requirements', icon: Tag, badge: adminRequirements.length },
-              { id: 'COMMUNITIES', label: 'Community & Q&A', icon: MessageSquare },
-              { id: 'AUDIT_LOGS', label: 'Audits & Compliance', icon: ShieldCheck },
-              { id: 'FINANCE', label: 'Finance & Ledger', icon: CreditCard },
-              {
-                id: 'MODERATION',
-                label: 'Approvals & Queue',
-                icon: CheckCircle2,
-                badge: moderationListings.length + moderationProfessionals.length + moderationPosts.length + moderationCommunities.length + moderationDeletionRequests.length,
-                badgeColor: 'bg-[#B49029] text-white'
-              },
-              { id: 'CREDENTIALS', label: 'Settings', icon: KeyRound }
-            ].map((item, idx) => {
-              const isActive = activeTab === item.id && (idx === 0 || item.label !== 'Dashboard');
-              const IconComp = item.icon;
-
-              return (
-                <button
-                  key={`${item.id}-${item.label}`}
-                  type="button"
-                  onClick={() => setActiveTab(item.id as any)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-[#FCFBF3] text-[#A99137] border border-[#CEC8A2] font-bold shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 truncate">
-                    <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#B49029]' : 'text-slate-400'}`} />
-                    <span className="truncate">{item.label}</span>
-                  </div>
-                  {item.badge !== undefined && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${item.badgeColor || 'bg-slate-100 text-slate-600'}`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Bottom Console Card - Live Telemetry Status */}
-        <div className="pt-4 border-t border-slate-100">
-          <div className="bg-gradient-to-br from-[#182A3E] via-[#0F1E2E] to-[#030508] text-white p-3.5 rounded-2xl relative overflow-hidden shadow-md border border-[#B49029]/20">
-            {/* Subtle background glow */}
-            <div
-              className="absolute inset-0 opacity-15 bg-cover bg-center pointer-events-none"
-              style={{
-                backgroundImage: "url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80')"
-              }}
-            />
-            <div className="relative z-10 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-mono font-bold tracking-wider uppercase">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>{serverHealth.databaseConnected ? 'Live Telemetry' : 'Syncing Node'}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={refreshServerData}
-                  className="w-6 h-6 rounded-lg bg-[#B49029]/20 hover:bg-[#B49029] text-[#B49029] hover:text-white flex items-center justify-center transition-all cursor-pointer"
-                  title="Force Live Data Re-sync"
-                >
-                  <RefreshCw className={`w-3 h-3 ${loadingData ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-
-              <div>
-                <span className="text-xs font-black block text-white tracking-wide">
-                  Property Studio Core
-                </span>
-                <span className="text-[10px] text-slate-300 font-mono block">
-                  {serverHealth.dbTarget || 'PostgreSQL Production'}
-                </span>
-              </div>
-
-              <div className="pt-1.5 border-t border-white/10 flex items-center justify-between text-[9px] font-mono text-slate-400">
-                <span>Latency &bull; {serverHealth.latencyMs ? `${serverHealth.latencyMs}ms` : '12ms'}</span>
-                <span className="text-emerald-400 font-bold">100% Operational</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* 
-        ====================================================================
-        MAIN APPLICATION AREA (MATCHING IMAGE 2)
-        ====================================================================
-      */}
-      <main className="flex-1 min-w-0 flex flex-col">
-        {/* Top Bar (Matching Image 2) */}
-        <header className="bg-white border-b border-[#E8E4D8] px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
-          <div>
-            <h1 className="text-lg sm:text-xl font-black text-[#030508] font-display leading-tight">
-              Dashboard
-            </h1>
-            <p className="text-xs text-[#64748B]">
-              Super Admin &bull; Platform Governance
-            </p>
-          </div>
-
-          {/* Center Search Input with Ctrl K */}
-          <div className="hidden md:flex items-center flex-1 max-w-md mx-4 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search users, projects, posts, or requirements..."
-              value={userSearch}
-              onChange={e => {
-                setUserSearch(e.target.value);
-                if (activeTab === 'OVERVIEW') setActiveTab('USERS_DIRECTORY');
-              }}
-              className="w-full pl-9 pr-14 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
-            />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-              Ctrl K
-            </span>
-          </div>
-
-          {/* Right Status & Profile Controls */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
-              <MapPin className="w-3.5 h-3.5 text-amber-600" />
-              <span>Hyderabad</span>
-            </div>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={refreshServerData}
-                className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 cursor-pointer transition-colors"
-                title="Notifications & Updates"
-              >
-                <Activity className="w-4 h-4" />
-                <span className="w-2 h-2 rounded-full bg-red-500 absolute top-2 right-2 ring-2 ring-white" />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
               <img
                 src={getSafeAvatar(currentUser.avatar)}
                 alt={currentUser.name}
-                className="w-8 h-8 rounded-full object-cover border border-[#B49029]"
-                onError={(e) => {
+                className="w-8 h-8 rounded-full object-cover border-2 border-[#B49029] bg-white shrink-0"
+                onError={e => {
                   (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
                 }}
               />
-              <div className="hidden sm:block text-left text-xs">
-                <span className="font-bold text-slate-900 block leading-tight">Super Admin</span>
-                <span className="text-[10px] text-slate-500 block">Platform Admin</span>
+              <div className="text-left text-xs">
+                <span className="font-bold text-slate-900 block leading-tight flex items-center gap-1">
+                  <span>Super Admin Controls</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${consoleDropdownOpen ? 'rotate-180 text-[#B49029]' : ''}`} />
+                </span>
+                <span className="text-[10px] text-[#A99137] font-semibold font-mono block">
+                  {activeLabel}
+                </span>
               </div>
-            </div>
+            </button>
+
+            {/* The Floating Super Admin Dropdown Menu */}
+            {consoleDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setConsoleDropdownOpen(false)}
+                />
+                <div
+                  onClick={e => e.stopPropagation()}
+                  className="absolute right-0 top-12 z-50 w-84 bg-white border border-[#E8E4D8] rounded-2xl shadow-2xl overflow-hidden text-slate-800 animate-in fade-in duration-150"
+                  style={{ boxShadow: '0 20px 40px -10px rgba(24, 42, 62, 0.25)' }}
+                >
+                  {/* Admin User Card in Dropdown */}
+                  <div className="p-3.5 bg-gradient-to-br from-[#182A3E] to-[#203750] text-white flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={getSafeAvatar(currentUser.avatar)}
+                        alt={currentUser.name}
+                        className="w-10 h-10 rounded-full object-cover border-2 border-[#B49029] bg-white shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-xs text-white truncate">{currentUser.name || 'Super Admin'}</h4>
+                        <p className="text-[10px] text-slate-300 truncate font-mono">{currentUser.email}</p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase font-mono bg-[#B49029]/30 text-amber-300 border border-[#B49029]/50 shrink-0">
+                      👑 SUPER ADMIN
+                    </span>
+                  </div>
+
+                  {/* Section Label */}
+                  <div className="px-3.5 pt-2.5 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                    SUPER ADMIN CONTROL PANEL OPTIONS
+                  </div>
+
+                  {/* 11 Navigation Options List */}
+                  <div className="p-2 space-y-0.5 max-h-80 overflow-y-auto no-scrollbar text-xs">
+                    {consoleNavItems.map((item, idx) => {
+                      const isActive = activeTab === item.id && (idx === 0 || item.label !== 'Dashboard');
+                      const IconComp = item.icon;
+
+                      return (
+                        <button
+                          key={`dropdown-${item.id}-${item.label}`}
+                          type="button"
+                          onClick={() => {
+                            setActiveTab(item.id as any);
+                            setConsoleDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-[#FCFBF3] text-[#A99137] border border-[#CEC8A2] font-bold shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#B49029]' : 'text-slate-400'}`} />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          {item.badge !== undefined && (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${item.badgeColor || 'bg-slate-100 text-slate-600'}`}>
+                              {item.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Bottom Console Card - Live Telemetry Status */}
+                  <div className="p-2.5 bg-slate-50 border-t border-slate-100">
+                    <div className="bg-gradient-to-br from-[#182A3E] via-[#0F1E2E] to-[#030508] text-white p-3 rounded-xl relative overflow-hidden shadow-xs border border-[#B49029]/20">
+                      <div className="relative z-10 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-mono font-bold tracking-wider uppercase">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>{serverHealth.databaseConnected ? 'Live Telemetry' : 'Syncing Node'}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={refreshServerData}
+                            className="w-5 h-5 rounded-md bg-[#B49029]/20 hover:bg-[#B49029] text-[#B49029] hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                            title="Force Live Data Re-sync"
+                          >
+                            <RefreshCw className={`w-2.5 h-2.5 ${loadingData ? 'animate-spin' : ''}`} />
+                          </button>
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-black block text-white tracking-wide">
+                            Property Studio Core
+                          </span>
+                          <span className="text-[9px] text-slate-300 font-mono block">
+                            {serverHealth.dbTarget || 'PostgreSQL Production'}
+                          </span>
+                        </div>
+                        <div className="pt-1 border-t border-white/10 flex items-center justify-between text-[9px] font-mono text-slate-400">
+                          <span>Latency &bull; {serverHealth.latencyMs ? `${serverHealth.latencyMs}ms` : '12ms'}</span>
+                          <span className="text-emerald-400 font-bold">100% Operational</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Exit to Feed */}
+                  <div className="p-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConsoleDropdownOpen(false);
+                        setActiveView('HOME');
+                      }}
+                      className="w-full py-1.5 text-center text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Return to Public Feed
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      {/* 
+        ====================================================================
+        MAIN FULL-WIDTH APPLICATION AREA FOR DASHBOARD VISUALS
+        (Sidebar space is now 100% dedicated to rich metrics, graphs & visuals)
+        ====================================================================
+      */}
+      <main className="flex-1 min-w-0 flex flex-col w-full">
 
         {/* Inner Content Area */}
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">

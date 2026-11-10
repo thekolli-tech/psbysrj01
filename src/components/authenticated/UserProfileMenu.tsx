@@ -118,20 +118,64 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
         </button>
 
         {isSuperAdmin && onNavigateAdmin && (
-          <button
-            type="button"
-            onClick={() => {
-              onNavigateAdmin();
-              onClose();
-            }}
-            className="w-full text-left px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 text-amber-900 flex items-center justify-between font-bold transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <ShieldCheck className="w-4 h-4 text-amber-700" />
-              <span>Super Admin Console</span>
+          <div className="space-y-1 pt-1 pb-1 border-y border-amber-200/50 my-1 bg-amber-50/50 rounded-xl p-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                onNavigateAdmin();
+                onClose();
+              }}
+              className="w-full text-left px-2.5 py-1.5 rounded-lg bg-amber-100/70 hover:bg-amber-100 text-amber-950 flex items-center justify-between font-bold transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-700" />
+                <span>Super Admin Console</span>
+              </div>
+              <ExternalLink className="w-3.5 h-3.5 text-amber-700" />
+            </button>
+            <div className="grid grid-cols-2 gap-1 text-[11px] pt-1 px-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigateAdmin();
+                  onClose();
+                }}
+                className="text-left py-1 px-2 rounded-md hover:bg-amber-100/60 text-amber-900 font-medium truncate"
+              >
+                • Platform Overview
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigateAdmin();
+                  onClose();
+                }}
+                className="text-left py-1 px-2 rounded-md hover:bg-amber-100/60 text-amber-900 font-medium truncate"
+              >
+                • Moderation Queue
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigateAdmin();
+                  onClose();
+                }}
+                className="text-left py-1 px-2 rounded-md hover:bg-amber-100/60 text-amber-900 font-medium truncate"
+              >
+                • User Accounts
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigateAdmin();
+                  onClose();
+                }}
+                className="text-left py-1 px-2 rounded-md hover:bg-amber-100/60 text-amber-900 font-medium truncate"
+              >
+                • Finance & Ledger
+              </button>
             </div>
-            <ExternalLink className="w-3.5 h-3.5 text-amber-700" />
-          </button>
+          </div>
         )}
 
         {isDeveloper && onNavigateDeveloper && (

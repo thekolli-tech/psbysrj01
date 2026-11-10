@@ -189,38 +189,58 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-        {/* Zone 2: Navigation Links (Desktop - Balanced to fill navigation bar space) */}
-        <nav
-          aria-label="Primary navigation"
-          className="hidden xl:flex flex-1 items-center justify-center 2xl:justify-evenly gap-1 xl:gap-1.5 2xl:gap-2.5 min-[1680px]:gap-3.5 text-xs 2xl:text-[13px] font-semibold text-slate-600 whitespace-nowrap mx-2 xl:mx-4"
-        >
-          {navLinks.map(link => {
-            const isActive = activeView === link.view;
-            const displayLabel = getDisplayLabel(link);
-            return (
+        {/* Zone 2: Navigation Links or Wide Reddit-style Search Bar for Public Home */}
+        {activeView === 'HOME' && !isLoggedIn ? (
+          <div className="flex-1 max-w-xl mx-2 sm:mx-6 relative hidden sm:block">
+            {onOpenSearchModal ? (
               <button
-                key={link.view}
-                onMouseEnter={() => prefetchView(link.view)}
-                onTouchStart={() => prefetchView(link.view)}
-                onClick={() => {
-                  if (link.view === 'COMMUNITY' && !isLoggedIn) {
-                    onOpenLoginModal();
-                    return;
-                  }
-                  setActiveView(link.view);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className={`px-2 xl:px-2.5 2xl:px-3.5 py-1.5 rounded-lg transition-all cursor-pointer shrink-0 tracking-tight min-[1440px]:tracking-normal ${
-                  isActive
-                    ? 'text-[#182A3E] bg-[#FCFBF3] font-bold border border-[#CEC8A2] shadow-xs'
-                    : 'text-slate-600 hover:text-[#030508] hover:bg-slate-100/80 font-medium'
-                }`}
+                type="button"
+                onClick={onOpenSearchModal}
+                className="w-full flex items-center justify-between pl-4 pr-3 py-2 bg-slate-100 hover:bg-slate-50 border border-slate-200 hover:border-[#B49029] rounded-full text-xs text-slate-400 text-left transition-all cursor-pointer shadow-inner"
               >
-                <span>{displayLabel}</span>
+                <div className="flex items-center gap-2.5 truncate">
+                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span className="truncate">Search Property Studio — discussions, communities, verified projects...</span>
+                </div>
+                <kbd className="px-2 py-0.5 text-[10px] font-mono text-slate-400 bg-white border border-slate-200 rounded-md shrink-0">
+                  Ctrl K
+                </kbd>
               </button>
-            );
-          })}
-        </nav>
+            ) : null}
+          </div>
+        ) : (
+          <nav
+            aria-label="Primary navigation"
+            className="hidden xl:flex flex-1 items-center justify-center 2xl:justify-evenly gap-1 xl:gap-1.5 2xl:gap-2.5 min-[1680px]:gap-3.5 text-xs 2xl:text-[13px] font-semibold text-slate-600 whitespace-nowrap mx-2 xl:mx-4"
+          >
+            {navLinks.map(link => {
+              const isActive = activeView === link.view;
+              const displayLabel = getDisplayLabel(link);
+              return (
+                <button
+                  key={link.view}
+                  onMouseEnter={() => prefetchView(link.view)}
+                  onTouchStart={() => prefetchView(link.view)}
+                  onClick={() => {
+                    if (link.view === 'COMMUNITY' && !isLoggedIn) {
+                      onOpenLoginModal();
+                      return;
+                    }
+                    setActiveView(link.view);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className={`px-2 xl:px-2.5 2xl:px-3.5 py-1.5 rounded-lg transition-all cursor-pointer shrink-0 tracking-tight min-[1440px]:tracking-normal ${
+                    isActive
+                      ? 'text-[#182A3E] bg-[#FCFBF3] font-bold border border-[#CEC8A2] shadow-xs'
+                      : 'text-slate-600 hover:text-[#030508] hover:bg-slate-100/80 font-medium'
+                  }`}
+                >
+                  <span>{displayLabel}</span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Zone 3: Actions & Controls (Right) - Clean Icon-Based Controls */}
         <div className="flex items-center gap-1.5 xl:gap-2.5 shrink-0 ml-auto">
