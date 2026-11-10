@@ -590,6 +590,7 @@ export type ViewType =
   | 'TESTIMONIALS'
   | 'ABOUT'
   | 'PRIVACY'
-  | 'TERMS';
+  | 'TERMS'
+  | 'NOT_FOUND';
 
 export type DeviceMode = 'AUTO' | 'MOBILE_APK' | 'DESKTOP' | 'STUDIO_IFP';

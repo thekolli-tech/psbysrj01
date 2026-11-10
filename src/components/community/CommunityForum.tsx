@@ -66,6 +66,8 @@ import {
 
 interface CommunityForumViewProps {
   onOpenLoginModal?: () => void;
+  initialCommunityId?: string | null;
+  initialDiscussionId?: string | null;
 }
 
 const COMMUNITY_TOPIC_LIST = [
@@ -95,7 +97,11 @@ const COMMUNITY_CATEGORIES = [
   'Investor Syndicate'
 ] as const;
 
-export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLoginModal }) => {
+export const CommunityForumView: React.FC<CommunityForumViewProps> = ({
+  onOpenLoginModal,
+  initialCommunityId,
+  initialDiscussionId
+}) => {
   const {
     communityPosts,
     properties,
@@ -155,9 +161,21 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   // Navigation & Filtering
   const [feedTab, setFeedTab] = useState<'FOR_YOU' | 'ALL' | 'AMAS' | 'FOLLOWING' | 'BOOKMARKS' | 'MY_POSTS'>('ALL');
   const [selectedTopic, setSelectedTopic] = useState<string>('ALL');
-  const [selectedCommunityId, setSelectedCommunityId] = useState<'ALL' | string>('ALL');
+  const [selectedCommunityId, setSelectedCommunityId] = useState<'ALL' | string>(initialCommunityId || 'ALL');
   // Dedicated Reddit-style Discussion Detail state
-  const [selectedDiscussionId, setSelectedDiscussionId] = useState<string | null>(null);
+  const [selectedDiscussionId, setSelectedDiscussionId] = useState<string | null>(initialDiscussionId || null);
+
+  useEffect(() => {
+    if (initialCommunityId) {
+      setSelectedCommunityId(initialCommunityId);
+    }
+  }, [initialCommunityId]);
+
+  useEffect(() => {
+    if (initialDiscussionId) {
+      setSelectedDiscussionId(initialDiscussionId);
+    }
+  }, [initialDiscussionId]);
   const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
   const [isVotingPostId, setIsVotingPostId] = useState<string | null>(null);

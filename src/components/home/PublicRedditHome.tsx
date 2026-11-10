@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DiscussionCard } from '../authenticated/DiscussionCard';
 import { QuestionCard } from '../authenticated/QuestionCard';
@@ -31,6 +31,8 @@ import {
 interface PublicRedditHomeProps {
   onOpenLoginModal: () => void;
   onOpenSupport?: () => void;
+  initialPostId?: string | null;
+  initialCategory?: string;
 }
 
 type FeedFilterTab = 'BEST' | 'LATEST' | 'TRENDING';
@@ -48,7 +50,9 @@ const CATEGORY_CHIPS = [
 
 export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
   onOpenLoginModal,
-  onOpenSupport
+  onOpenSupport,
+  initialPostId,
+  initialCategory
 }) => {
   const {
     communityPosts = [],
@@ -64,10 +68,40 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
   } = useApp();
 
   const [activeSort, setActiveSort] = useState<FeedFilterTab>('BEST');
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || 'ALL');
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(initialPostId || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+
+  useEffect(() => {
+    if (initialPostId) {
+      setSelectedPostId(initialPostId);
+    }
+  }, [initialPostId]);
+
+  useEffect(() => {
+    if (initialCategory) {
+      setSelectedCategory(initialCategory);
+    }
+  }, [initialCategory]);
+
+  const handleOpenDetail = (postId: string) => {
+    setSelectedPostId(postId);
+    if (typeof window !== 'undefined') {
+      const targetUrl = `/discussions/${postId}`;
+      if (window.location.pathname !== targetUrl) {
+        window.history.pushState({ path: targetUrl }, '', targetUrl);
+      }
+    }
+  };
+
+  const handleBackToFeed = () => {
+    setSelectedPostId(null);
+    if (typeof window !== 'undefined') {
+      const targetUrl = selectedCategory === 'Property Q&A' ? '/questions' : selectedCategory === 'Property Discussions' ? '/discussions' : '/';
+      window.history.pushState({ path: targetUrl }, '', targetUrl);
+    }
+  };
 
   // Source genuine discussions directly from the authoritative database
   const availablePosts = useMemo(() => {
@@ -295,7 +329,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
               <div className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-sm">
                 <DiscussionDetailView
                   postId={selectedPostId}
-                  onBack={() => setSelectedPostId(null)}
+                  onBack={handleBackToFeed}
                   currentUser={currentUser}
                   isLoggedIn={isLoggedIn}
                   onOpenLoginModal={onOpenLoginModal}
@@ -418,7 +452,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                           <QuestionCard
                             key={post.id}
                             post={post}
-                            onOpenDetail={postId => setSelectedPostId(postId)}
+                            onOpenDetail={handleOpenDetail}
                             onUpvote={() => handleActionRequiringAuth('upvote this question')}
                             onBookmark={() => handleActionRequiringAuth('bookmark this question')}
                           />
@@ -429,7 +463,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                         <DiscussionCard
                           key={post.id}
                           post={post}
-                          onOpenDetail={postId => setSelectedPostId(postId)}
+                          onOpenDetail={handleOpenDetail}
                           onUpvote={() => handleActionRequiringAuth('upvote this discussion')}
                           onBookmark={() => handleActionRequiringAuth('save this discussion')}
                           onShare={p => {
@@ -466,7 +500,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={onOpenLoginModal}
+                  onClick={() => setActiveView('COMMUNITY', '/communities')}
                   className="text-[11px] font-bold text-[#C5A880] hover:underline cursor-pointer"
                 >
                   View All
@@ -480,7 +514,8 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                   activeCommunities.map(c => (
                     <div
                       key={c.id}
-                      className="flex items-center justify-between gap-2 p-2 hover:bg-[#1B1B1E] rounded-xl transition-colors"
+                      onClick={() => setActiveView('COMMUNITY', `/communities/${c.id}`)}
+                      className="flex items-center justify-between gap-2 p-2 hover:bg-[#1B1B1E] rounded-xl transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-8 h-8 rounded-full bg-[#1B1B1E] border border-[#C5A880]/40 text-[#C5A880] flex items-center justify-center font-bold text-xs shrink-0">
@@ -522,7 +557,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                 {trendingDiscussions.map((t, idx) => (
                   <div
                     key={t.id}
-                    onClick={() => setSelectedPostId(t.id)}
+                    onClick={() => handleOpenDetail(t.id)}
                     className="group p-2 rounded-xl hover:bg-[#1B1B1E] transition-colors cursor-pointer space-y-1"
                   >
                     <div className="text-[10px] font-mono text-[#A5A5AA] flex items-center gap-1.5">

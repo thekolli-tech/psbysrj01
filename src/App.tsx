@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { RouterProvider } from './router/RouterContext';
 import { Header } from './components/common/Header';
 import { MobileHeader } from './components/common/MobileHeader';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
@@ -46,6 +47,7 @@ const PublicRedditHome = React.lazy(() => import('./components/home/PublicReddit
 const ProgramsView = React.lazy(() => import('./components/programs/ProgramsView').then(m => ({ default: m.ProgramsView })));
 const PSTestimonialsView = React.lazy(() => import('./components/testimonials/PSTestimonialsView').then(m => ({ default: m.PSTestimonialsView })));
 const AboutUsView = React.lazy(() => import('./components/about/AboutUsView').then(m => ({ default: m.AboutUsView })));
+const NotFoundPage = React.lazy(() => import('./components/common/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 import { LeftSidebar } from './components/authenticated/LeftSidebar';
 
 const ViewSkeleton: React.FC = () => (
@@ -73,7 +75,11 @@ const AppContent: React.FC = () => {
     deviceMode,
     isLoggedIn,
     activeNav,
-    navigateToNav
+    navigateToNav,
+    currentPath,
+    routeParams,
+    isNotFound,
+    navigate
   } = useApp();
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -130,74 +136,11 @@ const AppContent: React.FC = () => {
   }, [deviceMode]);
 
   React.useEffect(() => {
-    const applyViewFromUrl = () => {
-      const params = new URLSearchParams(window.location.search);
-      const viewParam = params.get('view')?.toLowerCase();
-      const postId = params.get('post') || '';
-
-      if (viewParam === 'privacy') {
-        setActiveView('PRIVACY');
-        return;
-      }
-      if (viewParam === 'terms') {
-        setActiveView('TERMS');
-        return;
-      }
-      if (params.get('auth') === '1' || params.get('auth') === 'register' || params.get('login') === '1') {
-        setLoginModalOpen(true);
-      }
-
-      const viewMap: Record<string, ViewType> = {
-        home: 'HOME',
-        overview: 'HOME',
-        dashboard: 'DASHBOARD',
-        properties: 'PROPERTIES',
-        projects: 'PROPERTIES',
-        leads_market: 'LEADS_MARKET',
-        leads: 'LEADS_MARKET',
-        media: 'MEDIA',
-        podcast: 'MEDIA',
-        conference: 'CONFERENCE',
-        market_insights: 'MARKET_INSIGHTS',
-        market: 'MARKET_INSIGHTS',
-        trends: 'MARKET_INSIGHTS',
-        community: 'COMMUNITY',
-        qa: 'COMMUNITY',
-        reviews: 'REVIEWS',
-        rating: 'REVIEWS',
-        requirement: 'REQUIREMENT',
-        requirements: 'REQUIREMENT',
-        chat: 'CHAT',
-        support: 'CHAT',
-        admin: 'ADMIN',
-        superadmin: 'ADMIN',
-        developer: 'DEVELOPER',
-        professional: 'PROFESSIONAL',
-        professionals: 'PROFESSIONALS',
-        network: 'PROFESSIONALS',
-        directory: 'PROFESSIONALS',
-        property_admin: 'PROPERTY_ADMIN',
-        studio: 'STUDIO',
-        contact: 'CONTACT',
-        programs: 'PROGRAMS',
-        academy: 'PROGRAMS',
-        testimonials: 'TESTIMONIALS',
-        ps_testimonials: 'TESTIMONIALS',
-        privacy: 'PRIVACY',
-        terms: 'TERMS'
-      };
-
-      if (viewParam && viewMap[viewParam]) {
-        setActiveView(viewMap[viewParam]);
-      } else if (isCommunityPostId(postId)) {
-        setActiveView('COMMUNITY');
-      }
-    };
-
-    applyViewFromUrl();
-    window.addEventListener('popstate', applyViewFromUrl);
-    return () => window.removeEventListener('popstate', applyViewFromUrl);
-  }, [setActiveView]);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('auth') === '1' || params.get('auth') === 'register' || params.get('login') === '1') {
+      setLoginModalOpen(true);
+    }
+  }, []);
 
   // If STUDIO_IFP mode or activeView is STUDIO, render Studio Broadcast View
   if (deviceMode === 'STUDIO_IFP' || activeView === 'STUDIO') {
@@ -269,7 +212,12 @@ const AppContent: React.FC = () => {
           <React.Suspense fallback={<ViewSkeleton />}>
             {activeView === 'HOME' && <UserDashboard initialMode="FEED" />}
             {activeView === 'DASHBOARD' && <UserDashboard initialMode="WORKSPACE" />}
-            {activeView === 'COMMUNITY' && <CommunityForumView onOpenLoginModal={() => setLoginModalOpen(true)} />}
+            {activeView === 'COMMUNITY' && (
+              <CommunityForumView
+                onOpenLoginModal={() => setLoginModalOpen(true)}
+                initialCommunityId={routeParams.communityId || null}
+              />
+            )}
             {activeView === 'PROFESSIONALS' && (
               <ProfessionalDirectoryView onOpenSupport={() => setSupportOpen(true)} />
             )}
@@ -406,6 +354,9 @@ const AppContent: React.FC = () => {
                 </div>
               )
             )}
+            {activeView === 'NOT_FOUND' && (
+              <NotFoundPage />
+            )}
           </React.Suspense>
         </AuthenticatedAppLayout>
       ) : (
@@ -418,6 +369,8 @@ const AppContent: React.FC = () => {
               <PublicRedditHome
                 onOpenLoginModal={() => setLoginModalOpen(true)}
                 onOpenSupport={() => setSupportOpen(true)}
+                initialPostId={routeParams.discussionId || routeParams.questionId || null}
+                initialCategory={currentPath === '/questions' ? 'Property Q&A' : currentPath === '/discussions' ? 'Property Discussions' : undefined}
               />
             )
           )}
@@ -470,11 +423,10 @@ const AppContent: React.FC = () => {
         )}
 
         {activeView === 'COMMUNITY' && (
-          isLoggedIn ? (
-            <UserDashboard initialMode="FEED" />
-          ) : (
-            <AuthRequiredCard view="COMMUNITY" onOpenLoginModal={() => setLoginModalOpen(true)} />
-          )
+          <CommunityForumView
+            onOpenLoginModal={() => setLoginModalOpen(true)}
+            initialCommunityId={routeParams.communityId || null}
+          />
         )}
 
         {activeView === 'REVIEWS' && (
@@ -651,6 +603,9 @@ const AppContent: React.FC = () => {
               </div>
             </div>
           )
+        )}
+        {activeView === 'NOT_FOUND' && (
+          <NotFoundPage />
         )}
       </React.Suspense>
       </main>
@@ -939,8 +894,10 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <RouterProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </RouterProvider>
   );
 }

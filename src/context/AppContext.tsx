@@ -24,6 +24,7 @@ import {
   MICRO_MARKET_TRENDS
 } from '../data/mockData';
 import { isPropertySeeker, postLoginDestination } from '../shared/policy';
+import { matchRoute, urlForView } from '../router/routes';
 
 interface AppContextType {
   currentUser: User;
@@ -31,7 +32,11 @@ interface AppContextType {
   switchUser: (user: User) => void;
   switchRole: (role: UserRole) => void;
   activeView: ViewType;
-  setActiveView: (view: ViewType) => void;
+  setActiveView: (view: ViewType, customUrl?: string) => void;
+  currentPath: string;
+  routeParams: Record<string, string>;
+  isNotFound: boolean;
+  navigate: (to: string, options?: { replace?: boolean; skipScroll?: boolean }) => void;
   deviceMode: DeviceMode;
   setDeviceMode: (mode: DeviceMode) => void;
   activeNav: NavItemKey;
@@ -251,108 +256,221 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const currentUser = sessionUser ?? GUEST_USER;
   const isLoggedIn = Boolean(sessionUser);
 
-  const [activeView, setActiveView] = useState<ViewType>('HOME');
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    if (typeof window !== 'undefined') return window.location.pathname || '/';
+    return '/';
+  });
+
+  const [routeParams, setRouteParams] = useState<Record<string, string>>(() => {
+    if (typeof window !== 'undefined') {
+      const match = matchRoute(window.location.pathname || '/');
+      return match.params;
+    }
+    return {};
+  });
+
+  const [isNotFound, setIsNotFound] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return matchRoute(window.location.pathname || '/').isNotFound || false;
+    }
+    return false;
+  });
+
+  const [activeView, setActiveViewState] = useState<ViewType>(() => {
+    if (typeof window !== 'undefined') {
+      const match = matchRoute(window.location.pathname || '/');
+      if (match.isNotFound) return 'NOT_FOUND';
+      return match.view;
+    }
+    return 'HOME';
+  });
+
   const [deviceMode, setDeviceMode] = useState<DeviceMode>('AUTO');
-  const [activeNav, setActiveNav] = useState<NavItemKey>('HOME');
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabType>('OVERVIEW');
+
+  const [activeNav, setActiveNav] = useState<NavItemKey>(() => {
+    if (typeof window !== 'undefined') {
+      const match = matchRoute(window.location.pathname || '/');
+      return match.navKey || 'HOME';
+    }
+    return 'HOME';
+  });
+
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabType>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname;
+      if (p === '/saved') return 'SAVED';
+      if (p === '/profile') return 'SETTINGS';
+    }
+    return 'OVERVIEW';
+  });
+
+  // Navigate helper pushing or replacing browser history
+  const navigate = (to: string, options?: { replace?: boolean; skipScroll?: boolean }) => {
+    if (typeof window === 'undefined') return;
+    const targetUrl = new URL(to, window.location.origin);
+    const targetPath = targetUrl.pathname;
+    const fullTarget = targetPath + targetUrl.search + targetUrl.hash;
+
+    const currentFull = window.location.pathname + window.location.search + window.location.hash;
+    if (fullTarget !== currentFull) {
+      if (options?.replace) {
+        window.history.replaceState({ path: fullTarget }, '', fullTarget);
+      } else {
+        window.history.pushState({ path: fullTarget }, '', fullTarget);
+      }
+    }
+
+    setCurrentPath(targetPath);
+    const match = matchRoute(targetPath);
+    setRouteParams(match.params);
+    setIsNotFound(Boolean(match.isNotFound));
+
+    if (match.isNotFound) {
+      setActiveViewState('NOT_FOUND');
+    } else {
+      setActiveViewState(match.view);
+      setActiveNav(match.navKey);
+    }
+
+    if (!options?.skipScroll) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const setActiveView = (view: ViewType, customUrl?: string) => {
+    setActiveViewState(view);
+    setIsNotFound(view === 'NOT_FOUND');
+    if (typeof window !== 'undefined') {
+      const targetUrl = customUrl || urlForView(view);
+      const currentFull = window.location.pathname + window.location.search + window.location.hash;
+      if (window.location.pathname !== targetUrl && currentFull !== targetUrl) {
+        window.history.pushState({ path: targetUrl }, '', targetUrl);
+      }
+      setCurrentPath(targetUrl);
+      const match = matchRoute(targetUrl);
+      setRouteParams(match.params);
+    }
+  };
 
   const navigateToNav = (key: NavItemKey) => {
     setActiveNav(key);
     switch (key) {
       case 'HOME':
-        setActiveView('HOME');
+        setActiveView('HOME', '/');
         break;
       case 'MEDIA':
       case 'REAL_ESTATE_MEDIA':
-        setActiveView('MEDIA');
+        setActiveView('MEDIA', '/media');
         break;
       case 'MARKET_INSIGHTS':
       case 'PROPERTY_INSIGHTS':
-        setActiveView('MARKET_INSIGHTS');
+        setActiveView('MARKET_INSIGHTS', '/insights');
         break;
       case 'REVIEWS':
-        setActiveView('REVIEWS');
+        setActiveView('REVIEWS', '/reviews');
         break;
       case 'COMMUNITY':
       case 'COMMUNITIES':
-        setActiveView('COMMUNITY');
+        setActiveView('COMMUNITY', '/communities');
         break;
       case 'CONFERENCE':
       case 'LIVE_SESSIONS':
-        setActiveView('CONFERENCE');
+        setActiveView('CONFERENCE', '/live');
         break;
       case 'REQUIREMENT':
-        setActiveView('REQUIREMENT');
+        setActiveView('REQUIREMENT', '/requirements');
         break;
       case 'CONTACT':
-        setActiveView('CONTACT');
+        setActiveView('CONTACT', '/contact');
         break;
       case 'PROGRAMS':
-        setActiveView('PROGRAMS');
+        setActiveView('PROGRAMS', '/programs');
         break;
       case 'TESTIMONIALS':
-        setActiveView('TESTIMONIALS');
+        setActiveView('TESTIMONIALS', '/testimonials');
         break;
       case 'ABOUT':
-        setActiveView('ABOUT');
+        setActiveView('ABOUT', '/about');
         break;
       case 'LEADS_MARKET':
-        setActiveView('LEADS_MARKET');
+        setActiveView('LEADS_MARKET', '/leads');
         break;
       case 'DASHBOARD':
-        setActiveView('DASHBOARD');
+        setActiveView('DASHBOARD', '/dashboard');
         break;
       case 'PROFESSIONAL':
-        setActiveView('PROFESSIONAL');
+        setActiveView('PROFESSIONAL', '/network');
         break;
       case 'PROPERTY_ADMIN':
-        setActiveView('PROPERTY_ADMIN');
+        setActiveView('PROPERTY_ADMIN', '/property-admin');
         break;
       case 'ADMIN':
       case 'SUPER_ADMIN_CONSOLE':
-        setActiveView('ADMIN');
+        setActiveView('ADMIN', '/admin');
         break;
       case 'DEVELOPER':
       case 'DEVELOPER_DASHBOARD':
-        setActiveView('DEVELOPER');
+        setActiveView('DEVELOPER', '/developer');
         break;
       case 'DISCUSSIONS':
-        setActiveView('HOME');
+        setActiveView('HOME', '/discussions');
         break;
       case 'DISCOVER':
-        setActiveView('PROPERTIES');
+        setActiveView('PROPERTIES', '/properties');
         break;
       case 'SAVED_ITEMS':
-        setActiveView('HOME');
+        setActiveView('DASHBOARD', '/saved');
+        setActiveWorkspaceTab('SAVED');
         break;
       case 'MY_PROFILE':
-        setActiveView('DASHBOARD');
+        setActiveView('DASHBOARD', '/profile');
         setActiveWorkspaceTab('SETTINGS');
         break;
       case 'MY_POSTS':
       case 'MY_QUESTIONS':
       case 'MY_COMMUNITIES':
-        setActiveView('DASHBOARD');
+        setActiveView('DASHBOARD', '/dashboard');
         setActiveWorkspaceTab('COMMUNITY');
         break;
       case 'MY_ENQUIRIES':
-        setActiveView('DASHBOARD');
+        setActiveView('DASHBOARD', '/dashboard');
         setActiveWorkspaceTab('REQUIREMENTS');
         break;
       case 'FIND_PROFESSIONALS':
       case 'DEVELOPERS':
       case 'CHANNEL_PARTNERS':
       case 'RERA_PROFESSIONALS':
-        setActiveView('PROFESSIONALS');
+        setActiveView('PROFESSIONALS', '/network');
         break;
       default:
-        setActiveView('HOME');
+        setActiveView('HOME', '/');
         break;
     }
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  // Synchronize with browser Back and Forward history buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window === 'undefined') return;
+      const path = window.location.pathname || '/';
+      setCurrentPath(path);
+      const match = matchRoute(path);
+      setRouteParams(match.params);
+      setIsNotFound(Boolean(match.isNotFound));
+      if (match.isNotFound) {
+        setActiveViewState('NOT_FOUND');
+      } else {
+        setActiveViewState(match.view);
+        setActiveNav(match.navKey);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     const directMap: Record<string, NavItemKey> = {
@@ -778,6 +896,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         localStorage.setItem('ps_session_user', JSON.stringify(mapped));
       } catch {}
+
+      // Check if user was trying to access a specific page before login
+      let redirectTarget = '';
+      try {
+        redirectTarget = sessionStorage.getItem('ps_redirect_after_login') || '';
+        if (redirectTarget) sessionStorage.removeItem('ps_redirect_after_login');
+      } catch {}
+
+      if (redirectTarget && redirectTarget !== '/' && redirectTarget !== '/home') {
+        const match = matchRoute(redirectTarget);
+        if (!match.isNotFound) {
+          navigate(redirectTarget);
+          showToast(`Signed in as ${mapped.name}`);
+          return;
+        }
+      }
+
       if (isPropertySeeker(mapped.role)) {
         setActiveView('DASHBOARD');
       } else {
@@ -1553,6 +1688,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         switchRole,
         activeView,
         setActiveView,
+        currentPath,
+        routeParams,
+        isNotFound,
+        navigate,
         deviceMode,
         setDeviceMode,
         activeNav,
