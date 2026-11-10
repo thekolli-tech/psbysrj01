@@ -295,7 +295,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
           <section className="flex-1 min-w-0 space-y-4 w-full">
             {/* If a discussion is selected, render DiscussionDetailView directly */}
             {selectedPostId ? (
-              <div className="bg-[#121214] rounded-3xl border border-[#333337] p-4 sm:p-6 shadow-xl">
+              <div className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-sm">
                 <DiscussionDetailView
                   postId={selectedPostId}
                   onBack={() => setSelectedPostId(null)}

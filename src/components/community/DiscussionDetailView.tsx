@@ -63,7 +63,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
 }) => {
   // Post data state
   const [post, setPost] = useState<CommunityPost | null>(() => {
-    return allPosts.find(p => p.id === postId) || null;
+    return allPosts.find(p => String(p.id) === String(postId)) || null;
   });
   const [postLoading, setPostLoading] = useState(!post);
 
@@ -85,13 +85,50 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
   const [isRepostingPost, setIsRepostingPost] = useState(false);
   const [isVotingPoll, setIsVotingPoll] = useState(false);
 
-  // Comments state
-  const [comments, setComments] = useState<CommentItem[]>([]);
+  // Comments state - pre-populate with existing post replies if present
+  const [comments, setComments] = useState<CommentItem[]>(() => {
+    const found = allPosts.find(p => String(p.id) === String(postId));
+    const initialReplies = (found as any)?.replies;
+    if (Array.isArray(initialReplies) && initialReplies.length > 0) {
+      return initialReplies.map((r: any) => ({
+        id: r.id || `reply_${Date.now()}_${Math.random()}`,
+        postId,
+        parentId: null,
+        authorId: r.authorId || r.author_id || 'author',
+        authorName: r.authorName || r.author_name || 'Community Member',
+        authorRole: r.authorRole || r.author_role || 'MEMBER',
+        authorAvatar: r.authorAvatar || r.author_avatar || null,
+        content: r.content || '',
+        likesCount: Number(r.likesCount || r.likes_count || 0),
+        userLiked: false,
+        isAmaAnswer: Boolean(r.isAmaAnswer || r.is_ama_answer || r.is_verified_builder),
+        isDeleted: false,
+        replies: Array.isArray(r.replies) ? r.replies : [],
+        createdAt: r.createdAt || r.created_at || new Date().toISOString(),
+        updatedAt: r.updatedAt || r.updated_at || new Date().toISOString()
+      }));
+    }
+    return [];
+  });
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [sortMode, setSortMode] = useState<'best' | 'newest' | 'oldest'>('best');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [totalComments, setTotalComments] = useState(0);
+  const [totalComments, setTotalComments] = useState<number>(() => {
+    const found = allPosts.find(p => String(p.id) === String(postId));
+    return (found as any)?.commentsCount || (found as any)?.replies?.length || 0;
+  });
+
+  // Keep post in sync with allPosts
+  useEffect(() => {
+    const found = allPosts.find(p => String(p.id) === String(postId));
+    if (found) {
+      setPost(found);
+      setUserVote(found.userVote ?? 0);
+      setIsBookmarked(Boolean(found.bookmarked));
+      setHasReposted(Boolean(found.hasReposted));
+    }
+  }, [postId, allPosts]);
 
   // Top-level comment composer state
   const [topCommentText, setTopCommentText] = useState('');
@@ -147,10 +184,17 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
       if (res.ok && Array.isArray(data.comments)) {
         if (append) {
           setComments(prev => [...prev, ...data.comments]);
-        } else {
+        } else if (data.comments.length > 0) {
           setComments(data.comments);
+        } else {
+          // If server returned 0 comments, retain any pre-populated initial replies
+          setComments(prev => (prev.length > 0 ? prev : []));
         }
-        setTotalComments(data.totalComments ?? data.comments.length);
+        setTotalComments(prev => {
+          if (typeof data.totalComments === 'number') return data.totalComments;
+          if (data.comments && data.comments.length > 0) return data.comments.length;
+          return prev;
+        });
         setHasMore(Boolean(data.hasMore));
         setPage(targetPage);
       }
@@ -485,7 +529,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
     setTotalComments(c => c + 1);
     setTopCommentText('');
     setTopCommentIsAma(false);
-    showToast(topCommentIsAma ? 'Verified AMA answer posted!' : 'Comment posted!');
+    showToast(isQuestion ? 'Answer posted successfully!' : topCommentIsAma ? 'Verified AMA answer posted!' : 'Comment posted!');
 
     // Background server call
     submittingTopRef.current = true;
@@ -1143,7 +1187,13 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs sm:text-sm font-bold text-slate-900">
-              {isLoggedIn ? `Join the Discussion as ${currentUser?.name}` : 'Sign in to Join the Discussion'}
+              {isLoggedIn
+                ? isQuestion
+                  ? `Write an Answer as ${currentUser?.name}`
+                  : `Join the Discussion as ${currentUser?.name}`
+                : isQuestion
+                ? 'Sign in to Answer this Question'
+                : 'Sign in to Join the Discussion'}
             </span>
             {isLoggedIn && (
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700">
@@ -1237,7 +1287,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <h2 className="text-base sm:text-lg font-bold text-slate-900">
-              Discussion Comments
+              {isQuestion ? 'Answers & Community Perspectives' : 'Discussion Comments'}
             </h2>
             <span className="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
               {totalComments}
@@ -1273,9 +1323,13 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
         ) : comments.length === 0 ? (
           <div className="py-12 text-center space-y-2 border border-dashed border-slate-200 rounded-2xl">
             <MessageSquare className="w-8 h-8 text-slate-300 mx-auto" />
-            <h4 className="text-sm font-bold text-slate-700">No Comments Yet</h4>
+            <h4 className="text-sm font-bold text-slate-700">
+              {isQuestion ? 'No Answers Yet' : 'No Comments Yet'}
+            </h4>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Be the first to share your perspectives, verify market prices, or ask questions!
+              {isQuestion
+                ? 'Be the first property expert or verified professional to answer this question!'
+                : 'Be the first to share your perspectives, verify market prices, or ask questions!'}
             </p>
           </div>
         ) : (

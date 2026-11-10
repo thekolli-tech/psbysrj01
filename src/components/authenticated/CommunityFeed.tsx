@@ -57,24 +57,6 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>(initialTopicFilter);
   const [selectedDiscussionId, setSelectedDiscussionId] = useState<string | null>(null);
 
-  // If a discussion is selected, render DiscussionDetailView
-  if (selectedDiscussionId) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-xs">
-        <DiscussionDetailView
-          postId={selectedDiscussionId}
-          onBack={() => setSelectedDiscussionId(null)}
-          currentUser={currentUser}
-          isLoggedIn={true}
-          allPosts={posts}
-          showToast={showToast}
-          refreshPosts={refreshPosts}
-          repostDiscussion={repostDiscussion}
-        />
-      </div>
-    );
-  }
-
   // Filter & sort logic
   const filteredPosts = useMemo(() => {
     const combined = [...(posts || [])];
@@ -152,6 +134,24 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({
 
     return result;
   }, [posts, activeTab, selectedCategory, searchQuery, currentUser]);
+
+  // If a discussion is selected, render DiscussionDetailView (after all hooks to prevent hook count mismatch)
+  if (selectedDiscussionId) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-xs">
+        <DiscussionDetailView
+          postId={selectedDiscussionId}
+          onBack={() => setSelectedDiscussionId(null)}
+          currentUser={currentUser}
+          isLoggedIn={true}
+          allPosts={posts}
+          showToast={showToast}
+          refreshPosts={refreshPosts}
+          repostDiscussion={repostDiscussion}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col gap-3.5 max-w-2xl xl:max-w-3xl w-full mx-auto">

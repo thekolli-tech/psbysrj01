@@ -3622,9 +3622,123 @@ function sqliteGetAllPosts(params?: {
   });
 }
 
+const BUILTIN_POST_SEEDS: Record<string, any> = {
+  post_official_welcome: {
+    title: 'Property Studio Live Construction & Engineering Community Feed',
+    content: 'Welcome to the official Property Studio forum. Real-time civil foundation reports, RERA compliance milestones, and micro-market analyses are published regularly here. Submit your questions or project updates directly below.',
+    author_id: 'usr_superadmin',
+    author_name: 'Swamy Reddy Javidi',
+    author_role: 'SUPER_ADMIN',
+    topic: 'Construction Updates',
+    upvotes: 48,
+    media_type: 'POST',
+    thumbnail_url: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
+    replies: [
+      {
+        id: 'reply_01',
+        author_id: 'usr_prop_admin_rajiv',
+        author_name: 'Rajiv Williams',
+        author_role: 'PROPERTY_ADMIN',
+        content: 'Project PMO confirms Level 42 casting is now complete with all SGS cube strength certifications on file.',
+        is_verified_builder: 1,
+        created_at: new Date(Date.now() - 3600000).toISOString()
+      }
+    ]
+  },
+  post_video_drone_neopolis: {
+    title: '4K Drone Walkthrough: Level 42 Shear Wall & Trumpet Interchange Progress',
+    content: 'Exclusive 4K aerial drone survey showing Tower A superstructure progression. Notice the acoustic curtain wall glazing progressing smoothly from Level 18 through 28 without civil delays.',
+    author_id: 'usr_agent_vikram',
+    author_name: 'Vikram Sethi',
+    author_role: 'AGENT',
+    topic: 'Construction Updates',
+    upvotes: 64,
+    media_type: 'VIDEO',
+    media_url: 'https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-modern-city-skyscrapers-31464-large.mp4',
+    thumbnail_url: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
+    duration: '3:45',
+    replies: [
+      {
+        id: 'reply_02',
+        author_id: 'usr_dev_maheshwar',
+        author_name: 'Maheshwar Rao (MD)',
+        author_role: 'DEVELOPER',
+        content: 'Thank you Vikram. Schindler high-speed destination dispatch elevator rails are arriving on site next week.',
+        is_verified_builder: 1,
+        created_at: new Date(Date.now() - 18 * 3600000).toISOString()
+      }
+    ]
+  },
+  post_rera_due_diligence: {
+    title: 'High Court Senior Advocate Title Due Diligence: 100% Clear Link Documents',
+    content: 'Before booking our triplex villa at Aura, our legal counsel conducted a 45-year title trace from 1980 onwards. Verified that zero Inam land or ceiling litigation exists across Survey No. 74.',
+    author_id: 'usr_seeker_ananya',
+    author_name: 'Dr. Ananya Rao',
+    author_role: 'PROPERTY_SEEKER',
+    topic: 'Legal & RERA',
+    upvotes: 38,
+    media_type: 'POST',
+    thumbnail_url: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=1200&q=80',
+    replies: []
+  }
+};
+
 function sqliteGetPostById(postId: string, currentUserId?: string): any {
   const stmt = db.prepare('SELECT * FROM community_posts WHERE id = ?');
-  const p = stmt.get(postId) as DbCommunityPost | undefined;
+  let p = stmt.get(postId) as DbCommunityPost | undefined;
+  if (!p) {
+    const seed = BUILTIN_POST_SEEDS[postId];
+    if (seed) {
+      try {
+        const now = new Date().toISOString();
+        db.prepare(`
+          INSERT OR IGNORE INTO community_posts (
+            id, author_id, author_name, author_role, topic, title, content, links, attachments,
+            media_type, media_url, thumbnail_url, duration, status, upvotes, comments_count,
+            is_pinned, is_flagged, post_type, visibility, poll_options, poll_votes, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, ?, ?, 'APPROVED', ?, ?, 0, 0, 'POST', 'PUBLIC', '[]', '{}', ?, ?)
+        `).run(
+          postId,
+          seed.author_id,
+          seed.author_name,
+          seed.author_role,
+          seed.topic,
+          seed.title,
+          seed.content,
+          seed.media_type || 'POST',
+          seed.media_url || null,
+          seed.thumbnail_url || null,
+          seed.duration || null,
+          seed.upvotes || 0,
+          seed.replies?.length || 0,
+          now,
+          now
+        );
+
+        for (const r of seed.replies || []) {
+          db.prepare(`
+            INSERT OR IGNORE INTO community_comments (
+              id, post_id, parent_id, author_id, author_name, author_role, author_avatar, content,
+              likes_count, is_ama_answer, is_deleted, created_at, updated_at
+            ) VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, 0, ?, 0, ?, ?)
+          `).run(
+            r.id,
+            postId,
+            r.author_id,
+            r.author_name,
+            r.author_role,
+            r.content,
+            r.is_verified_builder ? 1 : 0,
+            r.created_at,
+            r.created_at
+          );
+        }
+        p = stmt.get(postId) as DbCommunityPost | undefined;
+      } catch (err) {
+        console.warn('[Property Studio] Could not auto-seed fallback post:', err);
+      }
+    }
+  }
   if (!p) return null;
 
   const userLiked = currentUserId ? sqliteIsPostLikedByUser(postId, currentUserId) : false;
@@ -4083,6 +4197,35 @@ function sqliteGetCommentsForPost(
     }
   }
 
+  // Also include any legacy replies from community_replies table
+  try {
+    const legacyReplies = sqliteGetRepliesForPost(postId);
+    for (const r of legacyReplies) {
+      if (!commentMap.has(r.id)) {
+        const item = {
+          id: r.id,
+          postId: r.post_id,
+          parentId: null,
+          authorId: r.author_id || 'author',
+          authorName: r.author_name || 'Community Member',
+          authorRole: r.author_role || 'MEMBER',
+          authorAvatar: null,
+          content: r.content,
+          likesCount: 0,
+          userLiked: false,
+          isAmaAnswer: Boolean(r.is_verified_builder),
+          isDeleted: false,
+          deletedAt: null,
+          replies: [],
+          createdAt: r.created_at,
+          updatedAt: r.created_at
+        };
+        commentMap.set(r.id, item);
+        rootComments.push(item);
+      }
+    }
+  } catch {}
+
   // Sort child replies in each node chronologically
   for (const item of commentMap.values()) {
     item.replies.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -4126,9 +4269,27 @@ function sqliteCreateComment(data: {
   if (data.parentId) {
     const parent = sqliteGetCommentById(data.parentId);
     if (!parent) {
-      throw new Error('Parent comment not found');
-    }
-    if (parent.post_id !== data.postId) {
+      // Check if it's a legacy reply from community_replies
+      const legacyReplies = sqliteGetRepliesForPost(data.postId);
+      const matchedLegacy = legacyReplies.find(lr => lr.id === data.parentId);
+      if (!matchedLegacy) {
+        throw new Error('Parent comment not found');
+      }
+      db.prepare(`
+        INSERT OR IGNORE INTO community_comments (id, post_id, parent_id, author_id, author_name, author_role, author_avatar, content, likes_count, is_ama_answer, is_deleted, created_at, updated_at)
+        VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, 0, ?, 0, ?, ?)
+      `).run(
+        matchedLegacy.id,
+        matchedLegacy.post_id,
+        matchedLegacy.author_id || 'legacy_author',
+        matchedLegacy.author_name,
+        matchedLegacy.author_role,
+        matchedLegacy.content,
+        matchedLegacy.is_verified_builder ? 1 : 0,
+        matchedLegacy.created_at,
+        matchedLegacy.created_at
+      );
+    } else if (parent.post_id !== data.postId) {
       throw new Error('Parent comment does not belong to this discussion');
     }
   }
@@ -4413,43 +4574,51 @@ function sqliteCreateNotification(data: {
   title: string;
   message: string;
   linkUrl?: string;
-}): DbNotification {
-  const id = `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-  const now = new Date().toISOString();
+}): DbNotification | null {
+  try {
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(data.userId);
+    if (!user) return null;
 
-  db.prepare(`
-    INSERT INTO notifications (id, user_id, actor_id, actor_name, type, title, message, link_url, is_read, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
-  `).run(
-    id,
-    data.userId,
-    data.actorId,
-    data.actorName,
-    data.type,
-    data.title,
-    data.message,
-    data.linkUrl || null,
-    now
-  );
+    const id = `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    const now = new Date().toISOString();
 
-  sqliteRecordCommunityEvent('NOTIFICATION_EVENT', {
-    id,
-    userId: data.userId,
-    title: data.title
-  }, data.userId);
+    db.prepare(`
+      INSERT INTO notifications (id, user_id, actor_id, actor_name, type, title, message, link_url, is_read, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+    `).run(
+      id,
+      data.userId,
+      data.actorId,
+      data.actorName,
+      data.type,
+      data.title,
+      data.message,
+      data.linkUrl || null,
+      now
+    );
 
-  return {
-    id,
-    user_id: data.userId,
-    actor_id: data.actorId,
-    actor_name: data.actorName,
-    type: data.type,
-    title: data.title,
-    message: data.message,
-    link_url: data.linkUrl,
-    is_read: 0,
-    created_at: now
-  };
+    sqliteRecordCommunityEvent('NOTIFICATION_EVENT', {
+      id,
+      userId: data.userId,
+      title: data.title
+    }, data.userId);
+
+    return {
+      id,
+      user_id: data.userId,
+      actor_id: data.actorId,
+      actor_name: data.actorName,
+      type: data.type,
+      title: data.title,
+      message: data.message,
+      link_url: data.linkUrl,
+      is_read: 0,
+      created_at: now
+    };
+  } catch (err) {
+    console.warn('[Property Studio] Could not dispatch notification safely:', err);
+    return null;
+  }
 }
 
 function sqliteGetUserNotifications(userId: string, limit = 30): DbNotification[] {

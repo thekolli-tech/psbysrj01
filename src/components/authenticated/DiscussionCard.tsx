@@ -95,7 +95,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
   return (
     <article
       onClick={() => onOpenDetail(post.id)}
-      className="group relative bg-[#121214] border border-[#333337] hover:border-[#C5A880]/50 rounded-3xl p-4 sm:p-6 transition-all duration-200 shadow-lg hover:shadow-2xl cursor-pointer flex flex-col gap-3.5 text-white"
+      className="group relative bg-white border border-slate-200/90 hover:border-[#B49029]/80 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer flex flex-col gap-3 text-slate-800"
       style={{
         transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
       }}
@@ -221,13 +221,19 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
       </div>
 
       {/* Post Title */}
-      <h3 className="text-base sm:text-lg font-bold font-serif text-white group-hover:text-[#D7B991] tracking-tight leading-snug">
+      <h3
+        onClick={e => {
+          e.stopPropagation();
+          onOpenDetail(post.id);
+        }}
+        className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-[#182A3E] hover:text-[#B49029] tracking-tight leading-snug cursor-pointer transition-colors"
+      >
         {post.title}
       </h3>
 
       {/* Post Body Description Preview */}
       {post.content && (
-        <p className="text-xs sm:text-sm text-[#A5A5AA] line-clamp-3 leading-relaxed whitespace-pre-line font-normal">
+        <p className="text-xs sm:text-sm text-slate-600 line-clamp-3 leading-relaxed whitespace-pre-line font-normal cursor-pointer">
           {post.content}
         </p>
       )}
@@ -343,18 +349,18 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
       </div>
 
       {/* Bottom Action Bar */}
-      <div className="flex items-center justify-between pt-2 border-t border-[#333337] text-xs text-[#A5A5AA]">
+      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Upvote / Downvote Pill */}
           <div
             onClick={e => e.stopPropagation()}
-            className="inline-flex items-center bg-[#1B1B1E] hover:bg-[#26262b] rounded-full p-0.5 border border-[#333337] transition-colors"
+            className="inline-flex items-center bg-slate-50 hover:bg-slate-100 rounded-full p-0.5 border border-slate-200 transition-colors"
           >
             <button
               type="button"
               onClick={e => handleVote(e, 1)}
               className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                localVote === 1 ? 'text-[#C5A880] bg-[#121214] shadow-xs' : 'text-[#A5A5AA] hover:text-white'
+                localVote === 1 ? 'text-[#B49029] bg-amber-50 shadow-xs' : 'text-slate-400 hover:text-slate-700'
               }`}
               title="Upvote"
               aria-label="Upvote"
@@ -362,7 +368,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
               <ArrowBigUp className="w-4 h-4 fill-current" />
             </button>
 
-            <span className={`px-1.5 text-xs font-bold ${localVote !== 0 ? 'text-[#C5A880]' : 'text-slate-300'}`}>
+            <span className={`px-1.5 text-xs font-bold ${localVote !== 0 ? 'text-[#B49029]' : 'text-slate-700'}`}>
               {localScore}
             </span>
 
@@ -370,7 +376,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
               type="button"
               onClick={e => handleVote(e, -1)}
               className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                localVote === -1 ? 'text-blue-400 bg-[#121214] shadow-xs' : 'text-[#A5A5AA] hover:text-white'
+                localVote === -1 ? 'text-blue-600 bg-blue-50 shadow-xs' : 'text-slate-400 hover:text-slate-700'
               }`}
               title="Downvote"
               aria-label="Downvote"
@@ -386,9 +392,10 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
               e.stopPropagation();
               onOpenDetail(post.id);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1B1B1E] hover:bg-[#26262b] text-slate-300 border border-[#333337] rounded-full font-semibold transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-full font-semibold transition-colors cursor-pointer"
+            title="View discussion comments"
           >
-            <MessageSquare className="w-3.5 h-3.5 text-[#C5A880]" />
+            <MessageSquare className="w-3.5 h-3.5 text-[#B49029]" />
             <span>{post.commentsCount || (post as any).replies?.length || 0}</span>
             <span className="hidden sm:inline">Comments</span>
           </button>
