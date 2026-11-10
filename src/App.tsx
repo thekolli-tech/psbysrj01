@@ -277,7 +277,7 @@ const AppContent: React.FC = () => {
               <PropertyList onClaimProject={(prop) => setClaimTarget(prop)} />
             )}
             {activeView === 'LEADS_MARKET' && (
-              !isPropertySeeker(currentUser.role) ? (
+              (!isPropertySeeker(currentUser.role) || currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEVELOPER') ? (
                 <LeadMarketplace onOpenWalletModal={() => setWalletModalOpen(true)} />
               ) : (
                 <AuthRequiredCard view="LEADS_MARKET" onOpenLoginModal={() => setLoginModalOpen(true)} />
@@ -397,7 +397,7 @@ const AppContent: React.FC = () => {
               )
             )}
             {activeView === 'PROPERTY_ADMIN' && (
-              currentUser.role === 'PROPERTY_ADMIN' ? (
+              (currentUser.role === 'PROPERTY_ADMIN' || currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEVELOPER') ? (
                 <PropertyAdminDashboard />
               ) : (
                 <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-xs text-center space-y-4">
@@ -572,7 +572,7 @@ const AppContent: React.FC = () => {
         )}
 
         {activeView === 'PROFESSIONAL' && (
-          isLoggedIn && canAccessProfessionalSurface(currentUser.role) && !isPropertySeeker(currentUser.role) ? (
+          isLoggedIn && (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEVELOPER' || (canAccessProfessionalSurface(currentUser.role) && !isPropertySeeker(currentUser.role))) ? (
             <ProfessionalDashboard />
           ) : (
             <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-2">
@@ -616,7 +616,7 @@ const AppContent: React.FC = () => {
 
         {/* Property Admin Dashboard with Scoped Guard */}
         {activeView === 'PROPERTY_ADMIN' && (
-          currentUser.role === 'PROPERTY_ADMIN' && isLoggedIn ? (
+          (currentUser.role === 'PROPERTY_ADMIN' || currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEVELOPER') && isLoggedIn ? (
             <PropertyAdminDashboard />
           ) : (
             <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-xs text-center space-y-4">

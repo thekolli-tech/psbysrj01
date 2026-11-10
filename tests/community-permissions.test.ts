@@ -26,7 +26,8 @@ test('Schema and UI invariants for Community creation, membership, and discussio
 
   // 3. Discussion Repost with Repeat icon and attribution
   assert.match(communityForum, /handleToggleRepost/);
-  assert.match(communityForum, /<Repeat/);
+  // Repost button removed from post card UI per user request: "remove share follow and repost"
+  // assert.match(communityForum, /<Repeat/);
   assert.match(communityForum, /repostDiscussion/);
 
   // 4. Dedicated Community Hub Page & Private community locking

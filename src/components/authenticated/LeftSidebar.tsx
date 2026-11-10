@@ -58,7 +58,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   };
 
   const feedsList = [
-    { key: 'HOME' as const, label: 'Overview', icon: Home },
+    { key: 'HOME' as const, label: 'Home', icon: Home },
     { key: 'MEDIA' as const, label: 'Media & Podcast', icon: Video },
     { key: 'MARKET_INSIGHTS' as const, label: 'Market Trends & Insights', icon: TrendingUp },
     { key: 'REVIEWS' as const, label: 'Review & Rating', icon: Star },
@@ -77,7 +77,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     { key: 'PROFESSIONAL' as const, label: 'Professional Workspace', icon: Briefcase },
     { key: 'PROPERTY_ADMIN' as const, label: 'PMO Workspace', icon: Building },
     { key: 'ADMIN' as const, label: 'Admin Console', icon: ShieldCheck },
-    { key: 'DEVELOPER' as const, label: 'Developer Diagnostics', icon: Terminal }
+    ...(userRole === 'DEVELOPER'
+      ? [{ key: 'DEVELOPER' as const, label: 'Developer Diagnostics', icon: Terminal }]
+      : [])
   ];
 
   return (

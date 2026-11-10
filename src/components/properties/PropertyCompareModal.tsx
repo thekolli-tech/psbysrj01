@@ -152,7 +152,7 @@ export const PropertyCompareModal: React.FC<PropertyCompareModalProps> = ({
 
             {/* RERA Registration */}
             <div className="grid grid-cols-1 md:grid-cols-4 p-4">
-              <span className="font-bold text-slate-500 uppercase tracking-wider text-[11px]">TG RERA ID</span>
+              <span className="font-bold text-slate-500 uppercase tracking-wider text-[11px]">RERA ID</span>
               {properties.map(p => (
                 <div key={p.id} className="md:col-span-1 pt-1 md:pt-0 font-mono text-slate-800">
                   {p.reraRegId}

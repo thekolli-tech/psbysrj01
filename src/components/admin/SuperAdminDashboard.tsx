@@ -1185,7 +1185,7 @@ export const SuperAdminDashboard: React.FC = () => {
                       {properties.length.toLocaleString()}
                     </div>
                     <span className="text-xs text-emerald-600 font-bold flex items-center gap-0.5 pl-1">
-                      ↑ {properties.filter(p => Boolean(p.reraRegId)).length || properties.length} TS-RERA verified
+                      ↑ {properties.filter(p => Boolean(p.reraRegId)).length || properties.length} RERA verified
                     </span>
                   </div>
                   <svg className="w-24 h-10 text-emerald-600 overflow-visible" viewBox="0 0 96 40" fill="none">
@@ -3091,7 +3091,7 @@ export const SuperAdminDashboard: React.FC = () => {
             <h3 className="text-base font-bold text-slate-900">
               Agent RERA Verification Queue ({agentApplications.length})
             </h3>
-            <span className="text-xs text-slate-500">Requires TS-RERA certificate audit</span>
+            <span className="text-xs text-slate-500">Requires RERA certificate audit</span>
           </div>
 
           <div className="divide-y divide-slate-100 text-xs">

@@ -1163,7 +1163,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   const suggestedFollows = useMemo(() => {
     const list: Array<{ id: string; name: string; role: string; profession?: string; company?: string }> = [
       { id: 'usr_founder_srj', name: 'Swamy Reddy Javidi', role: 'FOUNDER & CEO', profession: 'PropTech Architect & Founder', company: 'Property Studio' },
-      { id: 'usr_ts_rera_desk', name: 'TS-RERA Intelligence Desk', role: 'REGULATORY_ANALYST', profession: 'Statutory Compliance Lead', company: 'Property Studio Research' },
+      { id: 'usr_ts_rera_desk', name: 'Regulatory Intelligence Desk', role: 'REGULATORY_ANALYST', profession: 'Statutory Compliance Lead', company: 'Property Studio Research' },
       { id: 'usr_secretariat', name: 'Property Studio Secretariat', role: 'VERIFICATION_DESK', profession: 'Editorial & Community Governance', company: 'Property Studio' },
       { id: 'usr_corridor_analyst', name: 'Western Corridor Research', role: 'MARKET_ANALYST', profession: 'Macro Infrastructure Analyst', company: 'Capital Advisory' }
     ];
@@ -2377,27 +2377,6 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                             <span>{post.commentsCount || (post.replies ? post.replies.length : 0)}</span>
                           </button>
 
-                          {/* Repost Pill: [ 🔁 Repost ] */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleRepost(post)}
-                            aria-pressed={row.hasReposted}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold border transition-colors cursor-pointer ${
-                              row.hasReposted
-                                ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                                : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border-slate-200/80'
-                            }`}
-                            title={row.hasReposted ? 'Remove repost' : 'Repost discussion to your profile'}
-                          >
-                            {repostingPostId === post.id ? (
-                              <Clock className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                            ) : (
-                              <Repeat className={`w-3.5 h-3.5 ${row.hasReposted ? 'text-emerald-600' : 'text-slate-500'}`} />
-                            )}
-                            <span>{row.repostsCount ?? post.repostsCount ?? 0}</span>
-                            <span className="hidden sm:inline">{repostingPostId === post.id ? 'Reposting...' : row.hasReposted ? 'Reposted' : 'Repost'}</span>
-                          </button>
-
                           {/* Bookmark Pill: [ 🔖 Bookmark ] */}
                           <button
                             type="button"
@@ -2411,30 +2390,6 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                           >
                             <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-600 text-amber-600' : 'text-slate-500'}`} />
                             <span>{isBookmarked ? 'Saved' : 'Save'}</span>
-                          </button>
-
-                          {/* Share Pill: [ ↗ Share ] */}
-                          <button
-                            type="button"
-                            onClick={() => handleShare(post)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-semibold border border-slate-200/80 transition-colors cursor-pointer"
-                          >
-                            <Share2 className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Share</span>
-                          </button>
-
-                          {/* Follow Discussion Pill */}
-                          <button
-                            type="button"
-                            onClick={() => handleFollow(post)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold border transition-colors cursor-pointer ${
-                              row.following
-                                ? 'bg-blue-100 text-blue-900 border-blue-300'
-                                : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border-slate-200/80'
-                            }`}
-                          >
-                            <UserCheck className={`w-3.5 h-3.5 ${row.following ? 'text-blue-600' : 'text-slate-500'}`} />
-                            <span>{row.following ? 'Following' : 'Follow'}</span>
                           </button>
                         </div>
 
@@ -2734,7 +2689,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
                   </span>
                 </div>
                 <h4 className="font-bold text-slate-900 leading-snug">
-                  {activeLiveAma?.title || 'TS-RERA Compliance, Infrastructure Masterplans & Delivery Audits'}
+                  {activeLiveAma?.title || 'RERA Compliance, Infrastructure Masterplans & Delivery Audits'}
                 </h4>
                 <p className="text-[11px] text-slate-600">
                   Host: {activeLiveAma?.amaHostName || activeLiveAma?.authorName || 'Swamy Reddy Javidi (Founder & CEO)'}

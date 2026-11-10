@@ -435,7 +435,7 @@ test('Module 9 & 10.1: Frontend DiscussionDetailView component integrates all re
   assert.match(detailFile, /Replying\.\.\./);
   assert.match(forumFile, /Posting\.\.\./);
   assert.match(forumFile, /Publishing\.\.\./);
-  assert.match(detailFile, /Reposting\.\.\./);
+  // Reposting removed per user request: "remove share follow and repost"
   assert.match(detailFile, /Saving\.\.\./);
   // Thread indentation clamp for mobile
   assert.match(detailFile, /depth >= 4/);

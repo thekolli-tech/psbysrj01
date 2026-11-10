@@ -148,7 +148,7 @@ export const ProfessionalDashboard: React.FC = () => {
           </div>
 
           <p className="text-xs text-[#64748B] leading-relaxed">
-            Status: <strong className="text-[#030508]">{profile?.verification_status || 'Not submitted'}</strong>. Submission of a valid RERA number initiates administrative verification with TS-RERA portal records.
+            Status: <strong className="text-[#030508]">{profile?.verification_status || 'Not submitted'}</strong>. Submission of a valid RERA number initiates administrative verification with RERA portal records.
           </p>
 
           <form onSubmit={saveProfile} className="space-y-3">

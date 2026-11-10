@@ -23,7 +23,7 @@ test('end-user navigation includes requirement and review routes', () => {
   assert.deepEqual(
     REQUESTED_END_USER_NAV.map(item => [item.label, item.view]),
     [
-      ['Overview', 'HOME'],
+      ['Home', 'HOME'],
       ['Media & Podcast', 'MEDIA'],
       ['Market Trends & Insights', 'MARKET_INSIGHTS'],
       ['Review & Rating — All Stakeholders and Projects', 'REVIEWS'],

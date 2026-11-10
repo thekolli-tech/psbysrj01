@@ -34,7 +34,7 @@ const INITIAL_TESTIMONIALS: Testimonial[] = [
     role: 'Buyer',
     location: 'Tellapur',
     rating: 5,
-    content: 'The TS-RERA audit checklists saved us months of anxiety. Completely transparent data without developer spin.',
+    content: 'The RERA audit checklists saved us months of anxiety. Completely transparent data without developer spin.',
     isVerified: true,
     helpfulCount: 42,
     date: '2 days ago'

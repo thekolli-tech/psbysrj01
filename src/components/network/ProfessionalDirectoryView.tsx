@@ -154,7 +154,7 @@ const DIRECTORY_ENTITIES: ProfessionalEntity[] = [
     location: 'Banjara Hills & Secretariat, Hyderabad',
     experience: '20+ Years Practice',
     description: 'Independent legal counsel providing comprehensive 30-year title verification, Telangana RERA registration validation, and master-plan zoning checks.',
-    notableProjects: ['30-Year Title Search', 'TG RERA Project Audit', 'Master Plan Zoning Certificates'],
+    notableProjects: ['30-Year Title Search', 'RERA Project Audit', 'Master Plan Zoning Certificates'],
     avatar: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=200&q=80',
     rating: 5.0,
     reviewCount: 94

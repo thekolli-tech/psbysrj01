@@ -161,7 +161,7 @@ const GUEST_USER: User = {
 
 const DEFAULT_CONFERENCE: CorporateConference = {
   id: 'conf-neopolis-summit-2026',
-  title: 'Neopolis High-Rise Engineering & TS-RERA Compliance Summit',
+  title: 'Neopolis High-Rise Engineering & RERA Compliance Summit',
   developerName: 'Property Studio Secretariat & Verified Developers',
   projectFocus: 'Kokapet & Neopolis Corridor Infrastructure Master Plan',
   date: 'Active Live Stream',
@@ -176,7 +176,7 @@ const DEFAULT_CONFERENCE: CorporateConference = {
   totalSlides: 12,
   agenda: [
     '11:00 AM - Corridor Infrastructure Timeline & Metro Phase 2 Link (Swamy Reddy Javidi)',
-    '11:30 AM - TS-RERA Legal Due Diligence & Escrow Audits (Adv. RERA Counsel)',
+    '11:30 AM - RERA Legal Due Diligence & Escrow Audits (Adv. RERA Counsel)',
     '12:00 PM - Live Attendee Q&A & Investor Voting (Secretariat Panel)'
   ],
   questions: [
@@ -189,7 +189,7 @@ const DEFAULT_CONFERENCE: CorporateConference = {
       id: 'poll-1',
       question: 'Which factor is most critical in your Hyderabad high-rise purchasing decision?',
       options: [
-        { label: 'TS-RERA Clean Title & Escrow Audits (55%)', votes: 136 },
+        { label: 'RERA Clean Title & Escrow Audits (55%)', votes: 136 },
         { label: 'Approach Road Width & Corridor Infrastructure (30%)', votes: 74 },
         { label: 'Developer Track Record & Delivery Punctuality (15%)', votes: 38 }
       ],

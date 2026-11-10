@@ -959,18 +959,6 @@ export const AboutUsView: React.FC<AboutUsViewProps> = ({
                     <p className="text-[11px] text-slate-300">Property Studio · Sadguna Properties</p>
                   </div>
                 </div>
-
-                {/* Government & RERA Identifiers */}
-                <div className="mt-3.5 space-y-2 text-xs">
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <span className="text-[11px] font-medium text-slate-500">TG RERA Registered</span>
-                    <span className="font-mono font-bold text-slate-800 text-[11px]">A02400000035</span>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <span className="text-[11px] font-medium text-slate-500">MSME Govt of India</span>
-                    <span className="font-mono font-bold text-slate-800 text-[11px]">UDYAM-TS-09-0083162</span>
-                  </div>
-                </div>
               </div>
             </div>
 

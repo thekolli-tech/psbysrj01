@@ -767,8 +767,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E4D8] w-full max-w-lg md:max-w-xl max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E4D8] w-full max-w-lg md:max-w-xl max-h-[96dvh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
         {/* Modal Header Matching Reference Image */}
         <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[#E8E4D8] flex items-center justify-between bg-[#182A3E] text-white shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -1552,7 +1552,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <label className="block font-bold text-slate-700 text-center mb-2 text-xs">
                       Enter 6-Digit WhatsApp Verification Code
                     </label>
-                    <div className="flex justify-center gap-2 sm:gap-2.5">
+                    <div className="flex justify-center gap-1.5 sm:gap-2.5">
                       {otpDigits.map((digit, idx) => (
                         <input
                           key={idx}
@@ -1565,7 +1565,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                           onChange={e => handleOtpDigitChange(idx, e.target.value)}
                           onKeyDown={e => handleOtpDigitKeyDown(idx, e)}
                           onPaste={handleOtpPaste}
-                          className="w-10 h-12 sm:w-11 sm:h-12 text-center text-lg sm:text-xl font-mono font-bold border-2 rounded-xl border-slate-300 focus:border-[#B49029] focus:ring-2 focus:ring-[#B49029]/20 focus:outline-none transition-all bg-white"
+                          className="w-9 h-11 sm:w-11 sm:h-12 text-center text-lg sm:text-xl font-mono font-bold border-2 rounded-xl border-slate-300 focus:border-[#B49029] focus:ring-2 focus:ring-[#B49029]/20 focus:outline-none transition-all bg-white shrink-0"
                           autoFocus={idx === 0}
                         />
                       ))}

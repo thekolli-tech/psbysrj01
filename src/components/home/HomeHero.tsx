@@ -461,7 +461,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                   <FileCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs sm:text-sm font-bold text-[#A99137] leading-tight">TS-RERA</div>
+                  <div className="text-xs sm:text-sm font-bold text-[#A99137] leading-tight">RERA</div>
                   <div className="text-[11px] font-medium text-[#64748B]">Audited Projects</div>
                 </div>
               </div>
@@ -484,7 +484,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-300 max-w-xl mt-0.5">
-                  Explore buyer sanity checks, Neopolis pricing debates, TG RERA legal checklists, and verified insider community intelligence.
+                  Explore buyer sanity checks, Neopolis pricing debates, RERA legal checklists, and verified insider community intelligence.
                 </p>
               </div>
             </div>
@@ -632,7 +632,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 Eliminate Financial Risk
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Protecting families through rigorous compliance analysis and TS-RERA audit checks.
+                Protecting families through rigorous compliance analysis and RERA audit checks.
               </p>
             </div>
 

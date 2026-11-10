@@ -35,8 +35,8 @@ const PROGRAM_ARTICLES: ProgramCard[] = [
     title: 'How to verify a RERA registration',
     summary: 'Check that the project is registered and the details match what you were shown.',
     steps: [
-      'Visit the official TS-RERA portal (rera.telangana.gov.in) and locate the Project Registration search tab.',
-      'Enter the TS-RERA registration number provided by the promoter or agent (format: P0240000XXXX).',
+      'Visit the official RERA portal (rera.telangana.gov.in) and locate the Project Registration search tab.',
+      'Enter the RERA registration number provided by the promoter or agent (format: P0240000XXXX).',
       'Examine the approved building sanction drawings, commencement certificate, and the scheduled possession date.',
       'Verify the designated 70% Escrow bank account where customer remittances must be deposited.',
       'Check for any litigation, encumbrance certificates, or show-cause notices recorded against the developer.'
@@ -80,7 +80,7 @@ const PROGRAM_ARTICLES: ProgramCard[] = [
     title: 'Reading a sale agreement',
     summary: 'The clauses worth slowing down for before you sign.',
     steps: [
-      'Scrutinize the default and delay compensation clause: Must adhere to SBI MCLR + 2% per TS-RERA rules.',
+      'Scrutinize the default and delay compensation clause: Must adhere to SBI MCLR + 2% per RERA rules.',
       'Check specification change clauses: The promoter cannot alter layout or unit plans without 2/3rd buyer consent.',
       'Review force majeure definitions: Ensure broad vague exceptions (e.g. general market delays) are excluded.',
       'Confirm car parking allocation is clearly demarcated by basement level and slot number.',

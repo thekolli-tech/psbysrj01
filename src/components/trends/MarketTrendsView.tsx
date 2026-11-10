@@ -73,7 +73,7 @@ export const MarketTrendsView: React.FC = () => {
             Western Corridor Market Trends & Capital Appreciation
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B] max-w-2xl leading-relaxed">
-            Live real-time micro-market intelligence across Hyderabad's Western Corridor. Verified TS-RERA analytics, land auction telemetry, and capital appreciation under Swamy Reddy Javidi.
+            Live real-time micro-market intelligence across Hyderabad's Western Corridor. Verified market analytics, land auction telemetry, and capital appreciation under Swamy Reddy Javidi.
           </p>
         </div>
 

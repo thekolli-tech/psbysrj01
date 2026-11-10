@@ -1,0 +1,26 @@
+{
+  "name": "Property Studio",
+  "short_name": "Property Studio",
+  "description": "Real Estate Media Network and Community PropTech Platform by Swamy Reddy Javidi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#030712",
+  "theme_color": "#182A3E",
+  "categories": ["business", "real estate", "productivity"],
+  "icons": [
+    {
+      "src": "/brand/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/property-studio-logo-square.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

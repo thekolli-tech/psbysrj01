@@ -769,6 +769,7 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
   const score = agreeCount - disagreeCount;
   const isPoll = post.postType === 'POLL';
   const isAma = post.postType === 'AMA';
+  const isQuestion = post.postType === 'QUESTION';
   const pollOpts = post.pollOptions || [];
   const totalPollVotes = pollOpts.reduce((sum: number, opt: any) => sum + Number(opt.votes || 0), 0);
 
@@ -1054,27 +1055,6 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
               <span className="hidden sm:inline">Comments</span>
             </div>
 
-            {/* Repost Pill */}
-            <button
-              type="button"
-              disabled={isRepostingPost}
-              onClick={handleToggleRepost}
-              aria-pressed={hasReposted}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold border transition-colors cursor-pointer ${
-                hasReposted
-                  ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                  : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border-slate-200/80'
-              } disabled:opacity-50`}
-            >
-              {isRepostingPost ? (
-                <Clock className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-              ) : (
-                <Repeat className={`w-3.5 h-3.5 ${hasReposted ? 'text-emerald-600' : 'text-slate-500'}`} />
-              )}
-              <span>{repostsCount}</span>
-              <span className="hidden sm:inline">{isRepostingPost ? 'Reposting...' : hasReposted ? 'Reposted' : 'Repost'}</span>
-            </button>
-
             {/* 5-Star Discussion Quality Rating */}
             <div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-amber-50/70 border border-amber-200 text-xs text-amber-900 font-semibold">
               <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider mr-1 hidden sm:inline">Thread Quality:</span>
@@ -1122,31 +1102,6 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
             >
               <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-600 text-amber-600' : 'text-slate-500'}`} />
               <span>{isBookmarked ? 'Saved' : 'Save'}</span>
-            </button>
-
-            {/* Share Pill */}
-            <button
-              type="button"
-              onClick={handleShare}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-semibold border border-slate-200/80 transition-colors cursor-pointer"
-            >
-              <Share2 className="w-3.5 h-3.5 text-slate-500" />
-              <span>Share</span>
-            </button>
-
-            {/* Follow Discussion Pill */}
-            <button
-              type="button"
-              disabled={isFollowingPost}
-              onClick={handleFollow}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold border transition-colors cursor-pointer ${
-                isFollowing
-                  ? 'bg-blue-100 text-blue-900 border-blue-300'
-                  : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border-slate-200/80'
-              } disabled:opacity-50`}
-            >
-              <UserCheck className={`w-3.5 h-3.5 ${isFollowing ? 'text-blue-600' : 'text-slate-500'}`} />
-              <span>{isFollowing ? 'Following' : 'Follow'}</span>
             </button>
           </div>
 
@@ -1219,7 +1174,11 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
               isLoggedIn
                 ? isAma
                   ? 'Ask the host a direct question or post your verified answer...'
+                  : isQuestion
+                  ? 'Write your verified answer, pricing data, or expert advice to this question...'
                   : 'What are your thoughts? Share verified pricing data, legal observations, or market realities...'
+                : isQuestion
+                ? 'Please sign in to answer this question...'
                 : 'Please sign in to comment on this discussion...'
             }
             className="w-full px-4 py-3 text-xs sm:text-sm border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none bg-slate-50/50"
@@ -1258,12 +1217,12 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
                 {isSubmittingTopComment ? (
                   <>
                     <Clock className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                    <span>Commenting...</span>
+                    <span>{isQuestion ? 'Posting Answer...' : 'Commenting...'}</span>
                   </>
                 ) : (
                   <>
                     <Send className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Comment</span>
+                    <span>{isQuestion ? 'Post Answer' : 'Comment'}</span>
                   </>
                 )}
               </button>

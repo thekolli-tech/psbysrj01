@@ -134,7 +134,7 @@ export const AgentOnboardModal: React.FC<AgentOnboardModalProps> = ({ isOpen, on
                 onChange={e => setFormData({ ...formData, reraState: e.target.value })}
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
               >
-                <option value="Telangana">Telangana (TS-RERA)</option>
+                <option value="Telangana">Telangana (RERA)</option>
                 <option value="Karnataka">Karnataka (K-RERA)</option>
                 <option value="Maharashtra">Maharashtra (MahaRERA)</option>
               </select>

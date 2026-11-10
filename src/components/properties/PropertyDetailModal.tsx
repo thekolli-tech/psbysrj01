@@ -349,7 +349,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 audioUrl={property.audioNarrationUrl}
                 transcript={
                   property.audioTranscript ||
-                  `This is the Property Studio architectural due-diligence review for ${property.title} located at ${property.location}. Featuring ${displayPropertyType(property.propertyType)} architecture with civil construction verified at ${property.progressPercent}%, this development adheres strictly to TS-RERA approval registration ID ${property.reraRegId}.`
+                  `This is the Property Studio architectural due-diligence review for ${property.title} located at ${property.location}. Featuring ${displayPropertyType(property.propertyType)} architecture with civil construction verified at ${property.progressPercent}%, this development adheres strictly to RERA approval registration ID ${property.reraRegId}.`
                 }
                 badge="Executive Voice Audit"
                 variant="card"
@@ -512,7 +512,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         {/* Modal Bottom Action Footer */}
         <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-xs text-slate-500">
-            TG RERA ID: <strong className="font-mono text-slate-800">{property.reraRegId}</strong>
+            RERA ID: <strong className="font-mono text-slate-800">{property.reraRegId}</strong>
             <span className="mx-2 text-slate-300" aria-hidden="true">·</span>
             Handover: <strong className="text-slate-800">{property.completionDate}</strong>
           </div>
@@ -540,7 +540,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         {/* Verified Regulatory Telemetry Bar */}
         <div className="px-6 py-2.5 bg-[#FCFBF3] border-t border-[#E8E4D8] text-[11px] text-[#182A3E] flex items-center justify-between">
           <span>
-            <strong className="text-[#030508]">Verified Property Dossier:</strong> Architectural specifications, pricing brackets, TS-RERA registration ({property.reraRegId || 'Verified Record'}), and civil progress milestones are monitored under Property Studio regulatory intelligence.
+            <strong className="text-[#030508]">Verified Property Dossier:</strong> Architectural specifications, pricing brackets, RERA registration ({property.reraRegId || 'Verified Record'}), and civil progress milestones are monitored under Property Studio regulatory intelligence.
           </span>
           <span className="font-mono text-amber-700 uppercase font-semibold text-[10px] hidden md:inline shrink-0 ml-2">
             Verified Record

@@ -21,7 +21,7 @@ export const LiveChatEngine: React.FC = () => {
       id: 'user_agent_vikram',
       name: 'Vikram Sethi',
       role: 'Verified RERA Agent',
-      badge: 'TS-RERA A02400001882',
+      badge: 'RERA Advisory Desk',
       avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=120&q=80',
       online: true
     },

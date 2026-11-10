@@ -52,7 +52,7 @@ test('end-user navigation order links only existing destinations', () => {
   assert.deepEqual(
     REQUESTED_END_USER_NAV.map(item => item.label),
     [
-      'Overview',
+      'Home',
       'Media & Podcast',
       'Market Trends & Insights',
       'Review & Rating — All Stakeholders and Projects',
@@ -67,7 +67,7 @@ test('end-user navigation order links only existing destinations', () => {
   assert.deepEqual(
     linked.map(item => item.label),
     [
-      'Overview',
+      'Home',
       'Media & Podcast',
       'Market Trends & Insights',
       'Review & Rating — All Stakeholders and Projects',

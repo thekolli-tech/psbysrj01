@@ -273,7 +273,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-[#B49029]" />
                   <span className="text-xs font-black tracking-wide uppercase font-mono text-[#CEC8A2]">
-                    Verified TS-RERA Ecosystem
+                    Verified Real Estate Ecosystem
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-300 leading-relaxed">
@@ -310,6 +310,21 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
               </div>
             ) : (
               <>
+                {/* Compact Mobile Join Banner */}
+                <div className="lg:hidden bg-gradient-to-r from-[#182A3E] to-[#1E344D] text-white rounded-2xl p-3.5 border border-[#B49029]/30 shadow-xs flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-black text-white truncate">Join Hyderabad Property Network</h4>
+                    <p className="text-[11px] text-slate-300 truncate">Ask questions & verify micro-market data</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onOpenLoginModal}
+                    className="px-3 py-1.5 bg-[#B49029] hover:bg-[#A38122] text-[#182A3E] font-bold text-xs rounded-xl shrink-0 transition-colors cursor-pointer shadow-xs active:scale-95"
+                  >
+                    Join / Sign In
+                  </button>
+                </div>
+
                 {/* Reddit-style Filter Bar: Best / Latest / Trending */}
                 <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-3 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                   {/* Sort Tabs */}

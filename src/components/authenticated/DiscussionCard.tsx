@@ -392,26 +392,6 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
             <span>{post.commentsCount || (post as any).replies?.length || 0}</span>
             <span className="hidden sm:inline">Comments</span>
           </button>
-
-          {/* Share Pill */}
-          <button
-            type="button"
-            onClick={handleShare}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/70 rounded-full font-semibold transition-colors cursor-pointer"
-            title="Share discussion"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-emerald-700 font-bold">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="w-3.5 h-3.5 text-slate-500" />
-                <span className="hidden sm:inline">Share</span>
-              </>
-            )}
-          </button>
         </div>
 
         {/* Bookmark Button */}

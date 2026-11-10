@@ -16,7 +16,7 @@ export type EndUserNavItem = {
  * Contact & Connect opens the existing secretariat page, not the property-admin application.
  */
 export const REQUESTED_END_USER_NAV: EndUserNavItem[] = [
-  { key: 'overview', label: 'Overview', view: 'HOME', unavailableReason: null },
+  { key: 'overview', label: 'Home', view: 'HOME', unavailableReason: null },
   { key: 'media', label: 'Media & Podcast', view: 'MEDIA', unavailableReason: null },
   { key: 'trends', label: 'Market Trends & Insights', view: 'MARKET_INSIGHTS', unavailableReason: null },
   {

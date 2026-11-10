@@ -17,7 +17,7 @@ export const PrivacyPolicyView: React.FC = () => {
           className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Return to Overview</span>
+          <span>Return to Home</span>
         </button>
       </div>
 

@@ -38,7 +38,7 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
 
   const [activeTab, setActiveTab] = useState<'CONTACT' | 'TICKET' | 'FAQ'>('CONTACT');
   const [ticketTopic, setTicketTopic] = useState<string>(
-    initialContext ? 'Video Audit Enquiry' : 'Project Regulatory Audit & TS-RERA Check'
+    initialContext ? 'Video Audit Enquiry' : 'Project Regulatory Audit & RERA Check'
   );
   const [name, setName] = useState(currentUser?.name || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
@@ -303,7 +303,7 @@ export const PropertyStudioSupportDesk: React.FC<SupportDeskProps> = ({
                       onChange={e => setTicketTopic(e.target.value)}
                       className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                     >
-                      <option>Project Regulatory Audit & TS-RERA Check</option>
+                      <option>Project Regulatory Audit & RERA Check</option>
                       <option>Anonymous Buyer Requirement Submission</option>
                       <option>Developer Community Space Claim</option>
                       <option>Elite Agent Verification & Badge</option>

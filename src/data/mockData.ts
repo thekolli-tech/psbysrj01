@@ -785,7 +785,7 @@ export const INITIAL_AGENT_APPLICATIONS: AgentApplication[] = [
     feePaid: true,
     feeAmount: 2499,
     documents: [
-      { name: 'TS-RERA Agent Registration Certificate.pdf', status: 'VALIDATED' },
+      { name: 'RERA Agent Registration Certificate.pdf', status: 'VALIDATED' },
       { name: 'GSTIN Certificate Form REG-06.pdf', status: 'VALIDATED' },
       { name: 'Aadhaar & PAN Verification.pdf', status: 'VALIDATED' }
     ],
@@ -804,7 +804,7 @@ export const INITIAL_AGENT_APPLICATIONS: AgentApplication[] = [
     feePaid: true,
     feeAmount: 2499,
     documents: [
-      { name: 'TS-RERA Agent Certificate.pdf', status: 'VALIDATED' },
+      { name: 'RERA Agent Certificate.pdf', status: 'VALIDATED' },
       { name: 'Professional Indemnity Insurance.pdf', status: 'VALIDATED' }
     ],
     status: 'PENDING',
