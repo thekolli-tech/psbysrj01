@@ -2649,51 +2649,50 @@ export async function pgCreateNotification(data: {
   title: string;
   message: string;
   linkUrl?: string;
-}): Promise<DbNotification | null> {
+}): Promise<DbNotification> {
+  const id = `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  const now = new Date().toISOString();
+
   try {
     const userRes = await queryPostgres('SELECT id FROM users WHERE id = $1', [data.userId]);
-    if (userRes.rows.length === 0) return null;
+    if (userRes.rows.length > 0) {
+      await queryPostgres(`
+        INSERT INTO notifications (id, user_id, actor_id, actor_name, type, title, message, link_url, is_read, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9)
+      `, [
+        id,
+        data.userId,
+        data.actorId,
+        data.actorName,
+        data.type,
+        data.title,
+        data.message,
+        data.linkUrl || null,
+        now
+      ]);
 
-    const id = `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-    const now = new Date().toISOString();
-
-    await queryPostgres(`
-      INSERT INTO notifications (id, user_id, actor_id, actor_name, type, title, message, link_url, is_read, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9)
-    `, [
-      id,
-      data.userId,
-      data.actorId,
-      data.actorName,
-      data.type,
-      data.title,
-      data.message,
-      data.linkUrl || null,
-      now
-    ]);
-
-    await pgRecordCommunityEvent('NOTIFICATION_EVENT', {
-      id,
-      userId: data.userId,
-      title: data.title
-    }, data.userId);
-
-    return {
-      id,
-      user_id: data.userId,
-      actor_id: data.actorId,
-      actor_name: data.actorName,
-      type: data.type,
-      title: data.title,
-      message: data.message,
-      link_url: data.linkUrl || null,
-      is_read: 0,
-      created_at: now
-    };
+      await pgRecordCommunityEvent('NOTIFICATION_EVENT', {
+        id,
+        userId: data.userId,
+        title: data.title
+      }, data.userId);
+    }
   } catch (err) {
     console.warn('[Property Studio] Could not dispatch notification safely in pg:', err);
-    return null;
   }
+
+  return {
+    id,
+    user_id: data.userId,
+    actor_id: data.actorId,
+    actor_name: data.actorName,
+    type: data.type,
+    title: data.title,
+    message: data.message,
+    link_url: data.linkUrl || undefined,
+    is_read: 0,
+    created_at: now
+  };
 }
 
 export async function pgGetUserNotifications(userId: string, limit = 30): Promise<DbNotification[]> {
