@@ -85,31 +85,8 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
   const [isRepostingPost, setIsRepostingPost] = useState(false);
   const [isVotingPoll, setIsVotingPoll] = useState(false);
 
-  // Comments state - pre-populate with existing post replies if present
-  const [comments, setComments] = useState<CommentItem[]>(() => {
-    const found = allPosts.find(p => String(p.id) === String(postId));
-    const initialReplies = (found as any)?.replies;
-    if (Array.isArray(initialReplies) && initialReplies.length > 0) {
-      return initialReplies.map((r: any) => ({
-        id: r.id || `reply_${Date.now()}_${Math.random()}`,
-        postId,
-        parentId: null,
-        authorId: r.authorId || r.author_id || 'author',
-        authorName: r.authorName || r.author_name || 'Community Member',
-        authorRole: r.authorRole || r.author_role || 'MEMBER',
-        authorAvatar: r.authorAvatar || r.author_avatar || null,
-        content: r.content || '',
-        likesCount: Number(r.likesCount || r.likes_count || 0),
-        userLiked: false,
-        isAmaAnswer: Boolean(r.isAmaAnswer || r.is_ama_answer || r.is_verified_builder),
-        isDeleted: false,
-        replies: Array.isArray(r.replies) ? r.replies : [],
-        createdAt: r.createdAt || r.created_at || new Date().toISOString(),
-        updatedAt: r.updatedAt || r.updated_at || new Date().toISOString()
-      }));
-    }
-    return [];
-  });
+  // Comments state - loaded directly from PostgreSQL backend
+  const [comments, setComments] = useState<CommentItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [sortMode, setSortMode] = useState<'best' | 'newest' | 'oldest'>('best');
   const [page, setPage] = useState(1);
@@ -184,11 +161,8 @@ export const DiscussionDetailView: React.FC<DiscussionDetailViewProps> = ({
       if (res.ok && Array.isArray(data.comments)) {
         if (append) {
           setComments(prev => [...prev, ...data.comments]);
-        } else if (data.comments.length > 0) {
-          setComments(data.comments);
         } else {
-          // If server returned 0 comments, retain any pre-populated initial replies
-          setComments(prev => (prev.length > 0 ? prev : []));
+          setComments(data.comments);
         }
         setTotalComments(prev => {
           if (typeof data.totalComments === 'number') return data.totalComments;

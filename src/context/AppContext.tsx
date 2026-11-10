@@ -21,8 +21,7 @@ import {
   WorkspaceTabType
 } from '../types';
 import {
-  MICRO_MARKET_TRENDS,
-  INITIAL_COMMUNITY_POSTS
+  MICRO_MARKET_TRENDS
 } from '../data/mockData';
 import { isPropertySeeker, postLoginDestination } from '../shared/policy';
 
@@ -426,7 +425,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } catch {}
     }
-    return INITIAL_COMMUNITY_POSTS;
+    return [];
   });
   const [communities, setCommunities] = useState<CommunityHub[]>(() => {
     if (typeof window !== 'undefined') {
@@ -442,13 +441,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await fetch('/api/community/posts');
       if (res.status === 401) {
-        // Keep initial public discussions for guests
         return;
       }
       const data = await res.json();
       if (Array.isArray(data?.posts)) {
         const valid = data.posts.filter((p: any) => p.status !== 'DELETED');
-        setCommunityPosts(valid.length > 0 ? valid : INITIAL_COMMUNITY_POSTS);
+        setCommunityPosts(valid);
         try {
           sessionStorage.setItem('ps_community_posts_cache', JSON.stringify(valid));
         } catch {}
@@ -498,7 +496,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time EventSource (SSE) connection with automatic auto-reconnect & event dispatching
   useEffect(() => {
-    if (typeof window === 'undefined' || !isLoggedIn) return;
+    if (typeof window === 'undefined') return;
 
     let eventSource: EventSource | null = null;
     let reconnectTimeout: NodeJS.Timeout | null = null;
@@ -584,11 +582,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       eventSource?.close();
     };
-  }, [currentUser?.id, isLoggedIn]);
+  }, [currentUser?.id]);
 
-  // Dual-mode active short-interval polling (3s) & window focus sync to guarantee delivery across browsers
+  // Dual-mode active short-interval polling (30s) & window focus sync to guarantee delivery across browsers
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (typeof window === 'undefined') return;
 
     const syncAuthoritativeFeed = async () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;

@@ -6,7 +6,6 @@ import { DiscussionDetailView } from '../community/DiscussionDetailView';
 import { BrandLogo } from '../common/BrandLogo';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { CommunityPost } from '../../types';
-import { INITIAL_COMMUNITY_POSTS } from '../../data/mockData';
 import {
   Flame,
   Clock,
@@ -70,11 +69,9 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
 
-  // Guarantee discussions are always available on the public homepage even before login
+  // Source genuine discussions directly from the authoritative database
   const availablePosts = useMemo(() => {
-    return (communityPosts && communityPosts.length > 0)
-      ? communityPosts
-      : INITIAL_COMMUNITY_POSTS;
+    return communityPosts || [];
   }, [communityPosts]);
 
   // Search autocomplete suggestions

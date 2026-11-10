@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ASSET_IMAGES, INITIAL_PROPERTIES } from '../../data/mockData';
+import { ASSET_IMAGES } from '../../data/mockData';
 import { OfficialBrandCard } from '../common/OfficialBrandCard';
 import { BrandLogo } from '../common/BrandLogo';
 import { AudioStoryPlayer } from '../common/AudioStoryPlayer';
@@ -75,9 +75,9 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
 
   const [activePropertyModal, setActivePropertyModal] = useState<Property | null>(null);
 
-  // Authoritative Property Listings state connected to public API with initial fallback
+  // Authoritative Property Listings state connected to PostgreSQL public API
   const [allProperties, setAllProperties] = useState<Property[]>(
-    properties && properties.length > 0 ? properties : INITIAL_PROPERTIES
+    properties && properties.length > 0 ? properties : []
   );
 
   useEffect(() => {
@@ -87,14 +87,14 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
       fetch('/api/properties')
         .then(res => res.json())
         .then(data => {
-          if (Array.isArray(data?.properties) && data.properties.length > 0) {
+          if (Array.isArray(data?.properties)) {
             setAllProperties(data.properties);
           } else {
-            setAllProperties(INITIAL_PROPERTIES);
+            setAllProperties([]);
           }
         })
         .catch(() => {
-          setAllProperties(INITIAL_PROPERTIES);
+          setAllProperties([]);
         });
     }
   }, [properties]);
