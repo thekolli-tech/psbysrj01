@@ -57,7 +57,25 @@ const getRoleIcon = (role: string) => {
     case 'RESELLER':
       return <span title="Strategic Reseller"><TrendingUp className="w-3.5 h-3.5 text-cyan-600 shrink-0" /></span>;
     case 'RERA_AGENT':
-      return <span title="RERA Agent"><Award className="w-3.5 h-3.5 text-amber-600 shrink-0" /></span>;
+      return <span title="RERA Certified Individual Realter/CP/Agent"><Award className="w-3.5 h-3.5 text-amber-600 shrink-0" /></span>;
+    case 'RERA_CONSULTANCY':
+      return <span title="RERA Certified Property Consultancy/Firm"><Building className="w-3.5 h-3.5 text-blue-700 shrink-0" /></span>;
+    case 'NON_RERA_BROKER':
+      return <span title="Non-RERA Realter/Broker/CP"><Handshake className="w-3.5 h-3.5 text-orange-600 shrink-0" /></span>;
+    case 'SALES_PROFESSIONAL':
+      return <span title="Working Sales Professional"><Briefcase className="w-3.5 h-3.5 text-indigo-600 shrink-0" /></span>;
+    case 'TRADER_INVESTOR':
+      return <span title="Trader / Investor"><TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" /></span>;
+    case 'VENDOR':
+      return <span title="Vendor – Contractors and Suppliers"><Briefcase className="w-3.5 h-3.5 text-amber-700 shrink-0" /></span>;
+    case 'ARCHITECT_ENGINEER':
+      return <span title="Architect & Engineer"><Compass className="w-3.5 h-3.5 text-cyan-700 shrink-0" /></span>;
+    case 'INTERIOR_DESIGNER':
+      return <span title="Interior Designer & Decorater"><Landmark className="w-3.5 h-3.5 text-purple-600 shrink-0" /></span>;
+    case 'INFLUENCER':
+      return <span title="Influencer"><Video className="w-3.5 h-3.5 text-pink-600 shrink-0" /></span>;
+    case 'DIGITAL_MARKETER':
+      return <span title="Digital Marketer"><TrendingUp className="w-3.5 h-3.5 text-violet-600 shrink-0" /></span>;
     case 'REAL_ESTATE_MEDIA':
     case 'CONTENT_CREATOR':
       return <span title="Real Estate Media"><Video className="w-3.5 h-3.5 text-rose-600 shrink-0" /></span>;

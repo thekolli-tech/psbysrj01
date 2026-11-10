@@ -378,14 +378,32 @@ export const ProfileControlPanelModal: React.FC<ProfileControlPanelModalProps> =
         return { label: 'Developer / Builder', desc: 'Primary project developer & showcase lead' };
       case 'AGENT':
       case 'RERA_AGENT':
-        return { label: 'RERA Agent', desc: 'Certified real estate advisory and facilitation' };
+        return { label: 'RERA Certified Individual Realter/CP/Agent', desc: 'Channel Partner /Broker /Agent' };
+      case 'RERA_CONSULTANCY':
+        return { label: 'RERA Certified Property Consultancy/Firm', desc: 'Institutional property consultancy & firm' };
+      case 'NON_RERA_BROKER':
+        return { label: 'Non-RERA Realter/Broker/CP', desc: 'Independent real estate broker & channel partner' };
+      case 'SALES_PROFESSIONAL':
+        return { label: 'Working Sales Professional', desc: 'Sales Person working to company on salary basis' };
+      case 'TRADER_INVESTOR':
+        return { label: 'Trader / Investor', desc: 'Frequently trading buying and selling Multiple Property' };
+      case 'VENDOR':
+        return { label: 'Vendor', desc: 'Contractors and Suppliers' };
+      case 'ARCHITECT_ENGINEER':
+        return { label: 'Architect & Engineer', desc: 'Architectural planning, structural design & engineering' };
+      case 'INTERIOR_DESIGNER':
+        return { label: 'Interior Designer & Decorater', desc: 'Interior architecture, turnkey styling & decoration' };
+      case 'INFLUENCER':
+        return { label: 'Influencer', desc: 'Content creator, property reviewer & social media promoter' };
+      case 'DIGITAL_MARKETER':
+        return { label: 'Digital Marketer', desc: 'PropTech performance marketing & lead generation' };
       case 'CHANNEL_PARTNER':
         return { label: 'Channel Partner', desc: 'Authorized mandate and distribution partner' };
       case 'RESELLER':
-        return { label: 'Reseller', desc: 'Secondary marketplace & portfolio sales' };
+        return { label: 'Reseller', desc: 'Bought Property, wanted to sell through Property Studio' };
       case 'LAND_OWNER':
       case 'LANDOWNER':
-        return { label: 'Landowner / Investor', desc: 'Joint developments & strategic parcels' };
+        return { label: 'Land Owner', desc: 'Landlord with large extent land for development' };
       case 'REAL_ESTATE_MEDIA':
       case 'CONTENT_CREATOR':
         return { label: 'Real Estate Media', desc: 'Ground journalism, podcasts & walkthroughs' };

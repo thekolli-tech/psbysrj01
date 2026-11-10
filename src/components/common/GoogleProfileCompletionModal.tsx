@@ -3,6 +3,7 @@ import { BrandLogo } from './BrandLogo';
 import { ANIME_AVATARS, getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { prepareAvatarUpload, validateAvatarFile } from '../../lib/avatarUpload';
 import { readApiResponse } from '../../lib/apiResponse';
+import { PLATFORM_ROLES } from '../../shared/platformRoles';
 import {
   X,
   User,
@@ -54,15 +55,11 @@ const AVAILABLE_INTERESTS = [
   'Home Loans & Taxation'
 ] as const;
 
-const ROLE_OPTIONS = [
-  { value: 'PROPERTY_SEEKER', label: 'Property Seeker (HNI / Investor / Buyer)', desc: 'Explore premium developments, seek investment opportunities, and connect with verified professionals.' },
-  { value: 'DEVELOPER', label: 'Developer', desc: 'Showcase statutory RERA-registered developments, receive matched buyer enquiries, and manage project compliance.' },
-  { value: 'LANDOWNER', label: 'Landowner', desc: 'Monetise land parcels, explore joint development partnerships, and evaluate market feasibility.' },
-  { value: 'CHANNEL_PARTNER', label: 'Channel Partner', desc: 'Promote verified luxury and commercial inventory to prospective buyers.' },
-  { value: 'RESELLER', label: 'Reseller', desc: 'Connect buyers and sellers of premium resale properties in high-demand micro-markets.' },
-  { value: 'RERA_AGENT', label: 'RERA Agent', desc: 'Provide authorized statutory real estate advisory and client representation.' },
-  { value: 'REAL_ESTATE_MEDIA', label: 'Real Estate Media', desc: 'Publish architectural photography, videography, construction walkthroughs, and market reports.' }
-] as const;
+const ROLE_OPTIONS = PLATFORM_ROLES.map(r => ({
+  value: r.roleKey,
+  label: r.fullLabel,
+  desc: r.subtitle
+}));
 
 export const GoogleProfileCompletionModal: React.FC<GoogleProfileCompletionModalProps> = ({
   isOpen,

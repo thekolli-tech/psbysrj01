@@ -6,6 +6,7 @@ import { readApiResponse } from '../../lib/apiResponse';
 import { BrandLogo } from './BrandLogo';
 import { ANIME_AVATARS, getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { GoogleProfileCompletionModal } from './GoogleProfileCompletionModal';
+import { PLATFORM_ROLES } from '../../shared/platformRoles';
 import {
   LogIn,
   LogOut,
@@ -1206,12 +1207,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       onChange={e => setRoleInput(e.target.value as any)}
                       className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-900 font-medium cursor-pointer"
                     >
-                      <option value="PROPERTY_SEEKER">Property Seeker (HNI / Investor / Buyer)</option>
-                      <option value="LANDOWNER">Landowner / Asset Holder</option>
-                      <option value="CHANNEL_PARTNER">Channel Partner / Agent</option>
-                      <option value="RESELLER">Reseller</option>
-                      <option value="RERA_AGENT">RERA Registered Agent</option>
-                      <option value="REAL_ESTATE_MEDIA">Real Estate Media Professional</option>
+                      {PLATFORM_ROLES.map(r => (
+                        <option key={r.roleKey} value={r.roleKey}>
+                          {r.fullLabel}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

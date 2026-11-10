@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Star, Building2, MapPin, Users, Home, Plus, X, Check, ShieldCheck, Sparkles } from 'lucide-react';
+import { STAKEHOLDER_REVIEW_ROLES } from '../../shared/platformRoles';
 
 type Listing = { id: string; title: string; category?: string };
 type PublicReview = { id: string; rating: number; body: string; authorName: string; createdAt: string };
@@ -82,7 +83,7 @@ export const ReviewRatingView: React.FC<{ onOpenLoginModal?: () => void; initial
   const [showAddModal, setShowAddModal] = useState(false);
   const [newEntityType, setNewEntityType] = useState<'SOCIETY_PROJECT' | 'COLONY' | 'LOCALITY' | 'STAKEHOLDERS'>('SOCIETY_PROJECT');
   const [newEntityName, setNewEntityName] = useState('');
-  const [newEntityRole, setNewEntityRole] = useState('Builder / Developer');
+  const [newEntityRole, setNewEntityRole] = useState(STAKEHOLDER_REVIEW_ROLES[0]);
   const [newEntityLocation, setNewEntityLocation] = useState('Hyderabad');
 
   useEffect(() => {
@@ -498,15 +499,13 @@ export const ReviewRatingView: React.FC<{ onOpenLoginModal?: () => void; initial
                     <select
                       value={newEntityRole}
                       onChange={e => setNewEntityRole(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer font-medium"
                     >
-                      <option value="Builder / Developer">Builder / Developer</option>
-                      <option value="Principal Architect">Principal Architect</option>
-                      <option value="RERA & Legal Counsel">RERA & Legal Counsel</option>
-                      <option value="RERA Certified Agent">RERA Certified Agent</option>
-                      <option value="Property Consultant">Property Consultant</option>
-                      <option value="Structural Engineer">Structural Engineer</option>
-                      <option value="Facility Manager">Facility Manager</option>
+                      {STAKEHOLDER_REVIEW_ROLES.map((role, idx) => (
+                        <option key={role} value={role}>
+                          {idx + 1}. {role}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </>

@@ -2571,13 +2571,20 @@ export const SuperAdminDashboard: React.FC = () => {
               className="px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
             >
               <option value="ALL">All Roles</option>
-              <option value="PROPERTY_SEEKER">Property Seeker</option>
-              <option value="LAND_OWNER">Landowner / Investor</option>
-              <option value="CHANNEL_PARTNER">Channel Partner</option>
-              <option value="RESELLER">Reseller</option>
-              <option value="AGENT">RERA Agent</option>
-              <option value="CONTENT_CREATOR">Real Estate Media</option>
-              <option value="DEVELOPER">Developer / MD</option>
+              <option value="PROPERTY_SEEKER">1. Property Seeker</option>
+              <option value="RERA_AGENT">2. RERA Certified Individual Realtor/CP/Agent</option>
+              <option value="RERA_CONSULTANCY">3. RERA Certified Property Consultancy/Firm</option>
+              <option value="NON_RERA_BROKER">4. Non-RERA Realtor/Broker/CP</option>
+              <option value="SALES_PROFESSIONAL">5. Working Sales Professional</option>
+              <option value="RESELLER">6. Reseller</option>
+              <option value="TRADER_INVESTOR">7. Trader / Investor</option>
+              <option value="LANDOWNER">8. Land Owner</option>
+              <option value="DEVELOPER">9. Developer</option>
+              <option value="VENDOR">10. Vendor</option>
+              <option value="ARCHITECT_ENGINEER">11. Architect & Engineer</option>
+              <option value="INTERIOR_DESIGNER">12. Interior Designer & Decorator</option>
+              <option value="INFLUENCER">13. Influencer</option>
+              <option value="DIGITAL_MARKETER">14. Digital Marketer</option>
               <option value="PROPERTY_ADMIN">Property Admin</option>
               <option value="SUPER_ADMIN">Super Admin</option>
               <option value="COMMUNITY_MODERATOR">Community Moderator</option>
