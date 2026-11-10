@@ -1196,7 +1196,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
   }, [communityPosts]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className={isLoggedIn ? "w-full space-y-6" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8"}>
       {/* Community Header Banner - Architectural Cinematic Hero matching Reference */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#FCFBF3] via-[#FCFBF3] to-slate-100 border border-[#E8E4D8] shadow-sm p-6 sm:p-8 lg:p-10">
         {/* Architectural Image Background Layer */}
@@ -1831,9 +1831,9 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
       )}
 
       {/* Main Grid: Feed + Right Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column (2 Cols): Search, Tabs, and Posts Feed */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className={isLoggedIn ? "w-full space-y-6" : "grid grid-cols-1 lg:grid-cols-3 gap-8"}>
+        {/* Posts Feed Column (Full width when authenticated, 2 Cols when logged out) */}
+        <div className={isLoggedIn ? "w-full space-y-6" : "lg:col-span-2 space-y-6"}>
           {selectedDiscussionId ? (
             <DiscussionDetailView
               postId={selectedDiscussionId}
@@ -2617,7 +2617,8 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
     )}
   </div>
 
-      {/* Right Sidebar (1 Col): Quora Recommended Topics, Who to Follow & AMA Schedule */}
+      {/* Right Sidebar (1 Col): Quora Recommended Topics, Who to Follow & AMA Schedule (Shown only when unauthenticated since AuthenticatedAppLayout provides contextual discovery) */}
+      {!isLoggedIn && (
         <div className="space-y-6">
           {/* Recommended Topics for You - Matching Reference Screenshot */}
           <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3.5">
@@ -2763,6 +2764,7 @@ export const CommunityForumView: React.FC<CommunityForumViewProps> = ({ onOpenLo
             </ul>
           </div>
         </div>
+      )}
       </div>
 
       {/* UNIFIED MODAL: QUORA ADD QUESTION & REDDIT/QUORA CREATE POST (Reference Images 1, 2, 3) */}

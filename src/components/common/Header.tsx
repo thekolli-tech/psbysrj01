@@ -184,22 +184,17 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Main Navigation Bar: Desktop 3-Zone Matching PDF Pages 4, 7-25 */}
       <div className="w-full px-4 sm:px-6 lg:px-8 min-h-16 flex flex-wrap items-center justify-between gap-x-2.5 gap-y-2 py-2">
-        {/* Zone 1: Brand & Logo with Amber PS Badge (Left) */}
+        {/* Zone 1: Brand & Logo with Official Logo Image (Left) */}
         <div className="flex items-center shrink-0">
           <button
             onClick={() => {
               setActiveView('HOME');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="flex items-center gap-2.5 text-left focus:outline-none cursor-pointer group"
+            className="flex items-center text-left focus:outline-none cursor-pointer group"
             aria-label="Property Studio Home"
           >
-            <span className="px-2 py-0.5 rounded-lg bg-[#B49029] text-white font-black text-xs font-mono tracking-wider shadow-2xs group-hover:bg-[#A99137] transition-colors">
-              PS
-            </span>
-            <span className="font-black font-display text-base sm:text-lg tracking-tight text-[#182A3E]">
-              Property Studio
-            </span>
+            <BrandLogo variant="compact" size="sm" className="h-10 w-auto object-contain" />
           </button>
         </div>
 

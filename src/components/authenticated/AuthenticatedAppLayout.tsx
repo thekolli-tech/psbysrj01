@@ -138,7 +138,7 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
       />
 
       {/* 2. Main Three-Column Application Container (Full width when viewing Super Admin Console) */}
-      <main className={`flex-1 mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 w-full ${activeView === 'ADMIN' ? 'max-w-[1600px]' : 'max-w-7xl'}`}>
+      <main className={`flex-1 mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 w-full ${activeView === 'ADMIN' ? 'max-w-[1600px]' : 'max-w-7xl 2xl:max-w-[1440px]'}`}>
         <div className="flex items-start justify-center gap-6">
           {/* Left Navigation Sidebar (Desktop sticky / collapsible; hidden in full-width Admin Console) */}
           {activeView !== 'ADMIN' && (
@@ -165,7 +165,7 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
               Boolean(activeView && !['HOME', 'COMMUNITY'].includes(activeView)) || isWorkspace;
             return (
               <>
-                <div className={isWideView ? "flex-1 min-w-0 w-full" : "flex-1 min-w-0 max-w-2xl xl:max-w-3xl"}>
+                <div className={isWideView ? "flex-1 min-w-0 w-full" : "flex-1 min-w-0 max-w-3xl 2xl:max-w-4xl"}>
                   {children ? (
                     children
                   ) : (

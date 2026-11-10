@@ -3,6 +3,7 @@ import { User } from '../../types';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { NotificationPanel } from './NotificationPanel';
 import { UserProfileMenu } from './UserProfileMenu';
+import { BrandLogo } from '../common/BrandLogo';
 import {
   Search,
   Bell,
@@ -91,14 +92,10 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
 
           <div
             onClick={onNavigateHome}
-            className="flex items-center gap-2.5 cursor-pointer group"
+            className="flex items-center cursor-pointer group"
+            title="Property Studio Home"
           >
-            <span className="px-2 py-0.5 rounded-lg bg-[#B49029] text-white font-black text-xs font-mono tracking-wider shadow-2xs group-hover:bg-[#A99137] transition-colors">
-              PS
-            </span>
-            <span className="font-black font-display text-base sm:text-lg tracking-tight text-[#182A3E]">
-              Property Studio
-            </span>
+            <BrandLogo variant="compact" size="sm" className="h-10 w-auto object-contain" />
           </div>
         </div>
 
