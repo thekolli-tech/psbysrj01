@@ -915,6 +915,23 @@ export async function pgIsTargetVerified(
 export async function pgPhoneTaken(phone: string): Promise<boolean> {
   const national = indianNationalDigits(phone);
   if (!national) return false;
+
+  // 1. Fast indexed lookup with standard stored formats:
+  const directVariants = [
+    `+91${national}`,
+    `91${national}`,
+    national,
+    `0${national}`,
+    `+91 ${national}`,
+    `+91-${national}`
+  ];
+  const directTaken = await queryPostgres(
+    `SELECT id FROM users WHERE phone = ANY($1::text[]) LIMIT 1`,
+    [directVariants]
+  );
+  if (directTaken.rows.length > 0) return true;
+
+  // 2. Fallback to regex scan only if indexed lookup misses
   const taken = await queryPostgres(
     `SELECT id FROM users WHERE regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') IN ($1, $2, $3) LIMIT 1`,
     [national, `0${national}`, `91${national}`]

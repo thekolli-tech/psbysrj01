@@ -222,7 +222,12 @@ export function getOtpDeliveryStatus(phoneOrMessageId: string): OtpDeliveryRecor
  */
 export async function getAsyncOtpDeliveryStatus(phoneOrMessageId: string): Promise<OtpDeliveryRecord | null> {
   const cached = findRecord(phoneOrMessageId);
+  const now = Date.now();
   if (cached && (cached.status === 'DELIVERED' || cached.status === 'FAILED')) {
+    return cached;
+  }
+  // Return recent in-memory cache (< 3500ms) without repeatedly querying PostgreSQL
+  if (cached && (now - cached.updatedAt < 3500)) {
     return cached;
   }
 

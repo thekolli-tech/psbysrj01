@@ -135,7 +135,8 @@ import {
   updateUploadIntentStorageKey,
   getUserNotificationPreferences,
   updateUserNotificationPreferences,
-  getPreferencesByUnsubscribeToken
+  getPreferencesByUnsubscribeToken,
+  isPhoneTaken
 } from './src/server/db.ts';
 import { resolveAuthoritativeOtpDestination, maskEmailForDisplay, validatePasswordPolicy } from './src/server/otpPolicy.ts';
 import {
@@ -1202,7 +1203,6 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
       return;
     }
     if (req.body?.intent === 'register') {
-      const { isPhoneTaken } = await import('./src/server/db.js');
       const taken = await isPhoneTaken(phone);
       if (taken) {
         res.status(409).json({
@@ -3139,6 +3139,9 @@ app.post('/api/notifications/mark-all-read', requireAuth, async (req: Authentica
 
 app.get('/api/communities', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    if (!req.user) {
+      res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=60, stale-while-revalidate=300');
+    }
     const category = req.query.category as string | undefined;
     const location = req.query.location as string | undefined;
     const search = req.query.search as string | undefined;

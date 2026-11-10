@@ -39,11 +39,11 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete, forc
       // Ignore storage errors in restricted private browsing
     }
 
-    // Smooth 600ms exit fade-out before unmounting
+    // Snappy 250ms exit fade-out before unmounting
     const timer = setTimeout(() => {
       setVisible(false);
       onComplete?.();
-    }, 600);
+    }, 250);
 
     return () => clearTimeout(timer);
   }, [isExiting, onComplete]);
@@ -63,13 +63,13 @@ export const CinematicIntro: React.FC<CinematicIntroProps> = ({ onComplete, forc
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [visible, handleDismiss]);
 
-  // Automatic progression: 3.8s cinematic duration then smooth exit
+  // Snappy progression: 1.2s duration then immediate smooth exit for millisecond website loading
   useEffect(() => {
     if (!visible) return;
 
     const autoTimer = setTimeout(() => {
       handleDismiss();
-    }, 3800);
+    }, 1200);
 
     return () => clearTimeout(autoTimer);
   }, [visible, handleDismiss]);

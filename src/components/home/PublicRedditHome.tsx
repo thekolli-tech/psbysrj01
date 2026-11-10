@@ -6,6 +6,7 @@ import { DiscussionDetailView } from '../community/DiscussionDetailView';
 import { BrandLogo } from '../common/BrandLogo';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { CommunityPost } from '../../types';
+import { INITIAL_COMMUNITY_POSTS } from '../../data/mockData';
 import {
   Flame,
   Clock,
@@ -69,6 +70,13 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
 
+  // Guarantee discussions are always available on the public homepage even before login
+  const availablePosts = useMemo(() => {
+    return (communityPosts && communityPosts.length > 0)
+      ? communityPosts
+      : INITIAL_COMMUNITY_POSTS;
+  }, [communityPosts]);
+
   // Search autocomplete suggestions
   const searchSuggestions = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -83,7 +91,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
     });
 
     // Match discussions / posts
-    communityPosts.forEach(p => {
+    availablePosts.forEach(p => {
       if (p.title.toLowerCase().includes(q) || p.content.toLowerCase().includes(q)) {
         suggestions.push({ type: 'post', id: p.id, title: p.title, subtitle: `By ${p.authorName} · Discussion` });
       }
@@ -97,11 +105,11 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
     });
 
     return suggestions.slice(0, 6);
-  }, [searchQuery, communities, communityPosts, properties]);
+  }, [searchQuery, communities, availablePosts, properties]);
 
   // Filtered & Sorted Feed
   const filteredPosts = useMemo(() => {
-    let list = [...communityPosts];
+    let list = [...availablePosts];
 
     // Filter by category chip
     if (selectedCategory !== 'ALL') {
@@ -132,14 +140,14 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
     }
 
     return list;
-  }, [communityPosts, selectedCategory, activeSort]);
+  }, [availablePosts, selectedCategory, activeSort]);
 
   // Trending discussions for right sidebar
   const trendingDiscussions = useMemo(() => {
-    return [...communityPosts]
+    return [...availablePosts]
       .sort((a, b) => ((b.commentsCount || 0) * 2 + (b.upvotes || 0)) - ((a.commentsCount || 0) * 2 + (a.upvotes || 0)))
       .slice(0, 4);
-  }, [communityPosts]);
+  }, [availablePosts]);
 
   // Real communities from DB for discovery sidebar
   const activeCommunities = useMemo(() => {
@@ -294,7 +302,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                   currentUser={currentUser}
                   isLoggedIn={isLoggedIn}
                   onOpenLoginModal={onOpenLoginModal}
-                  allPosts={communityPosts}
+                  allPosts={availablePosts}
                   showToast={showToast}
                   refreshPosts={refreshPosts}
                   repostDiscussion={repostDiscussion}

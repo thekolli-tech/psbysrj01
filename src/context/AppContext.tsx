@@ -21,7 +21,8 @@ import {
   WorkspaceTabType
 } from '../types';
 import {
-  MICRO_MARKET_TRENDS
+  MICRO_MARKET_TRENDS,
+  INITIAL_COMMUNITY_POSTS
 } from '../data/mockData';
 import { isPropertySeeker, postLoginDestination } from '../shared/policy';
 
@@ -415,7 +416,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [conference, setConference] = useState<CorporateConference>(DEFAULT_CONFERENCE);
 
-  const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
+  const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem('ps_community_posts_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return INITIAL_COMMUNITY_POSTS;
+  });
   const [communities, setCommunities] = useState<CommunityHub[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -430,12 +442,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await fetch('/api/community/posts');
       if (res.status === 401) {
-        setCommunityPosts([]);
+        // Keep initial public discussions for guests
         return;
       }
       const data = await res.json();
       if (Array.isArray(data?.posts)) {
-        setCommunityPosts(data.posts.filter((p: any) => p.status !== 'DELETED'));
+        const valid = data.posts.filter((p: any) => p.status !== 'DELETED');
+        setCommunityPosts(valid.length > 0 ? valid : INITIAL_COMMUNITY_POSTS);
+        try {
+          sessionStorage.setItem('ps_community_posts_cache', JSON.stringify(valid));
+        } catch {}
       }
     } catch (_err) {}
   };
