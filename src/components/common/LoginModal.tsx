@@ -768,9 +768,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-[#121214] text-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#333337] w-full max-w-lg md:max-w-xl max-h-[96dvh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
-        {/* Modal Header Matching Luxury Conglomerate Identity */}
-        <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[#333337] flex items-center justify-between bg-[#0A0A0B] text-white shrink-0">
+      <div className="bg-white text-[#111111] rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E8E3] w-full max-w-lg md:max-w-xl max-h-[96dvh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+        {/* Modal Header */}
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[#001428] flex items-center justify-between bg-[#001C38] text-white shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div>
               <h3 className="text-base sm:text-lg font-bold text-white font-serif">
@@ -784,7 +784,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     : 'Create Account'
                   : 'Portal Sign In'}
               </h3>
-              <p className="text-[11px] sm:text-xs text-[#A5A5AA]">
+              <p className="text-[11px] sm:text-xs text-slate-300">
                 {isLoggedIn
                   ? `Active as ${currentUser.name}`
                   : forgotPasswordMode
@@ -798,7 +798,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="p-1 sm:p-1.5 text-[#A5A5AA] hover:text-white rounded-lg hover:bg-[#1B1B1E] transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-[#001428] transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -839,7 +839,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       setActiveView('ADMIN');
                       onClose();
                     }}
-                    className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all cursor-pointer"
+                    className="flex-1 py-2.5 bg-[#B99A24] hover:bg-[#C8A932] text-[#111111] rounded-xl font-bold transition-all cursor-pointer"
                   >
                     Admin Console
                   </button>
@@ -865,8 +865,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                 </div>
               )}
 
-              {/* Segmented Toggle Pills Matching Luxury Conglomerate Identity */}
-              <div className="bg-[#1B1B1E] p-1 rounded-xl flex gap-1 border border-[#333337]">
+              {/* Segmented Toggle Pills */}
+              <div className="bg-[#F8F8F6] p-1 rounded-xl flex gap-1 border border-[#E8E8E3]">
                 <button
                   type="button"
                   onClick={() => {
@@ -876,8 +876,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   }}
                   className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all text-center cursor-pointer ${
                     mode === 'LOGIN' && !forgotPasswordMode
-                      ? 'bg-[#C5A880] text-[#0A0A0B] shadow-sm'
-                      : 'text-[#A5A5AA] hover:text-white'
+                      ? 'bg-[#B99A24] text-[#111111] shadow-xs'
+                      : 'text-slate-600 hover:text-[#111111]'
                   }`}
                 >
                   Sign In
@@ -892,8 +892,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   }}
                   className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all text-center cursor-pointer ${
                     mode === 'REGISTER' && !forgotPasswordMode
-                      ? 'bg-[#C5A880] text-[#0A0A0B] shadow-sm'
-                      : 'text-[#A5A5AA] hover:text-white'
+                      ? 'bg-[#B99A24] text-[#111111] shadow-xs'
+                      : 'text-slate-600 hover:text-[#111111]'
                   }`}
                 >
                   Register Account

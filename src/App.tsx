@@ -283,9 +283,9 @@ const AppContent: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <button
                     onClick={() => setSupportOpen(true)}
-                    className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold inline-flex items-center gap-2 shadow-xl shadow-slate-900/10 active:scale-95 transition-all cursor-pointer"
+                    className="px-6 py-3.5 bg-[#B99A24] hover:bg-[#C8A932] text-[#111111] rounded-2xl text-xs font-bold inline-flex items-center gap-2 shadow-xs active:scale-95 transition-all cursor-pointer"
                   >
-                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    <ShieldCheck className="w-4 h-4 text-[#111111]" />
                     <span>Launch Support Desk Drawer</span>
                     <ArrowRight className="w-4 h-4 ml-1" />
                   </button>
@@ -476,9 +476,9 @@ const AppContent: React.FC = () => {
             <div className="flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={() => setSupportOpen(true)}
-                className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold inline-flex items-center gap-2 shadow-xl shadow-slate-900/10 active:scale-95 transition-all cursor-pointer"
+                className="px-6 py-3.5 bg-[#B99A24] hover:bg-[#C8A932] text-[#111111] rounded-2xl text-xs font-bold inline-flex items-center gap-2 shadow-xs active:scale-95 transition-all cursor-pointer"
               >
-                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <ShieldCheck className="w-4 h-4 text-[#111111]" />
                 <span>Launch Support Desk Drawer</span>
                 <ArrowRight className="w-4 h-4 ml-1" />
               </button>

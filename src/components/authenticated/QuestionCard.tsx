@@ -30,9 +30,9 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   return (
     <article
       onClick={() => onOpenDetail(post.id)}
-      className="group bg-white border border-slate-200/90 hover:border-[#B49029]/80 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer flex flex-col gap-3 relative overflow-hidden text-slate-800"
+      className="group bg-white border border-slate-200/90 hover:border-[#B99A24]/80 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer flex flex-col gap-3 relative overflow-hidden text-slate-800"
     >
-      <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#B49029]" />
+      <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#B99A24]" />
 
       <div className="flex items-center justify-between text-xs text-slate-500 pl-1">
         <div className="flex items-center gap-2 flex-wrap">
@@ -48,7 +48,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             <>
               <span className="text-slate-300">•</span>
               <span className="font-semibold text-slate-700 flex items-center gap-1">
-                <Building className="w-3 h-3 text-[#B49029]" />
+                <Building className="w-3 h-3 text-[#B99A24]" />
                 {post.communityName}
               </span>
             </>
@@ -75,7 +75,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           e.stopPropagation();
           onOpenDetail(post.id);
         }}
-        className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-[#182A3E] hover:text-[#B49029] leading-snug pl-1 cursor-pointer transition-colors"
+        className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-[#001C38] hover:text-[#B99A24] leading-snug pl-1 cursor-pointer transition-colors"
       >
         {post.title}
       </h3>
@@ -96,7 +96,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             }}
             className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-full font-semibold cursor-pointer transition-colors"
           >
-            <ArrowBigUp className="w-4 h-4 fill-current text-[#B49029]" />
+            <ArrowBigUp className="w-4 h-4 fill-current text-[#B99A24]" />
             <span>{post.upvotes || 0} Upvotes</span>
           </button>
 
@@ -120,7 +120,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             e.stopPropagation();
             onOpenDetail(post.id);
           }}
-          className="text-[#182A3E] hover:text-[#B49029] font-bold text-xs inline-flex items-center gap-1 hover:underline cursor-pointer transition-colors"
+          className="text-[#001C38] hover:text-[#B99A24] font-bold text-xs inline-flex items-center gap-1 hover:underline cursor-pointer transition-colors"
           title="Open thread and write answer"
         >
           <span>Answer Question →</span>

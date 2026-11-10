@@ -95,7 +95,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
   return (
     <article
       onClick={() => onOpenDetail(post.id)}
-      className="group relative bg-white border border-slate-200/90 hover:border-[#B49029]/80 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer flex flex-col gap-3 text-slate-800"
+      className="group relative bg-white border border-slate-200/90 hover:border-[#B99A24]/80 rounded-2xl p-4 sm:p-5 transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer flex flex-col gap-3 text-slate-800"
       style={{
         transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
       }}
@@ -123,8 +123,8 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
           <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
             {/* Community Pill */}
             {post.communityName && (
-              <span className="font-bold text-[#182A3E] hover:text-[#B49029] transition-colors truncate max-w-[160px] flex items-center gap-1">
-                <Building className="w-3 h-3 text-[#B49029]" />
+              <span className="font-bold text-[#001C38] hover:text-[#B99A24] transition-colors truncate max-w-[160px] flex items-center gap-1">
+                <Building className="w-3 h-3 text-[#B99A24]" />
                 {post.communityName}
               </span>
             )}
@@ -226,7 +226,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
           e.stopPropagation();
           onOpenDetail(post.id);
         }}
-        className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-[#182A3E] hover:text-[#B49029] tracking-tight leading-snug cursor-pointer transition-colors"
+        className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-[#001C38] hover:text-[#B99A24] tracking-tight leading-snug cursor-pointer transition-colors"
       >
         {post.title}
       </h3>
@@ -360,7 +360,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
               type="button"
               onClick={e => handleVote(e, 1)}
               className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                localVote === 1 ? 'text-[#B49029] bg-amber-50 shadow-xs' : 'text-slate-400 hover:text-slate-700'
+                localVote === 1 ? 'text-[#B99A24] bg-amber-50 shadow-xs' : 'text-slate-400 hover:text-slate-700'
               }`}
               title="Upvote"
               aria-label="Upvote"
@@ -368,7 +368,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
               <ArrowBigUp className="w-4 h-4 fill-current" />
             </button>
 
-            <span className={`px-1.5 text-xs font-bold ${localVote !== 0 ? 'text-[#B49029]' : 'text-slate-700'}`}>
+            <span className={`px-1.5 text-xs font-bold ${localVote !== 0 ? 'text-[#B99A24]' : 'text-slate-700'}`}>
               {localScore}
             </span>
 
@@ -395,7 +395,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-full font-semibold transition-colors cursor-pointer"
             title="View discussion comments"
           >
-            <MessageSquare className="w-3.5 h-3.5 text-[#B49029]" />
+            <MessageSquare className="w-3.5 h-3.5 text-[#B99A24]" />
             <span>{post.commentsCount || (post as any).replies?.length || 0}</span>
             <span className="hidden sm:inline">Comments</span>
           </button>
@@ -410,7 +410,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
           }}
           className={`p-1.5 rounded-full transition-colors cursor-pointer ${
             isBookmarked
-              ? 'text-[#B49029] bg-amber-50 hover:bg-amber-100'
+              ? 'text-[#B99A24] bg-amber-50 hover:bg-amber-100'
               : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
           }`}
           title={isBookmarked ? 'Saved to Bookmarks' : 'Bookmark discussion'}

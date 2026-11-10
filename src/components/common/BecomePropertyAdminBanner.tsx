@@ -7,13 +7,13 @@ export const BecomePropertyAdminBanner: React.FC = () => {
 
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-10 shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+      <div className="bg-[#001C38] text-white rounded-3xl p-6 sm:p-10 shadow-xl border border-[#B99A24]/30 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         {/* Glow */}
-        <div className="absolute -left-12 -top-12 w-48 h-48 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -left-12 -top-12 w-48 h-48 bg-[#B99A24]/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="space-y-2 max-w-2xl relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold uppercase tracking-wider">
-            <ShieldCheck className="w-4 h-4 text-amber-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B99A24]/20 text-[#B99A24] border border-[#B99A24]/40 text-xs font-bold uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-[#B99A24]" />
             OFFICIAL PMO WORKSPACE ACCREDITATION
           </div>
 
@@ -22,7 +22,7 @@ export const BecomePropertyAdminBanner: React.FC = () => {
           </h2>
 
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Public self-registration is strictly disabled. Real estate developer PMOs, site directors, and project engineers can apply for official scoped verification. Applications are vetted and processed at <span className="font-mono text-amber-300 font-semibold">info@propertystudio.org</span>.
+            Public self-registration is strictly disabled. Real estate developer PMOs, site directors, and project engineers can apply for official scoped verification. Applications are vetted and processed at <span className="font-mono text-[#B99A24] font-semibold">info@propertystudio.org</span>.
           </p>
         </div>
 
@@ -32,7 +32,7 @@ export const BecomePropertyAdminBanner: React.FC = () => {
               setActiveView('CONTACT');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="px-6 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+            className="px-6 py-3.5 bg-[#B99A24] hover:bg-[#C8A932] text-[#111111] rounded-xl text-xs font-black tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
           >
             <Building2 className="w-4 h-4" />
             <span>Apply for Property Admin Scope</span>

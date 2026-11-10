@@ -6,8 +6,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#030712",
-  "theme_color": "#182A3E",
+  "background_color": "#F8F8F6",
+  "theme_color": "#001C38",
   "categories": ["business", "real estate", "productivity"],
   "icons": [
     {

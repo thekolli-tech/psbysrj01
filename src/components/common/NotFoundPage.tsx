@@ -36,7 +36,7 @@ export const NotFoundPage: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors shadow-md shadow-slate-900/10"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#B99A24] text-[#111111] text-sm font-bold hover:bg-[#C8A932] transition-colors shadow-xs"
           >
             <Home className="w-4 h-4" />
             Return Home

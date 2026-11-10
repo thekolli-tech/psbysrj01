@@ -967,7 +967,7 @@ export const AboutUsView: React.FC<AboutUsViewProps> = ({
                         setActiveNode(null);
                         onOpenRegister();
                       }}
-                      className="px-4 py-1.5 rounded-xl bg-[#B49029] hover:bg-[#C5A880] text-white font-bold transition-all shadow-xs cursor-pointer"
+                      className="px-4 py-1.5 rounded-xl bg-[#B99A24] hover:bg-[#C8A932] text-[#111111] font-bold transition-all shadow-xs cursor-pointer"
                     >
                       Join Property Studio
                     </button>

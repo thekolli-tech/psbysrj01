@@ -191,7 +191,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white flex flex-col font-sans w-full">
+    <div className="min-h-screen bg-[#F8F8F6] text-[#111111] flex flex-col font-sans w-full">
       {/* 
         ====================================================================
         MAIN 3-COLUMN REDDIT-INSPIRED PUBLIC LAYOUT (FULL HORIZONTAL WIDTH)
@@ -206,16 +206,16 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
           */}
           <aside className="hidden lg:block w-[280px] xl:w-[320px] 2xl:w-[350px] shrink-0 sticky top-20 space-y-4">
             {/* Registration Card */}
-            <div className="bg-[#121214] rounded-3xl border border-[#333337] p-5 shadow-xl text-white space-y-4">
+            <div className="bg-white rounded-3xl border border-[#E8E8E3] p-5 shadow-sm text-[#111111] space-y-4">
               <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#1B1B1E] text-[#C5A880] border border-[#C5A880]/40 text-[10px] font-bold font-mono">
-                  <Sparkles className="w-3 h-3 text-[#C5A880]" />
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FAF6EB] text-[#B99A24] border border-[#E5D58D] text-[10px] font-bold font-mono">
+                  <Sparkles className="w-3 h-3 text-[#B99A24]" />
                   <span>COMMUNITY ACCESS</span>
                 </div>
-                <h3 className="text-base font-black text-white font-serif leading-snug">
+                <h3 className="text-base font-black text-[#111111] font-serif leading-snug">
                   Your real estate network starts here.
                 </h3>
-                <p className="text-xs text-[#A5A5AA] leading-relaxed">
+                <p className="text-xs text-slate-600 leading-relaxed">
                   Discover verified developments, exchange property insights, connect with professionals and participate in real estate communities.
                 </p>
               </div>
@@ -226,9 +226,9 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                 <button
                   type="button"
                   onClick={onOpenLoginModal}
-                  className="w-full py-2.5 px-3 bg-[#C5A880] hover:bg-[#D7B991] text-[#0A0A0B] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                  className="w-full py-2.5 px-3 bg-[#B99A24] hover:bg-[#C8A932] text-[#111111] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                 >
-                  <Phone className="w-3.5 h-3.5 text-[#0A0A0B]" />
+                  <Phone className="w-3.5 h-3.5 text-[#111111]" />
                   <span>Continue with Phone / OTP</span>
                 </button>
 
@@ -236,7 +236,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                 <button
                   type="button"
                   onClick={onOpenLoginModal}
-                  className="w-full py-2.5 px-3 bg-[#1B1B1E] hover:bg-[#26262b] text-white border border-[#333337] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2.5 px-3 bg-white hover:bg-[#F8F8F6] text-[#111111] border border-[#E8E8E3] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
                     <path
@@ -263,20 +263,20 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                 <button
                   type="button"
                   onClick={onOpenLoginModal}
-                  className="w-full py-2.5 px-3 bg-[#1B1B1E] hover:bg-[#26262b] text-white border border-[#333337] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2.5 px-3 bg-white hover:bg-[#F8F8F6] text-[#111111] border border-[#E8E8E3] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Mail className="w-3.5 h-3.5 text-[#C5A880]" />
+                  <Mail className="w-3.5 h-3.5 text-[#B99A24]" />
                   <span>Continue with Email</span>
                 </button>
               </div>
 
               {/* Terms & Privacy */}
-              <p className="text-[10px] text-[#A5A5AA] text-center leading-normal pt-1">
+              <p className="text-[10px] text-slate-500 text-center leading-normal pt-1">
                 By continuing, you agree to our{' '}
                 <button
                   type="button"
                   onClick={() => setActiveView('TERMS')}
-                  className="text-[#C5A880] hover:underline cursor-pointer"
+                  className="text-[#B99A24] hover:underline cursor-pointer"
                 >
                   Terms
                 </button>{' '}
@@ -284,7 +284,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveView('PRIVACY')}
-                  className="text-[#C5A880] hover:underline cursor-pointer"
+                  className="text-[#B99A24] hover:underline cursor-pointer"
                 >
                   Privacy Policy
                 </button>
@@ -292,8 +292,8 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
               </p>
             </div>
 
-            {/* Promotional Brand Card */}
-            <div className="bg-[#121214] text-white rounded-3xl p-5 border border-[#C5A880]/30 shadow-xl space-y-3 relative overflow-hidden">
+            {/* Promotional Brand Card - Brand Navy */}
+            <div className="bg-[#001C38] text-white rounded-3xl p-5 border border-[#B99A24]/30 shadow-md space-y-3 relative overflow-hidden">
               <div
                 className="absolute inset-0 opacity-10 bg-cover bg-center pointer-events-none"
                 style={{
@@ -302,15 +302,15 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
               />
               <div className="relative z-10 space-y-2">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[#C5A880]" />
-                  <span className="text-xs font-black tracking-wide uppercase font-mono text-[#C5A880]">
+                  <ShieldCheck className="w-4 h-4 text-[#B99A24]" />
+                  <span className="text-xs font-black tracking-wide uppercase font-mono text-[#B99A24]">
                     Verified Real Estate Ecosystem
                   </span>
                 </div>
-                <p className="text-[11px] text-[#A5A5AA] leading-relaxed">
+                <p className="text-[11px] text-slate-300 leading-relaxed">
                   Real-time builder updates, regulatory due diligence and anonymous buyer enquiries across Hyderabad.
                 </p>
-                <div className="pt-2 border-t border-[#333337] flex items-center justify-between text-[10px] font-mono text-[#C5A880]">
+                <div className="pt-2 border-t border-[#001428] flex items-center justify-between text-[10px] font-mono text-[#B99A24]">
                   <span>CEO Swamy Reddy Javidi</span>
                   <span className="text-emerald-400">● 100% Verified</span>
                 </div>
@@ -342,34 +342,34 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
             ) : (
               <>
                 {/* Compact Mobile Join Banner */}
-                <div className="lg:hidden bg-[#121214] text-white rounded-2xl p-3.5 border border-[#C5A880]/40 shadow-md flex items-center justify-between gap-3">
+                <div className="lg:hidden bg-white text-[#111111] rounded-2xl p-3.5 border border-[#E8E8E3] shadow-sm flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <h4 className="text-xs font-black text-white font-serif truncate">Join Hyderabad Property Network</h4>
-                    <p className="text-[11px] text-[#A5A5AA] truncate">Ask questions & verify micro-market data</p>
+                    <h4 className="text-xs font-black text-[#111111] font-serif truncate">Join Hyderabad Property Network</h4>
+                    <p className="text-[11px] text-slate-500 truncate">Ask questions & verify micro-market data</p>
                   </div>
                   <button
                     type="button"
                     onClick={onOpenLoginModal}
-                    className="px-3.5 py-1.5 bg-[#C5A880] hover:bg-[#D7B991] text-[#0A0A0B] font-bold text-xs rounded-xl shrink-0 transition-colors cursor-pointer shadow-xs active:scale-95"
+                    className="px-3.5 py-1.5 bg-[#B99A24] hover:bg-[#C8A932] text-[#111111] font-bold text-xs rounded-xl shrink-0 transition-colors cursor-pointer shadow-xs active:scale-95"
                   >
                     Join / Sign In
                   </button>
                 </div>
 
                 {/* Reddit-style Filter Bar: Best / Latest / Trending */}
-                <div className="bg-[#121214] rounded-2xl border border-[#333337] p-2 sm:p-3 shadow-md flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="bg-white rounded-2xl border border-[#E8E8E3] p-2 sm:p-3 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                   {/* Sort Tabs */}
-                  <div className="flex items-center gap-1 bg-[#1B1B1E] p-1 rounded-xl text-xs font-bold">
+                  <div className="flex items-center gap-1 bg-[#F8F8F6] p-1 rounded-xl text-xs font-bold">
                     <button
                       type="button"
                       onClick={() => setActiveSort('BEST')}
                       className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
                         activeSort === 'BEST'
-                          ? 'bg-[#0A0A0B] text-[#C5A880] border border-[#C5A880]/30 shadow-xs font-black'
-                          : 'text-[#A5A5AA] hover:text-white'
+                          ? 'bg-[#B99A24] text-[#111111] shadow-xs font-black'
+                          : 'text-slate-600 hover:text-[#111111]'
                       }`}
                     >
-                      <Sparkles className={`w-3.5 h-3.5 ${activeSort === 'BEST' ? 'text-[#C5A880]' : 'text-[#A5A5AA]'}`} />
+                      <Sparkles className={`w-3.5 h-3.5 ${activeSort === 'BEST' ? 'text-[#111111]' : 'text-slate-400'}`} />
                       <span>Best</span>
                     </button>
 
@@ -378,11 +378,11 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                       onClick={() => setActiveSort('LATEST')}
                       className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
                         activeSort === 'LATEST'
-                          ? 'bg-[#0A0A0B] text-[#C5A880] border border-[#C5A880]/30 shadow-xs font-black'
-                          : 'text-[#A5A5AA] hover:text-white'
+                          ? 'bg-[#B99A24] text-[#111111] shadow-xs font-black'
+                          : 'text-slate-600 hover:text-[#111111]'
                       }`}
                     >
-                      <Clock className={`w-3.5 h-3.5 ${activeSort === 'LATEST' ? 'text-[#C5A880]' : 'text-[#A5A5AA]'}`} />
+                      <Clock className={`w-3.5 h-3.5 ${activeSort === 'LATEST' ? 'text-[#111111]' : 'text-slate-400'}`} />
                       <span>Latest</span>
                     </button>
 
@@ -391,18 +391,18 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                       onClick={() => setActiveSort('TRENDING')}
                       className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
                         activeSort === 'TRENDING'
-                          ? 'bg-[#0A0A0B] text-[#C5A880] border border-[#C5A880]/30 shadow-xs font-black'
-                          : 'text-[#A5A5AA] hover:text-white'
+                          ? 'bg-[#B99A24] text-[#111111] shadow-xs font-black'
+                          : 'text-slate-600 hover:text-[#111111]'
                       }`}
                     >
-                      <Flame className={`w-3.5 h-3.5 ${activeSort === 'TRENDING' ? 'text-[#C5A880]' : 'text-[#A5A5AA]'}`} />
+                      <Flame className={`w-3.5 h-3.5 ${activeSort === 'TRENDING' ? 'text-[#111111]' : 'text-slate-400'}`} />
                       <span>Trending</span>
                     </button>
                   </div>
 
                   {/* Public Feed Counter */}
-                  <div className="text-xs text-[#A5A5AA] font-mono hidden sm:flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <div className="text-xs text-slate-500 font-mono hidden sm:flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span>{filteredPosts.length} Public Discussions</span>
                   </div>
                 </div>
@@ -418,8 +418,8 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                         onClick={() => setSelectedCategory(cat)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-[#C5A880] text-[#0A0A0B] shadow-xs font-bold'
-                            : 'bg-[#121214] text-[#A5A5AA] hover:text-white hover:bg-[#1B1B1E] border border-[#333337]'
+                            ? 'bg-[#B99A24] text-[#111111] shadow-xs font-bold'
+                            : 'bg-white text-slate-700 hover:bg-[#F8F8F6] hover:text-[#111111] border border-[#E8E8E3]'
                         }`}
                       >
                         {cat}
@@ -430,16 +430,16 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
 
                 {/* Feed Items */}
                 {filteredPosts.length === 0 ? (
-                  <div className="bg-[#121214] rounded-3xl border border-[#333337] p-12 text-center space-y-3">
-                    <MessageSquare className="w-10 h-10 text-[#C5A880] mx-auto opacity-40" />
-                    <h4 className="text-sm font-bold font-serif text-white">No discussions match this category</h4>
-                    <p className="text-xs text-[#A5A5AA]">
+                  <div className="bg-white rounded-3xl border border-[#E8E8E3] p-12 text-center space-y-3">
+                    <MessageSquare className="w-10 h-10 text-[#B99A24] mx-auto opacity-50" />
+                    <h4 className="text-sm font-bold font-serif text-[#111111]">No discussions match this category</h4>
+                    <p className="text-xs text-slate-500">
                       Be the first to start a conversation in this topic.
                     </p>
                     <button
                       type="button"
                       onClick={onOpenLoginModal}
-                      className="px-4 py-2 bg-[#C5A880] text-[#0A0A0B] rounded-xl text-xs font-bold hover:bg-[#D7B991] transition-colors cursor-pointer"
+                      className="px-4 py-2 bg-[#B99A24] text-[#111111] rounded-xl text-xs font-bold hover:bg-[#C8A932] transition-colors cursor-pointer"
                     >
                       Sign In to Post
                     </button>
@@ -490,18 +490,18 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
           */}
           <aside className="hidden xl:flex flex-col gap-4 w-[320px] 2xl:w-[360px] shrink-0 sticky top-20">
             {/* Discover Property Communities */}
-            <div className="bg-[#121214] rounded-3xl border border-[#333337] p-5 shadow-xl space-y-3.5">
+            <div className="bg-white rounded-3xl border border-[#E8E8E3] p-5 shadow-sm space-y-3.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-[#C5A880]" />
-                  <h4 className="font-bold text-xs text-white uppercase tracking-wider font-mono">
+                  <Users className="w-4 h-4 text-[#B99A24]" />
+                  <h4 className="font-bold text-xs text-[#111111] uppercase tracking-wider font-mono">
                     Discover Communities
                   </h4>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActiveView('COMMUNITY', '/communities')}
-                  className="text-[11px] font-bold text-[#C5A880] hover:underline cursor-pointer"
+                  className="text-[11px] font-bold text-[#B99A24] hover:underline cursor-pointer"
                 >
                   View All
                 </button>
@@ -509,23 +509,23 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
 
               <div className="space-y-2.5 pt-1">
                 {activeCommunities.length === 0 ? (
-                  <p className="text-xs text-[#A5A5AA]">Loading communities...</p>
+                  <p className="text-xs text-slate-500">Loading communities...</p>
                 ) : (
                   activeCommunities.map(c => (
                     <div
                       key={c.id}
                       onClick={() => setActiveView('COMMUNITY', `/communities/${c.id}`)}
-                      className="flex items-center justify-between gap-2 p-2 hover:bg-[#1B1B1E] rounded-xl transition-colors cursor-pointer"
+                      className="flex items-center justify-between gap-2 p-2 hover:bg-[#F8F8F6] rounded-xl transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-[#1B1B1E] border border-[#C5A880]/40 text-[#C5A880] flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-[#FAF6EB] border border-[#E5D58D] text-[#B99A24] flex items-center justify-center font-bold text-xs shrink-0">
                           {c.name.slice(0, 1).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-bold text-xs text-white truncate">
+                          <div className="font-bold text-xs text-[#111111] truncate">
                             {c.name}
                           </div>
-                          <div className="text-[10px] text-[#A5A5AA] font-mono">
+                          <div className="text-[10px] text-slate-500 font-mono">
                             {c.memberCount || 1} members
                           </div>
                         </div>
@@ -534,7 +534,7 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                       <button
                         type="button"
                         onClick={onOpenLoginModal}
-                        className="px-3 py-1 bg-[#C5A880] hover:bg-[#D7B991] text-[#0A0A0B] rounded-full text-[11px] font-bold transition-all cursor-pointer shrink-0 shadow-xs"
+                        className="px-3 py-1 bg-[#B99A24] hover:bg-[#C8A932] text-[#111111] rounded-full text-[11px] font-bold transition-all cursor-pointer shrink-0 shadow-xs"
                       >
                         Join
                       </button>
@@ -545,10 +545,10 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
             </div>
 
             {/* Trending Discussions */}
-            <div className="bg-[#121214] rounded-3xl border border-[#333337] p-5 shadow-xl space-y-3.5">
+            <div className="bg-white rounded-3xl border border-[#E8E8E3] p-5 shadow-sm space-y-3.5">
               <div className="flex items-center gap-2">
-                <Flame className="w-4 h-4 text-[#C5A880]" />
-                <h4 className="font-bold text-xs text-white uppercase tracking-wider font-mono">
+                <Flame className="w-4 h-4 text-[#B99A24]" />
+                <h4 className="font-bold text-xs text-[#111111] uppercase tracking-wider font-mono">
                   Trending Discussions
                 </h4>
               </div>
@@ -558,17 +558,17 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                   <div
                     key={t.id}
                     onClick={() => handleOpenDetail(t.id)}
-                    className="group p-2 rounded-xl hover:bg-[#1B1B1E] transition-colors cursor-pointer space-y-1"
+                    className="group p-2 rounded-xl hover:bg-[#F8F8F6] transition-colors cursor-pointer space-y-1"
                   >
-                    <div className="text-[10px] font-mono text-[#A5A5AA] flex items-center gap-1.5">
+                    <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1.5">
                       <span>#{idx + 1}</span>
                       <span>•</span>
                       <span className="truncate">{t.topic || 'General'}</span>
                     </div>
-                    <h5 className="font-semibold text-xs text-white group-hover:text-[#C5A880] transition-colors line-clamp-2 leading-snug">
+                    <h5 className="font-semibold text-xs text-[#111111] group-hover:text-[#B99A24] transition-colors line-clamp-2 leading-snug">
                       {t.title}
                     </h5>
-                    <div className="text-[10px] text-[#A5A5AA] font-mono flex items-center gap-2">
+                    <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2">
                       <span>{t.commentsCount || 0} comments</span>
                       <span>•</span>
                       <span>{t.upvotes || 0} upvotes</span>
@@ -579,15 +579,15 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
             </div>
 
             {/* Market Insights Box */}
-            <div className="bg-[#121214] rounded-3xl border border-[#333337] p-5 shadow-xl space-y-3.5">
+            <div className="bg-white rounded-3xl border border-[#E8E8E3] p-5 shadow-sm space-y-3.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-[#C5A880]" />
-                  <h4 className="font-bold text-xs text-white uppercase tracking-wider font-mono">
+                  <TrendingUp className="w-4 h-4 text-[#B99A24]" />
+                  <h4 className="font-bold text-xs text-[#111111] uppercase tracking-wider font-mono">
                     Market Insights
                   </h4>
                 </div>
-                <span className="text-[10px] font-mono font-bold text-[#C5A880] bg-[#1B1B1E] px-2 py-0.5 rounded-full border border-[#C5A880]/30">
+                <span className="text-[10px] font-mono font-bold text-[#B99A24] bg-[#FAF6EB] px-2 py-0.5 rounded-full border border-[#E5D58D]">
                   Hyderabad
                 </span>
               </div>
@@ -599,32 +599,32 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
                   { locality: 'Tellapur & Kollur', trend: '+9.4% YoY', avgPrice: '₹7,800/sq.ft' },
                   { locality: 'Gachibowli Tech Belt', trend: '+8.1% YoY', avgPrice: '₹10,900/sq.ft' }
                 ].map(loc => (
-                  <div key={loc.locality} className="flex items-center justify-between py-1.5 border-b border-[#333337]/60 last:border-none">
+                  <div key={loc.locality} className="flex items-center justify-between py-1.5 border-b border-[#E8E8E3] last:border-none">
                     <div>
-                      <div className="font-semibold text-white">{loc.locality}</div>
-                      <div className="text-[10px] text-[#A5A5AA] font-mono">{loc.avgPrice}</div>
+                      <div className="font-semibold text-[#111111]">{loc.locality}</div>
+                      <div className="text-[10px] text-slate-500 font-mono">{loc.avgPrice}</div>
                     </div>
-                    <span className="text-[11px] font-bold text-emerald-400 font-mono">{loc.trend}</span>
+                    <span className="text-[11px] font-bold text-emerald-600 font-mono">{loc.trend}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Live & Latest Briefing Card */}
-            <div className="bg-[#121214] text-white rounded-3xl p-5 border border-[#C5A880]/40 shadow-xl space-y-2.5">
+            {/* Live & Latest Briefing Card - Brand Navy */}
+            <div className="bg-[#001C38] text-white rounded-3xl p-5 border border-[#B99A24]/30 shadow-md space-y-2.5">
               <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-[#C5A880] animate-pulse" />
+                <Radio className="w-4 h-4 text-[#B99A24] animate-pulse" />
                 <span className="text-xs font-bold text-white font-mono uppercase tracking-wider">
                   Live & Latest
                 </span>
               </div>
-              <p className="text-[11px] text-[#A5A5AA] leading-relaxed">
+              <p className="text-[11px] text-slate-300 leading-relaxed">
                 Watch studio video walkthroughs, RERA legal briefings and direct developer podcasts.
               </p>
               <button
                 type="button"
                 onClick={onOpenLoginModal}
-                className="w-full py-2 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                className="w-full py-2 bg-[#B99A24] hover:bg-[#C8A932] text-[#111111] rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <span>Access Broadcast Network</span>
                 <ChevronRight className="w-3.5 h-3.5" />

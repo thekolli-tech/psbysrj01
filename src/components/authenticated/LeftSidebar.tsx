@@ -84,11 +84,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   return (
     <aside className="w-60 xl:w-64 shrink-0 flex flex-col gap-3 text-xs select-none">
-      {/* Universal 2-Section Nav Card Matching Luxury Conglomerate Identity */}
-      <div className="bg-[#121214] border border-[#333337] rounded-3xl p-3 shadow-lg">
+      {/* Universal 2-Section Nav Card */}
+      <div className="bg-white border border-[#E8E8E3] rounded-3xl p-3 shadow-sm">
         {/* SECTION 1: FEEDS */}
         <div className="mb-3">
-          <div className="px-3 py-1 text-[11px] font-bold font-mono uppercase tracking-wider text-[#C5A880]">
+          <div className="px-3 py-1 text-[11px] font-bold font-mono uppercase tracking-wider text-[#B99A24]">
             FEEDS
           </div>
           <nav className="space-y-0.5 mt-1">
@@ -102,12 +102,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   onClick={() => onSelectNav(item.key)}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-all duration-150 cursor-pointer ${
                     active
-                      ? 'bg-[#1B1B1E] text-[#C5A880] font-bold border border-[#C5A880]/30 shadow-xs'
-                      : 'text-[#A5A5AA] hover:text-white hover:bg-[#1B1B1E]'
+                      ? 'bg-[#FAF6EB] text-[#B99A24] font-bold border border-[#E5D58D]/60 shadow-xs'
+                      : 'text-slate-600 hover:text-[#111111] hover:bg-[#F8F8F6]'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${active ? 'text-[#C5A880]' : 'text-[#A5A5AA]'}`} />
+                    <Icon className={`w-4 h-4 ${active ? 'text-[#B99A24]' : 'text-slate-400'}`} />
                     <span className="truncate">{item.label}</span>
                   </div>
                 </button>
@@ -117,8 +117,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         </div>
 
         {/* SECTION 2: WORKSPACES */}
-        <div className="pt-2 border-t border-[#333337]">
-          <div className="px-3 py-1 text-[11px] font-bold font-mono uppercase tracking-wider text-[#C5A880]">
+        <div className="pt-2 border-t border-[#E8E8E3]">
+          <div className="px-3 py-1 text-[11px] font-bold font-mono uppercase tracking-wider text-[#B99A24]">
             WORKSPACES
           </div>
           <nav className="space-y-0.5 mt-1">
@@ -132,12 +132,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   onClick={() => onSelectNav(item.key)}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-all duration-150 cursor-pointer ${
                     active
-                      ? 'bg-[#1B1B1E] text-[#C5A880] font-bold border border-[#C5A880]/30 shadow-xs'
-                      : 'text-[#A5A5AA] hover:text-white hover:bg-[#1B1B1E]'
+                      ? 'bg-[#FAF6EB] text-[#B99A24] font-bold border border-[#E5D58D]/60 shadow-xs'
+                      : 'text-slate-600 hover:text-[#111111] hover:bg-[#F8F8F6]'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${active ? 'text-[#C5A880]' : 'text-[#A5A5AA]'}`} />
+                    <Icon className={`w-4 h-4 ${active ? 'text-[#B99A24]' : 'text-slate-400'}`} />
                     <span className="truncate">{item.label}</span>
                   </div>
                 </button>
@@ -152,9 +152,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         <button
           type="button"
           onClick={onStartCommunity}
-          className="w-full py-2.5 px-3 rounded-2xl border border-dashed border-[#C5A880]/70 bg-[#121214] hover:bg-[#1B1B1E] text-white font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer text-xs"
+          className="w-full py-2.5 px-3 rounded-2xl border border-dashed border-[#B99A24]/70 bg-[#FAF6EB] hover:bg-[#F5EFCF] text-[#111111] font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer text-xs"
         >
-          <Plus className="w-4 h-4 text-[#C5A880]" />
+          <Plus className="w-4 h-4 text-[#B99A24]" />
           <span>Ask Question / Create Post</span>
         </button>
       )}

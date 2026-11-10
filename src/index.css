@@ -1,48 +1,47 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ps-primary-black: #0a0a0b;
-  --color-ps-surface-black: #121214;
-  --color-ps-elevated: #1b1b1e;
-  --color-ps-border-grey: #333337;
-  --color-ps-muted: #a5a5aa;
-  --color-ps-navy: #0a0a0b;
-  --color-ps-deep-navy: #121214;
-  --color-ps-gold: #c5a880;
-  --color-ps-gold-classic: #c5a880;
-  --color-ps-gold-hover: #d7b991;
-  --color-ps-gold-antique: #c5a880;
-  --color-ps-black: #0a0a0b;
+  --color-ps-primary-black: #111111;
+  --color-ps-surface-black: #ffffff;
+  --color-ps-elevated: #ffffff;
+  --color-ps-border-grey: #e8e8e3;
+  --color-ps-muted: #666666;
+  --color-ps-navy: #001c38;
+  --color-ps-deep-navy: #001428;
+  --color-ps-gold: #b99a24;
+  --color-ps-gold-classic: #b99a24;
+  --color-ps-gold-hover: #c8a932;
+  --color-ps-gold-antique: #a88b1f;
+  --color-ps-black: #111111;
   --color-ps-white: #ffffff;
-  --color-ps-off-white: #fafcfd;
-  --color-ps-champagne: #c5a880;
-  --color-ps-champagne-light: #1b1b1e;
-  --color-ps-amber: #c5a880;
-  --color-ps-light-gold: #1b1b1e;
-  --color-ps-bg: #0a0a0b;
-  --color-ps-surface: #121214;
-  --color-ps-border: #333337;
-  --color-ps-text-primary: #ffffff;
-  --color-ps-text-secondary: #a5a5aa;
+  --color-ps-off-white: #f8f8f6;
+  --color-ps-champagne: #f4edd4;
+  --color-ps-champagne-light: #faf6eb;
+  --color-ps-amber: #b99a24;
+  --color-ps-light-gold: #faf6eb;
+  --color-ps-bg: #f8f8f6;
+  --color-ps-surface: #ffffff;
+  --color-ps-border: #e8e8e3;
+  --color-ps-text-primary: #111111;
+  --color-ps-text-secondary: #555555;
   --color-ps-success: #16a34a;
   --color-ps-danger: #dc2626;
 
-  /* Remap standard amber scale to official luxury conglomerate gold */
-  --color-amber-50: #1b1b1e;
-  --color-amber-100: #26262b;
-  --color-amber-200: #3a362f;
-  --color-amber-300: #8c785c;
-  --color-amber-400: #c5a880;
-  --color-amber-500: #c5a880;
-  --color-amber-600: #d7b991;
-  --color-amber-700: #e3caa7;
-  --color-amber-800: #f0dec5;
-  --color-amber-900: #f7ede0;
-  --color-amber-950: #fbf6f0;
+  /* Remap standard amber scale to official logo gold palette */
+  --color-amber-50: #faf6eb;
+  --color-amber-100: #f5efcf;
+  --color-amber-200: #ebdd9f;
+  --color-amber-300: #dec768;
+  --color-amber-400: #c8a932;
+  --color-amber-500: #b99a24;
+  --color-amber-600: #a88b1f;
+  --color-amber-700: #876e17;
+  --color-amber-800: #6b5716;
+  --color-amber-900: #574716;
+  --color-amber-950: #33290b;
 
-  /* Remap slate scale so dark slate uses Luxury Black and Surfaces */
-  --color-slate-900: #0a0a0b;
-  --color-slate-950: #050506;
+  --color-slate-900: #111111;
+  --color-slate-950: #001c38;
 }
 
 :root {
@@ -51,30 +50,30 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
 
-  /* Property Studio Luxury Conglomerate Brand Design Tokens */
-  --ps-primary-black: #0A0A0B;
-  --ps-gold: #C5A880;
-  --ps-gold-hover: #D7B991;
-  --ps-surface-black: #121214;
-  --ps-elevated-surface: #1B1B1E;
-  --ps-border-grey: #333337;
-  --ps-muted-text: #A5A5AA;
+  /* Property Studio Official Brand Design Tokens */
+  --ps-primary-black: #111111;
+  --ps-gold: #B99A24;
+  --ps-gold-hover: #C8A932;
+  --ps-surface-black: #FFFFFF;
+  --ps-elevated-surface: #FFFFFF;
+  --ps-border-grey: #E8E8E3;
+  --ps-muted-text: #666666;
   --ps-white: #FFFFFF;
 
-  --ps-navy: #0A0A0B;
-  --ps-deep-navy: #121214;
-  --ps-gold-classic: #C5A880;
-  --ps-gold-antique: #C5A880;
-  --ps-black: #0A0A0B;
-  --ps-champagne: #C5A880;
-  --ps-champagne-light: #1B1B1E;
-  --ps-amber: #C5A880;
-  --ps-light-gold: #1B1B1E;
-  --ps-bg: #0A0A0B;
-  --ps-surface: #121214;
-  --ps-border: #333337;
-  --ps-text-primary: #FFFFFF;
-  --ps-text-secondary: #A5A5AA;
+  --ps-navy: #001C38;
+  --ps-deep-navy: #001428;
+  --ps-gold-classic: #B99A24;
+  --ps-gold-antique: #A88B1F;
+  --ps-black: #111111;
+  --ps-champagne: #F4EDD4;
+  --ps-champagne-light: #FAF6EB;
+  --ps-amber: #B99A24;
+  --ps-light-gold: #FAF6EB;
+  --ps-bg: #F8F8F6;
+  --ps-surface: #FFFFFF;
+  --ps-border: #E8E8E3;
+  --ps-text-primary: #111111;
+  --ps-text-secondary: #555555;
   --ps-success: #16A34A;
   --ps-danger: #DC2626;
 }
@@ -98,12 +97,14 @@
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #0a0a0b;
-    color: #ffffff;
+    background-color: #F8F8F6;
+    color: #111111;
   }
   
   h1, h2, h3, .font-display, .font-serif {
     font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+    font-weight: 700;
+    color: #111111;
   }
 
   .font-mono-numbers {
@@ -113,7 +114,7 @@
 
   /* Accessible focus indicators */
   *:focus-visible {
-    outline: 2px solid #c5a880;
+    outline: 2px solid #B99A24;
     outline-offset: 2px;
   }
 }
@@ -122,51 +123,53 @@
    PROPERTY STUDIO LUXURY DESIGN SYSTEM UTILITIES
    ============================================================================== */
 .ps-card {
-  background-color: #121214;
-  border: 1px solid #333337;
+  background-color: #FFFFFF;
+  border: 1px solid #E8E8E3;
   border-radius: 1.5rem;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 20px -2px rgba(0, 28, 56, 0.05);
 }
 
 .ps-card-hover {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .ps-card-hover:hover {
-  border-color: rgba(180, 144, 41, 0.45);
-  box-shadow: 0 10px 25px -5px rgba(24, 42, 62, 0.08), 0 8px 10px -6px rgba(24, 42, 62, 0.04);
+  border-color: rgba(185, 154, 36, 0.45);
+  box-shadow: 0 10px 25px -5px rgba(0, 28, 56, 0.08), 0 8px 10px -6px rgba(185, 154, 36, 0.06);
   transform: translateY(-2px);
 }
 
 .ps-badge-gold {
-  background-color: #fcfbf3;
-  color: #a99137;
-  border: 1px solid #cec8a2;
+  background-color: #FAF6EB;
+  color: #B99A24;
+  border: 1px solid #E5D58D;
   font-weight: 600;
 }
 
 .ps-badge-navy {
-  background-color: #182a3e;
-  color: #ffffff;
+  background-color: #001C38;
+  color: #FFFFFF;
 }
 
 .ps-btn-primary {
-  background-color: #182a3e;
-  color: #ffffff;
+  background-color: #B99A24;
+  color: #111111;
   font-weight: 700;
   transition: all 0.15s ease-in-out;
 }
 .ps-btn-primary:hover {
-  background-color: #030508;
+  background-color: #C8A932;
+  color: #000000;
 }
 
 .ps-btn-gold {
-  background-color: #b49029;
-  color: #ffffff;
+  background-color: #B99A24;
+  color: #111111;
   font-weight: 700;
   transition: all 0.15s ease-in-out;
 }
 .ps-btn-gold:hover {
-  background-color: #a99137;
+  background-color: #C8A932;
+  color: #000000;
 }
 
 /* ==============================================================================
