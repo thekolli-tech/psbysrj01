@@ -140,12 +140,12 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
         onToggleMobileMenu={() => setMobileSidebarOpen(!mobileSidebarOpen)}
       />
 
-      {/* 2. Main Three-Column Application Container (Full width when viewing Super Admin Console) */}
-      <main className={`flex-1 mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 w-full ${activeView === 'ADMIN' ? 'max-w-[1600px]' : 'max-w-7xl 2xl:max-w-[1440px]'}`}>
-        <div className="flex items-start justify-center gap-6">
+      {/* 2. Main Three-Column Application Container (Full horizontal space utilization) */}
+      <main className="flex-1 mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-4 sm:py-6 w-full max-w-[1920px]">
+        <div className="flex items-start justify-between gap-6 xl:gap-8 w-full">
           {/* Left Navigation Sidebar (Desktop sticky / collapsible; hidden in full-width Admin Console) */}
           {activeView !== 'ADMIN' && (
-            <div className="hidden lg:block sticky top-20">
+            <div className="hidden lg:block sticky top-20 shrink-0">
               <LeftSidebar
                 activeItem={activeNav}
                 onSelectNav={handleNavSelect}
@@ -168,7 +168,7 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
               Boolean(activeView && !['HOME', 'COMMUNITY'].includes(activeView)) || isWorkspace;
             return (
               <>
-                <div className={isWideView ? "flex-1 min-w-0 w-full" : "flex-1 min-w-0 max-w-3xl 2xl:max-w-4xl"}>
+                <div className="flex-1 min-w-0 w-full">
                   {children ? (
                     children
                   ) : (

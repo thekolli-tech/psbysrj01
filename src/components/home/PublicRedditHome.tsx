@@ -163,17 +163,17 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
     <div className="min-h-screen bg-[#0A0A0B] text-white flex flex-col font-sans w-full">
       {/* 
         ====================================================================
-        MAIN 3-COLUMN REDDIT-INSPIRED PUBLIC LAYOUT (LUXURY CONGLOMERATE)
+        MAIN 3-COLUMN REDDIT-INSPIRED PUBLIC LAYOUT (FULL HORIZONTAL WIDTH)
         ====================================================================
       */}
-      <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 w-full">
-        <div className="flex items-start justify-center gap-6">
+      <main className="flex-1 w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-5">
+        <div className="flex items-start justify-between gap-6 xl:gap-8 w-full">
           {/* 
             ----------------------------------------------------------------
-            COLUMN 1: LEFT JOIN PROPERTY STUDIO PANEL (~270px)
+            COLUMN 1: LEFT JOIN PROPERTY STUDIO PANEL (~280–350px)
             ----------------------------------------------------------------
           */}
-          <aside className="hidden lg:block w-[270px] shrink-0 sticky top-20 space-y-4">
+          <aside className="hidden lg:block w-[280px] xl:w-[320px] 2xl:w-[350px] shrink-0 sticky top-20 space-y-4">
             {/* Registration Card */}
             <div className="bg-[#121214] rounded-3xl border border-[#333337] p-5 shadow-xl text-white space-y-4">
               <div className="space-y-1.5">
@@ -289,10 +289,10 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
 
           {/* 
             ----------------------------------------------------------------
-            COLUMN 2: CENTER PUBLIC DISCUSSION FEED (650–700px)
+            COLUMN 2: CENTER PUBLIC DISCUSSION FEED (FLUID WIDTH)
             ----------------------------------------------------------------
           */}
-          <section className="flex-1 min-w-0 max-w-2xl xl:max-w-3xl space-y-4">
+          <section className="flex-1 min-w-0 space-y-4 w-full">
             {/* If a discussion is selected, render DiscussionDetailView directly */}
             {selectedPostId ? (
               <div className="bg-[#121214] rounded-3xl border border-[#333337] p-4 sm:p-6 shadow-xl">
@@ -454,10 +454,10 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
 
           {/* 
             ----------------------------------------------------------------
-            COLUMN 3: RIGHT CONTEXTUAL DISCOVERY SIDEBAR (~290px)
+            COLUMN 3: RIGHT CONTEXTUAL DISCOVERY SIDEBAR (~320–360px)
             ----------------------------------------------------------------
           */}
-          <aside className="hidden xl:flex flex-col gap-4 w-[290px] shrink-0 sticky top-20">
+          <aside className="hidden xl:flex flex-col gap-4 w-[320px] 2xl:w-[360px] shrink-0 sticky top-20">
             {/* Discover Property Communities */}
             <div className="bg-[#121214] rounded-3xl border border-[#333337] p-5 shadow-xl space-y-3.5">
               <div className="flex items-center justify-between">
