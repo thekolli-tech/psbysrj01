@@ -130,6 +130,8 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
         onOpenWallet={onOpenWallet || (() => {})}
         onLogout={logout}
         onNavigateHome={() => handleNavSelect('HOME')}
+        onNavigateAbout={() => handleNavSelect('ABOUT')}
+        activeView={activeView}
         onNavigateWorkspace={tab => handleNavSelect(tab === 'SETTINGS' ? 'MY_PROFILE' : 'MY_ENQUIRIES')}
         onNavigateAdmin={currentUser.role === 'SUPER_ADMIN' ? () => setActiveView('ADMIN') : undefined}
         onNavigateDeveloper={currentUser.role === 'DEVELOPER' ? () => setActiveView('DEVELOPER') : undefined}

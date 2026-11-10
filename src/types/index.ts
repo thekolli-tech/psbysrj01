@@ -532,6 +532,7 @@ export type NavItemKey =
   | 'CONTACT'
   | 'PROGRAMS'
   | 'TESTIMONIALS'
+  | 'ABOUT'
   | 'LEADS_MARKET'
   | 'DASHBOARD'
   | 'PROFESSIONAL'
@@ -587,6 +588,7 @@ export type ViewType =
   | 'CONTACT'
   | 'PROGRAMS'
   | 'TESTIMONIALS'
+  | 'ABOUT'
   | 'PRIVACY'
   | 'TERMS';
 

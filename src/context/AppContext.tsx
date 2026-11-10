@@ -293,6 +293,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       case 'TESTIMONIALS':
         setActiveView('TESTIMONIALS');
         break;
+      case 'ABOUT':
+        setActiveView('ABOUT');
+        break;
       case 'LEADS_MARKET':
         setActiveView('LEADS_MARKET');
         break;
@@ -363,6 +366,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       CONTACT: 'CONTACT',
       PROGRAMS: 'PROGRAMS',
       TESTIMONIALS: 'TESTIMONIALS',
+      ABOUT: 'ABOUT',
       LEADS_MARKET: 'LEADS_MARKET',
       DASHBOARD: 'DASHBOARD',
       PROFESSIONAL: 'PROFESSIONAL',

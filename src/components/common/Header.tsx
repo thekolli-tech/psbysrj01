@@ -313,6 +313,25 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
+          {/* About Us Navigation Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveView('ABOUT');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 ${
+              activeView === 'ABOUT'
+                ? 'bg-[#182A3E] text-white border-[#182A3E] shadow-sm'
+                : 'bg-white text-slate-700 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+            title="About Property Studio"
+            aria-label="About Property Studio"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-[#B49029]" />
+            <span>About Us</span>
+          </button>
+
           {/* Wallet Balance Pill Matching PDF: ₹ [BAL] + */}
           <button
             type="button"

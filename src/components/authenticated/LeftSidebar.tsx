@@ -17,7 +17,8 @@ import {
   Building,
   ShieldCheck,
   Terminal,
-  Plus
+  Plus,
+  Info
 } from 'lucide-react';
 export type { NavItemKey };
 
@@ -43,6 +44,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     if (key === 'MARKET_INSIGHTS' && activeItem === 'PROPERTY_INSIGHTS') return true;
     if (key === 'COMMUNITY' && activeItem === 'COMMUNITIES') return true;
     if (key === 'CONFERENCE' && activeItem === 'LIVE_SESSIONS') return true;
+    if (key === 'ABOUT' && activeItem === 'ABOUT') return true;
     return false;
   };
 
@@ -65,7 +67,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     { key: 'REQUIREMENT' as const, label: 'Property Requirement', icon: FileText },
     { key: 'CONTACT' as const, label: 'Contact & Connect', icon: Mail },
     { key: 'PROGRAMS' as const, label: 'Programs', icon: BookOpen },
-    { key: 'TESTIMONIALS' as const, label: 'PS Testimonials', icon: Award }
+    { key: 'TESTIMONIALS' as const, label: 'PS Testimonials', icon: Award },
+    { key: 'ABOUT' as const, label: 'About Us', icon: Info }
   ];
 
   const workspacesList = [

@@ -331,6 +331,24 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                     </button>
                   );
                 })}
+
+                {/* Dedicated About Us Navigation Link */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setActiveView('ABOUT');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center justify-between cursor-pointer ${
+                    activeView === 'ABOUT'
+                      ? 'bg-amber-50 text-amber-900 font-bold border-l-4 border-amber-600'
+                      : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <span>About Us</span>
+                  {activeView === 'ABOUT' && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />}
+                </button>
               </div>
             </div>
 

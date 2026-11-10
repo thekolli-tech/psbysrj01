@@ -25,6 +25,8 @@ interface TopNavigationProps {
   onLogout: () => void;
   onNavigateHome: () => void;
   onNavigateWorkspace: (tab?: string) => void;
+  onNavigateAbout?: () => void;
+  activeView?: string;
   onNavigateAdmin?: () => void;
   onNavigateDeveloper?: () => void;
   unreadCount?: number;
@@ -43,6 +45,8 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
   onLogout,
   onNavigateHome,
   onNavigateWorkspace,
+  onNavigateAbout,
+  activeView,
   onNavigateAdmin,
   onNavigateDeveloper,
   unreadCount = 0,
@@ -142,6 +146,24 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
             </select>
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </div>
+
+          {/* About Us Navigation Button */}
+          {onNavigateAbout && (
+            <button
+              type="button"
+              onClick={onNavigateAbout}
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                activeView === 'ABOUT'
+                  ? 'bg-[#182A3E] text-white border-[#182A3E] shadow-sm'
+                  : 'bg-white text-slate-700 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+              title="About Property Studio"
+              aria-label="About Property Studio"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#B49029]" />
+              <span>About Us</span>
+            </button>
+          )}
 
           {/* Wallet Balance Pill Matching PDF: ₹ [BAL] + */}
           <button

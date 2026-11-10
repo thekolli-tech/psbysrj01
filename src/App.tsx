@@ -45,6 +45,7 @@ const ProfessionalDirectoryView = React.lazy(() => import('./components/network/
 const PublicRedditHome = React.lazy(() => import('./components/home/PublicRedditHome').then(m => ({ default: m.PublicRedditHome })));
 const ProgramsView = React.lazy(() => import('./components/programs/ProgramsView').then(m => ({ default: m.ProgramsView })));
 const PSTestimonialsView = React.lazy(() => import('./components/testimonials/PSTestimonialsView').then(m => ({ default: m.PSTestimonialsView })));
+const AboutUsView = React.lazy(() => import('./components/about/AboutUsView').then(m => ({ default: m.AboutUsView })));
 import { LeftSidebar } from './components/authenticated/LeftSidebar';
 
 const ViewSkeleton: React.FC = () => (
@@ -309,6 +310,15 @@ const AppContent: React.FC = () => {
             {activeView === 'TESTIMONIALS' && (
               <PSTestimonialsView />
             )}
+            {activeView === 'ABOUT' && (
+              <AboutUsView
+                onNavigateHome={() => setActiveView('HOME')}
+                onNavigateCommunity={() => setActiveView('COMMUNITY')}
+                onNavigateProperties={() => setActiveView('PROPERTIES')}
+                onOpenRegister={() => setLoginModalOpen(true)}
+                onOpenLogin={() => setLoginModalOpen(true)}
+              />
+            )}
             {activeView === 'CHAT' && (
               <div className="max-w-4xl mx-auto px-4 py-12 text-center space-y-6">
                 <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-600 border border-amber-500/30 flex items-center justify-center mx-auto">
@@ -485,6 +495,16 @@ const AppContent: React.FC = () => {
 
         {activeView === 'TESTIMONIALS' && (
           <PSTestimonialsView />
+        )}
+
+        {activeView === 'ABOUT' && (
+          <AboutUsView
+            onNavigateHome={() => setActiveView('HOME')}
+            onNavigateCommunity={() => setActiveView('COMMUNITY')}
+            onNavigateProperties={() => setActiveView('PROPERTIES')}
+            onOpenRegister={() => setLoginModalOpen(true)}
+            onOpenLogin={() => setLoginModalOpen(true)}
+          />
         )}
 
         {/* Official Secretariat & Support Desk View */}
@@ -772,6 +792,16 @@ const AppContent: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-end">
+                <button
+                  onClick={() => {
+                    setActiveView('ABOUT');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-slate-900 hover:underline cursor-pointer transition-colors font-semibold text-slate-700"
+                >
+                  About Us
+                </button>
+                <span className="text-slate-300">·</span>
                 <button
                   onClick={() => {
                     setActiveView('PRIVACY');
