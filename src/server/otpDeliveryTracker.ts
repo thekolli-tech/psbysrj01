@@ -174,12 +174,12 @@ export async function persistOtpDeliveryUpdate(
   try {
     await pool.query(`
       UPDATE otps
-      SET delivery_status = $1,
-          provider_message_id = COALESCE($2, provider_message_id),
-          failure_reason = COALESCE($3, failure_reason),
-          delivered_at = CASE WHEN $1 = 'DELIVERED' THEN NOW() ELSE delivered_at END,
+      SET delivery_status = $1::text,
+          provider_message_id = COALESCE($2::text, provider_message_id),
+          failure_reason = COALESCE($3::text, failure_reason),
+          delivered_at = CASE WHEN $1::text = 'DELIVERED' THEN NOW() ELSE delivered_at END,
           updated_at = NOW()
-      WHERE (target = $4 OR target = $5 OR provider_message_id = $6)
+      WHERE (target = $4::text OR target = $5::text OR provider_message_id = $6::text)
         AND consumed_at IS NULL
     `, [
       status,
@@ -242,7 +242,7 @@ export async function getAsyncOtpDeliveryStatus(phoneOrMessageId: string): Promi
         const res = await pool.query(`
           SELECT delivery_status, provider_message_id, failure_reason, delivered_at, created_at, updated_at
           FROM otps
-          WHERE (target = $1 OR target = $2 OR provider_message_id = $3)
+          WHERE (target = $1::text OR target = $2::text OR provider_message_id = $3::text)
             AND consumed_at IS NULL
           ORDER BY created_at DESC
           LIMIT 1
