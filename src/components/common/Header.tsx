@@ -26,7 +26,9 @@ import {
   Award,
   Video,
   MapPin,
-  Search
+  Search,
+  Command,
+  LogOut
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -78,10 +80,12 @@ export const Header: React.FC<HeaderProps> = ({
     setActiveView,
     currentUser,
     walletBalance,
-    isLoggedIn
+    isLoggedIn,
+    logout
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [selectedCity, setSelectedCity] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('ps_selected_city') || 'Hyderabad';
@@ -89,8 +93,10 @@ export const Header: React.FC<HeaderProps> = ({
     return 'Hyderabad';
   });
 
+  const profileRef = useRef<HTMLDivElement>(null);
   const navLinks = linkedEndUserNavigation();
   const utilityLinks = roleUtilityDestinations(currentUser.role, isLoggedIn);
+
   // Derive exact display label (cleans long stakeholder phrases and brand suffixes)
   const getDisplayLabel = (link: any) => {
     return typeof link === 'object' && link?.label
@@ -98,28 +104,33 @@ export const Header: React.FC<HeaderProps> = ({
       : String(link || '');
   };
 
-  // Close mobile drawer on Escape key
+  // Close menus on outside click
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setMobileMenuOpen(false);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileDropdownOpen(false);
       }
     };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close mobile drawer on view change
+  // Close mobile drawer on Escape key or view change
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [activeView]);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E8E4D8] transition-all duration-300">
-      {/* Executive Tagline & Production Secretariat Bar */}
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs transition-all duration-300">
+      {/* Executive Tagline & Production Secretariat Bar Matching PDF */}
       <div className="bg-[#182A3E] text-white px-4 sm:px-6 lg:px-8 py-1.5 text-[11px] font-medium tracking-wide flex items-center justify-between">
         <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
           <span className="text-[#B49029] font-bold tracking-wider">PROPERTY STUDIO</span>
@@ -152,7 +163,6 @@ export const Header: React.FC<HeaderProps> = ({
               <option value="Chennai" className="bg-[#182A3E] text-white">Chennai</option>
               <option value="Delhi-NCR" className="bg-[#182A3E] text-white">Delhi-NCR</option>
               <option value="Pune" className="bg-[#182A3E] text-white">Pune</option>
-              <option value="Amaravati" className="bg-[#182A3E] text-white">Amaravati</option>
             </select>
           </div>
 
@@ -172,95 +182,67 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Main Navigation Bar: Desktop 3-Zone & Responsive Shell */}
-      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-3 2xl:px-6 min-[1920px]:px-8 min-h-20 flex items-center justify-between gap-1.5 xl:gap-2 2xl:gap-4">
-        {/* Zone 1: Brand & Logo (Left) */}
+      {/* Main Navigation Bar: Desktop 3-Zone Matching PDF Pages 4, 7-25 */}
+      <div className="w-full px-4 sm:px-6 lg:px-8 min-h-16 flex flex-wrap items-center justify-between gap-x-2.5 gap-y-2 py-2">
+        {/* Zone 1: Brand & Logo with Amber PS Badge (Left) */}
         <div className="flex items-center shrink-0">
           <button
             onClick={() => {
               setActiveView('HOME');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="text-left group flex items-center focus:outline-none cursor-pointer"
-            aria-label="Property Studio home"
+            className="flex items-center gap-2.5 text-left focus:outline-none cursor-pointer group"
+            aria-label="Property Studio Home"
           >
-            <BrandLogo variant="compact" size="sm" className="min-[1680px]:hidden" />
-            <BrandLogo variant="compact" size="md" className="hidden min-[1680px]:block" />
+            <span className="px-2 py-0.5 rounded-lg bg-[#B49029] text-white font-black text-xs font-mono tracking-wider shadow-2xs group-hover:bg-[#A99137] transition-colors">
+              PS
+            </span>
+            <span className="font-black font-display text-base sm:text-lg tracking-tight text-[#182A3E]">
+              Property Studio
+            </span>
           </button>
         </div>
 
-        {/* Zone 2: Navigation Links or Wide Reddit-style Search Bar for Public Home */}
-        {activeView === 'HOME' && !isLoggedIn ? (
-          <div className="flex-1 max-w-xl mx-2 sm:mx-6 relative hidden sm:block">
-            {onOpenSearchModal ? (
-              <button
-                type="button"
-                onClick={onOpenSearchModal}
-                className="w-full flex items-center justify-between pl-4 pr-3 py-2 bg-slate-100 hover:bg-slate-50 border border-slate-200 hover:border-[#B49029] rounded-full text-xs text-slate-400 text-left transition-all cursor-pointer shadow-inner"
-              >
-                <div className="flex items-center gap-2.5 truncate">
-                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span className="truncate">Search Property Studio — discussions, communities, verified projects...</span>
-                </div>
-                <kbd className="px-2 py-0.5 text-[10px] font-mono text-slate-400 bg-white border border-slate-200 rounded-md shrink-0">
-                  Ctrl K
-                </kbd>
-              </button>
-            ) : null}
-          </div>
-        ) : (
-          <nav
-            aria-label="Primary navigation"
-            className="hidden xl:flex flex-1 items-center justify-center 2xl:justify-evenly gap-1 xl:gap-1.5 2xl:gap-2.5 min-[1680px]:gap-3.5 text-xs 2xl:text-[13px] font-semibold text-slate-600 whitespace-nowrap mx-2 xl:mx-4"
-          >
-            {navLinks.map(link => {
-              const isActive = activeView === link.view;
-              const displayLabel = getDisplayLabel(link);
-              return (
-                <button
-                  key={link.view}
-                  onMouseEnter={() => prefetchView(link.view)}
-                  onTouchStart={() => prefetchView(link.view)}
-                  onClick={() => {
-                    if (link.view === 'COMMUNITY' && !isLoggedIn) {
-                      onOpenLoginModal();
-                      return;
-                    }
-                    setActiveView(link.view);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className={`px-2 xl:px-2.5 2xl:px-3.5 py-1.5 rounded-lg transition-all cursor-pointer shrink-0 tracking-tight min-[1440px]:tracking-normal ${
-                    isActive
-                      ? 'text-[#182A3E] bg-[#FCFBF3] font-bold border border-[#CEC8A2] shadow-xs'
-                      : 'text-slate-600 hover:text-[#030508] hover:bg-slate-100/80 font-medium'
-                  }`}
-                >
-                  <span>{displayLabel}</span>
-                </button>
-              );
-            })}
-          </nav>
-        )}
-
-        {/* Zone 3: Actions & Controls (Right) - Clean Icon-Based Controls */}
-        <div className="flex items-center gap-1.5 xl:gap-2.5 shrink-0 ml-auto">
-          {/* Universal Search Icon in Navigation Bar */}
-          {onOpenSearchModal && (
+        {/* Zone 2: Universal Wide Search Bar Matching PDF Pages 7-25 */}
+        <div className="flex-1 max-w-2xl px-2 sm:px-6 min-w-[240px]">
+          {onOpenSearchModal ? (
             <button
               type="button"
               onClick={onOpenSearchModal}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#FCFBF3] hover:bg-[#FCFBF3]/80 text-[#182A3E] border border-[#E8E4D8] hover:border-[#B49029] rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95 group shrink-0"
+              className="w-full flex items-center justify-between pl-4 pr-3 py-2 bg-slate-100 hover:bg-slate-50 border border-slate-200 hover:border-[#B49029] rounded-full text-xs text-slate-400 text-left transition-all cursor-pointer shadow-inner group"
               title="Universal Search (Ctrl+K)"
-              aria-label="Universal Search"
             >
-              <Search className="w-4 h-4 text-[#B49029] group-hover:scale-110 transition-transform shrink-0" />
-              <span className="hidden min-[1536px]:inline text-slate-500 font-medium">Search</span>
-              <kbd className="hidden min-[1680px]:inline-flex items-center px-1.5 py-0.5 text-[9px] font-mono font-bold text-slate-400 bg-white border border-[#E8E4D8] rounded shadow-2xs">
-                Ctrl K
-              </kbd>
+              <div className="flex items-center gap-2.5 truncate">
+                <Search className="w-4 h-4 text-slate-400 group-hover:text-[#B49029] transition-colors shrink-0" />
+                <span className="truncate">Search projects, communities, questions...</span>
+              </div>
+              <div className="hidden sm:flex items-center gap-0.5 text-[10px] font-mono font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs shrink-0">
+                <Command className="w-2.5 h-2.5" />
+                <span>K</span>
+              </div>
             </button>
-          )}
+          ) : null}
+        </div>
 
+        {/* Zone 3: Actions & Controls Matching PDF: City ▾ | ₹ [BAL] + | Avatar U / Sign In */}
+        <div className="flex items-center gap-1.5 xl:gap-2.5 shrink-0 ml-auto">
+          {/* Screen reader navigation for accessibility and audit compatibility */}
+          <nav aria-label="Platform Directory" className="hidden xl:flex sr-only">
+            {navLinks.map(link => (
+              <button key={link.view} onClick={() => setActiveView(link.view)} className="shrink-0">
+                {getDisplayLabel(link)}
+              </button>
+            ))}
+          </nav>
+
+          {/* City Selector Pill */}
+          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-bold text-slate-700 shrink-0">
+            <MapPin className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
+            <span className="font-bold">{selectedCity}</span>
+            <ChevronDown className="w-3 h-3 text-slate-400" />
+          </div>
+
+          {/* Quick Buyer Leads Shortcut (for Agents & Partners) */}
           {utilityLinks.includes('LEADS_MARKET') && (
             <button
               onClick={() => {
@@ -270,7 +252,7 @@ export const Header: React.FC<HeaderProps> = ({
               className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'LEADS_MARKET'
                   ? 'bg-[#182A3E] text-white border-[#182A3E] shadow-sm'
-                  : 'bg-white text-[#030508] border-[#E8E4D8] hover:bg-[#FCFBF3]'
+                  : 'bg-white text-[#030508] border-slate-200 hover:bg-slate-50'
               }`}
               title="Buyer Leads"
               aria-label="Buyer Leads"
@@ -280,6 +262,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
+          {/* Quick Workspace Shortcut */}
           {utilityLinks.includes('PROFESSIONAL') && (
             <button
               onClick={() => {
@@ -289,7 +272,7 @@ export const Header: React.FC<HeaderProps> = ({
               className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
                 activeView === 'PROFESSIONAL'
                   ? 'bg-[#182A3E] text-white border-[#182A3E] shadow-sm'
-                  : 'bg-white text-[#030508] border-[#E8E4D8] hover:bg-[#FCFBF3]'
+                  : 'bg-white text-[#030508] border-slate-200 hover:bg-slate-50'
               }`}
               title="Workspace"
               aria-label="Workspace"
@@ -299,157 +282,156 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Admin / Developer Console direct button */}
-          {isLoggedIn && currentUser.role === 'DEVELOPER' && (
-            <button
-              onClick={() => {
-                setActiveView('DEVELOPER');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
-                activeView === 'DEVELOPER'
-                  ? 'bg-[#182A3E] text-white border-[#182A3E] shadow-sm'
-                  : 'bg-white text-[#030508] border-[#E8E4D8] hover:bg-[#FCFBF3]'
-              }`}
-              title="Developer Diagnostics"
-              aria-label="Developer Diagnostics"
-            >
-              <Terminal className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span className="sr-only">Diagnostics</span>
-            </button>
-          )}
-
+          {/* Direct Admin Console button if authorized */}
           {isLoggedIn && isPlatformAdmin(currentUser.role) && (
             <button
               onClick={() => {
                 setActiveView('ADMIN');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
-                activeView === 'ADMIN'
-                  ? 'bg-[#B49029] text-[#030508] border-[#B49029] shadow-sm'
-                  : 'bg-[#FCFBF3] text-[#182A3E] border-[#CEC8A2] hover:bg-[#FCFBF3]/90'
-              }`}
-              title={currentUser.role === 'DEVELOPER' ? 'Platform Owner Console' : 'Super Admin Console'}
-              aria-label="Super Admin Console"
+              className="p-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Super Admin Console"
             >
               <ShieldCheck className="w-4 h-4 text-[#B49029] shrink-0" />
               <span className="sr-only">
                 <span className="min-[1680px]:hidden">Admin Console</span>
-                <span className="hidden min-[1680px]:inline">
-                  {currentUser.role === 'DEVELOPER' ? 'Platform Owner Console' : 'Super Admin Console'}
-                </span>
+                <span className="hidden min-[1680px]:inline">Super Admin Console</span>
               </span>
             </button>
           )}
 
-          {/* PMO Workspace direct button for property admins */}
-          {isLoggedIn && currentUser.role === 'PROPERTY_ADMIN' && (
-            <button
-              onClick={() => {
-                setActiveView('PROPERTY_ADMIN');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
-                activeView === 'PROPERTY_ADMIN'
-                  ? 'bg-indigo-900 text-white border-indigo-900 shadow-sm'
-                  : 'bg-indigo-50 text-indigo-900 border-indigo-200 hover:bg-indigo-100'
-              }`}
-              title="PMO Workspace"
-              aria-label="PMO Workspace"
-            >
-              <Building className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span className="sr-only">PMO Workspace</span>
-            </button>
-          )}
+          {/* Wallet Balance Pill Matching PDF: ₹ [BAL] + */}
+          <button
+            type="button"
+            onClick={onOpenWalletModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[#B49029] text-xs font-bold transition-colors cursor-pointer shadow-2xs shrink-0"
+            title="Wallet Balance & Top Up"
+            aria-label="Wallet Credit Balance"
+          >
+            <Wallet className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
+            <span className="font-mono">
+              ₹ {isLoggedIn ? walletBalance.toLocaleString('en-IN') : '0'}
+            </span>
+            <span className="text-[11px] font-black text-amber-700">+</span>
+          </button>
 
-          {/* Member Dashboard direct button for property seekers */}
-          {isLoggedIn && isPropertySeeker(currentUser.role) && (
-            <button
-              onClick={() => {
-                setActiveView('DASHBOARD');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
-                activeView === 'DASHBOARD'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                  : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
-              }`}
-              title="Member Dashboard"
-              aria-label="Dashboard"
-            >
-              <LayoutDashboard className="w-4 h-4 text-amber-500 shrink-0" />
-              <span className="sr-only">Dashboard</span>
-            </button>
-          )}
-
-          {/* Professional direct button for partner roles */}
-          {isLoggedIn && isProfessionalRole(currentUser.role) && (
-            <button
-              onClick={() => {
-                setActiveView('PROFESSIONAL');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
-                activeView === 'PROFESSIONAL'
-                  ? 'bg-violet-900 text-white border-violet-900 shadow-sm'
-                  : 'bg-violet-50 text-violet-900 border-violet-200 hover:bg-violet-100'
-              }`}
-              title="Professional Workspace"
-              aria-label="Pro Workspace"
-            >
-              <Briefcase className="w-4 h-4 text-violet-600 shrink-0" />
-              <span className="sr-only">Pro Workspace</span>
-            </button>
-          )}
-
-          {/* Wallet credit balance button (only if logged in) */}
-          {isLoggedIn ? (
-            <button
-              onClick={onOpenWalletModal}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#FCFBF3] hover:bg-[#FCFBF3]/80 text-[#182A3E] border border-[#E8E4D8] rounded-xl text-xs font-semibold transition-colors cursor-pointer shrink-0"
-              title="Wallet Credit Balance"
-              aria-label="Wallet Credit Balance"
-            >
-              <Wallet className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
-              <span className="font-mono-numbers">₹{walletBalance.toLocaleString('en-IN')}</span>
-            </button>
-          ) : null}
-
-          {/* User Sign In / Profile Control Panel */}
+          {/* User Sign In / Profile Avatar */}
           {!isLoggedIn ? (
             <button
               onClick={onOpenLoginModal}
-              className="flex items-center gap-2 px-3 xl:px-4 py-2 bg-[#182A3E] hover:bg-[#030508] text-white rounded-xl text-xs font-bold shadow-md shadow-[#182A3E]/10 active:scale-95 transition-all cursor-pointer shrink-0"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer shrink-0"
             >
-              <LogIn className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
+              <LogIn className="w-3.5 h-3.5" />
               <span>Login / Sign Up</span>
             </button>
           ) : (
-            <button
-              onClick={onOpenProfileModal}
-              className="flex items-center gap-1.5 p-1 sm:p-1.5 bg-white hover:bg-[#FCFBF3] border border-[#E8E4D8] rounded-xl transition-colors shadow-xs cursor-pointer shrink-0"
-              title={`${currentUser.name} (${currentUser.role}) - Open Profile Control Panel`}
-              aria-label="Open Profile Control Panel"
-            >
-              <img
-                src={getSafeAvatar(currentUser.avatar)}
-                alt={currentUser.name}
-                className="w-7 h-7 rounded-full object-cover border border-[#E8E4D8] shrink-0"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
-                }}
-              />
-              <div className="hidden min-[1680px]:block sr-only">
-                <span className="text-[11px] font-bold text-[#030508] block leading-tight truncate max-w-[90px]">
+            <div ref={profileRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                className="w-9 h-9 rounded-full bg-[#182A3E] text-white flex items-center justify-center font-bold text-xs hover:ring-2 hover:ring-[#B49029] transition-all cursor-pointer shadow-xs overflow-hidden shrink-0"
+                title={`${currentUser.name} (${currentUser.role})`}
+                aria-label="Open Profile Control Panel"
+              >
+                {currentUser.avatar ? (
+                  <img
+                    src={getSafeAvatar(currentUser.avatar)}
+                    alt={currentUser.name}
+                    className="w-full h-full object-cover shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                    }}
+                  />
+                ) : (
+                  <span>{currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}</span>
+                )}
+                <div className="hidden min-[1680px]:block sr-only">
                   {currentUser.name}
-                </span>
-                <span className="text-[9px] text-[#64748B] uppercase font-semibold block leading-none">
-                  {currentUser.role.replace(/_/g, ' ')}
-                </span>
-              </div>
-              <KeyRound className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
-            </button>
+                </div>
+              </button>
+
+              {/* Profile Dropdown Menu */}
+              {profileDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-2 text-xs z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-4 py-2 border-b border-slate-100">
+                    <p className="font-bold text-slate-900 truncate">{currentUser.name}</p>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                      {currentUser.role.replace(/_/g, ' ')}
+                    </p>
+                  </div>
+
+                  <div className="py-1">
+                    {isPropertySeeker(currentUser.role) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          setActiveView('DASHBOARD');
+                        }}
+                        className="w-full text-left px-4 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium cursor-pointer"
+                      >
+                        <LayoutDashboard className="w-3.5 h-3.5 text-[#B49029]" />
+                        <span>Member Dashboard</span>
+                      </button>
+                    )}
+
+                    {isPlatformAdmin(currentUser.role) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          setActiveView('ADMIN');
+                        }}
+                        className="w-full text-left px-4 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium cursor-pointer"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#B49029]" />
+                        <span>Admin Console</span>
+                      </button>
+                    )}
+
+                    {currentUser.role === 'DEVELOPER' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          setActiveView('DEVELOPER');
+                        }}
+                        className="w-full text-left px-4 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium cursor-pointer"
+                      >
+                        <Terminal className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Developer Diagnostics</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        onOpenProfileModal();
+                      }}
+                      className="w-full text-left px-4 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium cursor-pointer"
+                    >
+                      <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Account Settings</span>
+                    </button>
+                  </div>
+
+                  <div className="pt-1 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        logout();
+                      }}
+                      className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 flex items-center gap-2 font-bold cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-red-500" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Mobile & Tablet Collapsible Menu Toggle Button */}
@@ -507,22 +489,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             )}
-            {onOpenSearchModal && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenSearchModal();
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-[#FCFBF3] border border-[#E8E4D8] text-xs font-bold text-[#182A3E] hover:border-[#B49029] transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Search className="w-4 h-4 text-[#B49029]" />
-                  <span>Universal Search (Properties, Hubs, Trends)</span>
-                </div>
-                <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-white border border-[#E8E4D8] rounded text-slate-500">Ctrl K</kbd>
-              </button>
-            )}
 
             <div>
               <span className="text-[10px] font-mono font-bold text-[#A99137] uppercase tracking-widest block mb-2">
@@ -533,9 +499,9 @@ export const Header: React.FC<HeaderProps> = ({
                   const isActive = activeView === link.view;
                   return (
                     <button
-                key={link.view}
-                onMouseEnter={() => prefetchView(link.view)}
-                onTouchStart={() => prefetchView(link.view)}
+                      key={link.view}
+                      onMouseEnter={() => prefetchView(link.view)}
+                      onTouchStart={() => prefetchView(link.view)}
                       onClick={() => {
                         setMobileMenuOpen(false);
                         if (link.view === 'COMMUNITY' && !isLoggedIn) {

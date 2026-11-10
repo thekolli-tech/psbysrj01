@@ -158,24 +158,43 @@ const GUEST_USER: User = {
   walletBalance: 0
 };
 
-const EMPTY_CONFERENCE: CorporateConference = {
-  id: '',
-  title: '',
-  developerName: '',
-  projectFocus: '',
-  date: '',
-  time: '',
-  status: 'UPCOMING',
-  attendeesCount: 0,
-  currentPresenter: '',
-  presenterRole: '',
-  streamThumbnail: '',
-  presentationSlideUrl: '',
-  currentSlideIndex: 0,
-  totalSlides: 0,
-  agenda: [],
-  questions: [],
-  polls: []
+const DEFAULT_CONFERENCE: CorporateConference = {
+  id: 'conf-neopolis-summit-2026',
+  title: 'Neopolis High-Rise Engineering & TS-RERA Compliance Summit',
+  developerName: 'Property Studio Secretariat & Verified Developers',
+  projectFocus: 'Kokapet & Neopolis Corridor Infrastructure Master Plan',
+  date: 'Active Live Stream',
+  time: '11:00 AM IST',
+  status: 'LIVE',
+  attendeesCount: 248,
+  currentPresenter: 'Swamy Reddy Javidi',
+  presenterRole: 'Founder & Real Estate Intelligence Lead',
+  streamThumbnail: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
+  presentationSlideUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+  currentSlideIndex: 3,
+  totalSlides: 12,
+  agenda: [
+    '11:00 AM - Corridor Infrastructure Timeline & Metro Phase 2 Link (Swamy Reddy Javidi)',
+    '11:30 AM - TS-RERA Legal Due Diligence & Escrow Audits (Adv. RERA Counsel)',
+    '12:00 PM - Live Attendee Q&A & Investor Voting (Secretariat Panel)'
+  ],
+  questions: [
+    { id: 'q-1', authorName: 'Kishore Varma', authorRole: 'Attendee', question: 'What is the projected completion timeline for the Trumpet flyover at Neopolis Exit 1?', upvotes: 18, isAnswered: true, timestamp: '10m ago' },
+    { id: 'q-2', authorName: 'Dr. Ramana Rao', authorRole: 'Investor', question: 'Are the escrow account audit reports publicly accessible for under-construction towers in Tellapur?', upvotes: 14, isAnswered: false, timestamp: '5m ago' },
+    { id: 'q-3', authorName: 'Pooja Hegde', authorRole: 'Property Seeker', question: 'How does high-speed aluminum formwork impact long-term acoustic insulation between adjacent units?', upvotes: 9, isAnswered: false, timestamp: '2m ago' }
+  ],
+  polls: [
+    {
+      id: 'poll-1',
+      question: 'Which factor is most critical in your Hyderabad high-rise purchasing decision?',
+      options: [
+        { label: 'TS-RERA Clean Title & Escrow Audits (55%)', votes: 136 },
+        { label: 'Approach Road Width & Corridor Infrastructure (30%)', votes: 74 },
+        { label: 'Developer Track Record & Delivery Punctuality (15%)', votes: 38 }
+      ],
+      totalVotes: 248
+    }
+  ]
 };
 
 function mapLead(raw: any): Lead {
@@ -241,20 +260,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveNav(key);
     switch (key) {
       case 'HOME':
+        setActiveView('HOME');
+        break;
+      case 'MEDIA':
+      case 'REAL_ESTATE_MEDIA':
+        setActiveView('MEDIA');
+        break;
+      case 'MARKET_INSIGHTS':
+      case 'PROPERTY_INSIGHTS':
+        setActiveView('MARKET_INSIGHTS');
+        break;
+      case 'REVIEWS':
+        setActiveView('REVIEWS');
+        break;
+      case 'COMMUNITY':
+      case 'COMMUNITIES':
+        setActiveView('COMMUNITY');
+        break;
+      case 'CONFERENCE':
+      case 'LIVE_SESSIONS':
+        setActiveView('CONFERENCE');
+        break;
+      case 'REQUIREMENT':
+        setActiveView('REQUIREMENT');
+        break;
+      case 'CONTACT':
+        setActiveView('CONTACT');
+        break;
+      case 'PROGRAMS':
+        setActiveView('PROGRAMS');
+        break;
+      case 'TESTIMONIALS':
+        setActiveView('TESTIMONIALS');
+        break;
+      case 'LEADS_MARKET':
+        setActiveView('LEADS_MARKET');
+        break;
+      case 'DASHBOARD':
+        setActiveView('DASHBOARD');
+        break;
+      case 'PROFESSIONAL':
+        setActiveView('PROFESSIONAL');
+        break;
+      case 'PROPERTY_ADMIN':
+        setActiveView('PROPERTY_ADMIN');
+        break;
+      case 'ADMIN':
+      case 'SUPER_ADMIN_CONSOLE':
+        setActiveView('ADMIN');
+        break;
+      case 'DEVELOPER':
+      case 'DEVELOPER_DASHBOARD':
+        setActiveView('DEVELOPER');
+        break;
       case 'DISCUSSIONS':
         setActiveView('HOME');
         break;
       case 'DISCOVER':
         setActiveView('PROPERTIES');
-        break;
-      case 'COMMUNITIES':
-        setActiveView('COMMUNITY');
-        break;
-      case 'PROPERTY_INSIGHTS':
-        setActiveView('MARKET_INSIGHTS');
-        break;
-      case 'LIVE_SESSIONS':
-        setActiveView('CONFERENCE');
         break;
       case 'SAVED_ITEMS':
         setActiveView('HOME');
@@ -279,18 +342,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       case 'RERA_PROFESSIONALS':
         setActiveView('PROFESSIONALS');
         break;
-      case 'REAL_ESTATE_MEDIA':
-        setActiveView('MEDIA');
-        break;
-      case 'SUPER_ADMIN_CONSOLE':
-        setActiveView('ADMIN');
-        break;
-      case 'DEVELOPER_DASHBOARD':
-        setActiveView('DEVELOPER');
-        break;
-      case 'LEADS_MARKET':
-        setActiveView('LEADS_MARKET');
-        break;
       default:
         setActiveView('HOME');
         break;
@@ -301,28 +352,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
-    if (activeView === 'CONFERENCE') setActiveNav('LIVE_SESSIONS');
-    else if (activeView === 'MARKET_INSIGHTS') setActiveNav('PROPERTY_INSIGHTS');
-    else if (activeView === 'PROPERTIES') setActiveNav('DISCOVER');
-    else if (activeView === 'ADMIN') setActiveNav('SUPER_ADMIN_CONSOLE');
-    else if (activeView === 'DEVELOPER') setActiveNav('DEVELOPER_DASHBOARD');
-    else if (activeView === 'MEDIA') setActiveNav('REAL_ESTATE_MEDIA');
-    else if (activeView === 'REVIEWS') {
-      setActiveNav(prev =>
-        ['FIND_PROFESSIONALS', 'DEVELOPERS', 'CHANNEL_PARTNERS', 'RERA_PROFESSIONALS'].includes(prev)
-          ? prev
-          : 'FIND_PROFESSIONALS'
-      );
-    } else if (activeView === 'DASHBOARD') {
-      setActiveNav(prev =>
-        ['MY_PROFILE', 'MY_POSTS', 'MY_QUESTIONS', 'MY_COMMUNITIES', 'MY_ENQUIRIES'].includes(prev)
-          ? prev
-          : 'MY_PROFILE'
-      );
-    } else if (activeView === 'HOME' || activeView === 'COMMUNITY') {
-      setActiveNav(prev =>
-        ['HOME', 'DISCUSSIONS', 'SAVED_ITEMS', 'COMMUNITIES'].includes(prev) ? prev : 'HOME'
-      );
+    const directMap: Record<string, NavItemKey> = {
+      HOME: 'HOME',
+      MEDIA: 'MEDIA',
+      MARKET_INSIGHTS: 'MARKET_INSIGHTS',
+      REVIEWS: 'REVIEWS',
+      COMMUNITY: 'COMMUNITY',
+      CONFERENCE: 'CONFERENCE',
+      REQUIREMENT: 'REQUIREMENT',
+      CONTACT: 'CONTACT',
+      PROGRAMS: 'PROGRAMS',
+      TESTIMONIALS: 'TESTIMONIALS',
+      LEADS_MARKET: 'LEADS_MARKET',
+      DASHBOARD: 'DASHBOARD',
+      PROFESSIONAL: 'PROFESSIONAL',
+      PROPERTY_ADMIN: 'PROPERTY_ADMIN',
+      ADMIN: 'ADMIN',
+      DEVELOPER: 'DEVELOPER'
+    };
+    if (directMap[activeView]) {
+      setActiveNav(directMap[activeView]);
     }
   }, [activeView]);
 
@@ -360,7 +409,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
 
-  const [conference, setConference] = useState<CorporateConference>(EMPTY_CONFERENCE);
+  const [conference, setConference] = useState<CorporateConference>(DEFAULT_CONFERENCE);
 
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
   const [communities, setCommunities] = useState<CommunityHub[]>(() => {

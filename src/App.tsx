@@ -43,6 +43,9 @@ const AgentOnboardModal = React.lazy(() => import('./components/modals/AgentOnbo
 const ClaimProjectModal = React.lazy(() => import('./components/modals/ClaimProjectModal').then(m => ({ default: m.ClaimProjectModal })));
 const ProfessionalDirectoryView = React.lazy(() => import('./components/network/ProfessionalDirectoryView').then(m => ({ default: m.ProfessionalDirectoryView })));
 const PublicRedditHome = React.lazy(() => import('./components/home/PublicRedditHome').then(m => ({ default: m.PublicRedditHome })));
+const ProgramsView = React.lazy(() => import('./components/programs/ProgramsView').then(m => ({ default: m.ProgramsView })));
+const PSTestimonialsView = React.lazy(() => import('./components/testimonials/PSTestimonialsView').then(m => ({ default: m.PSTestimonialsView })));
+import { LeftSidebar } from './components/authenticated/LeftSidebar';
 
 const ViewSkeleton: React.FC = () => (
   <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse space-y-6">
@@ -67,7 +70,9 @@ const AppContent: React.FC = () => {
     activeView,
     setActiveView,
     deviceMode,
-    isLoggedIn
+    isLoggedIn,
+    activeNav,
+    navigateToNav
   } = useApp();
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -173,6 +178,10 @@ const AppContent: React.FC = () => {
         property_admin: 'PROPERTY_ADMIN',
         studio: 'STUDIO',
         contact: 'CONTACT',
+        programs: 'PROGRAMS',
+        academy: 'PROGRAMS',
+        testimonials: 'TESTIMONIALS',
+        ps_testimonials: 'TESTIMONIALS',
         privacy: 'PRIVACY',
         terms: 'TERMS'
       };
@@ -293,6 +302,12 @@ const AppContent: React.FC = () => {
             )}
             {activeView === 'REQUIREMENT' && (
               <PropertyRequirementView onOpenLoginModal={() => setLoginModalOpen(true)} />
+            )}
+            {activeView === 'PROGRAMS' && (
+              <ProgramsView />
+            )}
+            {activeView === 'TESTIMONIALS' && (
+              <PSTestimonialsView />
             )}
             {activeView === 'CHAT' && (
               <div className="max-w-4xl mx-auto px-4 py-12 text-center space-y-6">
@@ -462,6 +477,14 @@ const AppContent: React.FC = () => {
 
         {activeView === 'REQUIREMENT' && (
           <PropertyRequirementView onOpenLoginModal={() => setLoginModalOpen(true)} />
+        )}
+
+        {activeView === 'PROGRAMS' && (
+          <ProgramsView />
+        )}
+
+        {activeView === 'TESTIMONIALS' && (
+          <PSTestimonialsView />
         )}
 
         {/* Official Secretariat & Support Desk View */}

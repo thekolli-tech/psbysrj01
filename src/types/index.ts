@@ -514,6 +514,22 @@ export interface ChatMessage {
 
 export type NavItemKey =
   | 'HOME'
+  | 'MEDIA'
+  | 'MARKET_INSIGHTS'
+  | 'REVIEWS'
+  | 'COMMUNITY'
+  | 'CONFERENCE'
+  | 'REQUIREMENT'
+  | 'CONTACT'
+  | 'PROGRAMS'
+  | 'TESTIMONIALS'
+  | 'LEADS_MARKET'
+  | 'DASHBOARD'
+  | 'PROFESSIONAL'
+  | 'PROPERTY_ADMIN'
+  | 'ADMIN'
+  | 'DEVELOPER'
+  // Legacy nav keys for backwards compatibility
   | 'DISCOVER'
   | 'COMMUNITIES'
   | 'DISCUSSIONS'
@@ -531,8 +547,7 @@ export type NavItemKey =
   | 'RERA_PROFESSIONALS'
   | 'REAL_ESTATE_MEDIA'
   | 'SUPER_ADMIN_CONSOLE'
-  | 'DEVELOPER_DASHBOARD'
-  | 'LEADS_MARKET';
+  | 'DEVELOPER_DASHBOARD';
 
 export type WorkspaceTabType =
   | 'OVERVIEW'
@@ -561,6 +576,8 @@ export type ViewType =
   | 'PROPERTY_ADMIN'
   | 'STUDIO'
   | 'CONTACT'
+  | 'PROGRAMS'
+  | 'TESTIMONIALS'
   | 'PRIVACY'
   | 'TERMS';
 

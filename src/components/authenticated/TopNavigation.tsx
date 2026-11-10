@@ -1,18 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User } from '../../types';
-import { BrandLogo } from '../common/BrandLogo';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { NotificationPanel } from './NotificationPanel';
 import { UserProfileMenu } from './UserProfileMenu';
 import {
   Search,
-  Plus,
   Bell,
-  MessageSquare,
   X,
   Menu,
-  Sparkles,
-  Command
+  Command,
+  Wallet,
+  MapPin,
+  ChevronDown
 } from 'lucide-react';
 
 interface TopNavigationProps {
@@ -46,12 +45,16 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
   onNavigateAdmin,
   onNavigateDeveloper,
   unreadCount = 0,
-  onToggleMobileMenu,
-  searchQuery = '',
-  onSearchChange
+  onToggleMobileMenu
 }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [selectedCity, setSelectedCity] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('ps_selected_city') || 'Hyderabad';
+    }
+    return 'Hyderabad';
+  });
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -71,9 +74,9 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs select-none">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
-        {/* Left: Mobile Menu Toggle + Brand Logo */}
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs select-none">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sm:gap-6">
+        {/* Left: Mobile Menu Toggle + Amber PS Badge & Property Studio Brand */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {onToggleMobileMenu && (
             <button
@@ -86,59 +89,78 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
             </button>
           )}
 
-          <div onClick={onNavigateHome} className="cursor-pointer">
-            <BrandLogo variant="compact" size="sm" />
+          <div
+            onClick={onNavigateHome}
+            className="flex items-center gap-2.5 cursor-pointer group"
+          >
+            <span className="px-2 py-0.5 rounded-lg bg-[#B49029] text-white font-black text-xs font-mono tracking-wider shadow-2xs group-hover:bg-[#A99137] transition-colors">
+              PS
+            </span>
+            <span className="font-black font-display text-base sm:text-lg tracking-tight text-[#182A3E]">
+              Property Studio
+            </span>
           </div>
         </div>
 
-        {/* Center: Global Search Pill Bar (Reddit-style) */}
-        <div className="flex-1 max-w-2xl px-1 sm:px-4">
+        {/* Center: Global Search Pill Bar Matching PDF Pages 7-25 */}
+        <div className="flex-1 max-w-2xl px-2 sm:px-4">
           <div
             onClick={onOpenSearch}
-            className="group relative flex items-center w-full bg-slate-100/90 hover:bg-slate-100 rounded-full px-3.5 py-1.5 sm:py-2 border border-slate-200/80 hover:border-slate-300 transition-all cursor-pointer shadow-2xs"
+            className="group relative flex items-center w-full bg-slate-100/90 hover:bg-slate-100 rounded-full px-4 py-2 border border-slate-200/80 hover:border-slate-300 transition-all cursor-pointer shadow-inner"
           >
             <Search className="w-4 h-4 text-slate-400 group-hover:text-[#B49029] transition-colors shrink-0" />
             <span className="ml-2.5 text-xs text-slate-400 group-hover:text-slate-600 truncate flex-1">
-              Search properties, communities, discussions, topics...
+              Search projects, communities, questions...
             </span>
-            <div className="hidden sm:flex items-center gap-0.5 text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs shrink-0">
+            <div className="hidden sm:flex items-center gap-0.5 text-[10px] font-mono font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs shrink-0">
               <Command className="w-2.5 h-2.5" />
               <span>K</span>
             </div>
           </div>
         </div>
 
-        {/* Right: Actions (Create, Messages, Notifications, Avatar) */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Create Content Button */}
+        {/* Right: City Selector | Wallet ₹ [BAL] + | Notifications | User Avatar */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* City Selector */}
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-bold text-slate-700">
+            <MapPin className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
+            <select
+              value={selectedCity}
+              onChange={(e) => {
+                const newCity = e.target.value;
+                setSelectedCity(newCity);
+                try {
+                  localStorage.setItem('ps_selected_city', newCity);
+                } catch {}
+              }}
+              className="bg-transparent text-slate-800 font-bold text-xs focus:outline-none cursor-pointer"
+              aria-label="Select City"
+            >
+              <option value="Hyderabad">Hyderabad</option>
+              <option value="Bengaluru">Bengaluru</option>
+              <option value="Mumbai">Mumbai</option>
+              <option value="Chennai">Chennai</option>
+              <option value="Delhi-NCR">Delhi-NCR</option>
+              <option value="Pune">Pune</option>
+            </select>
+            <ChevronDown className="w-3 h-3 text-slate-400" />
+          </div>
+
+          {/* Wallet Balance Pill Matching PDF: ₹ [BAL] + */}
           <button
             type="button"
-            onClick={onOpenCreate}
-            className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold text-white transition-all shadow-xs hover:shadow-md cursor-pointer shrink-0"
-            style={{
-              backgroundColor: '#182A3E',
-              borderColor: '#B49029',
-              borderWidth: '1px'
-            }}
+            onClick={onOpenWallet}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[#B49029] text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+            title="Wallet Balance & Top Up"
           >
-            <Plus className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Create</span>
+            <Wallet className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
+            <span className="font-mono">
+              ₹ {currentUser.walletBalance?.toLocaleString('en-IN') ?? '0'}
+            </span>
+            <span className="text-[11px] font-black text-amber-700">+</span>
           </button>
 
-          {/* Messages Action */}
-          {onOpenMessages && (
-            <button
-              type="button"
-              onClick={onOpenMessages}
-              className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
-              title="Direct Messages & Enquiries"
-              aria-label="Messages"
-            >
-              <MessageSquare className="w-4 h-4" />
-            </button>
-          )}
-
-          {/* Notifications Bell Dropdown */}
+          {/* Notifications Bell */}
           <div ref={notificationsRef} className="relative">
             <button
               type="button"
@@ -148,21 +170,22 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
               }}
               className="relative p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
               title="Notifications"
-              aria-label="Notifications"
             >
               <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#B49029] rounded-full ring-2 ring-white" />
               )}
             </button>
 
-            <NotificationPanel
-              isOpen={notificationsOpen}
-              onClose={() => setNotificationsOpen(false)}
-            />
+            {notificationsOpen && (
+              <NotificationPanel
+                isOpen={notificationsOpen}
+                onClose={() => setNotificationsOpen(false)}
+              />
+            )}
           </div>
 
-          {/* User Profile Avatar & Menu Dropdown */}
+          {/* User Profile Avatar Circle (Initial or image) */}
           <div ref={profileRef} className="relative">
             <button
               type="button"
@@ -170,30 +193,36 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
                 setProfileOpen(!profileOpen);
                 setNotificationsOpen(false);
               }}
-              className="flex items-center gap-1.5 p-1 rounded-full hover:ring-2 hover:ring-amber-500/40 transition-all cursor-pointer"
-              aria-label="User profile menu"
+              className="w-9 h-9 rounded-full bg-[#182A3E] text-white flex items-center justify-center font-bold text-xs hover:ring-2 hover:ring-[#B49029] transition-all cursor-pointer shadow-xs overflow-hidden"
+              title={`${currentUser.name} (${currentUser.role})`}
             >
-              <img
-                src={getSafeAvatar(currentUser.avatar) || DEFAULT_AVATAR}
-                alt={currentUser.name}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-slate-200 bg-white"
-                onError={e => {
-                  (e.currentTarget as HTMLImageElement).src = DEFAULT_AVATAR;
-                }}
-              />
+              {currentUser.avatar ? (
+                <img
+                  src={getSafeAvatar(currentUser.avatar)}
+                  alt={currentUser.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = DEFAULT_AVATAR;
+                  }}
+                />
+              ) : (
+                <span>{currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}</span>
+              )}
             </button>
 
-            <UserProfileMenu
-              isOpen={profileOpen}
-              currentUser={currentUser}
-              onClose={() => setProfileOpen(false)}
-              onNavigateWorkspace={onNavigateWorkspace}
-              onOpenWallet={onOpenWallet}
-              onOpenSupport={onOpenSupport}
-              onLogout={onLogout}
-              onNavigateAdmin={onNavigateAdmin}
-              onNavigateDeveloper={onNavigateDeveloper}
-            />
+            {profileOpen && (
+              <UserProfileMenu
+                isOpen={profileOpen}
+                currentUser={currentUser}
+                onClose={() => setProfileOpen(false)}
+                onNavigateWorkspace={onNavigateWorkspace}
+                onOpenWallet={onOpenWallet}
+                onOpenSupport={onOpenSupport}
+                onNavigateAdmin={onNavigateAdmin}
+                onNavigateDeveloper={onNavigateDeveloper}
+                onLogout={onLogout}
+              />
+            )}
           </div>
         </div>
       </div>
