@@ -191,7 +191,7 @@ import {
   sendModerationDecisionEmailNotification
 } from './src/server/emailNotificationService.ts';
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
-import { normalizeIndianMobile } from './src/shared/indianMobile.ts';
+import { normalizeIndianMobile, indianNationalDigits } from './src/shared/indianMobile.ts';
 import { getOtpDeliveryStatus, getAsyncOtpDeliveryStatus, processGupshupWebhookEvent } from './src/server/otpDeliveryTracker.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
