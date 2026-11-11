@@ -137,7 +137,9 @@ import {
   getUserNotificationPreferences,
   updateUserNotificationPreferences,
   getPreferencesByUnsubscribeToken,
-  isPhoneTaken
+  isPhoneTaken,
+  findUserByPhone,
+  associateVerifiedPhone
 } from './src/server/db.ts';
 import { resolveAuthoritativeOtpDestination, maskEmailForDisplay, validatePasswordPolicy } from './src/server/otpPolicy.ts';
 import {
@@ -272,11 +274,79 @@ const authenticateUser = async (req: AuthenticatedRequest, _res: Response, next:
 
 app.use(authenticateUser);
 
+function sanitizeSessionUser(u: any) {
+  if (!u) return null;
+  const { password_hash, salt, ...safe } = u;
+  const hasVerifiedPhone = safe.role === 'SUPER_ADMIN' || Boolean(
+    safe.phone &&
+    String(safe.phone).trim() &&
+    Number(safe.phone_verified) === 1
+  );
+  return {
+    ...safe,
+    isVerified: Boolean(safe.is_verified),
+    phone_verified: Number(safe.phone_verified || 0),
+    phoneVerified: hasVerifiedPhone,
+    requiresPhoneVerification: !hasVerifiedPhone
+  };
+}
+
 // Authorization Guards
+
+// Base authenticated session guard: checks that a valid user session exists
+const requireSession = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required. Please sign in.' });
+    return;
+  }
+  next();
+};
+
+// Mandatory Mobile Phone Verification Guard:
+// Blocks unverified sessions (including Google OAuth users) from accessing protected application APIs.
+const requirePhoneVerified = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required. Please sign in.' });
+    return;
+  }
+  if (req.user.role !== 'SUPER_ADMIN') {
+    const isPhoneVerified = Boolean(
+      req.user.phone &&
+      String(req.user.phone).trim() &&
+      Number(req.user.phone_verified) === 1
+    );
+    if (!isPhoneVerified) {
+      res.status(403).json({
+        error: 'Mobile phone verification is mandatory. Please verify your phone number via 2Factor OTP to access this resource.',
+        code: 'PHONE_VERIFICATION_REQUIRED',
+        phoneVerified: false
+      });
+      return;
+    }
+  }
+  next();
+};
+
+// Protected Application API Guard: enforces active session AND mandatory mobile phone verification
 const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required. Please sign in.' });
     return;
+  }
+  if (req.user.role !== 'SUPER_ADMIN') {
+    const isPhoneVerified = Boolean(
+      req.user.phone &&
+      String(req.user.phone).trim() &&
+      Number(req.user.phone_verified) === 1
+    );
+    if (!isPhoneVerified) {
+      res.status(403).json({
+        error: 'Mobile phone verification is mandatory. Please verify your phone number via 2Factor OTP to access this resource.',
+        code: 'PHONE_VERIFICATION_REQUIRED',
+        phoneVerified: false
+      });
+      return;
+    }
   }
   next();
 };
@@ -552,11 +622,24 @@ app.post('/api/auth/google', async (req: Request, res: Response): Promise<void> 
       res.cookie('ps_session', authResult.sessionToken, sessionCookieOptions());
     }
 
+    const hasVerifiedPhone = authResult.user.role === 'SUPER_ADMIN' || Boolean(
+      authResult.user.phone &&
+      String(authResult.user.phone).trim() &&
+      Number(authResult.user.phone_verified) === 1
+    );
+    const requiresPhoneVerification = !hasVerifiedPhone;
+
     res.json({
       success: true,
-      user: authResult.user,
+      user: {
+        ...authResult.user,
+        phoneVerified: hasVerifiedPhone,
+        requiresPhoneVerification
+      },
       isNewUser: authResult.isNewUser,
       isProfileComplete: Boolean(authResult.isProfileComplete),
+      requiresPhoneVerification,
+      phoneVerified: hasVerifiedPhone,
       googlePicture: authResult.googlePicture
     });
   } catch (err: any) {
@@ -707,10 +790,23 @@ app.get('/api/auth/google/callback', async (req: Request, res: Response): Promis
       res.cookie('ps_session', authResult.sessionToken, sessionCookieOptions());
     }
 
+    const hasVerifiedPhone = authResult.user.role === 'SUPER_ADMIN' || Boolean(
+      authResult.user.phone &&
+      String(authResult.user.phone).trim() &&
+      Number(authResult.user.phone_verified) === 1
+    );
+    const requiresPhoneVerification = !hasVerifiedPhone;
+
     sendPostMessageResponse(true, {
-      user: authResult.user,
+      user: {
+        ...authResult.user,
+        phoneVerified: hasVerifiedPhone,
+        requiresPhoneVerification
+      },
       isNewUser: authResult.isNewUser,
       isProfileComplete: Boolean(authResult.isProfileComplete),
+      requiresPhoneVerification,
+      phoneVerified: hasVerifiedPhone,
       googlePicture: authResult.googlePicture
     });
   } catch (err: any) {
@@ -719,7 +815,7 @@ app.get('/api/auth/google/callback', async (req: Request, res: Response): Promis
 });
 
 // 4. POST /api/auth/google/complete-profile: Complete profile after Google authentication
-app.post('/api/auth/google/complete-profile', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/auth/google/complete-profile', requireSession, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { name, role, phone, organization, profession, company, interests, avatar } = req.body || {};
 
@@ -1047,6 +1143,13 @@ app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
     return;
   }
   const { password_hash, salt, ...safeUser } = req.user;
+  const hasVerifiedPhone = req.user.role === 'SUPER_ADMIN' || Boolean(
+    req.user.phone &&
+    String(req.user.phone).trim() &&
+    Number(req.user.phone_verified) === 1
+  );
+  const requiresPhoneVerification = !hasVerifiedPhone;
+
   res.json({
     user: {
       ...safeUser,
@@ -1055,6 +1158,9 @@ app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
       company: (safeUser as any).company || '',
       interests: typeof (safeUser as any).interests === 'string' ? JSON.parse((safeUser as any).interests) : ((safeUser as any).interests || []),
       isVerified: Boolean(safeUser.is_verified),
+      phone_verified: Number(safeUser.phone_verified || 0),
+      phoneVerified: hasVerifiedPhone,
+      requiresPhoneVerification,
       preferredLanguage: safeUser.preferred_language || 'en',
       assignedPropertyIds: JSON.parse(safeUser.assigned_properties || '[]')
     }
@@ -1218,6 +1324,18 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
       if (taken) {
         res.status(409).json({
           error: 'An account with this mobile number already exists. Please sign in instead.',
+          code: 'PHONE_ALREADY_REGISTERED'
+        });
+        return;
+      }
+    }
+
+    const activeUserId = (req as AuthenticatedRequest).user?.id;
+    if (activeUserId) {
+      const existingOwner = await findUserByPhone(phone);
+      if (existingOwner && existingOwner.id !== activeUserId) {
+        res.status(409).json({
+          error: 'An account with this mobile number already exists. Please use a different phone number.',
           code: 'PHONE_ALREADY_REGISTERED'
         });
         return;
@@ -1472,12 +1590,34 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
 
         // Provider confirmed! Mark verified in database & issue single-use registration grant
         await markPhoneOtpVerifiedByProvider(phone, otp);
+
+        let associatedUser = null;
+        const activeUserId = (req as AuthenticatedRequest).user?.id;
+        if (activeUserId) {
+          const existingOwner = await findUserByPhone(phone);
+          if (existingOwner && existingOwner.id !== activeUserId) {
+            res.status(409).json({
+              error: 'An account with this mobile number already exists. Please use a different phone number.',
+              code: 'PHONE_ALREADY_REGISTERED'
+            });
+            return;
+          }
+          associatedUser = await associateVerifiedPhone(activeUserId, phone);
+          if (associatedUser) {
+            (req as AuthenticatedRequest).user = associatedUser;
+          }
+        }
+
+        const safeUser = associatedUser ? sanitizeSessionUser(associatedUser) : null;
         res.json({
           success: true,
           verified: true,
           provider: '2factor',
           channel: effectiveChannel,
-          message: `Mobile number successfully verified via 2Factor ${effectiveChannel.toUpperCase()}`
+          message: `Mobile number successfully verified via 2Factor ${effectiveChannel.toUpperCase()}`,
+          phoneVerified: true,
+          requiresPhoneVerification: false,
+          user: safeUser || undefined
         });
         return;
       }
@@ -1490,7 +1630,33 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
       return;
     }
     await markPhoneOtpVerifiedByProvider(phone, otp);
-    res.json({ success: true, verified: true, message: 'Phone number successfully verified' });
+
+    let associatedUser = null;
+    const activeUserId = (req as AuthenticatedRequest).user?.id;
+    if (activeUserId) {
+      const existingOwner = await findUserByPhone(phone);
+      if (existingOwner && existingOwner.id !== activeUserId) {
+        res.status(409).json({
+          error: 'An account with this mobile number already exists. Please use a different phone number.',
+          code: 'PHONE_ALREADY_REGISTERED'
+        });
+        return;
+      }
+      associatedUser = await associateVerifiedPhone(activeUserId, phone);
+      if (associatedUser) {
+        (req as AuthenticatedRequest).user = associatedUser;
+      }
+    }
+
+    const safeUser = associatedUser ? sanitizeSessionUser(associatedUser) : null;
+    res.json({
+      success: true,
+      verified: true,
+      phoneVerified: true,
+      requiresPhoneVerification: false,
+      message: 'Phone number successfully verified',
+      user: safeUser || undefined
+    });
   } catch (err: any) {
     console.error('[Property Studio] verify-phone-otp error:', err?.message || err);
     if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {

@@ -24,6 +24,8 @@ export interface GoogleAuthResult {
   user?: any;
   isNewUser?: boolean;
   isProfileComplete?: boolean;
+  requiresPhoneVerification?: boolean;
+  phoneVerified?: boolean;
   googlePicture?: string;
   sessionToken?: string;
   error?: string;
@@ -416,6 +418,12 @@ export async function authenticateGoogleIdentity(
       }
     }
 
+    const hasVerifiedPhone = user.role === 'SUPER_ADMIN' || Boolean(
+      user.phone &&
+      String(user.phone).trim() &&
+      Number(user.phone_verified) === 1
+    );
+    const requiresPhoneVerification = !hasVerifiedPhone;
     const isProfileComplete = isUserProfileComplete(user);
 
     return {
@@ -426,10 +434,15 @@ export async function authenticateGoogleIdentity(
         isVerified: Boolean(safeUser.is_verified),
         preferredLanguage: safeUser.preferred_language || 'en',
         assignedPropertyIds,
+        phone_verified: Number(user.phone_verified || 0),
+        phoneVerified: hasVerifiedPhone,
+        requiresPhoneVerification,
         isProfileComplete
       },
       sessionToken: token,
       isNewUser: false,
+      requiresPhoneVerification,
+      phoneVerified: hasVerifiedPhone,
       isProfileComplete,
       googlePicture: identity.picture
     };
@@ -449,6 +462,7 @@ export async function authenticateGoogleIdentity(
     avatar: identity.picture,
     townCity: 'Hyderabad, Telangana, India',
     isVerified: true,
+    phoneVerified: false,
     password: randomPassword
   });
 
@@ -467,12 +481,17 @@ export async function authenticateGoogleIdentity(
       company: '',
       interests: [],
       isVerified: true,
+      phone: '',
       phone_verified: 0,
+      phoneVerified: false,
+      requiresPhoneVerification: true,
       assignedPropertyIds: [],
       isProfileComplete: false
     },
     sessionToken: token,
     isNewUser: true,
+    requiresPhoneVerification: true,
+    phoneVerified: false,
     isProfileComplete: false,
     googlePicture: identity.picture
   };

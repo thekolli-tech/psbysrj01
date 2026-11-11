@@ -31,6 +31,8 @@ import {
   pgGenerateOtp,
   pgVerifyOtp,
   pgMarkPhoneOtpVerifiedByProvider,
+  pgFindUserByPhone,
+  pgAssociateVerifiedPhone,
   pgIsTargetVerified,
   pgRegisterVerifiedUser,
   pgCreateAuditLog,
@@ -844,9 +846,20 @@ export async function createUser(data: {
   townCity?: string;
   password?: string;
   isVerified?: boolean;
+  phoneVerified?: boolean;
 }): Promise<DbUser> {
   if (isPostgresAuthoritative()) return pgCreateUser(data);
   return sqliteCreateUser(data);
+}
+
+export async function findUserByPhone(phone: string): Promise<DbUser | null> {
+  if (isPostgresAuthoritative()) return pgFindUserByPhone(phone);
+  return sqliteFindUserByPhone(phone);
+}
+
+export async function associateVerifiedPhone(userId: string, phone: string): Promise<DbUser | null> {
+  if (isPostgresAuthoritative()) return pgAssociateVerifiedPhone(userId, phone);
+  return sqliteAssociateVerifiedPhone(userId, phone);
 }
 
 export async function updateUser(id: string, updates: Partial<{
@@ -2560,6 +2573,7 @@ function sqliteCreateUser(data: {
   townCity?: string;
   password?: string;
   isVerified?: boolean;
+  phoneVerified?: boolean;
 }): DbUser {
   const id = `user_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   const publicId = `usr_${crypto.randomBytes(4).toString('hex')}`;
@@ -2567,6 +2581,9 @@ function sqliteCreateUser(data: {
   const password = data.password || crypto.randomBytes(8).toString('hex');
   const { hash, salt } = hashPassword(password);
   const now = new Date().toISOString();
+  const phoneVerifiedVal = data.phoneVerified !== undefined
+    ? (data.phoneVerified ? 1 : 0)
+    : (data.isVerified ? 1 : 0);
 
   const insert = db.prepare(`
     INSERT INTO users (id, public_id, name, email, phone, role, avatar, organization, town_city, wallet_balance, is_verified, email_verified, phone_verified, account_status, must_change_password, assigned_properties, password_hash, salt, created_at, updated_at)
@@ -2585,7 +2602,7 @@ function sqliteCreateUser(data: {
     data.townCity ?? null,
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
-    0,
+    phoneVerifiedVal,
     hash,
     salt,
     now,
@@ -3275,6 +3292,21 @@ function sqlitePhoneTaken(e164: string): boolean {
   if (!indianNationalDigits(e164)) return false;
   const rows = getSqliteDb().prepare(`SELECT phone FROM users`).all() as Array<{ phone: string | null }>;
   return rows.some((row) => storedPhoneMatches(row.phone, e164));
+}
+
+function sqliteFindUserByPhone(phone: string): DbUser | null {
+  if (!indianNationalDigits(phone)) return null;
+  const rows = getSqliteDb().prepare(`SELECT id, phone FROM users`).all() as Array<{ id: string; phone: string | null }>;
+  const match = rows.find((row) => storedPhoneMatches(row.phone, phone));
+  if (match) return sqliteFindUserById(match.id);
+  return null;
+}
+
+function sqliteAssociateVerifiedPhone(userId: string, phone: string): DbUser | null {
+  const normalized = normalizeIndianMobile(phone) || phone.trim();
+  const now = new Date().toISOString();
+  getSqliteDb().prepare(`UPDATE users SET phone = ?, phone_verified = 1, updated_at = ? WHERE id = ?`).run(normalized, now, userId);
+  return sqliteFindUserById(userId);
 }
 
 function sqliteRegisterVerifiedUser(data: {

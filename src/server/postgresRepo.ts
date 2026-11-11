@@ -167,6 +167,7 @@ export async function pgCreateUser(data: {
   townCity?: string;
   password?: string;
   isVerified?: boolean;
+  phoneVerified?: boolean;
 }): Promise<DbUser> {
   await ensurePostgresAdditiveSchema();
   const id = `user_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
@@ -175,6 +176,9 @@ export async function pgCreateUser(data: {
   const password = data.password || crypto.randomBytes(8).toString('hex');
   const { hash, salt } = hashPassword(password);
   const now = new Date().toISOString();
+  const phoneVerifiedVal = data.phoneVerified !== undefined
+    ? (data.phoneVerified ? 1 : 0)
+    : (data.isVerified ? 1 : 0);
 
   await queryPostgres(`
     INSERT INTO users (
@@ -195,7 +199,7 @@ export async function pgCreateUser(data: {
     data.townCity ?? null,
     data.isVerified ? 1 : 0,
     data.isVerified ? 1 : 0,
-    0,
+    phoneVerifiedVal,
     hash,
     salt,
     now,
@@ -978,6 +982,47 @@ export async function pgPhoneTaken(phone: string): Promise<boolean> {
     [national, `0${national}`, `91${national}`]
   );
   return taken.rows.length > 0;
+}
+
+export async function pgFindUserByPhone(phone: string): Promise<DbUser | null> {
+  const national = indianNationalDigits(phone);
+  if (!national) return null;
+
+  const directVariants = [
+    `+91${national}`,
+    `91${national}`,
+    national,
+    `0${national}`,
+    `+91 ${national}`,
+    `+91-${national}`
+  ];
+  const direct = await queryPostgres(
+    `SELECT id FROM users WHERE phone = ANY($1::text[]) LIMIT 1`,
+    [directVariants]
+  );
+  if (direct.rows.length > 0) {
+    return pgFindUserById(direct.rows[0].id);
+  }
+
+  const fallback = await queryPostgres(
+    `SELECT id FROM users WHERE regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') IN ($1, $2, $3) LIMIT 1`,
+    [national, `0${national}`, `91${national}`]
+  );
+  if (fallback.rows.length > 0) {
+    return pgFindUserById(fallback.rows[0].id);
+  }
+
+  return null;
+}
+
+export async function pgAssociateVerifiedPhone(userId: string, phone: string): Promise<DbUser | null> {
+  const normalized = normalizeIndianMobile(phone) || phone.trim();
+  const now = new Date().toISOString();
+  await queryPostgres(
+    `UPDATE users SET phone = $1, phone_verified = 1, updated_at = $2 WHERE id = $3`,
+    [normalized, now, userId]
+  );
+  return pgFindUserById(userId);
 }
 
 export async function pgRegisterVerifiedUser(data: {

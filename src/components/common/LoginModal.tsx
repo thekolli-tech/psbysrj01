@@ -154,6 +154,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         const user = event.data.user;
         const isNewUser = Boolean(event.data.isNewUser);
         const isProfileComplete = Boolean(event.data.isProfileComplete);
+        const hasVerifiedPhone = user?.role === 'SUPER_ADMIN' || Boolean(
+          user?.phoneVerified ?? (user?.phone && Number(user?.phone_verified) === 1)
+        );
+        const requiresPhoneVerification = Boolean(
+          event.data.requiresPhoneVerification ?? !hasVerifiedPhone
+        );
+
+        if (requiresPhoneVerification) {
+          setPendingGoogleUser({
+            user,
+            googlePicture: event.data?.googlePicture || user?.avatar
+          });
+          setVerifiedPhone(user?.phone || '');
+          setPhoneInput(user?.phone || '');
+          setRegStep('OTP');
+          setMode('REGISTER');
+          setGoogleLoading(false);
+          return;
+        }
 
         if (isNewUser || !isProfileComplete) {
           setPendingGoogleUser({
@@ -402,6 +421,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
       const isNewUser = Boolean(result.data?.isNewUser);
       const isProfileComplete = Boolean(result.data?.isProfileComplete);
+      const hasVerifiedPhone = (user as any)?.role === 'SUPER_ADMIN' || Boolean(
+        (user as any)?.phoneVerified ?? ((user as any)?.phone && Number((user as any)?.phone_verified) === 1)
+      );
+      const requiresPhoneVerification = Boolean(
+        result.data?.requiresPhoneVerification ?? !hasVerifiedPhone
+      );
+
+      if (requiresPhoneVerification) {
+        setPendingGoogleUser({
+          user,
+          googlePicture: result.data?.googlePicture || (user as any).avatar
+        });
+        setVerifiedPhone((user as any)?.phone || '');
+        setPhoneInput((user as any)?.phone || '');
+        setRegStep('OTP');
+        setMode('REGISTER');
+        setGoogleLoading(false);
+        return;
+      }
 
       if (isNewUser || !isProfileComplete) {
         setPendingGoogleUser({
@@ -512,6 +550,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           const user = event.data.user;
           const isNewUser = event.data.isNewUser;
           const isProfileComplete = Boolean(event.data?.isProfileComplete);
+
+          const hasVerifiedPhone = user?.role === 'SUPER_ADMIN' || Boolean(
+            user?.phoneVerified ?? (user?.phone && Number(user?.phone_verified) === 1)
+          );
+          const requiresPhoneVerification = Boolean(
+            event.data?.requiresPhoneVerification ?? !hasVerifiedPhone
+          );
+
+          if (requiresPhoneVerification) {
+            setPendingGoogleUser({
+              user,
+              googlePicture: event.data?.googlePicture || user?.avatar
+            });
+            setVerifiedPhone(user?.phone || '');
+            setPhoneInput(user?.phone || '');
+            setRegStep('OTP');
+            setMode('REGISTER');
+            setGoogleLoading(false);
+            return;
+          }
 
           if (isNewUser || !isProfileComplete) {
             setPendingGoogleUser({
@@ -744,6 +802,43 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           throw new Error('Verification code has expired. Please request a new code.');
         }
         throw new Error(errorText || 'Invalid or expired verification code. Please check and try again.');
+      }
+
+      // If this verification belongs to a pending Google OAuth user
+      if (pendingGoogleUser) {
+        const verifiedGoogleUser = result.data?.user || {
+          ...pendingGoogleUser.user,
+          phone: verifiedPhone,
+          phone_verified: 1,
+          phoneVerified: true,
+          requiresPhoneVerification: false
+        };
+
+        if (pendingGoogleUser.user.isNewUser || !pendingGoogleUser.user.isProfileComplete) {
+          setPendingGoogleUser({
+            user: verifiedGoogleUser,
+            googlePicture: pendingGoogleUser.googlePicture
+          });
+          setShowGoogleProfileCompletion(true);
+          setRegStep('FORM');
+          setOtpDigits(['', '', '', '', '', '']);
+          setVerifiedPhone('');
+          return;
+        }
+
+        login(verifiedGoogleUser as Parameters<typeof login>[0]);
+        showToast(`Mobile number verified! Welcome back, ${verifiedGoogleUser.name || 'User'}!`);
+        if (isPropertySeeker(verifiedGoogleUser.role)) {
+          setActiveView('DASHBOARD');
+        } else {
+          setActiveView(postLoginDestination(verifiedGoogleUser.role));
+        }
+        setPendingGoogleUser(null);
+        setRegStep('FORM');
+        setOtpDigits(['', '', '', '', '', '']);
+        setVerifiedPhone('');
+        onClose();
+        return;
       }
 
       // Code is verified! Directly complete registration with the pre-collected details
