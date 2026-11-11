@@ -13,6 +13,7 @@ export type OtpDeliveryStatus = 'QUEUED' | 'SUBMITTED' | 'SENT' | 'DELIVERED' | 
 export interface OtpDeliveryRecord {
   targetPhone: string;
   provider: string;
+  channel?: 'sms' | 'voice' | 'whatsapp';
   providerMessageId: string | null;
   status: OtpDeliveryStatus;
   queuedAt: number;
@@ -76,20 +77,23 @@ export function recordOtpQueued(phone: string, provider: string = 'whatsapp'): O
 }
 
 /**
- * 2. Record OTP submitted to provider (Gupshup returned HTTP 202)
+ * 2. Record OTP submitted to provider (Gupshup or 2Factor)
  */
 export function recordOtpSubmitted(
   phone: string,
   providerMessageId: string,
-  provider: string = 'whatsapp'
+  provider: string = 'whatsapp',
+  channel?: 'sms' | 'voice' | 'whatsapp'
 ): OtpDeliveryRecord {
   pruneExpiredCache();
   const key = canonicalPhoneKey(phone);
   const now = Date.now();
   const existing = deliveryCacheByPhone.get(key);
+  const resolvedChannel = channel || (provider.includes('voice') ? 'voice' : provider.includes('sms') ? 'sms' : 'whatsapp');
   const record: OtpDeliveryRecord = {
     targetPhone: key,
     provider,
+    channel: resolvedChannel,
     providerMessageId,
     status: 'SUBMITTED',
     queuedAt: existing?.queuedAt || now,
@@ -250,9 +254,12 @@ export async function getAsyncOtpDeliveryStatus(phoneOrMessageId: string): Promi
 
         if (res.rows.length > 0) {
           const row = res.rows[0];
+          const isUuidSession = typeof row.provider_message_id === 'string' && /^[0-9a-fA-F-]{20,}$/.test(row.provider_message_id);
+          const inferredProvider = isUuidSession ? '2factor' : 'whatsapp';
           const rec: OtpDeliveryRecord = {
             targetPhone: canonical,
-            provider: 'whatsapp',
+            provider: inferredProvider,
+            channel: isUuidSession ? 'sms' : 'whatsapp',
             providerMessageId: row.provider_message_id || null,
             status: (row.delivery_status || 'SUBMITTED') as OtpDeliveryStatus,
             queuedAt: new Date(row.created_at).getTime(),

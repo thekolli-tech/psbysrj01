@@ -1371,6 +1371,7 @@ app.get('/api/auth/phone-otp-status', async (req: Request, res: Response): Promi
     ok: true,
     status: record?.status || 'SUBMITTED',
     provider: record?.provider || (isTwoFactorConfigured() ? '2factor' : 'whatsapp'),
+    channel: record?.channel || (record?.provider?.includes('voice') ? 'voice' : 'sms'),
     messageId: record?.providerMessageId || messageId || null,
     deliveredAt: record?.deliveredAt || null,
     failureReason: record?.failureReason || null,
@@ -1400,6 +1401,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
   const phone = normalizeIndianMobile(req.body?.phone);
   const otp = String(req.body?.otp || '').trim();
   const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
+  const requestedChannel = (req.body?.channel === 'voice' ? 'voice' : req.body?.channel === 'sms' ? 'sms' : undefined) as 'sms' | 'voice' | undefined;
   if (rejectIfRateLimited(req, res, 'phone-otp-verify', phone || 'invalid')) return;
   try {
     if (!phone || !otp) {
@@ -1407,21 +1409,63 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
       return;
     }
 
-    // 1. If 2Factor is configured, verify through 2Factor provider verification mechanism
+    if (!/^\d{4,6}$/.test(otp)) {
+      res.status(400).json({ error: 'Verification code must be 6 numeric digits', code: 'INVALID_FORMAT' });
+      return;
+    }
+
+    // 1. If 2Factor is configured, verify through channel-specific 2Factor provider verification mechanism
     if (isTwoFactorConfigured()) {
       let activeSessionId = sessionId;
-      if (!activeSessionId) {
-        const record = await getAsyncOtpDeliveryStatus(phone);
-        if (record?.providerMessageId && record.provider?.includes('2factor')) {
-          activeSessionId = record.providerMessageId;
+      let effectiveChannel: 'sms' | 'voice' = requestedChannel || 'sms';
+
+      if (sessionId) {
+        const sessionRecord = await getAsyncOtpDeliveryStatus(sessionId);
+        if (sessionRecord) {
+          // Reject mismatched phone numbers
+          const reqDigits = indianNationalDigits(phone);
+          const recDigits = indianNationalDigits(sessionRecord.targetPhone);
+          if (reqDigits && recDigits && reqDigits !== recDigits) {
+            res.status(400).json({
+              error: 'Verification session does not match the provided phone number.',
+              code: 'SESSION_PHONE_MISMATCH'
+            });
+            return;
+          }
+
+          // Enforce channel association
+          const recordChannel: 'sms' | 'voice' = sessionRecord.channel || (sessionRecord.provider?.includes('voice') ? 'voice' : 'sms');
+          if (requestedChannel && requestedChannel !== recordChannel) {
+            res.status(400).json({
+              error: `Verification channel mismatch. The verification code was sent via ${recordChannel.toUpperCase()}, but verification was requested for ${requestedChannel.toUpperCase()}.`,
+              code: 'CHANNEL_MISMATCH'
+            });
+            return;
+          }
+          effectiveChannel = recordChannel;
+        }
+      } else {
+        const phoneRecord = await getAsyncOtpDeliveryStatus(phone);
+        if (phoneRecord?.providerMessageId && phoneRecord.provider?.includes('2factor')) {
+          activeSessionId = phoneRecord.providerMessageId;
+          const recordChannel: 'sms' | 'voice' = phoneRecord.channel || (phoneRecord.provider?.includes('voice') ? 'voice' : 'sms');
+          if (requestedChannel && requestedChannel !== recordChannel) {
+            res.status(400).json({
+              error: `Verification channel mismatch. The active code was sent via ${recordChannel.toUpperCase()}.`,
+              code: 'CHANNEL_MISMATCH'
+            });
+            return;
+          }
+          effectiveChannel = recordChannel;
         }
       }
 
       if (activeSessionId) {
-        const verifyRes = await verifyTwoFactorOtp(activeSessionId, otp);
+        const verifyRes = await verifyTwoFactorOtp(activeSessionId, otp, effectiveChannel);
         if (!verifyRes.success) {
           res.status(400).json({
-            error: verifyRes.error || 'Invalid or expired mobile verification code'
+            error: verifyRes.error || 'Invalid or expired mobile verification code',
+            code: verifyRes.status
           });
           return;
         }
@@ -1432,7 +1476,8 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
           success: true,
           verified: true,
           provider: '2factor',
-          message: 'Mobile number successfully verified via 2Factor'
+          channel: effectiveChannel,
+          message: `Mobile number successfully verified via 2Factor ${effectiveChannel.toUpperCase()}`
         });
         return;
       }
@@ -1444,6 +1489,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
       res.status(400).json({ error: 'Invalid or expired mobile verification code' });
       return;
     }
+    await markPhoneOtpVerifiedByProvider(phone, otp);
     res.json({ success: true, verified: true, message: 'Phone number successfully verified' });
   } catch (err: any) {
     if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {

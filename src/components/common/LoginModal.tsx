@@ -24,6 +24,7 @@ import {
   MapPin,
   Lock,
   MessageSquare,
+  PhoneCall,
   Sparkles,
   Loader2
 } from 'lucide-react';
@@ -85,7 +86,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [verifiedPhone, setVerifiedPhone] = useState('');
   const [phoneCountdown, setPhoneCountdown] = useState(0);
+  const [otpExpiryCountdown, setOtpExpiryCountdown] = useState(600); // 10-minute validity
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const formatExpiryTime = (seconds: number) => {
+    const mins = Math.floor(Math.max(0, seconds) / 60);
+    const secs = Math.max(0, seconds) % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Default avatar selection for registration
   const [selectedAvatar, setSelectedAvatar] = useState<string>(DEFAULT_AVATAR);
@@ -205,6 +213,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
     return () => clearTimeout(timer);
   }, [phoneCountdown]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (regStep === 'OTP' && otpExpiryCountdown > 0) {
+      timer = setTimeout(() => setOtpExpiryCountdown(c => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [regStep, otpExpiryCountdown]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -572,12 +588,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     otpRefs.current[nextIdx]?.focus();
   };
 
-  // WhatsApp OTP dispatch handler triggered on "Create Verified Account"
-  const handleSendWhatsAppOtp = async (e?: React.FormEvent, channel: 'sms' | 'voice' = 'sms') => {
+  // Mobile Phone OTP dispatch handler (2Factor SMS primary with Voice Call fallback)
+  const handleSendPhoneOtp = async (e?: React.FormEvent, channel: 'sms' | 'voice' = 'sms') => {
     setOtpChannel(channel);
     if (e) e.preventDefault();
     if (submitting.current) return;
     setErrorMsg(null);
+    setDeliveryFailureReason(null);
 
     if (!nameInput.trim()) {
       setErrorMsg('Please enter your full name.');
@@ -598,7 +615,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
 
     if (tenDigits.length !== 10) {
-      setErrorMsg('Please enter a valid 10-digit Indian mobile number for WhatsApp verification.');
+      setErrorMsg('Please enter a valid 10-digit Indian mobile number for verification.');
       return;
     }
 
@@ -632,12 +649,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         if (result.status === 409 || result.data?.code === 'PHONE_ALREADY_REGISTERED') {
           throw new Error('An account with this mobile number already exists. Please sign in instead.');
         }
-        throw new Error(result.error || 'WhatsApp verification code was not accepted by provider.');
+        if (result.status === 429) {
+          throw new Error(result.error || 'Please wait before requesting a new verification code.');
+        }
+        throw new Error(result.error || 'Verification code was not accepted by provider.');
       }
       setVerifiedPhone(fullPhone);
       setRegStep('OTP');
       setOtpDigits(['', '', '', '', '', '']);
       setPhoneCountdown(60);
+      setOtpExpiryCountdown(600); // 10-minute validity
       setOtpDeliveryStatus('SUBMITTED');
       setDeliveryFailureReason(null);
       const msgId = (result.data?.messageId as string) || null;
@@ -680,21 +701,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       }, 3500);
     } catch (err: any) {
       setOtpDeliveryStatus('FAILED');
-      setDeliveryFailureReason(err.message || 'WhatsApp verification was not sent.');
-      setErrorMsg(err.message || 'WhatsApp verification was not sent.');
+      setDeliveryFailureReason(err.message || 'Verification code was not sent.');
+      setErrorMsg(err.message || 'Verification code was not sent.');
     } finally {
       submitting.current = false;
       setLoading(false);
     }
   };
 
-  // WhatsApp OTP verification & direct registration completion
-  const handleVerifyWhatsAppOtp = async (e?: React.FormEvent) => {
+  const handleSendWhatsAppOtp = handleSendPhoneOtp;
+
+  // Phone OTP verification & direct registration completion
+  const handleVerifyPhoneOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (submitting.current) return;
+    if (otpExpiryCountdown <= 0) {
+      setErrorMsg('Verification code has expired. Please request a new code.');
+      return;
+    }
     const enteredOtp = otpDigits.join('');
     if (enteredOtp.length !== 6) {
-      setErrorMsg('Please enter the full 6-digit WhatsApp verification code.');
+      setErrorMsg('Please enter the full 6-digit verification code.');
       return;
     }
     stopDeliveryPolling();
@@ -705,11 +732,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       const res = await fetch('/api/auth/verify-phone-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ phone: verifiedPhone, otp: enteredOtp, sessionId: otpMessageId })
+        body: JSON.stringify({ phone: verifiedPhone, otp: enteredOtp, sessionId: otpMessageId, channel: otpChannel })
       });
       const result = await readApiResponse(res);
       if (!result.ok || result.data?.verified !== true) {
-        throw new Error(result.error || 'Invalid or expired WhatsApp verification code. Please check and try again.');
+        const errorText = result.error || result.data?.error || '';
+        if (errorText.toLowerCase().includes('mismatch') || errorText.toLowerCase().includes('invalid')) {
+          throw new Error('Invalid verification code. Please check the digits and try again.');
+        }
+        if (errorText.toLowerCase().includes('expired')) {
+          throw new Error('Verification code has expired. Please request a new code.');
+        }
+        throw new Error(errorText || 'Invalid or expired verification code. Please check and try again.');
       }
 
       // Code is verified! Directly complete registration with the pre-collected details
@@ -768,6 +802,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleVerifyWhatsAppOtp = handleVerifyPhoneOtp;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
       <div className="bg-white text-[#111111] rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E8E3] w-full max-w-lg md:max-w-xl max-h-[96dvh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
@@ -782,7 +818,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   ? 'Reset Password'
                   : mode === 'REGISTER'
                   ? regStep === 'OTP'
-                    ? 'WhatsApp Verification'
+                    ? (otpChannel === 'voice' ? 'Voice Call Verification' : 'Mobile Phone Verification')
                     : 'Create Account'
                   : 'Portal Sign In'}
               </h3>
@@ -792,7 +828,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   : forgotPasswordMode
                   ? 'Verify email OTP to set new password'
                   : mode === 'REGISTER' && regStep === 'OTP'
-                  ? 'Enter the 6-digit code received on WhatsApp'
+                  ? (otpChannel === 'voice'
+                      ? 'Listen to the 6-digit code on your incoming call'
+                      : 'Enter the 6-digit verification code received via SMS')
                   : 'Live server database authentication'}
               </p>
             </div>
@@ -1162,11 +1200,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                 </form>
               ) : regStep === 'FORM' ? (
                 /* Registration Form Exactly Matching Reference Image media_1794043027829_f2c0a4c9.jpg */
-                <form onSubmit={handleSendWhatsAppOtp} className="space-y-3">
-                  {/* Alert Banner: WhatsApp OTP verification is mandatory */}
+                <form onSubmit={(e) => handleSendPhoneOtp(e, 'sms')} className="space-y-3">
+                  {/* Alert Banner: Mobile OTP verification is mandatory */}
                   <div className="bg-[#FEFBF2] py-2 px-3 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Mobile number OTP verification is mandatory for verified account registration.</span>
+                    <span>Mobile phone verification is required. 2Factor SMS is dispatched by default with Voice Call fallback.</span>
                   </div>
 
                   {/* Full Name */}
@@ -1446,31 +1484,57 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     {loading ? (
                       <>
                         <Loader2 className="w-4 h-4 text-white animate-spin" />
-                        <span>Sending your WhatsApp verification code...</span>
+                        <span>Sending SMS verification code...</span>
                       </>
                     ) : (
                       <>
-                        <span>Create Verified Account</span>
+                        <span>Create Verified Account (SMS OTP)</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>
                 </form>
               ) : (
-                /* Step 2: 6-Digit WhatsApp OTP Verification */
-                <form onSubmit={handleVerifyWhatsAppOtp} className="space-y-4">
+                /* Step 2: 6-Digit 2Factor Mobile OTP Verification */
+                <form onSubmit={handleVerifyPhoneOtp} className="space-y-4">
+                  {/* Active Delivery Channel & Expiry Header */}
+                  <div className="flex items-center justify-between pb-0.5">
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                      otpChannel === 'voice'
+                        ? 'bg-purple-50 border-purple-200 text-purple-900'
+                        : 'bg-amber-50 border-amber-200 text-amber-900'
+                    }`}>
+                      {otpChannel === 'voice' ? (
+                        <>
+                          <PhoneCall className="w-3.5 h-3.5 text-purple-600" />
+                          <span>Voice Call Active</span>
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="w-3.5 h-3.5 text-amber-600" />
+                          <span>SMS OTP Active</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-mono">
+                      <span className={otpExpiryCountdown < 60 ? 'text-red-600 font-bold animate-pulse' : 'text-slate-600 font-medium'}>
+                        Expires: {formatExpiryTime(otpExpiryCountdown)}
+                      </span>
+                    </div>
+                  </div>
+
                   {(() => {
                     const elapsedSec = 60 - phoneCountdown;
                     const getWaitingMessage = () => {
-                      if (elapsedSec < 5) {
-                        return "Sending your WhatsApp verification code...";
-                      } else if (elapsedSec < 15) {
-                        return "Your OTP request has been accepted. Waiting for WhatsApp delivery...";
-                      } else if (elapsedSec < 30) {
-                        return "Your code is taking longer than expected. Please check WhatsApp and your network.";
-                      } else {
-                        return "Still waiting? You can resend your code when the resend timer expires.";
+                      if (otpChannel === 'voice') {
+                        if (elapsedSec < 5) return "Placing automated verification call...";
+                        if (elapsedSec < 15) return "Calling your mobile number. Please answer...";
+                        return "Call active. Listen for your 6-digit verification code.";
                       }
+                      if (elapsedSec < 5) return "Dispatching SMS verification code via 2Factor...";
+                      if (elapsedSec < 15) return "SMS request accepted. Waiting for carrier delivery...";
+                      if (elapsedSec < 30) return "Carrier dispatch in progress. SMS arrives within 15–30s.";
+                      return "Still waiting? You can resend SMS or receive code via Voice Call.";
                     };
 
                     return (
@@ -1486,7 +1550,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                             {otpDeliveryStatus === 'DELIVERED' ? (
                               <>
                                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                <span>WhatsApp message delivered. Enter your code.</span>
+                                <span>{otpChannel === 'voice' ? 'Automated call dispatched' : 'SMS verification code sent'}</span>
                               </>
                             ) : otpDeliveryStatus === 'FAILED' ? (
                               <>
@@ -1512,29 +1576,42 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         <div className="text-[11px] leading-relaxed text-left pt-1">
                           {otpDeliveryStatus === 'DELIVERED' ? (
                             <p className="text-emerald-800">
-                              Official verification code delivered to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits below:
+                              {otpChannel === 'voice'
+                                ? <>Automated voice call placed to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits you hear below:</>
+                                : <>Official verification code dispatched to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits below:</>
+                              }
                             </p>
                           ) : otpDeliveryStatus === 'FAILED' ? (
                             <div className="flex items-center justify-between gap-2 pt-0.5">
                               <span className="text-red-700 text-[11px]">{deliveryFailureReason || 'Unable to deliver message to this mobile number.'}</span>
                               <button
                                 type="button"
-                                onClick={() => handleSendWhatsAppOtp()}
+                                onClick={() => handleSendPhoneOtp(undefined, otpChannel === 'sms' ? 'voice' : 'sms')}
                                 className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-[10px] cursor-pointer shrink-0 shadow-xs"
                               >
-                                Try Again
+                                Try {otpChannel === 'sms' ? 'Voice Call' : 'SMS'}
                               </button>
                             </div>
                           ) : (
                             <p className="text-amber-800">
-                              {elapsedSec < 5 ? (
-                                <>Sending your verification code to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
-                              ) : elapsedSec < 15 ? (
-                                <>Your OTP request has been accepted. Waiting for carrier delivery to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
-                              ) : elapsedSec < 30 ? (
-                                <>Your code is taking longer than expected. Please check WhatsApp and your network.</>
+                              {otpChannel === 'voice' ? (
+                                elapsedSec < 5 ? (
+                                  <>Connecting to automated voice dialer for <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
+                                ) : elapsedSec < 15 ? (
+                                  <>Calling <strong className="font-mono text-amber-950">{verifiedPhone}</strong>. Answer incoming call to hear your code.</>
+                                ) : (
+                                  <>Call in progress. Listen carefully to the 6-digit code.</>
+                                )
                               ) : (
-                                <>Still waiting? You can resend your code when the resend timer expires.</>
+                                elapsedSec < 5 ? (
+                                  <>Sending your verification code to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
+                                ) : elapsedSec < 15 ? (
+                                  <>Your OTP request has been accepted. Waiting for carrier delivery to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
+                                ) : elapsedSec < 30 ? (
+                                  <>Your code is taking longer than expected. Please check your SMS inbox and network.</>
+                                ) : (
+                                  <>Still waiting? You can resend your code or receive it via Voice Call below.</>
+                                )
                               )}
                             </p>
                           )}
@@ -1549,6 +1626,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       </div>
                     );
                   })()}
+
+                  {/* Expired Code Warning */}
+                  {otpExpiryCountdown <= 0 && (
+                    <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs text-center font-medium">
+                      Verification code has expired. Please request a new code below.
+                    </div>
+                  )}
 
                   <div>
                     <label className="block font-bold text-slate-700 text-center mb-2 text-xs">
@@ -1574,32 +1658,48 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                    <span>Didn't receive the SMS code?</span>
-                    {phoneCountdown > 0 ? (
-                      <span className="font-mono text-slate-400">Resend in {phoneCountdown}s</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleSendWhatsAppOtp()}
-                        className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Resend SMS OTP</span>
-                      </button>
-                    )}
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
-                    <span>Having SMS issues?</span>
-                    <button
-                      type="button"
-                      disabled={loading || phoneCountdown > 45}
-                      onClick={() => handleSendWhatsAppOtp(undefined, 'voice')}
-                      className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <PhoneCall className="w-3 h-3 text-amber-600" />
-                      <span>Receive code via Voice Call</span>
-                    </button>
-                  </div>
+                  {/* Resend & Channel Switch Actions */}
+                  <div className="space-y-1.5 pt-1 text-[11px] text-slate-600">
+                    <div className="flex items-center justify-between">
+                      <span>Didn't receive the {otpChannel === 'voice' ? 'voice call' : 'SMS code'}?</span>
+                      {phoneCountdown > 0 ? (
+                        <span className="font-mono text-slate-400">Resend in {phoneCountdown}s</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSendPhoneOtp(undefined, otpChannel)}
+                          className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Resend {otpChannel === 'voice' ? 'Voice Call' : 'SMS OTP'}</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between pt-0.5">
+                      <span>{otpChannel === 'voice' ? 'Prefer SMS verification?' : 'Having SMS delivery issues?'}</span>
+                      {phoneCountdown > 0 ? (
+                        <span className="font-mono text-slate-400">Voice option in {phoneCountdown}s</span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => handleSendPhoneOtp(undefined, otpChannel === 'sms' ? 'voice' : 'sms')}
+                          className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {otpChannel === 'voice' ? (
+                            <>
+                              <MessageSquare className="w-3 h-3 text-amber-600" />
+                              <span>Receive code via SMS</span>
+                            </>
+                          ) : (
+                            <>
+                              <PhoneCall className="w-3 h-3 text-amber-600" />
+                              <span>Receive code via Voice Call</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 pt-1">
@@ -1617,7 +1717,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </button>
                     <button
                       type="submit"
-                      disabled={loading || otpDigits.join('').length !== 6}
+                      disabled={loading || otpDigits.join('').length !== 6 || otpExpiryCountdown <= 0}
                       className="flex-1 py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
                     >
                       <CheckCircle2 className="w-4 h-4 text-white" />

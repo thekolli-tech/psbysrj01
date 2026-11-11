@@ -184,6 +184,40 @@ test('verifyTwoFactorOtp correctly validates matching OTP code', async () => {
   }
 });
 
+test('verifyTwoFactorOtp targets VOICE verification endpoint when channel is voice', async () => {
+  const saved = snapshotEnv();
+  configureMockTwoFactor();
+
+  try {
+    const captured: Array<{ url: string }> = [];
+    const mockFetch = async (url: RequestInfo | URL): Promise<Response> => {
+      captured.push({ url: String(url) });
+      return new Response(JSON.stringify({
+        Status: 'Success',
+        Details: 'OTP Matched'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    };
+
+    const result = await verifyTwoFactorOtp('voice-session-456', '931204', 'voice', mockFetch as any);
+
+    assert.equal(result.success, true);
+    assert.equal(result.status, 'MATCHED');
+    assert.equal(result.channel, 'voice');
+    assert.equal(result.details, 'OTP Matched');
+
+    assert.equal(captured.length, 1);
+    assert.equal(
+      captured[0].url,
+      `https://2factor.in/API/V1/${MOCK_API_KEY}/VOICE/VERIFY/voice-session-456/931204`
+    );
+  } finally {
+    restoreEnv(saved);
+  }
+});
+
 test('verifyTwoFactorOtp rejects mismatched and expired codes', async () => {
   const saved = snapshotEnv();
   configureMockTwoFactor();

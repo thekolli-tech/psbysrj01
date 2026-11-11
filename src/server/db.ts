@@ -1826,6 +1826,8 @@ function sqliteInitDatabase(): void {
       consumed_at TEXT,
       delivery_status TEXT DEFAULT 'SUBMITTED',
       provider_message_id TEXT,
+      channel TEXT,
+      provider TEXT,
       failure_reason TEXT,
       delivered_at TEXT,
       updated_at TEXT,

@@ -19,6 +19,7 @@ export interface TwoFactorSendResult {
 export interface TwoFactorVerifyResult {
   success: boolean;
   status: 'MATCHED' | 'MISMATCH' | 'EXPIRED' | 'ERROR';
+  channel?: 'sms' | 'voice';
   details?: string;
   error?: string;
 }
@@ -168,8 +169,8 @@ export async function sendTwoFactorOtp(
       };
     }
 
-    // Record submission with Session ID
-    recordOtpSubmitted(normalized, sessionId, `2factor-${channel}`);
+    // Record submission with Session ID & Channel
+    recordOtpSubmitted(normalized, sessionId, `2factor-${channel}`, channel);
     console.log(`[Property Studio] 2Factor ${channel.toUpperCase()} OTP accepted. Session ID: ${sessionId}`);
 
     return {
@@ -192,19 +193,30 @@ export async function sendTwoFactorOtp(
 }
 
 /**
- * Verifies user-entered OTP against 2Factor.in provider session.
- * Endpoint: GET https://2factor.in/API/V1/{apiKey}/SMS/VERIFY/{sessionId}/{enteredOtp}
+ * Verifies user-entered OTP against 2Factor.in provider session with channel-specific routing.
+ * Primary endpoints:
+ *   - SMS:   GET https://2factor.in/API/V1/{apiKey}/SMS/VERIFY/{sessionId}/{enteredOtp}
+ *   - Voice: GET https://2factor.in/API/V1/{apiKey}/VOICE/VERIFY/{sessionId}/{enteredOtp}
+ *
+ * Supports both signatures:
+ *   verifyTwoFactorOtp(sessionId, otp, channel, fetchImpl)
+ *   verifyTwoFactorOtp(sessionId, otp, fetchImpl)  // defaults channel to 'sms'
  */
 export async function verifyTwoFactorOtp(
   sessionId: string,
   enteredOtp: string,
-  fetchImpl: typeof fetch = fetch
+  channelOrFetch: 'sms' | 'voice' | typeof fetch = 'sms',
+  maybeFetch?: typeof fetch
 ): Promise<TwoFactorVerifyResult> {
+  const channel: 'sms' | 'voice' = typeof channelOrFetch === 'string' ? channelOrFetch : 'sms';
+  const fetchImpl: typeof fetch = typeof channelOrFetch === 'function' ? channelOrFetch : (maybeFetch || fetch);
+
   const settings = twoFactorSettings();
   if (!settings) {
     return {
       success: false,
       status: 'ERROR',
+      channel,
       error: '2Factor provider is not configured.'
     };
   }
@@ -216,14 +228,17 @@ export async function verifyTwoFactorOtp(
     return {
       success: false,
       status: 'MISMATCH',
+      channel,
       error: 'Session ID and verification code are required.'
     };
   }
 
-  const verifyUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/SMS/VERIFY/${encodeURIComponent(cleanSession)}/${encodeURIComponent(cleanCode)}`;
+  // Channel-specific verification target
+  const endpointSubpath = channel === 'voice' ? 'VOICE' : 'SMS';
+  const verifyUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/${endpointSubpath}/VERIFY/${encodeURIComponent(cleanSession)}/${encodeURIComponent(cleanCode)}`;
 
   try {
-    const response = await fetchImpl(verifyUrl, {
+    let response = await fetchImpl(verifyUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
@@ -231,16 +246,36 @@ export async function verifyTwoFactorOtp(
       signal: AbortSignal.timeout(8_000)
     });
 
-    const data = await response.json().catch(() => null) as {
+    let data = await response.json().catch(() => null) as {
       Status?: string;
       Details?: string;
     } | null;
+
+    // Graceful gateway fallback for Voice verification if account routes verification to unified /SMS/VERIFY/
+    if (channel === 'voice' && (!response.ok || (data?.Status !== 'Success' && String(data?.Details || '').toLowerCase().includes('not found')))) {
+      const fallbackUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/SMS/VERIFY/${encodeURIComponent(cleanSession)}/${encodeURIComponent(cleanCode)}`;
+      try {
+        const fallbackRes = await fetchImpl(fallbackUrl, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(8_000)
+        });
+        const fallbackData = await fallbackRes.json().catch(() => null) as { Status?: string; Details?: string } | null;
+        if (fallbackData?.Status === 'Success' && fallbackData?.Details === 'OTP Matched') {
+          response = fallbackRes;
+          data = fallbackData;
+        }
+      } catch {
+        // preserve original response
+      }
+    }
 
     if (data?.Status === 'Success' && data.Details === 'OTP Matched') {
       recordOtpDelivered(cleanSession);
       return {
         success: true,
         status: 'MATCHED',
+        channel,
         details: data.Details
       };
     }
@@ -250,6 +285,7 @@ export async function verifyTwoFactorOtp(
       return {
         success: false,
         status: 'MISMATCH',
+        channel,
         error: 'Invalid verification code. Please check and retry.'
       };
     }
@@ -258,6 +294,7 @@ export async function verifyTwoFactorOtp(
       return {
         success: false,
         status: 'EXPIRED',
+        channel,
         error: 'Verification code has expired. Please request a new code.'
       };
     }
@@ -265,12 +302,14 @@ export async function verifyTwoFactorOtp(
     return {
       success: false,
       status: 'ERROR',
+      channel,
       error: detailsStr || `2Factor verification returned status ${response.status}`
     };
   } catch (err: any) {
     return {
       success: false,
       status: 'ERROR',
+      channel,
       error: err?.message || 'Unable to connect to verification gateway.'
     };
   }
