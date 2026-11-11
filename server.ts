@@ -97,6 +97,7 @@ import {
   updateConferenceDetails,
   generateOtp,
   verifyOtp,
+  markPhoneOtpVerifiedByProvider,
   registerVerifiedUser,
   discardUnconsumedOtp,
   getAllCommunities,
@@ -170,6 +171,13 @@ import { validateAvatarUpload } from './src/shared/avatar.ts';
 import { checkPostgresHealth, checkSchemaReadiness, redactDatabaseError } from './src/server/postgres.ts';
 import { sendWhatsAppOtp, getNotificationGatewayStatus, configuredWhatsAppProviders, notifySuperAdminsOnSubmission,
   sendSupportTicketNotification, sendPasswordChangeConfirmation } from './src/server/notifications.ts';
+import {
+  sendTwoFactorOtp,
+  verifyTwoFactorOtp,
+  isTwoFactorConfigured,
+  twoFactorSettings,
+  checkTwoFactorBalance
+} from './src/server/twoFactorOtp.ts';
 import {
   sendWelcomeNotification,
   sendQuestionReplyNotification,
@@ -1025,6 +1033,8 @@ app.get('/api/auth/config', (_req: Request, res: Response): void => {
   const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '';
   res.json({
     phoneOtpRequired: isPhoneOtpRequired(),
+    phoneProvider: isTwoFactorConfigured() ? '2factor' : (configuredWhatsAppProviders().length > 0 ? 'whatsapp' : 'none'),
+    voiceFallbackAvailable: isTwoFactorConfigured() && (twoFactorSettings()?.voiceEnabled ?? true),
     googleClientId,
     googleAuthEnabled: Boolean(googleClientId)
   });
@@ -1186,16 +1196,17 @@ app.post('/api/auth/reset-password', async (req: Request, res: Response): Promis
   }
 });
 
-function whatsAppUnavailable(res: Response, code: 'WHATSAPP_NOT_CONFIGURED' | 'OTP_NOT_CONFIGURED'): void {
+function phoneOtpUnavailable(res: Response, code: 'WHATSAPP_NOT_CONFIGURED' | 'PROVIDER_NOT_CONFIGURED' | 'OTP_NOT_CONFIGURED'): void {
   res.status(503).json({
-    error: 'WhatsApp verification is not configured. No code was sent and no account was created.',
+    error: 'Mobile phone verification is not configured. No code was sent and no account was created.',
     code
   });
 }
 
-// Send the phone OTP through WhatsApp. Property Seeker registration cannot finish without provider acceptance.
+// Send the mobile phone OTP via 2Factor (SMS / Voice Fallback) or WhatsApp.
 app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
   const phone = normalizeIndianMobile(req.body?.phone);
+  const channel = (req.body?.channel === 'voice' ? 'voice' : 'sms') as 'sms' | 'voice';
   if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
   try {
     if (!phone) {
@@ -1213,13 +1224,48 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
       }
     }
     if (!String(process.env.OTP_HASH_SECRET || '').trim()) {
-      whatsAppUnavailable(res, 'OTP_NOT_CONFIGURED');
+      phoneOtpUnavailable(res, 'OTP_NOT_CONFIGURED');
       return;
     }
-    if (configuredWhatsAppProviders().length === 0) {
-      whatsAppUnavailable(res, 'WHATSAPP_NOT_CONFIGURED');
+
+    const use2Factor = isTwoFactorConfigured();
+    const useWhatsApp = !use2Factor && configuredWhatsAppProviders().length > 0;
+
+    if (!use2Factor && !useWhatsApp) {
+      phoneOtpUnavailable(res, 'WHATSAPP_NOT_CONFIGURED');
       return;
     }
+
+    // 1. Primary Channel: 2Factor.in SMS (with Voice Call Fallback)
+    if (use2Factor) {
+      const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
+      const twoFactorRes = await sendTwoFactorOtp(phone, channel, otp);
+
+      if (!twoFactorRes.success) {
+        await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
+        res.status(502).json({
+          error: twoFactorRes.error || `Unable to deliver ${channel.toUpperCase()} OTP. Please try again.`,
+          code: 'PHONE_DELIVERY_FAILED'
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        status: 'SUBMITTED',
+        provider: '2factor',
+        channel,
+        messageId: twoFactorRes.sessionId || null,
+        message: channel === 'voice'
+          ? 'Voice call dispatched. You will receive an automated call with your verification code shortly.'
+          : 'SMS OTP dispatched to your mobile number.',
+        expiresAt,
+        deliveredVia: channel
+      });
+      return;
+    }
+
+    // 2. WhatsApp Gateway Fallback
     const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
     const dispatchResult = await sendWhatsAppOtp(phone, otp);
     if (!dispatchResult.success || dispatchResult.provider !== 'whatsapp') {
@@ -1233,6 +1279,7 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
     res.json({
       success: true,
       status: 'SUBMITTED',
+      provider: 'whatsapp',
       messageId: dispatchResult.messageId || null,
       message: 'OTP request accepted. Waiting for WhatsApp delivery...',
       expiresAt,
@@ -1251,14 +1298,64 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
       try {
         await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
       } catch {
-        // The caller still receives a generic failure and no code.
+        // Generic failure
       }
     }
     res.status(500).json({ error: 'Unable to send a verification code.' });
   }
 });
 
-// Query the real-time WhatsApp OTP delivery status
+// Dedicated Voice OTP trigger endpoint (Outbound Dialing fallback)
+app.post('/api/auth/send-voice-otp', async (req: Request, res: Response): Promise<void> => {
+  req.body = { ...req.body, channel: 'voice' };
+  const phone = normalizeIndianMobile(req.body?.phone);
+  if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
+  try {
+    if (!phone) {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    if (!isTwoFactorConfigured()) {
+      res.status(503).json({
+        error: 'Voice OTP fallback is not configured. 2Factor integration required.',
+        code: 'VOICE_NOT_CONFIGURED'
+      });
+      return;
+    }
+    const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
+    const twoFactorRes = await sendTwoFactorOtp(phone, 'voice', otp);
+    if (!twoFactorRes.success) {
+      await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
+      res.status(502).json({
+        error: twoFactorRes.error || 'Unable to place automated verification call. Please retry SMS.',
+        code: 'VOICE_DELIVERY_FAILED'
+      });
+      return;
+    }
+    res.json({
+      success: true,
+      status: 'SUBMITTED',
+      provider: '2factor',
+      channel: 'voice',
+      messageId: twoFactorRes.sessionId || null,
+      message: 'Automated verification call dispatched. Please answer the incoming call to hear your code.',
+      expiresAt,
+      deliveredVia: 'voice'
+    });
+  } catch (err: any) {
+    if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
+      res.status(429).json({ error: err.message });
+      return;
+    }
+    if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
+      res.status(400).json({ error: 'A valid Indian mobile number is required' });
+      return;
+    }
+    res.status(500).json({ error: 'Unable to dispatch voice verification call.' });
+  }
+});
+
+// Query real-time OTP delivery status
 app.get('/api/auth/phone-otp-status', async (req: Request, res: Response): Promise<void> => {
   const phone = normalizeIndianMobile(String(req.query.phone || ''));
   const messageId = String(req.query.messageId || '').trim();
@@ -1273,6 +1370,7 @@ app.get('/api/auth/phone-otp-status', async (req: Request, res: Response): Promi
   res.json({
     ok: true,
     status: record?.status || 'SUBMITTED',
+    provider: record?.provider || (isTwoFactorConfigured() ? '2factor' : 'whatsapp'),
     messageId: record?.providerMessageId || messageId || null,
     deliveredAt: record?.deliveredAt || null,
     failureReason: record?.failureReason || null,
@@ -1297,19 +1395,53 @@ const handleGupshupCallback = async (req: Request, res: Response): Promise<void>
 app.post('/api/webhooks/gupshup', handleGupshupCallback);
 app.post('/api/auth/whatsapp-callback', handleGupshupCallback);
 
-// Verify Phone OTP. The resulting grant is bound to this normalized number.
+// Verify Phone OTP. Authenticates with provider mechanism and creates the single-use registration grant.
 app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Promise<void> => {
   const phone = normalizeIndianMobile(req.body?.phone);
   const otp = String(req.body?.otp || '').trim();
+  const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
   if (rejectIfRateLimited(req, res, 'phone-otp-verify', phone || 'invalid')) return;
   try {
     if (!phone || !otp) {
       res.status(400).json({ error: 'Phone number and verification code are required' });
       return;
     }
+
+    // 1. If 2Factor is configured, verify through 2Factor provider verification mechanism
+    if (isTwoFactorConfigured()) {
+      let activeSessionId = sessionId;
+      if (!activeSessionId) {
+        const record = await getAsyncOtpDeliveryStatus(phone);
+        if (record?.providerMessageId && record.provider?.includes('2factor')) {
+          activeSessionId = record.providerMessageId;
+        }
+      }
+
+      if (activeSessionId) {
+        const verifyRes = await verifyTwoFactorOtp(activeSessionId, otp);
+        if (!verifyRes.success) {
+          res.status(400).json({
+            error: verifyRes.error || 'Invalid or expired mobile verification code'
+          });
+          return;
+        }
+
+        // Provider confirmed! Mark verified in database & issue single-use registration grant
+        await markPhoneOtpVerifiedByProvider(phone, otp);
+        res.json({
+          success: true,
+          verified: true,
+          provider: '2factor',
+          message: 'Mobile number successfully verified via 2Factor'
+        });
+        return;
+      }
+    }
+
+    // 2. Local cryptographic verification fallback
     const isValid = await verifyOtp(phone, 'PHONE_VERIFICATION', otp);
     if (!isValid) {
-      res.status(400).json({ error: 'Invalid or expired WhatsApp code' });
+      res.status(400).json({ error: 'Invalid or expired mobile verification code' });
       return;
     }
     res.json({ success: true, verified: true, message: 'Phone number successfully verified' });
@@ -1320,6 +1452,23 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
     }
     res.status(500).json({ error: 'Unable to verify the code.' });
   }
+});
+
+// Admin status & balance check for 2Factor integration
+app.get('/api/auth/twofactor-status', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  if (req.user?.role !== 'SUPER_ADMIN' && req.user?.role !== 'DEVELOPER') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+  const configured = isTwoFactorConfigured();
+  const settings = twoFactorSettings();
+  const balanceInfo = configured ? await checkTwoFactorBalance() : null;
+  res.json({
+    configured,
+    voiceEnabled: settings?.voiceEnabled ?? false,
+    hasTemplate: Boolean(settings?.templateName),
+    balance: balanceInfo?.balance ?? null
+  });
 });
 
 // Registration endpoint

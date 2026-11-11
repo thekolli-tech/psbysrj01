@@ -3,6 +3,7 @@ import { checkPostgresHealth, checkSchemaReadiness } from './postgres.ts';
 import { getSqliteDb, isPostgresAuthoritative, isSqliteExplicit } from './db.ts';
 import { paymentsStatus } from './commerce.ts';
 import { configuredWhatsAppProviders } from './notifications.ts';
+import { isTwoFactorConfigured } from './twoFactorOtp.ts';
 import { REQUIRED_TABLES } from './platformSchema.ts';
 
 function nonEmpty(name: string): boolean {
@@ -13,6 +14,7 @@ function nonEmpty(name: string): boolean {
 /** Presence only. Names are the keys; values, lengths, and secrets are never copied. */
 export function environmentPresence(): {
   DATABASE_URL: boolean;
+  TWO_FACTOR_API_KEY: boolean;
   RESEND_API_KEY: boolean;
   OTP_HASH_SECRET: boolean;
   EMAIL_FROM: boolean;
@@ -24,6 +26,7 @@ export function environmentPresence(): {
 } {
   return {
     DATABASE_URL: nonEmpty('DATABASE_URL'),
+    TWO_FACTOR_API_KEY: Boolean(nonEmpty('TWOFACTOR_API_KEY') || nonEmpty('TWO_FACTOR_API_KEY')),
     RESEND_API_KEY: nonEmpty('RESEND_API_KEY'),
     OTP_HASH_SECRET: nonEmpty('OTP_HASH_SECRET'),
     EMAIL_FROM: nonEmpty('EMAIL_FROM'),
@@ -49,6 +52,7 @@ function configurationFlags(): {
   emailSender: boolean;
   otpPepper: boolean;
   whatsapp: boolean;
+  twoFactor: boolean;
 } {
   const configuredSender = (process.env.EMAIL_FROM || process.env.RESEND_FROM || '').trim();
   return {
@@ -56,7 +60,8 @@ function configurationFlags(): {
     emailProvider: nonEmpty('RESEND_API_KEY'),
     emailSender: configuredSender.length > 0 && /@propertystudio\.org\b/i.test(configuredSender),
     otpPepper: nonEmpty('OTP_HASH_SECRET'),
-    whatsapp: configuredWhatsAppProviders().length > 0
+    whatsapp: configuredWhatsAppProviders().length > 0,
+    twoFactor: isTwoFactorConfigured()
   };
 }
 

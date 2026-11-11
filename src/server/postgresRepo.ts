@@ -904,6 +904,47 @@ export async function pgVerifyOtp(
   ));
 }
 
+export async function pgMarkPhoneOtpVerifiedByProvider(
+  phone: string,
+  verifiedCode: string
+): Promise<boolean> {
+  const canonicalPhone = canonicalOtpTarget('PHONE_VERIFICATION', phone);
+  const codeHash = sealOtp(verifiedCode);
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const expiresAt = now + OTP_TTL_MS;
+
+  return withPgTransaction([`otp:PHONE_VERIFICATION:${canonicalPhone}`, `otp:PHONE_REGISTRATION_GRANT:${canonicalPhone}`], async (client) => {
+    // 1. Mark existing PHONE_VERIFICATION challenge as verified & consumed
+    await client.query(`
+      UPDATE otps
+      SET is_verified = 1,
+          otp_hash = $1,
+          consumed_at = $2,
+          delivery_status = 'DELIVERED',
+          delivered_at = COALESCE(delivered_at, NOW()),
+          updated_at = NOW()
+      WHERE target = $3
+        AND type = 'PHONE_VERIFICATION'
+        AND consumed_at IS NULL
+    `, [codeHash, nowIso, canonicalPhone]);
+
+    // 2. Clear any old pending grants and insert fresh PHONE_REGISTRATION_GRANT
+    await client.query(`
+      DELETE FROM otps
+      WHERE target = $1 AND type = 'PHONE_REGISTRATION_GRANT' AND consumed_at IS NULL
+    `, [canonicalPhone]);
+
+    const grantId = `g_${crypto.randomBytes(16).toString('hex')}`;
+    await client.query(`
+      INSERT INTO otps (id, target, type, otp_hash, otp_raw, expires_at, attempt_count, is_verified, consumed_at, created_at)
+      VALUES ($1, $2, 'PHONE_REGISTRATION_GRANT', $3, NULL, $4, 0, 0, NULL, $5)
+    `, [grantId, canonicalPhone, codeHash, expiresAt, nowIso]);
+
+    return true;
+  });
+}
+
 /** Consumed OTP rows are not registration authorization. Claims are single-use. */
 export async function pgIsTargetVerified(
   _target: string,

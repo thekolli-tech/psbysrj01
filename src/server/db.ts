@@ -30,6 +30,7 @@ import {
   pgRevokeAllUserSessions,
   pgGenerateOtp,
   pgVerifyOtp,
+  pgMarkPhoneOtpVerifiedByProvider,
   pgIsTargetVerified,
   pgRegisterVerifiedUser,
   pgCreateAuditLog,
@@ -1013,6 +1014,14 @@ export async function verifyOtp(
 ): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgVerifyOtp(target, type, code);
   return sqliteVerifyOtp(target, type, code);
+}
+
+export async function markPhoneOtpVerifiedByProvider(
+  phone: string,
+  verifiedCode: string
+): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgMarkPhoneOtpVerifiedByProvider(phone, verifiedCode);
+  return sqliteMarkPhoneOtpVerifiedByProvider(phone, verifiedCode);
 }
 
 export async function isTargetVerified(
@@ -3224,6 +3233,40 @@ function sqliteGenerateOtp(target: string, type: 'EMAIL_VERIFICATION' | 'PHONE_V
 function sqliteVerifyOtp(target: string, type: string, code: string): boolean {
   const normalizedTarget = canonicalOtpTarget(type, target);
   return sqliteTransaction(() => claimOtpProofSync(sqliteRunner(), normalizedTarget, type, code));
+}
+
+function sqliteMarkPhoneOtpVerifiedByProvider(phone: string, verifiedCode: string): boolean {
+  const normalizedTarget = canonicalOtpTarget('PHONE_VERIFICATION', phone);
+  const codeHash = sealOtp(verifiedCode);
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const expiresAt = now + OTP_TTL_MS;
+
+  return sqliteTransaction(() => {
+    const database = getSqliteDb();
+    database.prepare(`
+      UPDATE otps
+      SET is_verified = 1,
+          otp_hash = ?,
+          consumed_at = ?
+      WHERE target = ?
+        AND type = 'PHONE_VERIFICATION'
+        AND consumed_at IS NULL
+    `).run(codeHash, nowIso, normalizedTarget);
+
+    database.prepare(`
+      DELETE FROM otps
+      WHERE target = ? AND type = 'PHONE_REGISTRATION_GRANT' AND consumed_at IS NULL
+    `).run(normalizedTarget);
+
+    const grantId = `g_${crypto.randomBytes(16).toString('hex')}`;
+    database.prepare(`
+      INSERT INTO otps (id, target, type, otp_hash, otp_raw, expires_at, attempt_count, is_verified, consumed_at, created_at)
+      VALUES (?, ?, 'PHONE_REGISTRATION_GRANT', ?, NULL, ?, 0, 0, NULL, ?)
+    `).run(grantId, normalizedTarget, codeHash, expiresAt, nowIso);
+
+    return true;
+  });
 }
 
 function sqlitePhoneTaken(e164: string): boolean {
