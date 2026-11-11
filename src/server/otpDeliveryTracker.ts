@@ -244,7 +244,7 @@ export async function getAsyncOtpDeliveryStatus(phoneOrMessageId: string): Promi
         const canonical = digits.length === 10 ? `+91${digits}` : clean.startsWith('+') ? clean : `+${digits}`;
 
         const res = await pool.query(`
-          SELECT delivery_status, provider_message_id, failure_reason, delivered_at, created_at, updated_at
+          SELECT target, delivery_status, provider_message_id, failure_reason, delivered_at, created_at, updated_at
           FROM otps
           WHERE (target = $1::text OR target = $2::text OR provider_message_id = $3::text)
             AND consumed_at IS NULL
@@ -257,7 +257,7 @@ export async function getAsyncOtpDeliveryStatus(phoneOrMessageId: string): Promi
           const isUuidSession = typeof row.provider_message_id === 'string' && /^[0-9a-fA-F-]{20,}$/.test(row.provider_message_id);
           const inferredProvider = isUuidSession ? '2factor' : 'whatsapp';
           const rec: OtpDeliveryRecord = {
-            targetPhone: canonical,
+            targetPhone: row.target || canonical,
             provider: inferredProvider,
             channel: isUuidSession ? 'sms' : 'whatsapp',
             providerMessageId: row.provider_message_id || null,

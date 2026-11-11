@@ -1492,6 +1492,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
     await markPhoneOtpVerifiedByProvider(phone, otp);
     res.json({ success: true, verified: true, message: 'Phone number successfully verified' });
   } catch (err: any) {
+    console.error('[Property Studio] verify-phone-otp error:', err?.message || err);
     if (err instanceof InvalidPhoneError || err?.name === 'InvalidPhoneError') {
       res.status(400).json({ error: 'A valid Indian mobile number is required' });
       return;
