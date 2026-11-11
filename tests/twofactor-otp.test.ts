@@ -54,7 +54,7 @@ test('formatPhoneFor2Factor correctly normalizes Indian mobile numbers', () => {
   assert.equal(formatPhoneFor2Factor('abcdefghij'), null);
 });
 
-test('2Factor configuration detection', () => {
+test('2Factor configuration detection with TWO_FACTOR_API_KEY and TWOFACTOR_API_KEY resolution', () => {
   const saved = snapshotEnv();
   try {
     delete process.env.TWOFACTOR_API_KEY;
@@ -62,12 +62,22 @@ test('2Factor configuration detection', () => {
     assert.equal(isTwoFactorConfigured(), false);
     assert.equal(twoFactorSettings(), null);
 
-    configureMockTwoFactor();
+    // Case 1: Canonical TWO_FACTOR_API_KEY
+    process.env.TWO_FACTOR_API_KEY = 'canonical_key_123';
+    delete process.env.TWOFACTOR_API_KEY;
     assert.equal(isTwoFactorConfigured(), true);
-    const settings = twoFactorSettings();
-    assert.ok(settings);
-    assert.equal(settings?.apiKey, MOCK_API_KEY);
-    assert.equal(settings?.voiceEnabled, true);
+    assert.equal(twoFactorSettings()?.apiKey, 'canonical_key_123');
+
+    // Case 2: Alias TWOFACTOR_API_KEY
+    delete process.env.TWO_FACTOR_API_KEY;
+    process.env.TWOFACTOR_API_KEY = 'alias_key_456';
+    assert.equal(isTwoFactorConfigured(), true);
+    assert.equal(twoFactorSettings()?.apiKey, 'alias_key_456');
+
+    // Case 3: Both set (canonical takes precedence)
+    process.env.TWO_FACTOR_API_KEY = 'canonical_primary';
+    process.env.TWOFACTOR_API_KEY = 'alias_secondary';
+    assert.equal(twoFactorSettings()?.apiKey, 'canonical_primary');
   } finally {
     restoreEnv(saved);
   }

@@ -35,11 +35,12 @@ function envValue(name: string): string {
  * Returns 2Factor configuration if the required API key is present in environment variables.
  */
 export function twoFactorSettings(): TwoFactorSettings | null {
-  const apiKey = envValue('TWOFACTOR_API_KEY') || envValue('TWO_FACTOR_API_KEY');
+  // Support both canonical TWO_FACTOR_API_KEY and alias TWOFACTOR_API_KEY
+  const apiKey = envValue('TWO_FACTOR_API_KEY') || envValue('TWOFACTOR_API_KEY');
   if (!apiKey) return null;
 
-  const templateName = envValue('TWOFACTOR_OTP_TEMPLATE') || envValue('TWO_FACTOR_OTP_TEMPLATE') || undefined;
-  const voiceEnabled = envValue('TWOFACTOR_VOICE_ENABLED') !== 'false';
+  const templateName = envValue('TWO_FACTOR_OTP_TEMPLATE') || envValue('TWOFACTOR_OTP_TEMPLATE') || undefined;
+  const voiceEnabled = envValue('TWO_FACTOR_VOICE_ENABLED') !== 'false' && envValue('TWOFACTOR_VOICE_ENABLED') !== 'false';
 
   return {
     apiKey,
