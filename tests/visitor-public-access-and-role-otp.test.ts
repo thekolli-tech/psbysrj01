@@ -224,3 +224,70 @@ test('6. Non-Property-Seeker professional roles REQUIRE mobile phone OTP verific
   assert.equal(failPhoneOtpRes.status, 400, 'Professional registration must require phoneOtp');
   assert.match(failPhoneOtpRes.json.error, /Mobile number OTP verification is required/i);
 });
+
+test('7. FEEDS menu card is present in visitor section above login/signup section', () => {
+  const publicHomeCode = fs.readFileSync(path.resolve('src/components/home/PublicRedditHome.tsx'), 'utf-8');
+  
+  // Verify FEEDS title exists in visitor section
+  assert.ok(publicHomeCode.includes('FEEDS'), 'PublicRedditHome must contain the FEEDS header');
+  
+  // Verify order: FEEDS menu comes BEFORE the login / signup (COMMUNITY ACCESS) section
+  const feedsIdx = publicHomeCode.indexOf('FEEDS Navigation Menu');
+  const communityAccessIdx = publicHomeCode.indexOf('COMMUNITY ACCESS');
+  assert.ok(feedsIdx > 0, 'PublicRedditHome must have FEEDS Navigation Menu');
+  assert.ok(communityAccessIdx > 0, 'PublicRedditHome must have COMMUNITY ACCESS card');
+  assert.ok(feedsIdx < communityAccessIdx, 'FEEDS navigation menu must be placed BEFORE the login/signup section in visitor sidebar');
+
+  // Verify all 11 feed navigation items match the user reference image
+  const expectedFeedLabels = [
+    'Home',
+    'Media & Podcast',
+    'Market Trends & Insights',
+    'Review & Rating',
+    'Community Q&A',
+    'Live & Latest',
+    'Property Requirement',
+    'Contact & Connect',
+    'Programs',
+    'PS Testimonials',
+    'About Us'
+  ];
+
+  for (const label of expectedFeedLabels) {
+    assert.ok(
+      publicHomeCode.includes(label),
+      `PublicRedditHome must include feed navigation item: ${label}`
+    );
+  }
+});
+
+test('8. Media and Live Conference views are open to visitors without AuthRequiredCard', () => {
+  const appCode = fs.readFileSync(path.resolve('src/App.tsx'), 'utf-8');
+
+  // Verify activeView === 'MEDIA' does NOT render AuthRequiredCard
+  assert.ok(
+    !appCode.includes('<AuthRequiredCard view="MEDIA"'),
+    'MEDIA view must be viewable by unauthenticated visitors without AuthRequiredCard'
+  );
+
+  // Verify activeView === 'CONFERENCE' does NOT render AuthRequiredCard
+  assert.ok(
+    !appCode.includes('<AuthRequiredCard view="CONFERENCE"'),
+    'CONFERENCE view must be viewable by unauthenticated visitors without AuthRequiredCard'
+  );
+
+  // Verify CorporateConferenceView protects interactions with login check
+  const confCode = fs.readFileSync(path.resolve('src/components/conference/CorporateConference.tsx'), 'utf-8');
+  assert.ok(
+    confCode.includes('Please sign in or register to submit questions in the conference'),
+    'Conference questions must require authentication'
+  );
+  assert.ok(
+    confCode.includes('Please sign in or register to upvote questions'),
+    'Conference upvoting must require authentication'
+  );
+  assert.ok(
+    confCode.includes('Please sign in or register to participate in polls'),
+    'Conference poll voting must require authentication'
+  );
+});

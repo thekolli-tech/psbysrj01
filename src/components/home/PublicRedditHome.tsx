@@ -25,7 +25,14 @@ import {
   ExternalLink,
   MapPin,
   Lock,
-  Compass
+  Compass,
+  Home,
+  Video,
+  Star,
+  FileText,
+  BookOpen,
+  Award,
+  Info
 } from 'lucide-react';
 
 interface PublicRedditHomeProps {
@@ -46,6 +53,20 @@ const CATEGORY_CHIPS = [
   'Legal & RERA',
   'Project Announcements',
   'Media'
+];
+
+const FEEDS_NAV_ITEMS = [
+  { key: 'HOME', label: 'Home', icon: Home },
+  { key: 'MEDIA', label: 'Media & Podcast', icon: Video },
+  { key: 'MARKET_INSIGHTS', label: 'Market Trends & Insights', icon: TrendingUp },
+  { key: 'REVIEWS', label: 'Review & Rating', icon: Star },
+  { key: 'COMMUNITY', label: 'Community Q&A', icon: MessageSquare },
+  { key: 'CONFERENCE', label: 'Live & Latest', icon: Radio },
+  { key: 'REQUIREMENT', label: 'Property Requirement', icon: FileText },
+  { key: 'CONTACT', label: 'Contact & Connect', icon: Mail },
+  { key: 'PROGRAMS', label: 'Programs', icon: BookOpen },
+  { key: 'TESTIMONIALS', label: 'PS Testimonials', icon: Award },
+  { key: 'ABOUT', label: 'About Us', icon: Info }
 ];
 
 export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
@@ -105,6 +126,19 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
       const targetUrl = selectedCategory === 'Property Q&A' ? '/questions' : selectedCategory === 'Property Discussions' ? '/discussions' : '/';
       window.history.pushState({ path: targetUrl }, '', targetUrl);
     }
+  };
+
+  const handleFeedNavSelect = (key: string) => {
+    if (key === 'HOME') {
+      setSelectedPostId(null);
+      setSelectedCategory('ALL');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        window.history.pushState({ path: '/' }, '', '/');
+      }
+      setActiveView('HOME');
+      return;
+    }
+    setActiveView(key as any);
   };
 
   // Source genuine discussions directly from the authoritative database
@@ -209,6 +243,36 @@ export const PublicRedditHome: React.FC<PublicRedditHomeProps> = ({
             ----------------------------------------------------------------
           */}
           <aside className="hidden lg:block w-[280px] xl:w-[320px] 2xl:w-[350px] shrink-0 sticky top-20 space-y-4">
+            {/* FEEDS Navigation Menu (Requested for Visitors) */}
+            <div className="bg-white rounded-3xl border border-[#E8E8E3] p-3 shadow-sm">
+              <div className="px-3 py-1.5 text-[11px] font-bold font-mono uppercase tracking-wider text-[#B99A24]">
+                FEEDS
+              </div>
+              <nav className="space-y-0.5 mt-1">
+                {FEEDS_NAV_ITEMS.map(item => {
+                  const Icon = item.icon;
+                  const active = item.key === 'HOME' && !selectedPostId;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => handleFeedNavSelect(item.key)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-all duration-150 cursor-pointer ${
+                        active
+                          ? 'bg-[#FAF6EB] text-[#B99A24] font-bold border border-[#E5D58D]/60 shadow-xs'
+                          : 'text-slate-600 hover:text-[#111111] hover:bg-[#F8F8F6]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className={`w-4 h-4 ${active ? 'text-[#B99A24]' : 'text-slate-400'}`} />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
             {/* Registration Card */}
             <div className="bg-white rounded-3xl border border-[#E8E8E3] p-5 shadow-sm text-[#111111] space-y-4">
               <div className="space-y-1.5">

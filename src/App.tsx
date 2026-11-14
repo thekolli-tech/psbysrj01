@@ -397,25 +397,17 @@ const AppContent: React.FC = () => {
         )}
 
         {activeView === 'MEDIA' && (
-          isLoggedIn ? (
-            <MediaEngine
-              onOpenLoginModal={() => setLoginModalOpen(true)}
-              onTriggerSupportWithContext={(ctx) => {
-                setSupportContext(ctx);
-                setSupportOpen(true);
-              }}
-            />
-          ) : (
-            <AuthRequiredCard view="MEDIA" onOpenLoginModal={() => setLoginModalOpen(true)} />
-          )
+          <MediaEngine
+            onOpenLoginModal={() => setLoginModalOpen(true)}
+            onTriggerSupportWithContext={(ctx) => {
+              setSupportContext(ctx);
+              setSupportOpen(true);
+            }}
+          />
         )}
 
         {activeView === 'CONFERENCE' && (
-          isLoggedIn ? (
-            <CorporateConferenceView />
-          ) : (
-            <AuthRequiredCard view="CONFERENCE" onOpenLoginModal={() => setLoginModalOpen(true)} />
-          )
+          <CorporateConferenceView onOpenLoginModal={() => setLoginModalOpen(true)} />
         )}
 
         {activeView === 'MARKET_INSIGHTS' && (

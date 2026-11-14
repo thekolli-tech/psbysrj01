@@ -313,10 +313,6 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                       onTouchStart={() => prefetchView(link.view)}
                       onClick={() => {
                         setMenuOpen(false);
-                        if (link.view === 'COMMUNITY' && !isLoggedIn) {
-                          if (onOpenLoginModal) onOpenLoginModal();
-                          return;
-                        }
                         setActiveView(link.view);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}

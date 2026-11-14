@@ -20,7 +20,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-export const CorporateConferenceView: React.FC = () => {
+export const CorporateConferenceView: React.FC<{ onOpenLoginModal?: () => void }> = ({ onOpenLoginModal }) => {
   const {
     conference,
     upvoteQuestion,
@@ -30,7 +30,8 @@ export const CorporateConferenceView: React.FC = () => {
     showToast,
     mediaItems,
     setSelectedMedia,
-    setActiveView
+    setActiveView,
+    isLoggedIn
   } = useApp();
 
   const [questionInput, setQuestionInput] = useState('');
@@ -41,6 +42,11 @@ export const CorporateConferenceView: React.FC = () => {
   const handleQuestionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!questionInput.trim()) return;
+    if (!isLoggedIn) {
+      showToast('Please sign in or register to submit questions in the conference.');
+      onOpenLoginModal?.();
+      return;
+    }
     submitQuestion(questionInput.trim());
     setQuestionInput('');
   };
@@ -48,10 +54,33 @@ export const CorporateConferenceView: React.FC = () => {
   const handleStandbyQuestionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!standbyQuestion.trim()) return;
+    if (!isLoggedIn) {
+      showToast('Please sign in or register to submit a question to the Secretariat.');
+      onOpenLoginModal?.();
+      return;
+    }
     submitQuestion(standbyQuestion.trim());
     setStandbyQuestion('');
     setStandbySubmitted(true);
     showToast('Question submitted to Secretariat for the upcoming executive session!');
+  };
+
+  const handleUpvote = (qId: string) => {
+    if (!isLoggedIn) {
+      showToast('Please sign in or register to upvote questions.');
+      onOpenLoginModal?.();
+      return;
+    }
+    upvoteQuestion(qId);
+  };
+
+  const handleVotePoll = (pollId: string, idx: number) => {
+    if (!isLoggedIn) {
+      showToast('Please sign in or register to participate in polls.');
+      onOpenLoginModal?.();
+      return;
+    }
+    votePoll(pollId, idx);
   };
 
   if (!conference?.id) {
@@ -365,7 +394,7 @@ export const CorporateConferenceView: React.FC = () => {
 
                     <div className="flex items-center justify-between pt-1">
                       <button
-                        onClick={() => upvoteQuestion(q.id)}
+                        onClick={() => handleUpvote(q.id)}
                         className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-200 transition-colors"
                       >
                         <ThumbsUp className="w-3 h-3 text-amber-600" />
@@ -407,7 +436,7 @@ export const CorporateConferenceView: React.FC = () => {
                     return (
                       <button
                         key={idx}
-                        onClick={() => votePoll(activePoll.id, idx)}
+                        onClick={() => handleVotePoll(activePoll.id, idx)}
                         className={`w-full text-left p-3 rounded-xl border transition-all relative overflow-hidden ${
                           isUserVoted
                             ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-500/20'
