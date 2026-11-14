@@ -277,7 +277,8 @@ app.use(authenticateUser);
 function sanitizeSessionUser(u: any) {
   if (!u) return null;
   const { password_hash, salt, ...safe } = u;
-  const hasVerifiedPhone = safe.role === 'SUPER_ADMIN' || Boolean(
+  const isSeeker = safe.role === 'PROPERTY_SEEKER';
+  const hasVerifiedPhone = safe.role === 'SUPER_ADMIN' || isSeeker || Boolean(
     safe.phone &&
     String(safe.phone).trim() &&
     Number(safe.phone_verified) === 1
@@ -303,13 +304,23 @@ const requireSession = (req: AuthenticatedRequest, res: Response, next: NextFunc
 };
 
 // Mandatory Mobile Phone Verification Guard:
-// Blocks unverified sessions (including Google OAuth users) from accessing protected application APIs.
+// Blocks unverified sessions from accessing protected application APIs.
+// Property Seekers require email verification instead of mobile phone verification.
 const requirePhoneVerified = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required. Please sign in.' });
     return;
   }
-  if (req.user.role !== 'SUPER_ADMIN') {
+  if (req.user.role === 'PROPERTY_SEEKER') {
+    if (!req.user.is_verified && !req.user.email_verified) {
+      res.status(403).json({
+        error: 'Email verification is mandatory. Please verify your email via OTP to access this resource.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        emailVerified: false
+      });
+      return;
+    }
+  } else if (req.user.role !== 'SUPER_ADMIN') {
     const isPhoneVerified = Boolean(
       req.user.phone &&
       String(req.user.phone).trim() &&
@@ -327,13 +338,22 @@ const requirePhoneVerified = (req: AuthenticatedRequest, res: Response, next: Ne
   next();
 };
 
-// Protected Application API Guard: enforces active session AND mandatory mobile phone verification
+// Protected Application API Guard: enforces active session AND mandatory mobile phone verification (or email verification for Property Seeker)
 const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required. Please sign in.' });
     return;
   }
-  if (req.user.role !== 'SUPER_ADMIN') {
+  if (req.user.role === 'PROPERTY_SEEKER') {
+    if (!req.user.is_verified && !req.user.email_verified) {
+      res.status(403).json({
+        error: 'Email verification is mandatory. Please verify your email via OTP to access this resource.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        emailVerified: false
+      });
+      return;
+    }
+  } else if (req.user.role !== 'SUPER_ADMIN') {
     const isPhoneVerified = Boolean(
       req.user.phone &&
       String(req.user.phone).trim() &&
@@ -622,7 +642,7 @@ app.post('/api/auth/google', async (req: Request, res: Response): Promise<void> 
       res.cookie('ps_session', authResult.sessionToken, sessionCookieOptions());
     }
 
-    const hasVerifiedPhone = authResult.user.role === 'SUPER_ADMIN' || Boolean(
+    const hasVerifiedPhone = authResult.user.role === 'SUPER_ADMIN' || authResult.user.role === 'PROPERTY_SEEKER' || Boolean(
       authResult.user.phone &&
       String(authResult.user.phone).trim() &&
       Number(authResult.user.phone_verified) === 1
@@ -790,7 +810,7 @@ app.get('/api/auth/google/callback', async (req: Request, res: Response): Promis
       res.cookie('ps_session', authResult.sessionToken, sessionCookieOptions());
     }
 
-    const hasVerifiedPhone = authResult.user.role === 'SUPER_ADMIN' || Boolean(
+    const hasVerifiedPhone = authResult.user.role === 'SUPER_ADMIN' || authResult.user.role === 'PROPERTY_SEEKER' || Boolean(
       authResult.user.phone &&
       String(authResult.user.phone).trim() &&
       Number(authResult.user.phone_verified) === 1
@@ -1143,7 +1163,7 @@ app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
     return;
   }
   const { password_hash, salt, ...safeUser } = req.user;
-  const hasVerifiedPhone = req.user.role === 'SUPER_ADMIN' || Boolean(
+  const hasVerifiedPhone = req.user.role === 'SUPER_ADMIN' || req.user.role === 'PROPERTY_SEEKER' || Boolean(
     req.user.phone &&
     String(req.user.phone).trim() &&
     Number(req.user.phone_verified) === 1
@@ -1697,7 +1717,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
     const hasPhoneOtp = Boolean(phoneOtp && String(phoneOtp).trim());
     const hasEmailOtp = Boolean(otp && String(otp).trim());
     if (!hasPhoneOtp && !hasEmailOtp) {
-      res.status(400).json({ error: 'WhatsApp verification code (OTP) is required to register' });
+      res.status(400).json({ error: 'Verification code (OTP) is required to register' });
       return;
     }
 
@@ -1709,7 +1729,6 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
 
     const safeRole = selfServeStorageRole(requestedRole);
     const seeker = safeRole === 'PROPERTY_SEEKER';
-    const phoneRequired = isPhoneOtpRequired();
 
     let resolvedPhone = '';
     if (phone && typeof phone === 'string' && phone.trim()) {
@@ -1717,13 +1736,20 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       resolvedPhone = normalized || phone.trim();
     }
 
-    if (phoneRequired && seeker) {
-      if (!resolvedPhone || !normalizeIndianMobile(phone)) {
-        res.status(400).json({ error: 'A valid Indian mobile number is required' });
+    if (seeker) {
+      // Only Property Seeker has email OTP verification instead of mobile number
+      if (!hasEmailOtp) {
+        res.status(400).json({ error: 'Email verification code (OTP) is required for Property Seeker registration. Please verify your email address.' });
         return;
       }
-      if (!String(phoneOtp || '').trim()) {
-        res.status(400).json({ error: 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.' });
+    } else {
+      // All remaining roles must have mobile number OTP verification
+      if (!resolvedPhone || !normalizeIndianMobile(phone)) {
+        res.status(400).json({ error: 'A valid Indian mobile number is required for registration.' });
+        return;
+      }
+      if (!hasPhoneOtp) {
+        res.status(400).json({ error: 'Mobile number OTP verification is required for professional registration. Please verify your mobile phone.' });
         return;
       }
     }
@@ -1755,7 +1781,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
       townCity: resolvedTownCity,
       otp: hasEmailOtp ? String(otp) : undefined,
       phoneOtp: hasPhoneOtp ? String(phoneOtp) : undefined,
-      requirePhone: Boolean((phoneRequired && seeker) || hasPhoneOtp)
+      requirePhone: !seeker
     });
 
     let validatedProfession: string | null = null;
@@ -2349,7 +2375,7 @@ app.post('/api/community/comments/:id/restore', requireAuth, requireUnrestricted
 
 
 // Fetch all community posts
-app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.get('/api/community/posts', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const communityId = req.query.communityId as string | undefined;
     const topic = req.query.topic as string | undefined;
@@ -2406,7 +2432,7 @@ app.get('/api/community/posts', requireAuth, async (req: AuthenticatedRequest, r
 });
 
 // Fetch single post with full comments
-app.get('/api/community/posts/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.get('/api/community/posts/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
     if (!post) {
@@ -3142,7 +3168,7 @@ app.post('/api/community/posts/:id/like', requireAuth, requireUnrestricted, asyn
 // ==============================================================================
 
 // Fetch comments for a post (hierarchical Reddit-style tree, sorting & pagination)
-app.get('/api/community/posts/:id/comments', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.get('/api/community/posts/:id/comments', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const post = await getPostById(req.params.id, req.user?.id);
     if (!post) {

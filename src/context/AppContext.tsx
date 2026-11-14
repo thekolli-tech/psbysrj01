@@ -842,11 +842,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     refreshCommunities();
+    refreshPosts();
     if (!sessionUser) {
       setLeads([]);
       return;
     }
-    refreshPosts();
     fetch('/api/leads')
       .then(res => res.ok ? res.json() : null)
       .then(data => {

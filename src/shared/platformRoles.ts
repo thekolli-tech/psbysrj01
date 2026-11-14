@@ -30,15 +30,15 @@ export const PLATFORM_ROLES: PlatformRoleItem[] = [
     number: 1,
     roleKey: 'PROPERTY_SEEKER',
     title: 'Property Seeker',
-    subtitle: 'Who is looking for Property',
-    fullLabel: '1. Property Seeker – Who is looking for Property'
+    subtitle: 'Property Seeker',
+    fullLabel: '1. Property Seeker'
   },
   {
     number: 2,
     roleKey: 'RERA_AGENT',
     title: 'RERA Certified Individual Realter/CP/Agent',
-    subtitle: 'Channel Partner /Broker /Agent',
-    fullLabel: '2. RERA Certified Individual Realter/CP/Agent – Channel Partner /Broker /Agent'
+    subtitle: 'RERA Certified Individual Realter/CP/Agent',
+    fullLabel: '2. RERA Certified Individual Realter/CP/Agent'
   },
   {
     number: 3,
@@ -58,43 +58,43 @@ export const PLATFORM_ROLES: PlatformRoleItem[] = [
     number: 5,
     roleKey: 'SALES_PROFESSIONAL',
     title: 'Working Sales Professional',
-    subtitle: 'Sales Person, who are working to some company on salary basis',
-    fullLabel: '5. Working Sales Professional – Sales Person, who are working to some company on salary basis'
+    subtitle: 'Working Sales Professional',
+    fullLabel: '5. Working Sales Professional'
   },
   {
     number: 6,
     roleKey: 'RESELLER',
     title: 'Reseller',
-    subtitle: 'Bought Property, wanted to sell through Property Studio',
-    fullLabel: '6. Reseller – Bought Property, wanted to sell through Property Studio'
+    subtitle: 'Reseller',
+    fullLabel: '6. Reseller'
   },
   {
     number: 7,
     roleKey: 'TRADER_INVESTOR',
     title: 'Trader / Investor',
-    subtitle: 'Frequently trading buying and selling Multiple Property',
-    fullLabel: '7. Trader / Investor – Frequently trading buying and selling Multiple Property'
+    subtitle: 'Trader / Investor',
+    fullLabel: '7. Trader / Investor'
   },
   {
     number: 8,
     roleKey: 'LANDOWNER',
     title: 'Land Owner',
-    subtitle: 'Landlord, who had large extent land, who gave development to developer',
-    fullLabel: '8. Land Owner – Landlord, who had large extent land, who gave development to developer'
+    subtitle: 'Land Owner',
+    fullLabel: '8. Land Owner'
   },
   {
     number: 9,
     roleKey: 'DEVELOPER',
     title: 'Developer',
-    subtitle: 'Developer of plotting venture in Sq Yards and builder of apartments and Villas or other residential or commercial property in Square Feet’s',
-    fullLabel: '9. Developer – Plotting venture in Sq Yards & builder of apartments, Villas & commercial'
+    subtitle: 'Developer',
+    fullLabel: '9. Developer'
   },
   {
     number: 10,
     roleKey: 'VENDOR',
     title: 'Vendor',
-    subtitle: 'Contractors and Suppliers',
-    fullLabel: '10. Vendor – Contractors and Suppliers'
+    subtitle: 'Vendor',
+    fullLabel: '10. Vendor'
   },
   {
     number: 11,
@@ -130,16 +130,16 @@ export const PLATFORM_ROLES: PlatformRoleItem[] = [
  * Exact list of 14 Stakeholder Roles for Add Entity to Review dropdown
  */
 export const STAKEHOLDER_REVIEW_ROLES: string[] = [
-  'Property Seeker – Who is looking for Property',
-  'RERA Certified Individual Realter/CP/Agent – Channel Partner /Broker /Agent',
+  'Property Seeker',
+  'RERA Certified Individual Realter/CP/Agent',
   'RERA Certified Property Consultancy/Firm',
   'Non-RERA Realter/Broker/CP',
-  'Working Sales Professional – Sales Person, who are working to some company on salary basis',
-  'Reseller – Bought Property, wanted to sell through Property Studio',
-  'Trader / Investor – Frequently trading buying and selling Multiple Property',
-  'Land Owner – Landlord, who had large extent land, who gave development to developer',
-  'Developer – who developer of plotting venture in Sq Yards and builder of apartments and Villas or other residential or commercial property in Square Feet’s',
-  'Vendor – Contractors and Suppliers',
+  'Working Sales Professional',
+  'Reseller',
+  'Trader / Investor',
+  'Land Owner',
+  'Developer',
+  'Vendor',
   'Architect & Engineer',
   'Interior Designer & Decorater',
   'Influencer',

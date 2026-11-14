@@ -75,8 +75,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || ''
   );
 
-  // WhatsApp OTP registration flow state: 'FORM' | 'OTP'
+  // OTP registration flow state: 'FORM' | 'OTP'
   const [regStep, setRegStep] = useState<'FORM' | 'OTP'>('FORM');
+  const [regOtpChannel, setRegOtpChannel] = useState<'email' | 'phone'>('email');
   const [otpDeliveryStatus, setOtpDeliveryStatus] = useState<'SENDING' | 'SUBMITTED' | 'SENT' | 'DELIVERED' | 'FAILED'>('SUBMITTED');
   const [otpMessageId, setOtpMessageId] = useState<string | null>(null);
   const [otpChannel, setOtpChannel] = useState<'sms' | 'voice'>('sms');
@@ -646,9 +647,75 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     otpRefs.current[nextIdx]?.focus();
   };
 
+  // Email OTP dispatch handler for Property Seeker registration
+  const handleSendEmailOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (submitting.current) return;
+    setErrorMsg(null);
+    setDeliveryFailureReason(null);
+
+    if (!nameInput.trim()) {
+      setErrorMsg('Please enter your full name.');
+      return;
+    }
+
+    if (!emailInput.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.trim())) {
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
+    if (!professionInput.trim()) {
+      setErrorMsg('Please enter your profession.');
+      return;
+    }
+
+    if (!passwordInput || passwordInput.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    if (passwordInput !== confirmPasswordInput) {
+      setErrorMsg('Passwords do not match. Please ensure both passwords match.');
+      return;
+    }
+
+    submitting.current = true;
+    setLoading(true);
+    setOtpDeliveryStatus('SENDING');
+    try {
+      const res = await fetch('/api/auth/send-email-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ email: emailInput.trim().toLowerCase() })
+      });
+      const result = await readApiResponse(res);
+      if (!result.ok || result.data?.success !== true) {
+        if (result.status === 429) {
+          throw new Error(result.error || 'Please wait before requesting a new verification code.');
+        }
+        throw new Error(result.error || 'Unable to send email verification code.');
+      }
+      setRegOtpChannel('email');
+      setRegStep('OTP');
+      setOtpDigits(['', '', '', '', '', '']);
+      setPhoneCountdown(60);
+      setOtpExpiryCountdown(600);
+      setOtpDeliveryStatus('DELIVERED');
+      showToast('Verification code dispatched to your email address.');
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } catch (err: any) {
+      setOtpDeliveryStatus('FAILED');
+      setErrorMsg(err.message || 'Unable to send email verification code.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
+    }
+  };
+
   // Mobile Phone OTP dispatch handler (2Factor SMS primary with Voice Call fallback)
   const handleSendPhoneOtp = async (e?: React.FormEvent, channel: 'sms' | 'voice' = 'sms') => {
     setOtpChannel(channel);
+    setRegOtpChannel('phone');
     if (e) e.preventDefault();
     if (submitting.current) return;
     setErrorMsg(null);
@@ -768,6 +835,83 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleSendWhatsAppOtp = handleSendPhoneOtp;
+
+  // Email OTP verification & direct registration completion for Property Seeker
+  const handleVerifyEmailOtpAndRegister = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (submitting.current) return;
+    if (otpExpiryCountdown <= 0) {
+      setErrorMsg('Verification code has expired. Please request a new code.');
+      return;
+    }
+    const enteredOtp = otpDigits.join('');
+    if (enteredOtp.length !== 6) {
+      setErrorMsg('Please enter the full 6-digit verification code.');
+      return;
+    }
+    setErrorMsg(null);
+    submitting.current = true;
+    setLoading(true);
+    try {
+      const cleanPhoneDigits = phoneInput.replace(/[^0-9]/g, '');
+      let optionalPhone: string | undefined = undefined;
+      if (cleanPhoneDigits.length >= 10) {
+        optionalPhone = '+91' + cleanPhoneDigits.slice(-10);
+      }
+
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({
+          name: nameInput.trim(),
+          email: emailInput.trim().toLowerCase(),
+          password: passwordInput,
+          role: roleInput,
+          phone: optionalPhone,
+          otp: enteredOtp, // Email OTP
+          organization: organizationInput.trim(),
+          profession: professionInput.trim(),
+          company: companyInput.trim() || undefined,
+          interests: selectedInterests,
+          townCity: DEFAULT_SIGNUP_LOCATION,
+          location: DEFAULT_SIGNUP_LOCATION,
+          avatar: selectedAvatar || DEFAULT_AVATAR
+        })
+      });
+
+      const regResult = await readApiResponse(response);
+      const user = regResult.data?.user as Parameters<typeof login>[0] | undefined;
+      if (!regResult.ok || !user) {
+        throw new Error(regResult.error || 'Registration failed');
+      }
+
+      login(user);
+      showToast(`Welcome to Property Studio, ${user.name}!`);
+      if (isPropertySeeker(user.role)) {
+        setActiveView('DASHBOARD');
+      } else {
+        setActiveView(postLoginDestination(user.role));
+      }
+      onClose();
+
+      // Reset state
+      setRegStep('FORM');
+      setPhoneInput('');
+      setOtpDigits(['', '', '', '', '', '']);
+      setNameInput('');
+      setEmailInput('');
+      setPasswordInput('');
+      setConfirmPasswordInput('');
+      setProfessionInput('');
+      setOrganizationInput('');
+      setCompanyInput('');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Verification failed. Please check the code.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
+    }
+  };
 
   // Phone OTP verification & direct registration completion
   const handleVerifyPhoneOtp = async (e?: React.FormEvent) => {
@@ -913,7 +1057,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   ? 'Reset Password'
                   : mode === 'REGISTER'
                   ? regStep === 'OTP'
-                    ? (otpChannel === 'voice' ? 'Voice Call Verification' : 'Mobile Phone Verification')
+                    ? (regOtpChannel === 'email' ? 'Email Address Verification' : otpChannel === 'voice' ? 'Voice Call Verification' : 'Mobile Phone Verification')
                     : 'Create Account'
                   : 'Portal Sign In'}
               </h3>
@@ -923,7 +1067,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   : forgotPasswordMode
                   ? 'Verify email OTP to set new password'
                   : mode === 'REGISTER' && regStep === 'OTP'
-                  ? (otpChannel === 'voice'
+                  ? (regOtpChannel === 'email'
+                      ? 'Enter the 6-digit verification code sent to your email'
+                      : otpChannel === 'voice'
                       ? 'Listen to the 6-digit code on your incoming call'
                       : 'Enter the 6-digit verification code received via SMS')
                   : 'Live server database authentication'}
@@ -1253,53 +1399,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <span>{loading ? 'Authenticating...' : 'Sign In to Account'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
-
-                  {/* Social Logins Divider */}
-                  <div className="relative my-4 text-center">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200" />
-                    </div>
-                    <span className="relative px-3 bg-white text-[11px] text-slate-400 font-medium">
-                      or continue with
-                    </span>
-                  </div>
-
-                  {/* Single Google Social Button */}
-                  <div className="w-full">
-                    <button
-                      type="button"
-                      disabled={loading || googleLoading}
-                      onClick={handleGoogleSignIn}
-                      className="w-full py-2.5 px-4 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl flex items-center justify-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
-                      title="Sign in with Google"
-                      aria-label="Sign in with Google"
-                    >
-                      {googleLoading ? (
-                        <div className="flex items-center gap-2 text-slate-600 font-medium">
-                          <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin shrink-0" />
-                          <span>Connecting to Google...</span>
-                        </div>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                          </svg>
-                          <span>Continue with Google</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
                 </form>
               ) : regStep === 'FORM' ? (
-                /* Registration Form Exactly Matching Reference Image media_1794043027829_f2c0a4c9.jpg */
-                <form onSubmit={(e) => handleSendPhoneOtp(e, 'sms')} className="space-y-3">
-                  {/* Alert Banner: Mobile OTP verification is mandatory */}
+                /* Registration Form */
+                <form
+                  onSubmit={roleInput === 'PROPERTY_SEEKER' ? handleSendEmailOtp : (e) => handleSendPhoneOtp(e, 'sms')}
+                  className="space-y-3"
+                >
+                  {/* Alert Banner: OTP verification */}
                   <div className="bg-[#FEFBF2] py-2 px-3 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Mobile phone verification is required. 2Factor SMS is dispatched by default with Voice Call fallback.</span>
+                    <span>
+                      {roleInput === 'PROPERTY_SEEKER'
+                        ? 'Email verification is required for Property Seeker registration. A 6-digit code will be sent to your email.'
+                        : 'Mobile phone verification is required. 2Factor SMS is dispatched by default with Voice Call fallback.'}
+                    </span>
                   </div>
 
                   {/* Full Name */}
@@ -1339,7 +1453,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </label>
                     <select
                       value={roleInput}
-                      onChange={e => setRoleInput(e.target.value as any)}
+                      onChange={e => {
+                        const r = e.target.value as any;
+                        setRoleInput(r);
+                        if (r === 'PROPERTY_SEEKER') {
+                          setRegOtpChannel('email');
+                        } else {
+                          setRegOtpChannel('phone');
+                        }
+                      }}
                       className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-900 font-medium cursor-pointer"
                     >
                       {PLATFORM_ROLES.map(r => (
@@ -1350,11 +1472,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </select>
                   </div>
 
-                  {/* Two-Column Row: Contact Mobile * (Mandatory) & Organization (Optional) */}
+                  {/* Two-Column Row: Contact Mobile (Optional for Seeker) & Organization (Optional) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
                       <label className="block font-bold text-slate-700 text-xs mb-1">
-                        Contact Mobile <span className="text-red-500">*</span>
+                        Contact Mobile {roleInput === 'PROPERTY_SEEKER' ? <span className="text-slate-400 font-normal">(Optional)</span> : <span className="text-red-500">*</span>}
                       </label>
                       <input
                         type="tel"
@@ -1363,7 +1485,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         onChange={e => setPhoneInput(e.target.value)}
                         placeholder="e.g. +91 98490 12345"
                         className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
-                        required
+                        required={roleInput !== 'PROPERTY_SEEKER'}
                       />
                     </div>
                     <div>
@@ -1579,27 +1701,34 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     {loading ? (
                       <>
                         <Loader2 className="w-4 h-4 text-white animate-spin" />
-                        <span>Sending SMS verification code...</span>
+                        <span>{roleInput === 'PROPERTY_SEEKER' ? 'Sending email verification code...' : 'Sending SMS verification code...'}</span>
                       </>
                     ) : (
                       <>
-                        <span>Create Verified Account (SMS OTP)</span>
+                        <span>{roleInput === 'PROPERTY_SEEKER' ? 'Create Verified Account (Email OTP)' : 'Create Verified Account (Mobile OTP)'}</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>
                 </form>
               ) : (
-                /* Step 2: 6-Digit 2Factor Mobile OTP Verification */
-                <form onSubmit={handleVerifyPhoneOtp} className="space-y-4">
+                /* Step 2: 6-Digit OTP Verification */
+                <form onSubmit={regOtpChannel === 'email' ? handleVerifyEmailOtpAndRegister : handleVerifyPhoneOtp} className="space-y-4">
                   {/* Active Delivery Channel & Expiry Header */}
                   <div className="flex items-center justify-between pb-0.5">
                     <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                      otpChannel === 'voice'
+                      regOtpChannel === 'email'
+                        ? 'bg-amber-50 border-amber-200 text-amber-900'
+                        : otpChannel === 'voice'
                         ? 'bg-purple-50 border-purple-200 text-purple-900'
                         : 'bg-amber-50 border-amber-200 text-amber-900'
                     }`}>
-                      {otpChannel === 'voice' ? (
+                      {regOtpChannel === 'email' ? (
+                        <>
+                          <Mail className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Email OTP Active</span>
+                        </>
+                      ) : otpChannel === 'voice' ? (
                         <>
                           <PhoneCall className="w-3.5 h-3.5 text-purple-600" />
                           <span>Voice Call Active</span>
@@ -1618,7 +1747,36 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </div>
                   </div>
 
-                  {(() => {
+                  {regOtpChannel === 'email' ? (
+                    <div className="rounded-2xl p-3 text-center space-y-1 border bg-emerald-50/90 border-emerald-200/90 text-emerald-950">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1.5 text-xs text-left">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Email verification code sent</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setRegStep('FORM'); setErrorMsg(null); }}
+                          className="text-[11px] text-amber-700 hover:underline font-bold cursor-pointer shrink-0 ml-2"
+                        >
+                          Change Email
+                        </button>
+                      </div>
+
+                      <div className="text-[11px] leading-relaxed text-left pt-1">
+                        <p className="text-emerald-800">
+                          Official verification code dispatched to <strong className="font-mono text-emerald-950">{emailInput}</strong>. Enter the 6 digits below:
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                        <span className="flex items-center gap-1 text-slate-600">
+                          <MapPin className="w-3.5 h-3.5 text-amber-600" /> Location:
+                        </span>
+                        <span className="font-semibold text-slate-800">{DEFAULT_SIGNUP_LOCATION} (Fixed Territory)</span>
+                      </div>
+                    </div>
+                  ) : (() => {
                     const elapsedSec = 60 - phoneCountdown;
                     const getWaitingMessage = () => {
                       if (otpChannel === 'voice') {
@@ -1731,7 +1889,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
                   <div>
                     <label className="block font-bold text-slate-700 text-center mb-2 text-xs">
-                      Enter 6-Digit Mobile Verification Code
+                      {regOtpChannel === 'email' ? 'Enter 6-Digit Email Verification Code' : 'Enter 6-Digit Mobile Verification Code'}
                     </label>
                     <div className="flex justify-center gap-1.5 sm:gap-2.5">
                       {otpDigits.map((digit, idx) => (
@@ -1754,48 +1912,68 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   </div>
 
                   {/* Resend & Channel Switch Actions */}
-                  <div className="space-y-1.5 pt-1 text-[11px] text-slate-600">
-                    <div className="flex items-center justify-between">
-                      <span>Didn't receive the {otpChannel === 'voice' ? 'voice call' : 'SMS code'}?</span>
-                      {phoneCountdown > 0 ? (
-                        <span className="font-mono text-slate-400">Resend in {phoneCountdown}s</span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleSendPhoneOtp(undefined, otpChannel)}
-                          className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          <span>Resend {otpChannel === 'voice' ? 'Voice Call' : 'SMS OTP'}</span>
-                        </button>
-                      )}
+                  {regOtpChannel === 'email' ? (
+                    <div className="space-y-1.5 pt-1 text-[11px] text-slate-600">
+                      <div className="flex items-center justify-between">
+                        <span>Didn't receive the email code?</span>
+                        {phoneCountdown > 0 ? (
+                          <span className="font-mono text-slate-400">Resend in {phoneCountdown}s</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSendEmailOtp()}
+                            className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Resend Email OTP</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between pt-0.5">
-                      <span>{otpChannel === 'voice' ? 'Prefer SMS verification?' : 'Having SMS delivery issues?'}</span>
-                      {phoneCountdown > 0 ? (
-                        <span className="font-mono text-slate-400">Voice option in {phoneCountdown}s</span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={loading}
-                          onClick={() => handleSendPhoneOtp(undefined, otpChannel === 'sms' ? 'voice' : 'sms')}
-                          className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {otpChannel === 'voice' ? (
-                            <>
-                              <MessageSquare className="w-3 h-3 text-amber-600" />
-                              <span>Receive code via SMS</span>
-                            </>
-                          ) : (
-                            <>
-                              <PhoneCall className="w-3 h-3 text-amber-600" />
-                              <span>Receive code via Voice Call</span>
-                            </>
-                          )}
-                        </button>
-                      )}
+                  ) : (
+                    <div className="space-y-1.5 pt-1 text-[11px] text-slate-600">
+                      <div className="flex items-center justify-between">
+                        <span>Didn't receive the {otpChannel === 'voice' ? 'voice call' : 'SMS code'}?</span>
+                        {phoneCountdown > 0 ? (
+                          <span className="font-mono text-slate-400">Resend in {phoneCountdown}s</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSendPhoneOtp(undefined, otpChannel)}
+                            className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Resend {otpChannel === 'voice' ? 'Voice Call' : 'SMS OTP'}</span>
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between pt-0.5">
+                        <span>{otpChannel === 'voice' ? 'Prefer SMS verification?' : 'Having SMS delivery issues?'}</span>
+                        {phoneCountdown > 0 ? (
+                          <span className="font-mono text-slate-400">Voice option in {phoneCountdown}s</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => handleSendPhoneOtp(undefined, otpChannel === 'sms' ? 'voice' : 'sms')}
+                            className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {otpChannel === 'voice' ? (
+                              <>
+                                <MessageSquare className="w-3 h-3 text-amber-600" />
+                                <span>Receive code via SMS</span>
+                              </>
+                            ) : (
+                              <>
+                                <PhoneCall className="w-3 h-3 text-amber-600" />
+                                <span>Receive code via Voice Call</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="flex items-center gap-2 pt-1">
                     <button

@@ -170,7 +170,7 @@ test('HTTP POST /api/auth/register defaults to Hyderabad, Telangana, India and r
     name: 'Suresh Chandra',
     email,
     password: 'SecurePassword123!',
-    role: 'CHANNEL_PARTNER',
+    role: 'PROPERTY_SEEKER',
     otp: code
   });
 
@@ -205,7 +205,7 @@ test('HTTP POST /api/auth/register persists user-customized location and persist
     name: 'Warangal Member',
     email,
     password: 'SecurePassword123!',
-    role: 'RESELLER',
+    role: 'PROPERTY_SEEKER',
     townCity: chosenLocation,
     otp: code
   });
@@ -235,7 +235,7 @@ test('HTTP POST /api/auth/register supports separate city and state fields', asy
     name: 'Hyderabad Dual Field User',
     email,
     password: 'SecurePassword123!',
-    role: 'LANDOWNER',
+    role: 'PROPERTY_SEEKER',
     city: 'Hyderabad',
     state: 'Telangana, India',
     otp: code
@@ -254,7 +254,7 @@ test('Registration rejects invalid location input containing HTML or exceeding 8
     name: 'Attacker',
     email: emailHtml,
     password: 'Password123!',
-    role: 'CHANNEL_PARTNER',
+    role: 'PROPERTY_SEEKER',
     townCity: 'Hyderabad <script>alert(1)</script>',
     otp: codeHtml
   });
@@ -269,7 +269,7 @@ test('Registration rejects invalid location input containing HTML or exceeding 8
     name: 'Long Location User',
     email: emailLong,
     password: 'Password123!',
-    role: 'CHANNEL_PARTNER',
+    role: 'PROPERTY_SEEKER',
     townCity: 'A'.repeat(81),
     otp: codeLong
   });

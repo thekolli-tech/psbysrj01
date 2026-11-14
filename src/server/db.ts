@@ -3351,7 +3351,7 @@ function sqliteRegisterVerifiedUser(data: {
         throw new RegistrationRejected(400, 'An account with this mobile number already exists');
       }
     } else if (data.requirePhone) {
-      throw new RegistrationRejected(400, 'Mobile number OTP verification is required for Property Seeker registration. Please verify your mobile phone.');
+      throw new RegistrationRejected(400, 'Mobile number OTP verification is required for registration. Please verify your mobile phone.');
     }
 
     try {
