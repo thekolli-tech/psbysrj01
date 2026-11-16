@@ -41,7 +41,8 @@ export function twoFactorSettings(): TwoFactorSettings | null {
   if (!apiKey) return null;
 
   const templateName = envValue('TWO_FACTOR_OTP_TEMPLATE') || envValue('TWOFACTOR_OTP_TEMPLATE') || undefined;
-  const voiceEnabled = envValue('TWO_FACTOR_VOICE_ENABLED') !== 'false' && envValue('TWOFACTOR_VOICE_ENABLED') !== 'false';
+  // Voice call OTP disabled in favor of SMS OTP per client requirement
+  const voiceEnabled = false;
 
   return {
     apiKey,
@@ -100,35 +101,20 @@ export async function sendTwoFactorOtp(
     };
   }
 
-  if (channel === 'voice' && !settings.voiceEnabled) {
-    return {
-      success: false,
-      provider: '2factor',
-      channel,
-      error: 'Voice OTP is currently disabled in system settings.'
-    };
-  }
+  // Number verification strictly enforces SMS OTP delivery per client requirement
+  const effectiveChannel: 'sms' = 'sms';
 
   // Record queued state locally
-  recordOtpQueued(normalized, `2factor-${channel}`);
+  recordOtpQueued(normalized, '2factor-sms');
 
-  // Build target 2Factor URL
+  // Build target 2Factor URL - strictly SMS OTP
   let endpointUrl: string;
-  if (channel === 'voice') {
-    if (customOtp && /^\d{4,6}$/.test(customOtp.trim())) {
-      endpointUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/VOICE/${phoneDigits}/${encodeURIComponent(customOtp.trim())}`;
-    } else {
-      endpointUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/VOICE/${phoneDigits}/AUTOGEN`;
-    }
+  if (settings.templateName && customOtp && /^\d{4,6}$/.test(customOtp.trim())) {
+    endpointUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/SMS/${phoneDigits}/${encodeURIComponent(customOtp.trim())}/${encodeURIComponent(settings.templateName)}`;
+  } else if (settings.templateName) {
+    endpointUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/SMS/${phoneDigits}/AUTOGEN/${encodeURIComponent(settings.templateName)}`;
   } else {
-    // Primary: SMS OTP
-    if (settings.templateName && customOtp && /^\d{4,6}$/.test(customOtp.trim())) {
-      endpointUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/SMS/${phoneDigits}/${encodeURIComponent(customOtp.trim())}/${encodeURIComponent(settings.templateName)}`;
-    } else if (settings.templateName) {
-      endpointUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/SMS/${phoneDigits}/AUTOGEN/${encodeURIComponent(settings.templateName)}`;
-    } else {
-      endpointUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/SMS/${phoneDigits}/AUTOGEN`;
-    }
+    endpointUrl = `${BASE_URL}/${encodeURIComponent(settings.apiKey)}/SMS/${phoneDigits}/AUTOGEN`;
   }
 
   try {
@@ -148,11 +134,11 @@ export async function sendTwoFactorOtp(
     if (!response.ok || !data || data.Status !== 'Success') {
       const errorMsg = data?.Details || `2Factor returned HTTP ${response.status}`;
       recordOtpFailed(normalized, errorMsg);
-      console.warn(`[Property Studio] 2Factor ${channel.toUpperCase()} dispatch rejected: ${errorMsg}`);
+      console.warn(`[Property Studio] 2Factor SMS dispatch rejected: ${errorMsg}`);
       return {
         success: false,
         provider: '2factor',
-        channel,
+        channel: effectiveChannel,
         error: errorMsg,
         statusCode: response.status
       };
@@ -164,29 +150,29 @@ export async function sendTwoFactorOtp(
       return {
         success: false,
         provider: '2factor',
-        channel,
+        channel: effectiveChannel,
         error: '2Factor response did not contain a valid session ID.'
       };
     }
 
     // Record submission with Session ID & Channel
-    recordOtpSubmitted(normalized, sessionId, `2factor-${channel}`, channel);
-    console.log(`[Property Studio] 2Factor ${channel.toUpperCase()} OTP accepted. Session ID: ${sessionId}`);
+    recordOtpSubmitted(normalized, sessionId, '2factor-sms', effectiveChannel);
+    console.log(`[Property Studio] 2Factor SMS OTP accepted. Session ID: ${sessionId}`);
 
     return {
       success: true,
       provider: '2factor',
-      channel,
+      channel: effectiveChannel,
       sessionId
     };
   } catch (err: any) {
     const message = err?.message || 'Network request failed';
     recordOtpFailed(normalized, message);
-    console.warn(`[Property Studio] 2Factor ${channel.toUpperCase()} request failed:`, message);
+    console.warn('[Property Studio] 2Factor SMS request failed:', message);
     return {
       success: false,
       provider: '2factor',
-      channel,
+      channel: effectiveChannel,
       error: '2Factor service request timed out or failed to connect.'
     };
   }

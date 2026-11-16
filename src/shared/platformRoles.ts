@@ -29,9 +29,9 @@ export const PLATFORM_ROLES: PlatformRoleItem[] = [
   {
     number: 1,
     roleKey: 'PROPERTY_SEEKER',
-    title: 'Property Seeker',
-    subtitle: 'Property Seeker',
-    fullLabel: '1. Property Seeker'
+    title: 'Property Seeker / NRI / Buyer',
+    subtitle: 'Property Seeker / NRI / Buyer',
+    fullLabel: '1. Property Seeker / NRI / Buyer'
   },
   {
     number: 2,
@@ -130,7 +130,7 @@ export const PLATFORM_ROLES: PlatformRoleItem[] = [
  * Exact list of 14 Stakeholder Roles for Add Entity to Review dropdown
  */
 export const STAKEHOLDER_REVIEW_ROLES: string[] = [
-  'Property Seeker',
+  'Property Seeker / NRI / Buyer',
   'RERA Certified Individual Realter/CP/Agent',
   'RERA Certified Property Consultancy/Firm',
   'Non-RERA Realter/Broker/CP',

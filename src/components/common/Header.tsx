@@ -46,7 +46,7 @@ const getRoleIcon = (role: string) => {
     case 'DEVELOPER':
       return <span title="Platform Developer"><Terminal className="w-3.5 h-3.5 text-emerald-600 shrink-0" /></span>;
     case 'PROPERTY_SEEKER':
-      return <span title="Property Seeker"><Compass className="w-3.5 h-3.5 text-blue-600 shrink-0" /></span>;
+      return <span title="Property Seeker / NRI / Buyer"><Compass className="w-3.5 h-3.5 text-blue-600 shrink-0" /></span>;
     case 'PROPERTY_ADMIN':
       return <span title="Property Admin"><Building className="w-3.5 h-3.5 text-indigo-600 shrink-0" /></span>;
     case 'LANDOWNER':

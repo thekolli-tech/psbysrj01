@@ -712,9 +712,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Mobile Phone OTP dispatch handler (2Factor SMS primary with Voice Call fallback)
+  // Mobile Phone OTP dispatch handler (2Factor SMS OTP)
   const handleSendPhoneOtp = async (e?: React.FormEvent, channel: 'sms' | 'voice' = 'sms') => {
-    setOtpChannel(channel);
+    setOtpChannel('sms');
     setRegOtpChannel('phone');
     if (e) e.preventDefault();
     if (submitting.current) return;
@@ -767,7 +767,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       const res = await fetch('/api/auth/send-phone-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ phone: fullPhone, intent: 'register', channel })
+        body: JSON.stringify({ phone: fullPhone, intent: 'register', channel: 'sms' })
       });
       const result = await readApiResponse(res);
       if (!result.ok || result.data?.success !== true) {
@@ -788,7 +788,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       setDeliveryFailureReason(null);
       const msgId = (result.data?.messageId as string) || null;
       setOtpMessageId(msgId);
-      showToast(channel === 'voice' ? 'Placing automated verification call...' : 'Sending SMS verification code...');
+      showToast('Sending SMS verification code...');
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
 
       // Active status polling: queries /api/auth/phone-otp-status every 3.5 seconds
@@ -1057,7 +1057,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   ? 'Reset Password'
                   : mode === 'REGISTER'
                   ? regStep === 'OTP'
-                    ? (regOtpChannel === 'email' ? 'Email Address Verification' : otpChannel === 'voice' ? 'Voice Call Verification' : 'Mobile Phone Verification')
+                    ? (regOtpChannel === 'email' ? 'Email Address Verification' : 'Mobile Phone Verification (SMS)')
                     : 'Create Account'
                   : 'Portal Sign In'}
               </h3>
@@ -1069,8 +1069,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   : mode === 'REGISTER' && regStep === 'OTP'
                   ? (regOtpChannel === 'email'
                       ? 'Enter the 6-digit verification code sent to your email'
-                      : otpChannel === 'voice'
-                      ? 'Listen to the 6-digit code on your incoming call'
                       : 'Enter the 6-digit verification code received via SMS')
                   : 'Live server database authentication'}
               </p>
@@ -1716,22 +1714,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                 <form onSubmit={regOtpChannel === 'email' ? handleVerifyEmailOtpAndRegister : handleVerifyPhoneOtp} className="space-y-4">
                   {/* Active Delivery Channel & Expiry Header */}
                   <div className="flex items-center justify-between pb-0.5">
-                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                      regOtpChannel === 'email'
-                        ? 'bg-amber-50 border-amber-200 text-amber-900'
-                        : otpChannel === 'voice'
-                        ? 'bg-purple-50 border-purple-200 text-purple-900'
-                        : 'bg-amber-50 border-amber-200 text-amber-900'
-                    }`}>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-amber-50 border-amber-200 text-amber-900">
                       {regOtpChannel === 'email' ? (
                         <>
                           <Mail className="w-3.5 h-3.5 text-amber-600" />
                           <span>Email OTP Active</span>
-                        </>
-                      ) : otpChannel === 'voice' ? (
-                        <>
-                          <PhoneCall className="w-3.5 h-3.5 text-purple-600" />
-                          <span>Voice Call Active</span>
                         </>
                       ) : (
                         <>
@@ -1779,15 +1766,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   ) : (() => {
                     const elapsedSec = 60 - phoneCountdown;
                     const getWaitingMessage = () => {
-                      if (otpChannel === 'voice') {
-                        if (elapsedSec < 5) return "Placing automated verification call...";
-                        if (elapsedSec < 15) return "Calling your mobile number. Please answer...";
-                        return "Call active. Listen for your 6-digit verification code.";
-                      }
                       if (elapsedSec < 5) return "Dispatching SMS verification code via 2Factor...";
                       if (elapsedSec < 15) return "SMS request accepted. Waiting for carrier delivery...";
                       if (elapsedSec < 30) return "Carrier dispatch in progress. SMS arrives within 15–30s.";
-                      return "Still waiting? You can resend SMS or receive code via Voice Call.";
+                      return "Still waiting? You can request a new SMS OTP code below.";
                     };
 
                     return (
@@ -1803,12 +1785,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                             {otpDeliveryStatus === 'DELIVERED' ? (
                               <>
                                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                <span>{otpChannel === 'voice' ? 'Automated call dispatched' : 'SMS verification code sent'}</span>
+                                <span>SMS verification code sent</span>
                               </>
                             ) : otpDeliveryStatus === 'FAILED' ? (
                               <>
                                 <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                                <span>Unable to send OTP. Please try again.</span>
+                                <span>Unable to send SMS OTP. Please try again.</span>
                               </>
                             ) : (
                               <>
@@ -1829,42 +1811,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         <div className="text-[11px] leading-relaxed text-left pt-1">
                           {otpDeliveryStatus === 'DELIVERED' ? (
                             <p className="text-emerald-800">
-                              {otpChannel === 'voice'
-                                ? <>Automated voice call placed to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits you hear below:</>
-                                : <>Official verification code dispatched to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits below:</>
-                              }
+                              Official verification code dispatched via SMS to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits below:
                             </p>
                           ) : otpDeliveryStatus === 'FAILED' ? (
                             <div className="flex items-center justify-between gap-2 pt-0.5">
-                              <span className="text-red-700 text-[11px]">{deliveryFailureReason || 'Unable to deliver message to this mobile number.'}</span>
+                              <span className="text-red-700 text-[11px]">{deliveryFailureReason || 'Unable to deliver SMS to this mobile number.'}</span>
                               <button
                                 type="button"
-                                onClick={() => handleSendPhoneOtp(undefined, otpChannel === 'sms' ? 'voice' : 'sms')}
-                                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-[10px] cursor-pointer shrink-0 shadow-xs"
+                                onClick={() => handleSendPhoneOtp(undefined, 'sms')}
+                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] cursor-pointer shrink-0 shadow-xs"
                               >
-                                Try {otpChannel === 'sms' ? 'Voice Call' : 'SMS'}
+                                Retry SMS OTP
                               </button>
                             </div>
                           ) : (
                             <p className="text-amber-800">
-                              {otpChannel === 'voice' ? (
-                                elapsedSec < 5 ? (
-                                  <>Connecting to automated voice dialer for <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
-                                ) : elapsedSec < 15 ? (
-                                  <>Calling <strong className="font-mono text-amber-950">{verifiedPhone}</strong>. Answer incoming call to hear your code.</>
-                                ) : (
-                                  <>Call in progress. Listen carefully to the 6-digit code.</>
-                                )
+                              {elapsedSec < 5 ? (
+                                <>Sending your SMS verification code to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
+                              ) : elapsedSec < 15 ? (
+                                <>Your SMS OTP request has been accepted. Waiting for carrier delivery to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
+                              ) : elapsedSec < 30 ? (
+                                <>Your SMS code is taking longer than expected. Please check your SMS inbox and network.</>
                               ) : (
-                                elapsedSec < 5 ? (
-                                  <>Sending your verification code to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
-                                ) : elapsedSec < 15 ? (
-                                  <>Your OTP request has been accepted. Waiting for carrier delivery to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
-                                ) : elapsedSec < 30 ? (
-                                  <>Your code is taking longer than expected. Please check your SMS inbox and network.</>
-                                ) : (
-                                  <>Still waiting? You can resend your code or receive it via Voice Call below.</>
-                                )
+                                <>Still waiting? You can request a new SMS OTP code below.</>
                               )}
                             </p>
                           )}
@@ -1933,42 +1902,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   ) : (
                     <div className="space-y-1.5 pt-1 text-[11px] text-slate-600">
                       <div className="flex items-center justify-between">
-                        <span>Didn't receive the {otpChannel === 'voice' ? 'voice call' : 'SMS code'}?</span>
+                        <span>Didn't receive the SMS code?</span>
                         {phoneCountdown > 0 ? (
                           <span className="font-mono text-slate-400">Resend in {phoneCountdown}s</span>
                         ) : (
                           <button
                             type="button"
-                            onClick={() => handleSendPhoneOtp(undefined, otpChannel)}
+                            onClick={() => handleSendPhoneOtp(undefined, 'sms')}
                             className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
                           >
                             <RotateCcw className="w-3 h-3" />
-                            <span>Resend {otpChannel === 'voice' ? 'Voice Call' : 'SMS OTP'}</span>
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between pt-0.5">
-                        <span>{otpChannel === 'voice' ? 'Prefer SMS verification?' : 'Having SMS delivery issues?'}</span>
-                        {phoneCountdown > 0 ? (
-                          <span className="font-mono text-slate-400">Voice option in {phoneCountdown}s</span>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={loading}
-                            onClick={() => handleSendPhoneOtp(undefined, otpChannel === 'sms' ? 'voice' : 'sms')}
-                            className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {otpChannel === 'voice' ? (
-                              <>
-                                <MessageSquare className="w-3 h-3 text-amber-600" />
-                                <span>Receive code via SMS</span>
-                              </>
-                            ) : (
-                              <>
-                                <PhoneCall className="w-3 h-3 text-amber-600" />
-                                <span>Receive code via Voice Call</span>
-                              </>
-                            )}
+                            <span>Resend SMS OTP</span>
                           </button>
                         )}
                       </div>

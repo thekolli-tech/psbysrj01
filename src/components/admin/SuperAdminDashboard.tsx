@@ -2571,7 +2571,7 @@ export const SuperAdminDashboard: React.FC = () => {
               className="px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
             >
               <option value="ALL">All Roles</option>
-              <option value="PROPERTY_SEEKER">1. Property Seeker</option>
+              <option value="PROPERTY_SEEKER">1. Property Seeker / NRI / Buyer</option>
               <option value="RERA_AGENT">2. RERA Certified Individual Realtor/CP/Agent</option>
               <option value="RERA_CONSULTANCY">3. RERA Certified Property Consultancy/Firm</option>
               <option value="NON_RERA_BROKER">4. Non-RERA Realtor/Broker/CP</option>

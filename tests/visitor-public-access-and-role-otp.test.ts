@@ -76,7 +76,8 @@ test('1. Role labels in platformRoles.ts have NO explanations (only clean role t
   });
 
   // Verify specific roles match the uploaded screenshot requirements without explanation
-  assert.equal(PLATFORM_ROLES[0].fullLabel, '1. Property Seeker');
+  assert.equal(PLATFORM_ROLES[0].fullLabel, '1. Property Seeker / NRI / Buyer');
+  assert.equal(PLATFORM_ROLES[0].title, 'Property Seeker / NRI / Buyer');
   assert.equal(PLATFORM_ROLES[1].fullLabel, '2. RERA Certified Individual Realter/CP/Agent');
   assert.equal(PLATFORM_ROLES[4].fullLabel, '5. Working Sales Professional');
   assert.equal(PLATFORM_ROLES[5].fullLabel, '6. Reseller');
@@ -290,4 +291,26 @@ test('8. Media and Live Conference views are open to visitors without AuthRequir
     confCode.includes('Please sign in or register to participate in polls'),
     'Conference poll voting must require authentication'
   );
+});
+
+test('9. Mobile OTP verification strictly uses SMS OTP instead of voice call OTP', () => {
+  const loginModalCode = fs.readFileSync(path.resolve('src/components/common/LoginModal.tsx'), 'utf-8');
+  const twoFactorCode = fs.readFileSync(path.resolve('src/server/twoFactorOtp.ts'), 'utf-8');
+  const serverCode = fs.readFileSync(path.resolve('server.ts'), 'utf-8');
+
+  // LoginModal UI must NOT have Voice Call fallback prompts or buttons
+  assert.ok(!loginModalCode.includes('Receive code via Voice Call'), 'Must not offer voice call option in LoginModal');
+  assert.ok(!loginModalCode.includes('Try Voice Call'), 'Must not offer Try Voice Call on failure');
+  assert.ok(!loginModalCode.includes('Voice option in'), 'Must not display Voice option countdown');
+
+  // LoginModal must emphasize SMS OTP Active
+  assert.ok(loginModalCode.includes('SMS OTP Active'), 'Must display SMS OTP Active badge');
+  assert.ok(loginModalCode.includes('Resend SMS OTP'), 'Must provide Resend SMS OTP action');
+
+  // twoFactorOtp.ts must disable voice and route to SMS
+  assert.ok(twoFactorCode.includes('voiceEnabled = false'), 'Voice must be disabled in twoFactorSettings');
+  assert.ok(twoFactorCode.includes("effectiveChannel: 'sms' = 'sms'"), 'sendTwoFactorOtp must enforce SMS delivery');
+
+  // server.ts must strictly route mobile verification to SMS
+  assert.ok(serverCode.includes("const channel: 'sms' = 'sms'"), 'server.ts must enforce SMS channel for send-phone-otp');
 });

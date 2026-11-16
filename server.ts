@@ -1329,10 +1329,10 @@ function phoneOtpUnavailable(res: Response, code: 'WHATSAPP_NOT_CONFIGURED' | 'P
   });
 }
 
-// Send the mobile phone OTP via 2Factor (SMS / Voice Fallback) or WhatsApp.
+// Send the mobile phone OTP via 2Factor (Strictly SMS OTP) or WhatsApp.
 app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
   const phone = normalizeIndianMobile(req.body?.phone);
-  const channel = (req.body?.channel === 'voice' ? 'voice' : 'sms') as 'sms' | 'voice';
+  const channel: 'sms' = 'sms';
   if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
   try {
     if (!phone) {
@@ -1374,15 +1374,15 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
       return;
     }
 
-    // 1. Primary Channel: 2Factor.in SMS (with Voice Call Fallback)
+    // 1. Primary Channel: 2Factor.in SMS OTP (Strict SMS delivery)
     if (use2Factor) {
       const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
-      const twoFactorRes = await sendTwoFactorOtp(phone, channel, otp);
+      const twoFactorRes = await sendTwoFactorOtp(phone, 'sms', otp);
 
       if (!twoFactorRes.success) {
         await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
         res.status(502).json({
-          error: twoFactorRes.error || `Unable to deliver ${channel.toUpperCase()} OTP. Please try again.`,
+          error: twoFactorRes.error || 'Unable to deliver SMS OTP. Please try again.',
           code: 'PHONE_DELIVERY_FAILED'
         });
         return;
@@ -1392,13 +1392,11 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
         success: true,
         status: 'SUBMITTED',
         provider: '2factor',
-        channel,
+        channel: 'sms',
         messageId: twoFactorRes.sessionId || null,
-        message: channel === 'voice'
-          ? 'Voice call dispatched. You will receive an automated call with your verification code shortly.'
-          : 'SMS OTP dispatched to your mobile number.',
+        message: 'SMS OTP dispatched to your mobile number.',
         expiresAt,
-        deliveredVia: channel
+        deliveredVia: 'sms'
       });
       return;
     }
@@ -1443,9 +1441,8 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
   }
 });
 
-// Dedicated Voice OTP trigger endpoint (Outbound Dialing fallback)
+// Dedicated Voice OTP trigger endpoint - routed to SMS per client requirement
 app.post('/api/auth/send-voice-otp', async (req: Request, res: Response): Promise<void> => {
-  req.body = { ...req.body, channel: 'voice' };
   const phone = normalizeIndianMobile(req.body?.phone);
   if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
   try {
@@ -1455,18 +1452,18 @@ app.post('/api/auth/send-voice-otp', async (req: Request, res: Response): Promis
     }
     if (!isTwoFactorConfigured()) {
       res.status(503).json({
-        error: 'Voice OTP fallback is not configured. 2Factor integration required.',
-        code: 'VOICE_NOT_CONFIGURED'
+        error: 'Mobile phone verification is not configured. 2Factor integration required.',
+        code: 'PROVIDER_NOT_CONFIGURED'
       });
       return;
     }
     const { otp, expiresAt } = await generateOtp(phone, 'PHONE_VERIFICATION');
-    const twoFactorRes = await sendTwoFactorOtp(phone, 'voice', otp);
+    const twoFactorRes = await sendTwoFactorOtp(phone, 'sms', otp);
     if (!twoFactorRes.success) {
       await discardUnconsumedOtp(phone, 'PHONE_VERIFICATION');
       res.status(502).json({
-        error: twoFactorRes.error || 'Unable to place automated verification call. Please retry SMS.',
-        code: 'VOICE_DELIVERY_FAILED'
+        error: twoFactorRes.error || 'Unable to deliver SMS verification code. Please retry.',
+        code: 'PHONE_DELIVERY_FAILED'
       });
       return;
     }
@@ -1474,11 +1471,11 @@ app.post('/api/auth/send-voice-otp', async (req: Request, res: Response): Promis
       success: true,
       status: 'SUBMITTED',
       provider: '2factor',
-      channel: 'voice',
+      channel: 'sms',
       messageId: twoFactorRes.sessionId || null,
-      message: 'Automated verification call dispatched. Please answer the incoming call to hear your code.',
+      message: 'SMS OTP dispatched to your mobile number.',
       expiresAt,
-      deliveredVia: 'voice'
+      deliveredVia: 'sms'
     });
   } catch (err: any) {
     if (err instanceof OtpCooldownError || err?.name === 'OtpCooldownError') {
