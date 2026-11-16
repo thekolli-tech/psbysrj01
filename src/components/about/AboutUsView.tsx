@@ -160,13 +160,87 @@ export const AboutUsView: React.FC<AboutUsViewProps> = ({
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] w-full bg-[#F8FAFC] text-slate-800 flex flex-col items-center justify-center px-4 py-8 sm:py-12 overflow-hidden select-none">
+    <div className="relative min-h-[calc(100vh-4rem)] w-full bg-[#F8FAFC] text-slate-800 flex flex-col items-center justify-start md:justify-center px-4 py-4 sm:py-8 md:py-12 select-none">
       {/* Subtle brand ambient lighting */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-[#B49029]/8 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[900px] h-[300px] bg-gradient-to-t from-white via-white/80 to-transparent rounded-t-full border-t border-slate-200/90 pointer-events-none" />
 
-      {/* Main Semicircle Infographic Container */}
-      <div className="relative w-full max-w-4xl mx-auto flex flex-col items-center">
+      {/* 
+        ========================================================================
+        MOBILE DEDICATED ARCHITECTURE VIEW (CLEAN, NEAT & ZERO OVERLAPPING)
+        ========================================================================
+      */}
+      <div className="block md:hidden w-full max-w-md mx-auto space-y-3.5">
+        {/* Mobile Header */}
+        <div className="text-center pt-2 pb-1">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-[10px] font-mono font-bold text-[#B49029] mb-1.5 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-[#B49029]" />
+            <span>PROPERTY STUDIO IDENTITY</span>
+          </div>
+          <h1 className="text-xl font-serif font-black text-[#182A3E] tracking-tight">
+            Six-Node Core Architecture
+          </h1>
+          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+            Tap any core pillar below to explore our leadership, institutional architecture, and mission.
+          </p>
+        </div>
+
+        {/* Central Core Identity Emblem Banner */}
+        <div className="w-full bg-gradient-to-br from-white to-[#FAF6EB] border border-[#B49029]/30 rounded-2xl p-3.5 shadow-xs flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-white border border-[#B49029]/50 shadow-xs flex items-center justify-center shrink-0">
+            <Sparkles className="w-6 h-6 text-[#B49029]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-serif font-black text-sm text-[#182A3E]">PROPERTY STUDIO</div>
+            <div className="font-mono text-[9px] font-bold text-[#B49029] uppercase tracking-wider">CORE IDENTITY ARCHITECTURE</div>
+            <div className="text-[11px] text-slate-500 truncate mt-0.5">Six Interconnected Institutional Pillars</div>
+          </div>
+        </div>
+
+        {/* 2-Column Responsive Card Grid */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {NODES.map((node) => {
+            const Icon = node.icon;
+            const isSelected = activeNode === node.id;
+            return (
+              <button
+                key={`mobile-${node.id}`}
+                type="button"
+                onClick={() => setActiveNode(node.id)}
+                className={`bg-white border rounded-2xl p-3 text-left transition-all duration-150 active:scale-[0.98] shadow-xs flex flex-col justify-between cursor-pointer group ${
+                  isSelected ? 'border-[#B49029] ring-2 ring-[#B49029]/20' : 'border-slate-200 hover:border-[#B49029]'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="w-6 h-6 rounded-lg bg-amber-50 text-[#B49029] border border-amber-200/60 font-mono font-black text-[11px] flex items-center justify-center shadow-2xs">
+                      {node.number}
+                    </span>
+                    <Icon className="w-4 h-4 text-slate-400 group-hover:text-[#B49029] transition-colors" />
+                  </div>
+                  <h3 className="font-serif font-bold text-xs text-[#182A3E] group-hover:text-[#B49029] transition-colors leading-snug">
+                    {node.title}
+                  </h3>
+                  <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
+                    {node.subtitle}
+                  </p>
+                </div>
+                <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-semibold text-[#B49029]">
+                  <span>Explore</span>
+                  <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 
+        ========================================================================
+        DESKTOP SEMICIRCLE INFOGRAPHIC (VIEWPORTS MD AND ABOVE)
+        ========================================================================
+      */}
+      <div className="hidden md:flex relative w-full max-w-4xl mx-auto flex-col items-center">
         {/* Top Instruction Pill */}
         <div className="mb-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-[#B49029]/40 text-xs font-mono text-[#B49029] shadow-xs">
           <span className="w-2 h-2 rounded-full bg-[#B49029] animate-pulse" />

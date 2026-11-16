@@ -258,6 +258,7 @@ const AppContent: React.FC = () => {
             {activeView === 'TESTIMONIALS' && (
               <PSTestimonialsView />
             )}
+            {/* About Us view routing */}
             {activeView === 'ABOUT' && (
               <AboutUsView
                 onNavigateHome={() => setActiveView('HOME')}
