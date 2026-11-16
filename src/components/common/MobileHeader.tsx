@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ViewType } from '../../types';
 import { BrandLogo } from './BrandLogo';
+import { MobileSocialSection } from './MobileSocialSection';
 import { getSafeAvatar, DEFAULT_AVATAR } from '../../shared/avatar';
 import { linkedEndUserNavigation, roleUtilityDestinations } from '../../shared/endUserNavigation';
 import { isPlatformAdmin, isPropertySeeker } from '../../shared/policy';
@@ -407,6 +408,9 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Dedicated Official Social Media Section inside Mobile Drawer */}
+            <MobileSocialSection />
 
             {/* Support Desk trigger inside mobile drawer */}
             {onOpenSupport && (

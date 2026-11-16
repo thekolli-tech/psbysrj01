@@ -316,20 +316,30 @@ test('10. Mobile top header is properly aligned without clipped elements', () =>
   assert.ok(topNavCode.includes('shrink-0'), 'Header controls must prevent shrinkage/overflow');
 });
 
-test('11. Platform footer is rendered for both authenticated and visitor layouts with mobile bottom nav spacing', () => {
+test('11. Footer is completely removed from page layouts and social media section is dedicated in mobile menu', () => {
   const authLayoutCode = fs.readFileSync(path.resolve('src/components/authenticated/AuthenticatedAppLayout.tsx'), 'utf-8');
   const appCode = fs.readFileSync(path.resolve('src/App.tsx'), 'utf-8');
-  const footerCode = fs.readFileSync(path.resolve('src/components/common/PlatformFooter.tsx'), 'utf-8');
+  const mobileHeaderCode = fs.readFileSync(path.resolve('src/components/common/MobileHeader.tsx'), 'utf-8');
+  const socialSectionCode = fs.readFileSync(path.resolve('src/components/common/MobileSocialSection.tsx'), 'utf-8');
 
-  // Footer must be included in AuthenticatedAppLayout
-  assert.ok(authLayoutCode.includes('<PlatformFooter'), 'AuthenticatedAppLayout must include PlatformFooter');
-  assert.ok(authLayoutCode.includes('hasBottomNav={true}'), 'Authenticated layout must configure bottom nav offset');
+  // Footer must NOT be rendered in page layouts
+  assert.ok(!authLayoutCode.includes('<PlatformFooter'), 'Footer must not be rendered in AuthenticatedAppLayout');
+  assert.ok(!authLayoutCode.includes('<footer'), 'No <footer> in AuthenticatedAppLayout');
+  assert.ok(!appCode.includes('<PlatformFooter'), 'Footer must not be rendered in App.tsx');
+  assert.ok(!appCode.includes('<footer'), 'No <footer> in App.tsx');
 
-  // Footer must be included in App.tsx
-  assert.ok(appCode.includes('<PlatformFooter'), 'App.tsx must include PlatformFooter');
+  // Mobile menu drawers must have dedicated MobileSocialSection
+  assert.ok(authLayoutCode.includes('<MobileSocialSection'), 'Authenticated mobile drawer must include MobileSocialSection');
+  assert.ok(mobileHeaderCode.includes('<MobileSocialSection'), 'Visitor mobile drawer must include MobileSocialSection');
 
-  // PlatformFooter must have padding-bottom offset for mobile bottom navigation bar
-  assert.ok(footerCode.includes("hasBottomNav ? 'pb-24 lg:pb-6' : 'pb-6'"), 'Footer must offset for mobile bottom bar');
-  assert.ok(footerCode.includes('COMPANY_CONTACT_DISPLAY'), 'Footer must display official secretariat phone');
-  assert.ok(footerCode.includes('info@propertystudio.org'), 'Footer must display secretariat email');
+  // MobileSocialSection must include all 6 official social media links
+  assert.ok(socialSectionCode.includes('OFFICIAL SOCIAL MEDIA'), 'Must have official social media heading');
+  assert.ok(socialSectionCode.includes('WhatsApp Channel'), 'Must include WhatsApp Channel');
+  assert.ok(socialSectionCode.includes('YouTube Studio'), 'Must include YouTube Studio');
+  assert.ok(socialSectionCode.includes('Instagram'), 'Must include Instagram');
+  assert.ok(socialSectionCode.includes('LinkedIn Network'), 'Must include LinkedIn Network');
+  assert.ok(socialSectionCode.includes('Facebook Page'), 'Must include Facebook Page');
+  assert.ok(socialSectionCode.includes('Twitter / X'), 'Must include Twitter / X');
+  assert.ok(socialSectionCode.includes('COMPANY_CONTACT_DISPLAY'), 'Must include official call number');
+  assert.ok(socialSectionCode.includes('info@propertystudio.org'), 'Must include secretariat email');
 });

@@ -11,7 +11,7 @@ import { TrendingDiscussions } from './TrendingDiscussions';
 import { UpcomingLiveSessions } from './UpcomingLiveSessions';
 import { ProfessionalRecommendations } from './ProfessionalRecommendations';
 import { UniversalSearchModal } from '../common/UniversalSearchModal';
-import { PlatformFooter } from '../common/PlatformFooter';
+import { MobileSocialSection } from '../common/MobileSocialSection';
 import { CommunityPost } from '../../types';
 import { X, LifeBuoy } from 'lucide-react';
 
@@ -142,7 +142,7 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
       />
 
       {/* 2. Main Three-Column Application Container (Full horizontal space utilization) */}
-      <main className="flex-1 mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-4 sm:py-6 w-full max-w-[1920px]">
+      <main className="flex-1 mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-3 sm:pt-6 pb-24 lg:pb-8 w-full max-w-[1920px]">
         <div className="flex items-start justify-between gap-6 xl:gap-8 w-full">
           {/* Left Navigation Sidebar (Desktop sticky / collapsible; hidden in full-width Admin Console) */}
           {activeView !== 'ADMIN' && (
@@ -234,17 +234,7 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
         </div>
       </main>
 
-      {/* 3. Official Platform Footer (Visible on both mobile & desktop with bottom nav offset) */}
-      <PlatformFooter
-        onNavigateView={view => {
-          setActiveView(view);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenSupport={onOpenSupport || (() => setActiveView('CHAT'))}
-        hasBottomNav={true}
-      />
-
-      {/* 4. Mobile Navigation Bottom Bar */}
+      {/* 3. Mobile Navigation Bottom Bar */}
       <MobileNavigation
         activeItem={activeNav}
         onSelectNav={handleNavSelect}
@@ -254,7 +244,7 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
         }}
       />
 
-      {/* 4. Mobile Off-Canvas Drawer for Left Sidebar */}
+      {/* 4. Mobile Off-Canvas Drawer for Left Sidebar & Official Social Media */}
       {mobileSidebarOpen && (
         <div
           role="dialog"
@@ -264,7 +254,7 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="w-72 max-w-[85%] bg-white h-full p-4 overflow-y-auto shadow-2xl animate-in slide-in-from-left duration-200 flex flex-col justify-between"
+            className="w-72 max-w-[85%] bg-white h-full p-4 overflow-y-auto shadow-2xl animate-in slide-in-from-left duration-200 flex flex-col justify-between gap-4"
           >
             <div>
               <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
@@ -290,10 +280,13 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
                   setMobileSidebarOpen(false);
                 }}
               />
+
+              {/* Dedicated Official Social Media Section inside Mobile Menu Drawer */}
+              <MobileSocialSection className="mt-3" />
             </div>
 
             {/* Mobile Drawer Footer: Support Desk */}
-            <div className="pt-4 mt-4 border-t border-slate-100 space-y-2 text-xs">
+            <div className="pt-3 border-t border-slate-100 space-y-2 text-xs shrink-0">
               <button
                 type="button"
                 onClick={() => {

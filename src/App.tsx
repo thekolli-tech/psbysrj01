@@ -12,7 +12,6 @@ import { HomeHero } from './components/home/HomeHero';
 import { PropertyList } from './components/properties/PropertyList';
 import { SupportDeskButton } from './components/support/SupportDeskButton';
 import { CinematicIntro } from './components/common/CinematicIntro';
-import { PlatformFooter } from './components/common/PlatformFooter';
 import { canAccessProfessionalSurface, isPropertySeeker } from './shared/policy';
 import { COMPANY_CONTACT_DISPLAY, COMPANY_CONTACT_TEL, COMPANY_SUPPORT_WHATSAPP } from './shared/companyContact';
 import { linkedEndUserNavigation, roleUtilityDestinations } from './shared/endUserNavigation';
@@ -605,21 +604,6 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Mobile navigation is integrated directly into the sticky top MobileHeader drawer */}
-
-      {/* Production Footer (Compact & Stylish Layout) */}
-      {!isLoggedIn && (
-        <PlatformFooter
-          onNavigateView={view => {
-            setActiveView(view);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          onOpenSupport={() => setSupportOpen(true)}
-          onReplayIntro={() => {
-            setReplayIntro(true);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        />
-      )}
 
       {/* Official Property Studio Support Desk Drawer & Floating Button */}
       <SupportDeskButton
