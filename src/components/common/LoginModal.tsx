@@ -1044,8 +1044,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const handleVerifyWhatsAppOtp = handleVerifyPhoneOtp;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-white text-[#111111] rounded-2xl sm:rounded-3xl shadow-2xl border border-[#E8E8E3] w-full max-w-lg md:max-w-xl max-h-[96dvh] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-white text-[#111111] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-[#E8E8E3] w-full max-w-lg md:max-w-xl max-h-[92dvh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
+        {/* Mobile Drag Indicator Bar */}
+        <div className="w-10 h-1 bg-slate-400/40 rounded-full mx-auto my-2 block sm:hidden shrink-0" />
         {/* Modal Header */}
         <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[#001428] flex items-center justify-between bg-[#001C38] text-white shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -1337,7 +1339,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       value={emailInput}
                       onChange={e => setEmailInput(e.target.value)}
                       placeholder="e.g. admin@propertystudio.org"
-                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                       required
                     />
                   </div>
@@ -1364,13 +1366,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         value={passwordInput}
                         onChange={e => setPasswordInput(e.target.value)}
                         placeholder="••••••••••••"
-                        className="w-full px-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10"
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -1392,7 +1394,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold text-sm sm:text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     <span>{loading ? 'Authenticating...' : 'Sign In to Account'}</span>
                     <ArrowRight className="w-4 h-4" />
@@ -1424,7 +1426,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       value={nameInput}
                       onChange={e => setNameInput(e.target.value)}
                       placeholder="e.g. Suresh Chandra"
-                      className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                      className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
                       required
                     />
                   </div>
@@ -1439,7 +1441,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       value={emailInput}
                       onChange={e => setEmailInput(e.target.value)}
                       placeholder="admin@propertystudio.org"
-                      className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                      className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
                       required
                     />
                   </div>
@@ -1460,7 +1462,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                           setRegOtpChannel('phone');
                         }
                       }}
-                      className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-900 font-medium cursor-pointer"
+                      className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-slate-900 font-medium cursor-pointer"
                     >
                       {PLATFORM_ROLES.map(r => (
                         <option key={r.roleKey} value={r.roleKey}>
@@ -1482,7 +1484,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         value={phoneInput}
                         onChange={e => setPhoneInput(e.target.value)}
                         placeholder="e.g. +91 98490 12345"
-                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
                         required={roleInput !== 'PROPERTY_SEEKER'}
                       />
                     </div>
@@ -1495,7 +1497,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         value={organizationInput}
                         onChange={e => setOrganizationInput(e.target.value)}
                         placeholder="Firm or organization"
-                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
                       />
                     </div>
                   </div>
@@ -1514,7 +1516,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         value={professionInput}
                         onChange={e => setProfessionInput(e.target.value)}
                         placeholder="Enter your profession"
-                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
                         required
                       />
                     </div>
@@ -1527,7 +1529,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         value={companyInput}
                         onChange={e => setCompanyInput(e.target.value)}
                         placeholder="e.g. Studio Arc / Firm"
-                        className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
+                        className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 font-medium"
                       />
                     </div>
                   </div>
@@ -1542,7 +1544,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         Personalizes your Community Q&A
                       </span>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-xl bg-slate-50/50">
+                    <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-xl bg-slate-50/50 max-h-24 sm:max-h-none overflow-y-auto pr-1">
                       {[
                         'Kokapet & Neopolis',
                         'High-Rise Construction',
@@ -1600,7 +1602,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         readOnly
                         aria-readonly="true"
                         tabIndex={-1}
-                        className="w-full pl-9 pr-9 py-2 text-xs border border-slate-200 rounded-xl bg-slate-100/90 text-slate-800 font-semibold cursor-not-allowed select-none focus:outline-none"
+                        className="w-full pl-9 pr-9 py-2.5 text-base sm:text-xs border border-slate-200 rounded-xl bg-slate-100/90 text-slate-800 font-semibold cursor-not-allowed select-none focus:outline-none"
                       />
                       <Lock className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
@@ -1621,7 +1623,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                           value={passwordInput}
                           onChange={e => setPasswordInput(e.target.value)}
                           placeholder="••••••••••••"
-                          className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-9 text-slate-900 font-medium"
+                          className="w-full px-3.5 py-2.5 text-base sm:text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 pr-9 text-slate-900 font-medium"
                           required
                         />
                         <button
@@ -1643,7 +1645,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                           value={confirmPasswordInput}
                           onChange={e => setConfirmPasswordInput(e.target.value)}
                           placeholder="Re-enter your password"
-                          className={`w-full px-3.5 py-2 text-xs border rounded-xl focus:outline-none focus:ring-2 pr-9 text-slate-900 font-medium ${
+                          className={`w-full px-3.5 py-2.5 text-base sm:text-xs border rounded-xl focus:outline-none focus:ring-2 pr-9 text-slate-900 font-medium ${
                             confirmPasswordInput && confirmPasswordInput !== passwordInput
                               ? 'border-red-400 focus:ring-red-400 bg-red-50/40 text-red-900'
                               : 'border-slate-300 focus:ring-amber-500'
@@ -1694,7 +1696,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
+                    className="w-full py-3.5 sm:py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-sm sm:text-xs"
                   >
                     {loading ? (
                       <>
@@ -1765,15 +1767,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </div>
                   ) : (() => {
                     const elapsedSec = 60 - phoneCountdown;
-                    const getWaitingMessage = () => {
-                      if (elapsedSec < 5) return "Dispatching SMS verification code via 2Factor...";
-                      if (elapsedSec < 15) return "SMS request accepted. Waiting for carrier delivery...";
-                      if (elapsedSec < 30) return "Carrier dispatch in progress. SMS arrives within 15–30s.";
-                      return "Still waiting? You can request a new SMS OTP code below.";
+                    const getWaitingHeader = () => {
+                      if (otpDeliveryStatus === 'DELIVERED') return "SMS verification code sent";
+                      if (otpDeliveryStatus === 'FAILED') return "Unable to deliver SMS OTP";
+                      if (elapsedSec < 5) return "Dispatching SMS verification code...";
+                      if (elapsedSec < 15) return "Waiting for carrier SMS delivery...";
+                      if (elapsedSec < 30) return "SMS in transit via telecom carrier...";
+                      return "SMS carrier delivery in progress";
                     };
 
                     return (
-                      <div className={`rounded-2xl p-3 text-center space-y-1 border transition-all ${
+                      <div className={`rounded-2xl p-3 text-center space-y-1.5 border transition-all ${
                         otpDeliveryStatus === 'DELIVERED'
                           ? 'bg-emerald-50/90 border-emerald-200/90 text-emerald-950'
                           : otpDeliveryStatus === 'FAILED'
@@ -1795,7 +1799,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                             ) : (
                               <>
                                 <Loader2 className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
-                                <span>{getWaitingMessage()}</span>
+                                <span>{getWaitingHeader()}</span>
                               </>
                             )}
                           </span>
@@ -1808,7 +1812,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                           </button>
                         </div>
 
-                        <div className="text-[11px] leading-relaxed text-left pt-1">
+                        <div className="text-[11px] leading-relaxed text-left pt-0.5">
                           {otpDeliveryStatus === 'DELIVERED' ? (
                             <p className="text-emerald-800">
                               Official verification code dispatched via SMS to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits below:
@@ -1831,9 +1835,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                               ) : elapsedSec < 15 ? (
                                 <>Your SMS OTP request has been accepted. Waiting for carrier delivery to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
                               ) : elapsedSec < 30 ? (
-                                <>Your SMS code is taking longer than expected. Please check your SMS inbox and network.</>
+                                <>Your SMS code is in transit. Please check your SMS inbox and network coverage.</>
                               ) : (
-                                <>Still waiting? You can request a new SMS OTP code below.</>
+                                <>If the SMS has not arrived yet, you can request a new code using the resend option below.</>
                               )}
                             </p>
                           )}
@@ -1860,7 +1864,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <label className="block font-bold text-slate-700 text-center mb-2 text-xs">
                       {regOtpChannel === 'email' ? 'Enter 6-Digit Email Verification Code' : 'Enter 6-Digit Mobile Verification Code'}
                     </label>
-                    <div className="flex justify-center gap-1.5 sm:gap-2.5">
+                    <div className="flex justify-center gap-2 sm:gap-2.5">
                       {otpDigits.map((digit, idx) => (
                         <input
                           key={idx}
@@ -1873,7 +1877,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                           onChange={e => handleOtpDigitChange(idx, e.target.value)}
                           onKeyDown={e => handleOtpDigitKeyDown(idx, e)}
                           onPaste={handleOtpPaste}
-                          className="w-9 h-11 sm:w-11 sm:h-12 text-center text-lg sm:text-xl font-mono font-bold border-2 rounded-xl border-slate-300 focus:border-[#B49029] focus:ring-2 focus:ring-[#B49029]/20 focus:outline-none transition-all bg-white shrink-0"
+                          className="w-10 h-12 sm:w-11 sm:h-12 text-center text-xl sm:text-2xl font-mono font-bold border-2 rounded-xl border-slate-300 focus:border-[#B49029] focus:ring-2 focus:ring-[#B49029]/20 focus:outline-none transition-all bg-white shrink-0 shadow-xs"
                           autoFocus={idx === 0}
                         />
                       ))}
@@ -1919,7 +1923,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 pt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -1927,7 +1931,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         setRegStep('FORM');
                         setErrorMsg(null);
                       }}
-                      className="px-3.5 py-3 border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                      className="w-full sm:w-auto px-4 py-3 border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors active:scale-[0.98]"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
                       <span>Edit Details</span>
@@ -1935,7 +1939,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <button
                       type="submit"
                       disabled={loading || otpDigits.join('').length !== 6 || otpExpiryCountdown <= 0}
-                      className="flex-1 py-3 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer text-xs sm:text-sm"
+                      className="w-full sm:flex-1 py-3.5 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed cursor-pointer text-xs sm:text-sm"
                     >
                       <CheckCircle2 className="w-4 h-4 text-white" />
                       <span>{loading ? 'Verifying Code...' : 'Verify Code & Launch Platform'}</span>
@@ -1949,12 +1953,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Modal Footer Bar */}
-        <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-[#E8E4D8] flex items-center justify-between text-xs text-slate-500 shrink-0">
-          <span>Official Secretariat: info@propertystudio.org</span>
+        <div className="p-3 sm:p-4 bg-slate-50 border-t border-[#E8E4D8] flex items-center justify-between text-xs text-slate-500 shrink-0">
+          <span className="truncate max-w-[200px] sm:max-w-none">Secretariat: info@propertystudio.org</span>
           <button
             type="button"
             onClick={onClose}
-            className="font-bold text-[#030508] hover:text-[#B49029] cursor-pointer"
+            className="font-bold text-[#030508] hover:text-[#B49029] cursor-pointer shrink-0 ml-2"
           >
             Close
           </button>
