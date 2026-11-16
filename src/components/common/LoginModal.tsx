@@ -1409,8 +1409,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
                     <span>
                       {roleInput === 'PROPERTY_SEEKER'
-                        ? 'Email verification is required for Property Seeker registration. A 6-digit code will be sent to your email.'
-                        : 'Mobile phone verification is required. 2Factor SMS is dispatched by default with Voice Call fallback.'}
+                        ? 'Email verification is required for Property Seeker / NRI / Buyer registration. A 6-digit code will be sent to your email.'
+                        : 'Mobile phone verification is required. 2Factor SMS verification code will be sent to your mobile number.'}
                     </span>
                   </div>
 
@@ -1703,7 +1703,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       </>
                     ) : (
                       <>
-                        <span>{roleInput === 'PROPERTY_SEEKER' ? 'Create Verified Account (Email OTP)' : 'Create Verified Account (Mobile OTP)'}</span>
+                        <span>{roleInput === 'PROPERTY_SEEKER' ? 'Create Verified Account (Email OTP)' : 'Create Verified Account (Mobile SMS OTP)'}</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
