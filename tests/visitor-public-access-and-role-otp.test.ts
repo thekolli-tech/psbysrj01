@@ -303,3 +303,33 @@ test('9. Mobile OTP verification features incoming phone call ringing animation'
   assert.ok(loginModalCode.includes('animate-bounce'), 'Must include ringing bounce animation');
   assert.ok(loginModalCode.includes('animate-ping'), 'Must include concentric ripple ping animation');
 });
+
+test('10. Mobile top header is properly aligned without clipped elements', () => {
+  const topNavCode = fs.readFileSync(path.resolve('src/components/authenticated/TopNavigation.tsx'), 'utf-8');
+
+  // Search input on desktop must be hidden on mobile to avoid pushing controls off-screen
+  assert.ok(topNavCode.includes('hidden md:flex flex-1 max-w-2xl'), 'Desktop search pill must be hidden on mobile');
+  assert.ok(topNavCode.includes('md:hidden p-1.5 text-slate-600'), 'Mobile search trigger must be rendered on mobile');
+
+  // Wallet, bell, and avatar must have shrink-0 and compact styling
+  assert.ok(topNavCode.includes('Wallet Balance & Top Up'), 'Wallet balance button must be present');
+  assert.ok(topNavCode.includes('shrink-0'), 'Header controls must prevent shrinkage/overflow');
+});
+
+test('11. Platform footer is rendered for both authenticated and visitor layouts with mobile bottom nav spacing', () => {
+  const authLayoutCode = fs.readFileSync(path.resolve('src/components/authenticated/AuthenticatedAppLayout.tsx'), 'utf-8');
+  const appCode = fs.readFileSync(path.resolve('src/App.tsx'), 'utf-8');
+  const footerCode = fs.readFileSync(path.resolve('src/components/common/PlatformFooter.tsx'), 'utf-8');
+
+  // Footer must be included in AuthenticatedAppLayout
+  assert.ok(authLayoutCode.includes('<PlatformFooter'), 'AuthenticatedAppLayout must include PlatformFooter');
+  assert.ok(authLayoutCode.includes('hasBottomNav={true}'), 'Authenticated layout must configure bottom nav offset');
+
+  // Footer must be included in App.tsx
+  assert.ok(appCode.includes('<PlatformFooter'), 'App.tsx must include PlatformFooter');
+
+  // PlatformFooter must have padding-bottom offset for mobile bottom navigation bar
+  assert.ok(footerCode.includes("hasBottomNav ? 'pb-24 lg:pb-6' : 'pb-6'"), 'Footer must offset for mobile bottom bar');
+  assert.ok(footerCode.includes('COMPANY_CONTACT_DISPLAY'), 'Footer must display official secretariat phone');
+  assert.ok(footerCode.includes('info@propertystudio.org'), 'Footer must display secretariat email');
+});

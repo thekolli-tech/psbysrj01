@@ -11,6 +11,7 @@ import { TrendingDiscussions } from './TrendingDiscussions';
 import { UpcomingLiveSessions } from './UpcomingLiveSessions';
 import { ProfessionalRecommendations } from './ProfessionalRecommendations';
 import { UniversalSearchModal } from '../common/UniversalSearchModal';
+import { PlatformFooter } from '../common/PlatformFooter';
 import { CommunityPost } from '../../types';
 import { X, LifeBuoy } from 'lucide-react';
 
@@ -233,7 +234,17 @@ export const AuthenticatedAppLayout: React.FC<AuthenticatedAppLayoutProps> = ({
         </div>
       </main>
 
-      {/* 3. Mobile Navigation Bottom Bar */}
+      {/* 3. Official Platform Footer (Visible on both mobile & desktop with bottom nav offset) */}
+      <PlatformFooter
+        onNavigateView={view => {
+          setActiveView(view);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenSupport={onOpenSupport || (() => setActiveView('CHAT'))}
+        hasBottomNav={true}
+      />
+
+      {/* 4. Mobile Navigation Bottom Bar */}
       <MobileNavigation
         activeItem={activeNav}
         onSelectNav={handleNavSelect}

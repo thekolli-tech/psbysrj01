@@ -80,9 +80,9 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs select-none">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sm:gap-6">
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-6">
         {/* Left: Mobile Menu Toggle + Amber PS Badge & Property Studio Brand */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {onToggleMobileMenu && (
             <button
               type="button"
@@ -99,12 +99,12 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
             className="flex items-center cursor-pointer group"
             title="Property Studio Home"
           >
-            <BrandLogo variant="compact" size="sm" className="h-10 w-auto object-contain" />
+            <BrandLogo variant="compact" size="sm" className="h-8 sm:h-10 w-auto object-contain" />
           </div>
         </div>
 
-        {/* Center: Global Search Pill Bar Matching PDF Pages 7-25 */}
-        <div className="flex-1 max-w-2xl px-2 sm:px-4">
+        {/* Center: Global Search Pill Bar (Desktop & Tablets) */}
+        <div className="hidden md:flex flex-1 max-w-2xl px-2 sm:px-4">
           <div
             onClick={onOpenSearch}
             className="group relative flex items-center w-full bg-slate-100/90 hover:bg-slate-100 rounded-full px-4 py-2 border border-slate-200/80 hover:border-slate-300 transition-all cursor-pointer shadow-inner"
@@ -120,9 +120,20 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
           </div>
         </div>
 
-        {/* Right: City Selector | Wallet ₹ [BAL] + | Notifications | User Avatar */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* City Selector */}
+        {/* Right: Search (Mobile) | City Selector | Wallet ₹ [BAL] + | Notifications | User Avatar */}
+        <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+          {/* Mobile Search Icon Trigger */}
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            className="md:hidden p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0"
+            title="Search projects, communities, questions..."
+            aria-label="Search"
+          >
+            <Search className="w-4 h-4 text-[#B49029]" />
+          </button>
+
+          {/* City Selector (Desktop) */}
           <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-bold text-slate-700">
             <MapPin className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
             <select
@@ -147,7 +158,7 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </div>
 
-          {/* About Us Navigation Button */}
+          {/* About Us Navigation Button (Desktop) */}
           {onNavigateAbout && (
             <button
               type="button"
@@ -169,30 +180,30 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
           <button
             type="button"
             onClick={onOpenWallet}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[#B49029] text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[#B49029] text-xs font-bold transition-colors cursor-pointer shadow-2xs shrink-0"
             title="Wallet Balance & Top Up"
           >
             <Wallet className="w-3.5 h-3.5 text-[#B49029] shrink-0" />
-            <span className="font-mono">
+            <span className="font-mono text-[11px] sm:text-xs">
               ₹ {currentUser.walletBalance?.toLocaleString('en-IN') ?? '0'}
             </span>
-            <span className="text-[11px] font-black text-amber-700">+</span>
+            <span className="text-[10px] sm:text-[11px] font-black text-amber-700 hidden min-[400px]:inline">+</span>
           </button>
 
           {/* Notifications Bell */}
-          <div ref={notificationsRef} className="relative">
+          <div ref={notificationsRef} className="relative shrink-0">
             <button
               type="button"
               onClick={() => {
                 setNotificationsOpen(!notificationsOpen);
                 setProfileOpen(false);
               }}
-              className="relative p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+              className="relative p-1.5 sm:p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors cursor-pointer shrink-0"
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#B49029] rounded-full ring-2 ring-white" />
+                <span className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 w-2 h-2 bg-[#B49029] rounded-full ring-2 ring-white" />
               )}
             </button>
 
@@ -205,14 +216,14 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
           </div>
 
           {/* User Profile Avatar Circle (Initial or image) */}
-          <div ref={profileRef} className="relative">
+          <div ref={profileRef} className="relative shrink-0">
             <button
               type="button"
               onClick={() => {
                 setProfileOpen(!profileOpen);
                 setNotificationsOpen(false);
               }}
-              className="w-9 h-9 rounded-full bg-[#182A3E] text-white flex items-center justify-center font-bold text-xs hover:ring-2 hover:ring-[#B49029] transition-all cursor-pointer shadow-xs overflow-hidden"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#182A3E] text-white flex items-center justify-center font-bold text-xs hover:ring-2 hover:ring-[#B49029] transition-all cursor-pointer shadow-xs overflow-hidden shrink-0"
               title={`${currentUser.name} (${currentUser.role})`}
             >
               {currentUser.avatar ? (

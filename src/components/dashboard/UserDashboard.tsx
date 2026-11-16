@@ -782,21 +782,21 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
     <div className="space-y-4">
         {/* View Mode Switcher Header Pill */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-1.5 shadow-2xs flex items-center justify-between">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => {
                 setDashboardViewMode('FEED');
                 setActiveNav('HOME');
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 dashboardViewMode === 'FEED'
                   ? 'bg-[#182A3E] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
-              <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
-              <span>Community Discussions</span>
+              <MessageSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">Community Discussions</span>
             </button>
 
             <button
@@ -805,18 +805,18 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
                 setDashboardViewMode('WORKSPACE');
                 setActiveNav(activeTab === 'SETTINGS' ? 'MY_PROFILE' : activeTab === 'REQUIREMENTS' ? 'MY_ENQUIRIES' : 'MY_PROFILE');
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`flex-1 sm:flex-initial px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 dashboardViewMode === 'WORKSPACE'
                   ? 'bg-[#182A3E] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
-              <Briefcase className="w-3.5 h-3.5 text-amber-500" />
-              <span>My Workspace & Enquiries</span>
+              <Briefcase className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span className="truncate">My Workspace & Enquiries</span>
             </button>
           </div>
 
-          <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline px-3">
+          <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline px-3 shrink-0">
             {dashboardViewMode === 'FEED' ? 'Real-Time Intelligence Network' : 'Personal Dashboard'}
           </span>
         </div>
