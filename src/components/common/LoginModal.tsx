@@ -789,7 +789,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       setDeliveryFailureReason(null);
       const msgId = (result.data?.messageId as string) || null;
       setOtpMessageId(msgId);
-      showToast('Sending SMS verification code...');
+      showToast('Automated verification call dispatched...');
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
 
       // Active status polling: queries /api/auth/phone-otp-status every 3.5 seconds
