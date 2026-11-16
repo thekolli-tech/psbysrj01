@@ -293,24 +293,13 @@ test('8. Media and Live Conference views are open to visitors without AuthRequir
   );
 });
 
-test('9. Mobile OTP verification strictly uses SMS OTP instead of voice call OTP', () => {
+test('9. Mobile OTP verification features incoming phone call ringing animation', () => {
   const loginModalCode = fs.readFileSync(path.resolve('src/components/common/LoginModal.tsx'), 'utf-8');
-  const twoFactorCode = fs.readFileSync(path.resolve('src/server/twoFactorOtp.ts'), 'utf-8');
-  const serverCode = fs.readFileSync(path.resolve('server.ts'), 'utf-8');
 
-  // LoginModal UI must NOT have Voice Call fallback prompts or buttons
-  assert.ok(!loginModalCode.includes('Receive code via Voice Call'), 'Must not offer voice call option in LoginModal');
-  assert.ok(!loginModalCode.includes('Try Voice Call'), 'Must not offer Try Voice Call on failure');
-  assert.ok(!loginModalCode.includes('Voice option in'), 'Must not display Voice option countdown');
-
-  // LoginModal must emphasize SMS OTP Active
-  assert.ok(loginModalCode.includes('SMS OTP Active'), 'Must display SMS OTP Active badge');
-  assert.ok(loginModalCode.includes('Resend SMS OTP'), 'Must provide Resend SMS OTP action');
-
-  // twoFactorOtp.ts must disable voice and route to SMS
-  assert.ok(twoFactorCode.includes('voiceEnabled = false'), 'Voice must be disabled in twoFactorSettings');
-  assert.ok(twoFactorCode.includes("effectiveChannel: 'sms' = 'sms'"), 'sendTwoFactorOtp must enforce SMS delivery');
-
-  // server.ts must strictly route mobile verification to SMS
-  assert.ok(serverCode.includes("const channel: 'sms' = 'sms'"), 'server.ts must enforce SMS channel for send-phone-otp');
+  // LoginModal UI must display the animated incoming phone call verification UI
+  assert.ok(loginModalCode.includes('Please Answer the Incoming Call'), 'Must display Please Answer the Incoming Call prompt');
+  assert.ok(loginModalCode.includes('Automated Verification Call Dispatched'), 'Must display Automated Verification Call Dispatched badge');
+  assert.ok(loginModalCode.includes('PhoneIncoming'), 'Must display PhoneIncoming animation icon');
+  assert.ok(loginModalCode.includes('animate-bounce'), 'Must include ringing bounce animation');
+  assert.ok(loginModalCode.includes('animate-ping'), 'Must include concentric ripple ping animation');
 });

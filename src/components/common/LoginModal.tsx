@@ -25,6 +25,7 @@ import {
   Lock,
   MessageSquare,
   PhoneCall,
+  PhoneIncoming,
   Sparkles,
   Loader2
 } from 'lucide-react';
@@ -1059,7 +1060,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   ? 'Reset Password'
                   : mode === 'REGISTER'
                   ? regStep === 'OTP'
-                    ? (regOtpChannel === 'email' ? 'Email Address Verification' : 'Mobile Phone Verification (SMS)')
+                    ? (regOtpChannel === 'email' ? 'Email Address Verification' : 'Phone Call Verification')
                     : 'Create Account'
                   : 'Portal Sign In'}
               </h3>
@@ -1071,7 +1072,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   : mode === 'REGISTER' && regStep === 'OTP'
                   ? (regOtpChannel === 'email'
                       ? 'Enter the 6-digit verification code sent to your email'
-                      : 'Enter the 6-digit verification code received via SMS')
+                      : 'Answer the incoming call on your phone to hear the 6-digit code')
                   : 'Live server database authentication'}
               </p>
             </div>
@@ -1412,7 +1413,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <span>
                       {roleInput === 'PROPERTY_SEEKER'
                         ? 'Email verification is required for Property Seeker / NRI / Buyer registration. A 6-digit code will be sent to your email.'
-                        : 'Mobile phone verification is required. 2Factor SMS verification code will be sent to your mobile number.'}
+                        : 'Mobile phone verification is required. You will receive an automated call with your 6-digit verification code.'}
                     </span>
                   </div>
 
@@ -1701,11 +1702,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     {loading ? (
                       <>
                         <Loader2 className="w-4 h-4 text-white animate-spin" />
-                        <span>{roleInput === 'PROPERTY_SEEKER' ? 'Sending email verification code...' : 'Sending SMS verification code...'}</span>
+                        <span>{roleInput === 'PROPERTY_SEEKER' ? 'Sending email verification code...' : 'Placing verification call...'}</span>
                       </>
                     ) : (
                       <>
-                        <span>{roleInput === 'PROPERTY_SEEKER' ? 'Create Verified Account (Email OTP)' : 'Create Verified Account (Mobile SMS OTP)'}</span>
+                        <span>{roleInput === 'PROPERTY_SEEKER' ? 'Create Verified Account (Email OTP)' : 'Create Verified Account (Receive Call OTP)'}</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -1724,8 +1725,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         </>
                       ) : (
                         <>
-                          <MessageSquare className="w-3.5 h-3.5 text-amber-600" />
-                          <span>SMS OTP Active</span>
+                          <PhoneIncoming className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+                          <span>Verification Call Active</span>
                         </>
                       )}
                     </div>
@@ -1765,104 +1766,54 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                         <span className="font-semibold text-slate-800">{DEFAULT_SIGNUP_LOCATION} (Fixed Territory)</span>
                       </div>
                     </div>
-                  ) : (() => {
-                    const elapsedSec = 60 - phoneCountdown;
-                    const getWaitingHeader = () => {
-                      if (otpDeliveryStatus === 'DELIVERED') return "SMS verification code sent";
-                      if (otpDeliveryStatus === 'FAILED') return "Unable to deliver SMS OTP";
-                      if (elapsedSec < 5) return "Dispatching SMS verification code...";
-                      if (elapsedSec < 15) return "Waiting for carrier SMS delivery...";
-                      if (elapsedSec < 30) return "SMS in transit via telecom carrier...";
-                      return "SMS carrier delivery in progress";
-                    };
-
-                    return (
-                      <div className={`rounded-2xl p-3 text-center space-y-1.5 border transition-all ${
-                        otpDeliveryStatus === 'DELIVERED'
-                          ? 'bg-emerald-50/90 border-emerald-200/90 text-emerald-950'
-                          : otpDeliveryStatus === 'FAILED'
-                          ? 'bg-red-50/90 border-red-200/90 text-red-950'
-                          : 'bg-amber-50/90 border-amber-200/90 text-amber-950'
-                      }`}>
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold flex items-center gap-1.5 text-xs text-left">
-                            {otpDeliveryStatus === 'DELIVERED' ? (
-                              <>
-                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                <span>SMS verification code sent</span>
-                              </>
-                            ) : otpDeliveryStatus === 'FAILED' ? (
-                              <>
-                                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                                <span>Unable to send SMS OTP. Please try again.</span>
-                              </>
-                            ) : (
-                              <>
-                                <Loader2 className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
-                                <span>{getWaitingHeader()}</span>
-                              </>
-                            )}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => { stopDeliveryPolling(); setRegStep('FORM'); setErrorMsg(null); }}
-                            className="text-[11px] text-amber-700 hover:underline font-bold cursor-pointer shrink-0 ml-2"
-                          >
-                            Change Number
-                          </button>
-                        </div>
-
-                        <div className="text-[11px] leading-relaxed text-left pt-0.5">
-                          {otpDeliveryStatus === 'DELIVERED' ? (
-                            <p className="text-emerald-800">
-                              Official verification code dispatched via SMS to <strong className="font-mono text-emerald-950">{verifiedPhone}</strong>. Enter the 6 digits below:
-                            </p>
-                          ) : otpDeliveryStatus === 'FAILED' ? (
-                            <div className="flex items-center justify-between gap-2 pt-0.5">
-                              <span className="text-red-700 text-[11px]">{deliveryFailureReason || 'Unable to deliver SMS to this mobile number.'}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleSendPhoneOtp(undefined, 'sms')}
-                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] cursor-pointer shrink-0 shadow-xs"
-                              >
-                                Retry SMS OTP
-                              </button>
-                            </div>
-                          ) : (
-                            <p className="text-amber-800">
-                              {elapsedSec < 5 ? (
-                                <>Sending your SMS verification code to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
-                              ) : elapsedSec < 15 ? (
-                                <>Your SMS OTP request has been accepted. Waiting for carrier delivery to <strong className="font-mono text-amber-950">{verifiedPhone}</strong>...</>
-                              ) : elapsedSec < 30 ? (
-                                <>Your SMS code is in transit. Please check your SMS inbox and network coverage.</>
-                              ) : (
-                                <>If the SMS has not arrived yet, you can request a new code using the resend option below.</>
-                              )}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
-                          <span className="flex items-center gap-1 text-slate-600">
-                            <MapPin className="w-3.5 h-3.5 text-amber-600" /> Location:
-                          </span>
-                          <span className="font-semibold text-slate-800">{DEFAULT_SIGNUP_LOCATION} (Fixed Territory)</span>
+                  ) : (
+                    /* Phone Call Ringing Animation Card */
+                    <div className="rounded-2xl p-4 text-center bg-gradient-to-b from-emerald-50/80 via-white to-amber-50/40 border border-emerald-200/90 shadow-xs space-y-3">
+                      {/* Phone Ringing Animation with Concentric Ripple Waves */}
+                      <div className="relative flex items-center justify-center py-2.5">
+                        <span className="absolute w-24 h-24 rounded-full bg-emerald-400/20 animate-ping pointer-events-none" />
+                        <span className="absolute w-20 h-20 rounded-full bg-emerald-500/25 animate-pulse pointer-events-none" />
+                        <div className="relative w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-600 to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 ring-4 ring-emerald-100">
+                          <PhoneIncoming className="w-8 h-8 animate-bounce" />
                         </div>
                       </div>
-                    );
-                  })()}
+
+                      <div className="space-y-1">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>Automated Verification Call Dispatched</span>
+                        </div>
+
+                        <h4 className="text-sm font-bold text-slate-900 tracking-tight">
+                          Please Answer the Incoming Call
+                        </h4>
+                        <p className="text-xs text-slate-600 max-w-xs mx-auto leading-relaxed">
+                          Your phone <strong className="font-mono text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">{verifiedPhone}</strong> is ringing with an automated call. Answer it to hear your 6-digit OTP code.
+                        </p>
+                      </div>
+
+                      <div className="pt-0.5 flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => { stopDeliveryPolling(); setRegStep('FORM'); setErrorMsg(null); }}
+                          className="text-[11px] text-amber-700 hover:text-amber-900 font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <span>Wrong mobile number? Change Number</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Expired Code Warning */}
                   {otpExpiryCountdown <= 0 && (
                     <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs text-center font-medium">
-                      Verification code has expired. Please request a new code below.
+                      Verification code has expired. Please request a new call below.
                     </div>
                   )}
 
                   <div>
                     <label className="block font-bold text-slate-700 text-center mb-2 text-xs">
-                      {regOtpChannel === 'email' ? 'Enter 6-Digit Email Verification Code' : 'Enter 6-Digit Mobile Verification Code'}
+                      {regOtpChannel === 'email' ? 'Enter 6-Digit Email Verification Code' : 'Enter 6-Digit Code Spoken on Call'}
                     </label>
                     <div className="flex justify-center gap-2 sm:gap-2.5">
                       {otpDigits.map((digit, idx) => (
@@ -1906,17 +1857,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   ) : (
                     <div className="space-y-1.5 pt-1 text-[11px] text-slate-600">
                       <div className="flex items-center justify-between">
-                        <span>Didn't receive the SMS code?</span>
+                        <span>Didn't receive the call?</span>
                         {phoneCountdown > 0 ? (
-                          <span className="font-mono text-slate-400">Resend in {phoneCountdown}s</span>
+                          <span className="font-mono text-slate-400">Call again in {phoneCountdown}s</span>
                         ) : (
                           <button
                             type="button"
                             onClick={() => handleSendPhoneOtp(undefined, 'sms')}
-                            className="text-amber-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                            className="text-emerald-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
                           >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>Resend SMS OTP</span>
+                            <PhoneIncoming className="w-3.5 h-3.5" />
+                            <span>Call Again</span>
                           </button>
                         )}
                       </div>
