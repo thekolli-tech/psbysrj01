@@ -1453,6 +1453,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       Role / Account Type
                     </label>
                     <select
+                      id="register-role-select"
+                      name="roleKey"
                       value={roleInput}
                       onChange={e => {
                         const r = e.target.value as any;
