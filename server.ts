@@ -5005,6 +5005,136 @@ app.delete('/api/programs/:id', requireSuperAdminOnly, async (req: Authenticated
   }
 });
 
+// -----------------------------------------------------------------------------
+// PS Testimonials Video API (Super Admin Upload & URL Link with 700MB max limit)
+// -----------------------------------------------------------------------------
+app.get('/api/testimonials/video', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=60, stale-while-revalidate=300');
+    const items = await getAllMedia({ type: 'FEATURED_TESTIMONIAL_VIDEO' });
+    const videoTestimonials = items.map(item => {
+      let meta: any = {};
+      try {
+        if (item.tags) meta = JSON.parse(item.tags);
+      } catch {}
+      return {
+        id: item.id,
+        title: item.title,
+        summary: item.summary,
+        clientName: meta.clientName || item.author_name || 'Verified Client',
+        clientRole: meta.clientRole || item.category || 'Buyer',
+        location: meta.location || 'Hyderabad',
+        duration: item.duration || '3:45',
+        videoUrl: item.video_url || item.media_url || '',
+        thumbnailUrl: item.thumbnail || '',
+        fileName: meta.fileName || '',
+        fileSizeBytes: meta.fileSizeBytes || item.file_size || 0,
+        createdAt: item.created_at
+      };
+    });
+    res.json({ success: true, videoTestimonials });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch video testimonials' });
+  }
+});
+
+app.post('/api/testimonials/video', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { title, clientName, clientRole, location, summary, duration, videoUrl, thumbnailUrl, fileSizeBytes, fileName } = req.body || {};
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      res.status(400).json({ error: 'Title is required for video testimonial.' });
+      return;
+    }
+
+    const trimmedUrl = String(videoUrl || '').trim();
+    if (!trimmedUrl && !fileSizeBytes && !fileName) {
+      res.status(400).json({ error: 'Either a video link URL or a direct video upload file is required.' });
+      return;
+    }
+
+    // Direct Video Upload: Enforce 700MB maximum limit
+    const MAX_TESTIMONIAL_VIDEO_SIZE = 700 * 1024 * 1024; // 700 MB
+    if (fileSizeBytes && Number(fileSizeBytes) > MAX_TESTIMONIAL_VIDEO_SIZE) {
+      res.status(400).json({
+        error: `Video file exceeds maximum size limit of 700 MB (provided: ${(Number(fileSizeBytes) / (1024 * 1024)).toFixed(1)} MB).`
+      });
+      return;
+    }
+
+    let resolvedThumbnail = (thumbnailUrl || '').trim();
+    if (!resolvedThumbnail && trimmedUrl) {
+      const yt = parseYouTubeUrl(trimmedUrl);
+      if (yt.isValid && yt.thumbnailUrl) {
+        resolvedThumbnail = yt.maxResThumbnailUrl || yt.thumbnailUrl;
+      }
+    }
+
+    const testId = `vid_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const resolvedClientName = String(clientName || req.user?.name || 'Verified Client').trim();
+    const resolvedClientRole = String(clientRole || 'Buyer').trim();
+    const resolvedLocation = String(location || 'Hyderabad').trim();
+    const resolvedDuration = String(duration || '3:45').trim();
+
+    await createMedia({
+      id: testId,
+      title: title.trim(),
+      summary: (summary || '').trim(),
+      video_url: trimmedUrl || `/api/testimonials/video/${testId}/video`,
+      media_url: trimmedUrl || `/api/testimonials/video/${testId}/video`,
+      thumbnail: resolvedThumbnail || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+      type: 'FEATURED_TESTIMONIAL_VIDEO',
+      category: resolvedClientRole,
+      duration: resolvedDuration,
+      tags: JSON.stringify({
+        clientName: resolvedClientName,
+        clientRole: resolvedClientRole,
+        location: resolvedLocation,
+        fileName,
+        fileSizeBytes
+      }),
+      author_id: req.user?.id || 'admin',
+      author_name: resolvedClientName,
+      status: 'PUBLISHED',
+      published_date: new Date().toISOString(),
+      content_type: 'VIDEO',
+      file_size: fileSizeBytes ? Number(fileSizeBytes) : null
+    });
+
+    res.status(201).json({
+      success: true,
+      videoTestimonial: {
+        id: testId,
+        title: title.trim(),
+        summary: (summary || '').trim(),
+        clientName: resolvedClientName,
+        clientRole: resolvedClientRole,
+        location: resolvedLocation,
+        duration: resolvedDuration,
+        videoUrl: trimmedUrl || `/api/testimonials/video/${testId}/video`,
+        thumbnailUrl: resolvedThumbnail,
+        fileName: fileName || '',
+        fileSizeBytes: fileSizeBytes || 0,
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create video testimonial' });
+  }
+});
+
+app.delete('/api/testimonials/video/:id', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const deleted = await deleteMedia(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: 'Video testimonial not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete video testimonial' });
+  }
+});
+
 app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
   try {
     const report = await buildHealthReport();
