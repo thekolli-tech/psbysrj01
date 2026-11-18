@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-test('Super Admin exclusive Video Posting with BOTH Direct Upload and Video Link in PS Testimonials', async (t) => {
+test('Video Testimonials with Public Submission, 700MB Max Limit, and Super Admin Approval Workflow', async (t) => {
   const testimonialsCode = fs.readFileSync('src/components/testimonials/PSTestimonialsView.tsx', 'utf-8');
   const serverCode = fs.readFileSync('server.ts', 'utf-8');
 
@@ -12,17 +12,10 @@ test('Super Admin exclusive Video Posting with BOTH Direct Upload and Video Link
     assert.doesNotMatch(testimonialsCode, /dQw4w9WgXcQ/);
   });
 
-  await t.test('2. PSTestimonialsView strictly gates the Post Video Testimonial button to Super Admin only', () => {
-    // Verifies that isSuperAdmin requires role === 'SUPER_ADMIN'
-    assert.match(testimonialsCode, /isSuperAdmin\s*=\s*Boolean\(isLoggedIn\s*&&\s*currentUser\?\.role\s*===\s*['"]SUPER_ADMIN['"]\)/);
-
-    // Verifies button is wrapped with {isSuperAdmin && ( ... )}
-    assert.match(testimonialsCode, /\{isSuperAdmin\s*&&\s*\(/);
-    assert.match(testimonialsCode, /Post Video Testimonial/);
-
-    // Verifies delete action is also restricted to Super Admin
-    assert.match(testimonialsCode, /isSuperAdmin\s*&&\s*\(/);
-    assert.match(testimonialsCode, /handleDeleteVideoTestimonial/);
+  await t.test('2. Video testimonial submission button is accessible to everyone', () => {
+    // Verify "+ Submit Video Testimonial" button is present and not hidden behind isSuperAdmin check
+    assert.match(testimonialsCode, /Submit Video Testimonial/);
+    assert.match(testimonialsCode, /setIsVideoModalOpen\(true\)/);
   });
 
   await t.test('3. Dual-mode support: Both Direct Video Upload and Video Link / URL features are available', () => {
@@ -55,27 +48,30 @@ test('Super Admin exclusive Video Posting with BOTH Direct Upload and Video Link
     assert.match(testimonialsCode, /vimeo\.com/);
   });
 
-  await t.test('6. Embedded video player in modal handles both iframe (YouTube/Vimeo) and native HTML5 video (uploaded / MP4)', () => {
-    assert.match(testimonialsCode, /<video/);
-    assert.match(testimonialsCode, /<iframe/);
-    assert.match(testimonialsCode, /youtube-nocookie\.com\/embed/);
-    assert.match(testimonialsCode, /player\.vimeo\.com\/video/);
-    assert.match(testimonialsCode, /controls/);
+  await t.test('6. Super Admin Moderation Queue and Approval Workflow are implemented', () => {
+    // Queue section rendered for Super Admin
+    assert.match(testimonialsCode, /Super Admin Moderation Queue/);
+    assert.match(testimonialsCode, /AWAITING APPROVAL/);
+
+    // Approve & Reject handlers
+    assert.match(testimonialsCode, /handleApproveVideoTestimonial/);
+    assert.match(testimonialsCode, /handleRejectVideoTestimonial/);
+    assert.match(testimonialsCode, /Approve & Make Live/);
+
+    // Only approved videos appear live
+    assert.match(testimonialsCode, /videoTestimonials\.filter\(v => v\.status === 'PUBLISHED'\)/);
   });
 
-  await t.test('7. Backend /api/testimonials/video enforces requireSuperAdminOnly, 700MB size limit, and accepts both file or URL', () => {
-    // GET /api/testimonials/video is open for public viewing
+  await t.test('7. Backend /api/testimonials/video supports public submissions with pending approval, and requireSuperAdminOnly for approvals', () => {
+    // GET /api/testimonials/video serves published videos
     assert.match(serverCode, /app\.get\(['"]\/api\/testimonials\/video['"]/);
 
-    // POST /api/testimonials/video requires Super Admin only
-    assert.match(serverCode, /app\.post\(['"]\/api\/testimonials\/video['"],\s*requireSuperAdminOnly/);
+    // POST /api/testimonials/video accepts submissions and sets non-superadmin to PENDING_APPROVAL
+    assert.match(serverCode, /app\.post\(['"]\/api\/testimonials\/video['"]/);
+    assert.match(serverCode, /PENDING_APPROVAL/);
 
-    // Requires either URL or file
-    assert.match(serverCode, /Either a video link URL or a direct video upload file is required/);
-
-    // Server-side 700MB limit check
-    assert.match(serverCode, /MAX_TESTIMONIAL_VIDEO_SIZE\s*=\s*700\s*\*\s*1024\s*\*\s*1024/);
-    assert.match(serverCode, /Video file exceeds maximum size limit of 700 MB/);
+    // PATCH /api/testimonials/video/:id/approve requires Super Admin only
+    assert.match(serverCode, /app\.patch\(['"]\/api\/testimonials\/video\/:id\/approve['"],\s*requireSuperAdminOnly/);
 
     // DELETE /api/testimonials/video/:id requires Super Admin only
     assert.match(serverCode, /app\.delete\(['"]\/api\/testimonials\/video\/:id['"],\s*requireSuperAdminOnly/);

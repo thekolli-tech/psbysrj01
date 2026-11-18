@@ -19,7 +19,9 @@ import {
   FileCheck,
   Link as LinkIcon,
   Trash2,
-  Sparkles
+  Sparkles,
+  Clock,
+  Check
 } from 'lucide-react';
 
 export interface Testimonial {
@@ -44,6 +46,7 @@ export interface VideoTestimonial {
   duration: string;
   videoUrl: string;
   thumbnailUrl?: string;
+  status: 'PUBLISHED' | 'PENDING_APPROVAL' | 'REJECTED';
   fileName?: string;
   fileSizeBytes?: number;
   createdAt?: string;
@@ -201,7 +204,7 @@ export const PSTestimonialsView: React.FC = () => {
   const [activeModalVideo, setActiveModalVideo] = useState<VideoTestimonial | null>(null);
   const [activeModalVideoSrc, setActiveModalVideoSrc] = useState<string | null>(null);
 
-  // Super Admin Post Video Testimonial Modal State
+  // Video Testimonial Submission Modal State (Open to Everyone)
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isSubmittingVideo, setIsSubmittingVideo] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -221,7 +224,7 @@ export const PSTestimonialsView: React.FC = () => {
   // Form Fields
   const [videoTitle, setVideoTitle] = useState('');
   const [videoClientName, setVideoClientName] = useState('');
-  const [videoClientRole, setVideoClientRole] = useState('First-time Homebuyer');
+  const [videoClientRole, setVideoClientRole] = useState('Buyer');
   const [videoLocation, setVideoLocation] = useState('Tellapur');
   const [videoDuration, setVideoDuration] = useState('3:45');
   const [videoSummary, setVideoSummary] = useState('');
@@ -237,7 +240,10 @@ export const PSTestimonialsView: React.FC = () => {
   // Load dynamic video testimonials from backend
   const loadVideoTestimonials = async () => {
     try {
-      const res = await fetch('/api/testimonials/video');
+      const url = isSuperAdmin
+        ? '/api/testimonials/video?includePending=true'
+        : '/api/testimonials/video';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         if (data?.videoTestimonials && Array.isArray(data.videoTestimonials)) {
@@ -252,7 +258,7 @@ export const PSTestimonialsView: React.FC = () => {
 
   useEffect(() => {
     loadVideoTestimonials();
-  }, []);
+  }, [isSuperAdmin]);
 
   // When opening video modal, resolve local blob or remote url
   useEffect(() => {
@@ -357,8 +363,8 @@ export const PSTestimonialsView: React.FC = () => {
     setVideoUrl('');
     setUploadMode('FILE');
     setVideoTitle('');
-    setVideoClientName('');
-    setVideoClientRole('First-time Homebuyer');
+    setVideoClientName(currentUser?.name || '');
+    setVideoClientRole(currentUser?.role ? currentUser.role.replace('_', ' ') : 'Buyer');
     setVideoLocation('Tellapur');
     setVideoDuration('3:45');
     setVideoSummary('');
@@ -366,12 +372,10 @@ export const PSTestimonialsView: React.FC = () => {
     setIsVideoModalOpen(false);
   };
 
+  // Video Testimonial Creation: Accessible to Everyone!
+  // Submissions by non-superadmin default to PENDING_APPROVAL until approved by Super Admin.
   const handleCreateVideoTestimonial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSuperAdmin) {
-      showToast('Unauthorized: Only Super Admin can post video testimonials.');
-      return;
-    }
     if (!videoTitle.trim()) {
       showToast('Please enter a video title.');
       return;
@@ -430,7 +434,7 @@ export const PSTestimonialsView: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: videoTitle.trim(),
-          clientName: videoClientName.trim() || 'Verified Client',
+          clientName: videoClientName.trim() || currentUser?.name || 'Verified Client',
           clientRole: videoClientRole.trim() || 'Buyer',
           location: videoLocation.trim() || 'Hyderabad',
           summary: videoSummary.trim(),
@@ -446,21 +450,23 @@ export const PSTestimonialsView: React.FC = () => {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to post video testimonial');
+        throw new Error(errData.error || 'Failed to submit video testimonial');
       }
 
       const data = await res.json();
+      const expectedStatus = isSuperAdmin ? 'PUBLISHED' : 'PENDING_APPROVAL';
       const newVideo: VideoTestimonial = {
         ...(data.videoTestimonial || {}),
         id: vidId,
         title: videoTitle.trim(),
-        clientName: videoClientName.trim() || 'Verified Client',
+        clientName: videoClientName.trim() || currentUser?.name || 'Verified Client',
         clientRole: videoClientRole.trim() || 'Buyer',
         location: videoLocation.trim() || 'Hyderabad',
         duration: videoDuration.trim() || '3:45',
         summary: videoSummary.trim(),
         videoUrl: finalVideoUrl,
         thumbnailUrl: finalThumbnail,
+        status: expectedStatus,
         fileName: finalFileName,
         fileSizeBytes: finalFileSizeBytes,
         createdAt: new Date().toISOString()
@@ -474,17 +480,64 @@ export const PSTestimonialsView: React.FC = () => {
         return updated;
       });
 
-      showToast(
-        uploadMode === 'FILE'
-          ? 'Video testimonial uploaded successfully (Max 700MB verified)!'
-          : 'Video testimonial link published successfully!'
-      );
+      if (isSuperAdmin) {
+        showToast('Video testimonial published live on the website!');
+      } else {
+        showToast('Video testimonial submitted! It will appear live on the website once approved by Super Admin.');
+      }
       resetVideoForm();
     } catch (err: any) {
       showToast(err.message || 'Error publishing video testimonial');
     } finally {
       setIsSubmittingVideo(false);
       setUploadProgress(0);
+    }
+  };
+
+  // Super Admin Approval Handler: Makes pending video live on website
+  const handleApproveVideoTestimonial = async (id: string) => {
+    if (!isSuperAdmin) return;
+    try {
+      const res = await fetch(`/api/testimonials/video/${id}/approve`, { method: 'PATCH' });
+      if (res.ok) {
+        setVideoTestimonials(prev => {
+          const updated = prev.map(v => (v.id === id ? { ...v, status: 'PUBLISHED' as const } : v));
+          try {
+            localStorage.setItem('ps_video_testimonials_cache', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        showToast('Video testimonial approved! It is now live on the website.');
+      } else {
+        showToast('Failed to approve video testimonial.');
+      }
+    } catch {
+      showToast('Error approving video testimonial.');
+    }
+  };
+
+  // Super Admin Rejection Handler
+  const handleRejectVideoTestimonial = async (id: string) => {
+    if (!isSuperAdmin) return;
+    if (!window.confirm('Reject and delete this video testimonial?')) return;
+
+    try {
+      await deleteTestimonialVideoBlob(id);
+      const res = await fetch(`/api/testimonials/video/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setVideoTestimonials(prev => {
+          const updated = prev.filter(v => v.id !== id);
+          try {
+            localStorage.setItem('ps_video_testimonials_cache', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        showToast('Video testimonial rejected.');
+      } else {
+        showToast('Failed to reject video testimonial.');
+      }
+    } catch {
+      showToast('Error rejecting video testimonial.');
     }
   };
 
@@ -565,8 +618,12 @@ export const PSTestimonialsView: React.FC = () => {
     return true;
   });
 
-  // Featured video testimonial is the latest one created by Super Admin
-  const featuredVideo = videoTestimonials[0] || null;
+  // Filter published vs pending video testimonials
+  const publishedVideos = videoTestimonials.filter(v => v.status === 'PUBLISHED');
+  const pendingVideos = videoTestimonials.filter(v => v.status === 'PENDING_APPROVAL');
+
+  // Active featured video testimonial is the latest APPROVED video
+  const featuredVideo = publishedVideos[0] || null;
 
   return (
     <div className="space-y-6">
@@ -582,17 +639,23 @@ export const PSTestimonialsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Super Admin Exclusive: Post Video Testimonial Button */}
-          {isSuperAdmin && (
-            <button
-              type="button"
-              onClick={() => setIsVideoModalOpen(true)}
-              className="px-4 py-2.5 bg-[#182A3E] hover:bg-[#1f3752] text-amber-400 border border-amber-400/40 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
-            >
-              <Video className="w-4 h-4 text-amber-400" />
-              <span>+ Post Video Testimonial</span>
-            </button>
-          )}
+          {/* Video Testimonial Button: OPEN TO EVERYONE */}
+          <button
+            type="button"
+            onClick={() => {
+              resetVideoForm();
+              setIsVideoModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-[#182A3E] hover:bg-[#1f3752] text-amber-400 border border-amber-400/40 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
+          >
+            <Video className="w-4 h-4 text-amber-400" />
+            <span>+ Submit Video Testimonial</span>
+            {isSuperAdmin && pendingVideos.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-900 text-[10px] font-bold">
+                {pendingVideos.length} pending
+              </span>
+            )}
+          </button>
 
           <button
             type="button"
@@ -604,6 +667,82 @@ export const PSTestimonialsView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* =========================================================================
+          SUPER ADMIN MODERATION QUEUE (ONLY VISIBLE TO SUPER ADMIN WHEN PENDING)
+          ========================================================================= */}
+      {isSuperAdmin && pendingVideos.length > 0 && (
+        <div className="bg-amber-50/80 border-2 border-amber-300 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 animate-in fade-in duration-150">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <span className="px-3 py-1 rounded-full bg-[#182A3E] text-amber-300 text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>Super Admin Moderation Queue</span>
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 text-xs font-bold font-mono">
+                {pendingVideos.length} Pending Approval
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 font-medium">
+              Community video submissions awaiting your review. Approve to make live on website.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pendingVideos.map(pending => (
+              <div key={pending.id} className="bg-white rounded-2xl p-4 border border-amber-200 shadow-xs space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-slate-900 truncate">{pending.title}</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Submitted by <strong className="text-slate-800">{pending.clientName}</strong> · {pending.clientRole} ({pending.location})
+                    </p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-amber-600" />
+                    <span>AWAITING APPROVAL</span>
+                  </span>
+                </div>
+
+                {pending.summary && (
+                  <p className="text-xs text-slate-600 line-clamp-2 italic">
+                    "{pending.summary}"
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setActiveModalVideo(pending)}
+                    className="text-xs font-bold text-[#182A3E] hover:text-[#B49029] inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current text-[#B49029]" />
+                    <span>Preview Video ({pending.duration})</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRejectVideoTestimonial(pending.id)}
+                      className="px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApproveVideoTestimonial(pending.id)}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Approve & Make Live</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Top Rating Distribution Card */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
@@ -669,7 +808,7 @@ export const PSTestimonialsView: React.FC = () => {
       </div>
 
       {/* =========================================================================
-          FEATURED VIDEO TESTIMONIAL SECTION (DYNAMIC & MANAGED BY SUPER ADMIN)
+          FEATURED VIDEO TESTIMONIAL SECTION (ONLY APPROVED / PUBLISHED VIDEOS ARE LIVE)
           ========================================================================= */}
       {featuredVideo ? (
         <div className="bg-[#182A3E] text-white rounded-3xl p-6 sm:p-8 border border-slate-700/60 shadow-lg relative overflow-hidden">
@@ -697,18 +836,21 @@ export const PSTestimonialsView: React.FC = () => {
             <div className="space-y-2 flex-1">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
-                  FEATURED VIDEO TESTIMONIAL
+                  FEATURED VIDEO TESTIMONIAL · APPROVED
                 </span>
 
-                {/* Super Admin Manage Actions */}
+                {/* Super Admin Actions */}
                 {isSuperAdmin && (
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setIsVideoModalOpen(true)}
+                      onClick={() => {
+                        resetVideoForm();
+                        setIsVideoModalOpen(true);
+                      }}
                       className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/30 transition-all cursor-pointer"
                     >
-                      + Replace / Post
+                      + Upload New Video
                     </button>
                     <button
                       type="button"
@@ -744,15 +886,18 @@ export const PSTestimonialsView: React.FC = () => {
               SUPER ADMIN STUDIO · VIDEO TESTIMONIAL
             </span>
             <h3 className="text-base sm:text-lg font-bold text-white">
-              No Featured Video Testimonial Published
+              No Featured Video Testimonial Live
             </h3>
             <p className="text-xs text-slate-300 max-w-xl">
-              Upload a direct video file from your device (Max 700 MB) or provide a video link (YouTube, Vimeo, MP4 direct) to feature on this page.
+              Upload a direct video file from your device (Max 700 MB) or provide a video link (YouTube, Vimeo, MP4 direct) to make it live on this page.
             </p>
           </div>
           <button
             type="button"
-            onClick={() => setIsVideoModalOpen(true)}
+            onClick={() => {
+              resetVideoForm();
+              setIsVideoModalOpen(true);
+            }}
             className="px-5 py-2.5 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer shrink-0"
           >
             <UploadCloud className="w-4 h-4" />
@@ -816,9 +961,9 @@ export const PSTestimonialsView: React.FC = () => {
       </div>
 
       {/* =========================================================================
-          SUPER ADMIN DUAL-MODE VIDEO TESTIMONIAL UPLOAD MODAL
+          VIDEO TESTIMONIAL SUBMISSION MODAL (ACCESSIBLE TO EVERYONE)
           ========================================================================= */}
-      {isVideoModalOpen && isSuperAdmin && (
+      {isVideoModalOpen && (
         <div
           role="dialog"
           aria-modal="true"
@@ -834,13 +979,15 @@ export const PSTestimonialsView: React.FC = () => {
               <div>
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-[#B49029] text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
                   <Video className="w-3 h-3 text-[#B49029]" />
-                  <span>Super Admin Studio</span>
+                  <span>{isSuperAdmin ? 'Super Admin Studio' : 'Community Video Testimonial'}</span>
                 </span>
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-1">
-                  Post Video Testimonial
+                  {isSuperAdmin ? 'Post Video Testimonial' : 'Submit Video Testimonial'}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Direct video upload (Max 700 MB) or video link (YouTube, Vimeo, MP4 direct) · PS Testimonials
+                  {isSuperAdmin
+                    ? 'Direct video upload (Max 700 MB) or video link · Published live on website.'
+                    : 'Direct video upload (Max 700 MB) or video link · All submissions are reviewed & approved by Super Admin before going live.'}
                 </p>
               </div>
               <button
@@ -1088,13 +1235,13 @@ export const PSTestimonialsView: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Client / Buyer Name
+                    Your Name / Client Name
                   </label>
                   <input
                     type="text"
                     value={videoClientName}
                     onChange={e => setVideoClientName(e.target.value)}
-                    placeholder="e.g. Swetha & Raghu"
+                    placeholder="e.g. Suresh Chandra"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029]"
                   />
                 </div>
@@ -1106,7 +1253,7 @@ export const PSTestimonialsView: React.FC = () => {
                     type="text"
                     value={videoClientRole}
                     onChange={e => setVideoClientRole(e.target.value)}
-                    placeholder="e.g. First-time Homebuyers"
+                    placeholder="e.g. Buyer or Investor"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029]"
                   />
                 </div>
@@ -1147,7 +1294,7 @@ export const PSTestimonialsView: React.FC = () => {
                   rows={2}
                   value={videoSummary}
                   onChange={e => setVideoSummary(e.target.value)}
-                  placeholder="Describe the client journey, evaluation of high-rises, and verified telemetry takeaways..."
+                  placeholder="Describe your journey, evaluation of high-rises, and verified telemetry takeaways..."
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029] resize-none"
                 />
               </div>
@@ -1186,11 +1333,19 @@ export const PSTestimonialsView: React.FC = () => {
                   className="px-5 py-2.5 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2 disabled:opacity-50"
                 >
                   {isSubmittingVideo ? (
-                    <span>{uploadMode === 'FILE' ? `Uploading (${uploadProgress}%)...` : 'Publishing...'}</span>
+                    <span>{uploadMode === 'FILE' ? `Uploading (${uploadProgress}%)...` : 'Submitting...'}</span>
                   ) : (
                     <>
                       {uploadMode === 'FILE' ? <UploadCloud className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                      <span>{uploadMode === 'FILE' ? 'Upload & Publish Video' : 'Publish Video Link'}</span>
+                      <span>
+                        {isSuperAdmin
+                          ? uploadMode === 'FILE'
+                            ? 'Upload & Publish Video'
+                            : 'Publish Video Link'
+                          : uploadMode === 'FILE'
+                            ? 'Upload & Submit for Approval'
+                            : 'Submit Video for Approval'}
+                      </span>
                     </>
                   )}
                 </button>

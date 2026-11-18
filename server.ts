@@ -5006,39 +5006,50 @@ app.delete('/api/programs/:id', requireSuperAdminOnly, async (req: Authenticated
 });
 
 // -----------------------------------------------------------------------------
-// PS Testimonials Video API (Super Admin Upload & URL Link with 700MB max limit)
+// PS Testimonials Video API (Community Submissions with Super Admin Approval)
 // -----------------------------------------------------------------------------
-app.get('/api/testimonials/video', async (_req: Request, res: Response): Promise<void> => {
+app.get('/api/testimonials/video', async (req: Request, res: Response): Promise<void> => {
   try {
-    res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=60, stale-while-revalidate=300');
-    const items = await getAllMedia({ type: 'FEATURED_TESTIMONIAL_VIDEO' });
-    const videoTestimonials = items.map(item => {
-      let meta: any = {};
-      try {
-        if (item.tags) meta = JSON.parse(item.tags);
-      } catch {}
-      return {
-        id: item.id,
-        title: item.title,
-        summary: item.summary,
-        clientName: meta.clientName || item.author_name || 'Verified Client',
-        clientRole: meta.clientRole || item.category || 'Buyer',
-        location: meta.location || 'Hyderabad',
-        duration: item.duration || '3:45',
-        videoUrl: item.video_url || item.media_url || '',
-        thumbnailUrl: item.thumbnail || '',
-        fileName: meta.fileName || '',
-        fileSizeBytes: meta.fileSizeBytes || item.file_size || 0,
-        createdAt: item.created_at
-      };
+    const isSuperAdminUser = (req as AuthenticatedRequest).user?.role === 'SUPER_ADMIN';
+    const includePending = isSuperAdminUser && req.query.includePending === 'true';
+
+    res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=15, stale-while-revalidate=60');
+    const items = await getAllMedia({
+      type: 'FEATURED_TESTIMONIAL_VIDEO',
+      includeDrafts: includePending
     });
+
+    const videoTestimonials = items
+      .filter(item => includePending || item.status === 'PUBLISHED' || !item.status)
+      .map(item => {
+        let meta: any = {};
+        try {
+          if (item.tags) meta = JSON.parse(item.tags);
+        } catch {}
+        return {
+          id: item.id,
+          title: item.title,
+          summary: item.summary,
+          clientName: meta.clientName || item.author_name || 'Verified Client',
+          clientRole: meta.clientRole || item.category || 'Buyer',
+          location: meta.location || 'Hyderabad',
+          duration: item.duration || '3:45',
+          videoUrl: item.video_url || item.media_url || '',
+          thumbnailUrl: item.thumbnail || '',
+          status: item.status || 'PUBLISHED',
+          fileName: meta.fileName || '',
+          fileSizeBytes: meta.fileSizeBytes || item.file_size || 0,
+          createdAt: item.created_at
+        };
+      });
     res.json({ success: true, videoTestimonials });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch video testimonials' });
   }
 });
 
-app.post('/api/testimonials/video', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Submission open to everyone: Super Admin publishes immediately; community submissions default to PENDING_APPROVAL
+app.post('/api/testimonials/video', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { title, clientName, clientRole, location, summary, duration, videoUrl, thumbnailUrl, fileSizeBytes, fileName } = req.body || {};
     if (!title || typeof title !== 'string' || !title.trim()) {
@@ -5070,10 +5081,14 @@ app.post('/api/testimonials/video', requireSuperAdminOnly, async (req: Authentic
     }
 
     const testId = `vid_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const resolvedClientName = String(clientName || req.user?.name || 'Verified Client').trim();
-    const resolvedClientRole = String(clientRole || 'Buyer').trim();
+    const resolvedClientName = String(clientName || req.user?.name || 'Community Member').trim();
+    const resolvedClientRole = String(clientRole || req.user?.role || 'Buyer').trim();
     const resolvedLocation = String(location || 'Hyderabad').trim();
     const resolvedDuration = String(duration || '3:45').trim();
+
+    // Super Admin submissions go live immediately; all other roles/visitors require Super Admin approval
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+    const submissionStatus = isSuperAdmin ? 'PUBLISHED' : 'PENDING_APPROVAL';
 
     await createMedia({
       id: testId,
@@ -5092,16 +5107,20 @@ app.post('/api/testimonials/video', requireSuperAdminOnly, async (req: Authentic
         fileName,
         fileSizeBytes
       }),
-      author_id: req.user?.id || 'admin',
+      author_id: req.user?.id || 'guest',
       author_name: resolvedClientName,
-      status: 'PUBLISHED',
-      published_date: new Date().toISOString(),
+      status: submissionStatus,
+      published_date: isSuperAdmin ? new Date().toISOString() : null,
       content_type: 'VIDEO',
       file_size: fileSizeBytes ? Number(fileSizeBytes) : null
     });
 
     res.status(201).json({
       success: true,
+      isPending: !isSuperAdmin,
+      message: isSuperAdmin
+        ? 'Video testimonial published live on the website.'
+        : 'Video testimonial submitted successfully! It will appear on the website once approved by Super Admin.',
       videoTestimonial: {
         id: testId,
         title: title.trim(),
@@ -5112,6 +5131,7 @@ app.post('/api/testimonials/video', requireSuperAdminOnly, async (req: Authentic
         duration: resolvedDuration,
         videoUrl: trimmedUrl || `/api/testimonials/video/${testId}/video`,
         thumbnailUrl: resolvedThumbnail,
+        status: submissionStatus,
         fileName: fileName || '',
         fileSizeBytes: fileSizeBytes || 0,
         createdAt: new Date().toISOString()
@@ -5119,6 +5139,39 @@ app.post('/api/testimonials/video', requireSuperAdminOnly, async (req: Authentic
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to create video testimonial' });
+  }
+});
+
+// Super Admin Approval Endpoint to make a video testimonial live
+app.patch('/api/testimonials/video/:id/approve', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const updated = await updateMedia(req.params.id, {
+      status: 'PUBLISHED',
+      published_date: new Date().toISOString()
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'Video testimonial not found' });
+      return;
+    }
+    res.json({ success: true, message: 'Video testimonial approved and live on website.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to approve video testimonial' });
+  }
+});
+
+// Super Admin Rejection Endpoint
+app.patch('/api/testimonials/video/:id/reject', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const updated = await updateMedia(req.params.id, {
+      status: 'REJECTED'
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'Video testimonial not found' });
+      return;
+    }
+    res.json({ success: true, message: 'Video testimonial rejected.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to reject video testimonial' });
   }
 });
 
