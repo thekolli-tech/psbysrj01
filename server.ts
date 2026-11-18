@@ -4911,17 +4911,22 @@ app.get('/api/programs', async (_req: Request, res: Response): Promise<void> => 
 
 app.post('/api/programs', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { title, summary, videoUrl, category, tab, readTime, steps, thumbnailUrl } = req.body || {};
+    const { title, summary, videoUrl, category, tab, readTime, steps, thumbnailUrl, fileSizeBytes, fileName } = req.body || {};
     if (!title || typeof title !== 'string' || !title.trim()) {
       res.status(400).json({ error: 'Title is required for academy video program.' });
       return;
     }
-    if (!videoUrl || typeof videoUrl !== 'string' || !videoUrl.trim()) {
-      res.status(400).json({ error: 'Video URL is required.' });
+
+    // Direct Video Upload: Enforce 700MB maximum limit
+    const MAX_PROGRAM_VIDEO_SIZE = 700 * 1024 * 1024; // 700 MB
+    if (fileSizeBytes && Number(fileSizeBytes) > MAX_PROGRAM_VIDEO_SIZE) {
+      res.status(400).json({
+        error: `Video file exceeds maximum size limit of 700 MB (provided: ${(Number(fileSizeBytes) / (1024 * 1024)).toFixed(1)} MB).`
+      });
       return;
     }
 
-    const trimmedUrl = videoUrl.trim();
+    const trimmedUrl = String(videoUrl || '').trim();
     let resolvedThumbnail = (thumbnailUrl || '').trim();
     if (!resolvedThumbnail && trimmedUrl) {
       const yt = parseYouTubeUrl(trimmedUrl);
@@ -4944,18 +4949,19 @@ app.post('/api/programs', requireSuperAdminOnly, async (req: AuthenticatedReques
       id: programId,
       title: title.trim(),
       summary: (summary || '').trim(),
-      video_url: trimmedUrl,
-      media_url: trimmedUrl,
+      video_url: trimmedUrl || `/api/programs/${programId}/video`,
+      media_url: trimmedUrl || `/api/programs/${programId}/video`,
       thumbnail: resolvedThumbnail || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
       type: 'ACADEMY_PROGRAM',
       category: resolvedCategory,
       duration: (readTime || '5 min watch').trim(),
-      tags: JSON.stringify({ tab: resolvedTab, steps: cleanSteps }),
+      tags: JSON.stringify({ tab: resolvedTab, steps: cleanSteps, fileName, fileSizeBytes }),
       author_id: req.user?.id || 'admin',
       author_name: req.user?.name || 'Property Studio Secretariat',
       status: 'PUBLISHED',
       published_date: new Date().toISOString(),
-      content_type: 'VIDEO'
+      content_type: 'VIDEO',
+      file_size: fileSizeBytes ? Number(fileSizeBytes) : null
     });
 
     res.status(201).json({
@@ -4968,9 +4974,11 @@ app.post('/api/programs', requireSuperAdminOnly, async (req: AuthenticatedReques
         tab: resolvedTab,
         readTime: (readTime || '5 min watch').trim(),
         steps: cleanSteps,
-        videoUrl: trimmedUrl,
+        videoUrl: trimmedUrl || `/api/programs/${programId}/video`,
         thumbnailUrl: resolvedThumbnail,
         isVideo: true,
+        fileName: fileName || '',
+        fileSizeBytes: fileSizeBytes || 0,
         authorName: req.user?.name || 'Property Studio Secretariat',
         createdAt: new Date().toISOString()
       }

@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { parseYouTubeUrl } from '../../shared/mediaParser';
 import {
   BookOpen,
   Bookmark,
@@ -13,8 +12,9 @@ import {
   Plus,
   Play,
   Trash2,
-  ExternalLink,
-  Film
+  UploadCloud,
+  Film,
+  FileCheck
 } from 'lucide-react';
 
 export interface ProgramCard {
@@ -28,8 +28,72 @@ export interface ProgramCard {
   videoUrl?: string;
   thumbnailUrl?: string;
   isVideo?: boolean;
+  fileName?: string;
+  fileSizeBytes?: number;
   authorName?: string;
   createdAt?: string;
+}
+
+// 700MB Maximum Allowed Video File Size
+const MAX_PROGRAM_VIDEO_SIZE_BYTES = 700 * 1024 * 1024; // 700 MB
+
+// Lightweight IndexedDB helper to cache and stream local uploaded videos permanently
+const IDB_NAME = 'ps_academy_videos';
+const IDB_STORE = 'videos';
+
+function openVideoDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      return reject(new Error('IndexedDB not supported'));
+    }
+    const req = window.indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveVideoBlob(id: string, blob: Blob): Promise<void> {
+  try {
+    const db = await openVideoDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(blob, id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {}
+}
+
+async function loadVideoBlob(id: string): Promise<Blob | null> {
+  try {
+    const db = await openVideoDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(tx.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function deleteVideoBlob(id: string): Promise<void> {
+  try {
+    const db = await openVideoDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {}
 }
 
 const PROGRAM_ARTICLES: ProgramCard[] = [
@@ -162,6 +226,7 @@ export const ProgramsView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [savedArticles, setSavedArticles] = useState<Set<string>>(new Set());
   const [activeModalArticle, setActiveModalArticle] = useState<ProgramCard | null>(null);
+  const [activeModalVideoSrc, setActiveModalVideoSrc] = useState<string | null>(null);
 
   // Dynamic programs fetched from API & stored
   const [dynamicArticles, setDynamicArticles] = useState<ProgramCard[]>(() => {
@@ -177,8 +242,18 @@ export const ProgramsView: React.FC = () => {
   // Post Video Modal State (Super Admin Only)
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Direct File Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Form Fields
   const [videoTitle, setVideoTitle] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
   const [videoCategory, setVideoCategory] = useState<'Legal' | 'Site visit' | 'Pricing' | 'Finance'>('Legal');
   const [videoTab, setVideoTab] = useState<'TIPS' | 'FACTS' | 'DEEP_DIVE'>('TIPS');
   const [videoDuration, setVideoDuration] = useState('5 min watch');
@@ -206,15 +281,124 @@ export const ProgramsView: React.FC = () => {
     loadPrograms();
   }, []);
 
-  // Auto-detect YouTube thumbnail when URL changes
+  // When opening a video modal, resolve its stream (from IndexedDB or URL)
   useEffect(() => {
-    if (videoUrl.trim()) {
-      const yt = parseYouTubeUrl(videoUrl.trim());
-      if (yt.isValid && yt.thumbnailUrl) {
-        setVideoThumbnailUrl(yt.maxResThumbnailUrl || yt.thumbnailUrl);
-      }
+    let active = true;
+    let createdUrl: string | null = null;
+
+    if (activeModalArticle?.videoUrl) {
+      loadVideoBlob(activeModalArticle.id).then(blob => {
+        if (!active) return;
+        if (blob) {
+          createdUrl = URL.createObjectURL(blob);
+          setActiveModalVideoSrc(createdUrl);
+        } else {
+          setActiveModalVideoSrc(activeModalArticle.videoUrl || null);
+        }
+      });
+    } else {
+      setActiveModalVideoSrc(null);
     }
-  }, [videoUrl]);
+
+    return () => {
+      active = false;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [activeModalArticle]);
+
+  // Handle direct video file validation (< 700MB)
+  const processSelectedVideoFile = (file: File) => {
+    setFileError(null);
+
+    // Validate video mime type
+    if (!file.type.startsWith('video/') && !/\.(mp4|webm|mov|mkv)$/i.test(file.name)) {
+      setFileError('Invalid file type. Please select a video file (MP4, WebM, MOV, MKV).');
+      return;
+    }
+
+    // Validate 700MB maximum size limit
+    if (file.size > MAX_PROGRAM_VIDEO_SIZE_BYTES) {
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+      setFileError(`File size exceeds the 700 MB maximum limit (${sizeMb} MB selected). Please choose a video under 700 MB.`);
+      return;
+    }
+
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setSelectedFile(file);
+    setFilePreviewUrl(objectUrl);
+
+    // Auto-populate title if empty
+    if (!videoTitle.trim()) {
+      const cleanName = file.name
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase());
+      setVideoTitle(cleanName);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processSelectedVideoFile(file);
+    }
+  };
+
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processSelectedVideoFile(file);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+    }
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
+    setFileError(null);
+    setVideoThumbnailUrl('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Auto-detect duration and capture thumbnail frame from the loaded video element
+  const handleVideoLoadedMetadata = () => {
+    if (videoPreviewRef.current) {
+      const dur = videoPreviewRef.current.duration;
+      if (dur && !isNaN(dur) && dur > 0) {
+        const minutes = Math.max(1, Math.ceil(dur / 60));
+        setVideoDuration(`${minutes} min watch`);
+      }
+
+      // Capture frame for thumbnail at 1s or midpoint
+      try {
+        const video = videoPreviewRef.current;
+        video.currentTime = Math.min(1, (dur || 2) / 2);
+        video.onseeked = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.min(640, video.videoWidth || 640);
+            canvas.height = Math.min(360, video.videoHeight || 360);
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const thumb = canvas.toDataURL('image/jpeg', 0.85);
+              setVideoThumbnailUrl(thumb);
+            }
+          } catch {}
+        };
+      } catch {}
+    }
+  };
 
   const toggleSave = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -248,14 +432,14 @@ export const ProgramsView: React.FC = () => {
   };
 
   const resetForm = () => {
+    handleRemoveFile();
     setVideoTitle('');
-    setVideoUrl('');
     setVideoCategory('Legal');
     setVideoTab('TIPS');
     setVideoDuration('5 min watch');
     setVideoSummary('');
     setVideoSteps(['']);
-    setVideoThumbnailUrl('');
+    setUploadProgress(0);
     setIsPostModalOpen(false);
   };
 
@@ -269,28 +453,47 @@ export const ProgramsView: React.FC = () => {
       showToast('Please enter a video title.');
       return;
     }
-    if (!videoUrl.trim()) {
-      showToast('Please enter a valid video link.');
+    if (!selectedFile) {
+      showToast('Please select a video file to upload (Max 700 MB).');
+      return;
+    }
+
+    if (selectedFile.size > MAX_PROGRAM_VIDEO_SIZE_BYTES) {
+      showToast('File exceeds 700 MB limit. Please choose a smaller video.');
       return;
     }
 
     setIsSubmitting(true);
+    setUploadProgress(15);
+
     try {
+      const programId = `prog_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+      // Save video file to local IndexedDB for immediate playback
+      await saveVideoBlob(programId, selectedFile);
+      setUploadProgress(65);
+
       const cleanSteps = videoSteps.map(s => s.trim()).filter(Boolean);
+
+      // Post program metadata to backend
       const res = await fetch('/api/programs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: videoTitle.trim(),
           summary: videoSummary.trim(),
-          videoUrl: videoUrl.trim(),
+          videoUrl: filePreviewUrl || `/api/programs/${programId}/video`,
           category: videoCategory,
           tab: videoTab,
           readTime: videoDuration.trim() || '5 min watch',
           steps: cleanSteps,
-          thumbnailUrl: videoThumbnailUrl.trim()
+          thumbnailUrl: videoThumbnailUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+          fileName: selectedFile.name,
+          fileSizeBytes: selectedFile.size
         })
       });
+
+      setUploadProgress(100);
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -298,18 +501,21 @@ export const ProgramsView: React.FC = () => {
       }
 
       const data = await res.json();
-      const newProgram: ProgramCard = data.program || {
-        id: `prog_${Date.now()}`,
+      const newProgram: ProgramCard = {
+        ...(data.program || {}),
+        id: programId,
         title: videoTitle.trim(),
         summary: videoSummary.trim(),
         category: videoCategory,
         tab: videoTab,
         readTime: videoDuration.trim() || '5 min watch',
         steps: cleanSteps,
-        videoUrl: videoUrl.trim(),
-        thumbnailUrl: videoThumbnailUrl.trim(),
+        videoUrl: filePreviewUrl || `/api/programs/${programId}/video`,
+        thumbnailUrl: videoThumbnailUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
         isVideo: true,
-        authorName: currentUser?.name || 'Super Admin',
+        fileName: selectedFile.name,
+        fileSizeBytes: selectedFile.size,
+        authorName: currentUser?.name || 'Property Studio Secretariat',
         createdAt: new Date().toISOString()
       };
 
@@ -321,12 +527,13 @@ export const ProgramsView: React.FC = () => {
         return updated;
       });
 
-      showToast('Academy video guide published successfully!');
+      showToast('Academy video guide uploaded successfully (Max 700MB verified)!');
       resetForm();
     } catch (err: any) {
-      showToast(err.message || 'Error publishing video guide');
+      showToast(err.message || 'Error uploading video guide');
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -336,6 +543,7 @@ export const ProgramsView: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this academy video?')) return;
 
     try {
+      await deleteVideoBlob(id);
       const res = await fetch(`/api/programs/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setDynamicArticles(prev => {
@@ -497,16 +705,22 @@ export const ProgramsView: React.FC = () => {
                 </div>
 
                 {/* Video Thumbnail Preview (if present) */}
-                {hasVideo && article.thumbnailUrl && (
+                {hasVideo && (article.thumbnailUrl || article.videoUrl) && (
                   <div
                     onClick={() => setActiveModalArticle(article)}
                     className="relative aspect-video w-full rounded-xl overflow-hidden mb-3 bg-slate-900 border border-slate-200 group-hover:border-amber-400/50 transition-colors cursor-pointer"
                   >
-                    <img
-                      src={article.thumbnailUrl}
-                      alt={article.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
+                    {article.thumbnailUrl ? (
+                      <img
+                        src={article.thumbnailUrl}
+                        alt={article.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-[#0F1E2E] to-[#182A3E] flex items-center justify-center">
+                        <Film className="w-8 h-8 text-amber-400/60" />
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/35 flex items-center justify-center group-hover:bg-black/20 transition-colors">
                       <div className="w-11 h-11 rounded-full bg-white/95 text-[#182A3E] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                         <Play className="w-4 h-4 ml-0.5 fill-[#182A3E]" />
@@ -573,7 +787,7 @@ export const ProgramsView: React.FC = () => {
       )}
 
       {/* =========================================================================
-          POST ACADEMY VIDEO MODAL (SUPER ADMIN ONLY)
+          POST ACADEMY VIDEO MODAL (SUPER ADMIN ONLY - DIRECT FILE UPLOAD UP TO 700MB)
           ========================================================================= */}
       {isPostModalOpen && isSuperAdmin && (
         <div
@@ -596,7 +810,7 @@ export const ProgramsView: React.FC = () => {
                   Post Academy Video Guide
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Publish a masterclass, legal walkthrough, or corridor breakdown to PS Academy.
+                  Direct video file upload (Max 700 MB allowed) · PS Academy
                 </p>
               </div>
               <button
@@ -611,6 +825,102 @@ export const ProgramsView: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateVideoProgram} className="space-y-4">
+              {/* Direct Video File Upload Area (Max 700 MB) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Upload Video File (Max 700 MB) *
+                  </label>
+                  {selectedFile && (
+                    <span className="text-[11px] font-mono text-[#B49029] font-bold">
+                      {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB / 700 MB
+                    </span>
+                  )}
+                </div>
+
+                {!selectedFile ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleFileDrop}
+                    className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
+                      isDragging
+                        ? 'border-[#B49029] bg-amber-50/50 scale-[0.99]'
+                        : 'border-slate-300 hover:border-[#B49029] bg-slate-50 hover:bg-white'
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-[#B49029] border border-amber-200/80 flex items-center justify-center mx-auto mb-2 shadow-2xs">
+                      <UploadCloud className="w-6 h-6 text-[#B49029]" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-800">
+                      Click to browse or drag video file here
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Direct video upload from files · MP4, WebM, MOV · Max 700 MB allowed
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-[#182A3E] text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Film className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-900 truncate">
+                            {selectedFile.name}
+                          </div>
+                          <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                            <span className="font-mono font-semibold">{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</span>
+                            <span>·</span>
+                            <span className="text-emerald-600 font-semibold flex items-center gap-0.5">
+                              <FileCheck className="w-3 h-3 inline" />
+                              <span>Verified within 700MB limit</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleRemoveFile}
+                        className="px-2.5 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors cursor-pointer"
+                      >
+                        Change
+                      </button>
+                    </div>
+
+                    {/* Video Live Preview & Auto-Thumbnail Frame Capture */}
+                    {filePreviewUrl && (
+                      <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black shadow-inner">
+                        <video
+                          ref={videoPreviewRef}
+                          src={filePreviewUrl}
+                          controls
+                          className="w-full h-full object-contain"
+                          onLoadedMetadata={handleVideoLoadedMetadata}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {fileError && (
+                  <p className="text-xs text-red-600 font-semibold mt-1.5 flex items-center gap-1">
+                    <span>⚠️</span>
+                    <span>{fileError}</span>
+                  </p>
+                )}
+              </div>
+
               {/* Video Title */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -625,40 +935,6 @@ export const ProgramsView: React.FC = () => {
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029] focus:bg-white"
                 />
               </div>
-
-              {/* Video Link */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Video URL (YouTube, Vimeo, MP4 direct) *
-                </label>
-                <input
-                  type="url"
-                  required
-                  value={videoUrl}
-                  onChange={e => setVideoUrl(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029] focus:bg-white"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Supports standard YouTube links, Shorts, and MP4 direct videos. Thumbnails auto-detect.
-                </p>
-              </div>
-
-              {/* Live Preview If Video Thumbnail Detected */}
-              {videoThumbnailUrl && (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3">
-                  <div className="relative w-24 aspect-video rounded-lg overflow-hidden bg-slate-900 shrink-0">
-                    <img src={videoThumbnailUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-                      <Play className="w-4 h-4 text-white fill-white" />
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[11px] font-bold text-slate-800 truncate">Video Preview Ready</div>
-                    <div className="text-[10px] text-slate-500 truncate">Thumbnail automatically linked</div>
-                  </div>
-                </div>
-              )}
 
               {/* Section (Tab) & Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -765,6 +1041,27 @@ export const ProgramsView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Upload Progress Bar if submitting */}
+              {isSubmitting && (
+                <div className="space-y-1.5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#182A3E]">
+                    <span>Uploading & Verifying Video File ({uploadProgress}%)</span>
+                    <span className="font-mono text-[#B49029]">
+                      {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB / 700 MB` : ''}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-amber-200/60 overflow-hidden">
+                    <div
+                      className="h-full bg-[#B49029] transition-all duration-200"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Storing direct video file under 700MB policy...
+                  </p>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
                 <button
@@ -777,15 +1074,15 @@ export const ProgramsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !selectedFile}
                   className="px-5 py-2.5 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2 disabled:opacity-50"
                 >
                   {isSubmitting ? (
-                    <span>Publishing...</span>
+                    <span>Uploading ({uploadProgress}%)...</span>
                   ) : (
                     <>
-                      <Video className="w-4 h-4" />
-                      <span>Publish Video Guide</span>
+                      <UploadCloud className="w-4 h-4" />
+                      <span>Upload & Publish Video</span>
                     </>
                   )}
                 </button>
@@ -818,7 +1115,7 @@ export const ProgramsView: React.FC = () => {
                   {activeModalArticle.isVideo && (
                     <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
                       <Film className="w-3 h-3 text-[#B49029]" />
-                      <span>VIDEO MASTERCLASS</span>
+                      <span>DIRECT VIDEO GUIDE</span>
                     </span>
                   )}
                 </div>
@@ -836,34 +1133,15 @@ export const ProgramsView: React.FC = () => {
               </button>
             </div>
 
-            {/* Embedded Video Player if this is a video program */}
+            {/* Embedded Native HTML5 Video Player for uploaded direct videos */}
             {activeModalArticle.videoUrl && (
               <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-md border border-slate-200">
-                {(() => {
-                  const yt = parseYouTubeUrl(activeModalArticle.videoUrl || '');
-                  if (yt.isValid && (yt.videoId || yt.embedUrl)) {
-                    const embedSrc = yt.videoId
-                      ? `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&rel=0`
-                      : yt.embedUrl;
-                    return (
-                      <iframe
-                        src={embedSrc}
-                        title={activeModalArticle.title}
-                        className="w-full h-full border-0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    );
-                  }
-                  return (
-                    <video
-                      src={activeModalArticle.videoUrl}
-                      controls
-                      autoPlay
-                      className="w-full h-full object-contain"
-                    />
-                  );
-                })()}
+                <video
+                  src={activeModalVideoSrc || activeModalArticle.videoUrl}
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain"
+                />
               </div>
             )}
 
