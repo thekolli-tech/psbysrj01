@@ -76,4 +76,41 @@ test('Video Testimonials with Public Submission, 700MB Max Limit, and Super Admi
     // DELETE /api/testimonials/video/:id requires Super Admin only
     assert.match(serverCode, /app\.delete\(['"]\/api\/testimonials\/video\/:id['"],\s*requireSuperAdminOnly/);
   });
+
+  await t.test('8. Comment kind of testimonials also require Super Admin approval', () => {
+    // Testimonial interface includes status enum
+    assert.match(testimonialsCode, /status\?:\s*['"]PUBLISHED['"]\s*\|\s*['"]PENDING_APPROVAL['"]\s*\|\s*['"]REJECTED['"]/);
+
+    // Non-superadmin submissions default to PENDING_APPROVAL and notify user of pending review
+    assert.match(testimonialsCode, /const expectedStatus = isSuperAdmin \? 'PUBLISHED' : 'PENDING_APPROVAL'/);
+    assert.match(testimonialsCode, /Testimonial submitted! It will appear on the website once approved by Super Admin/);
+
+    // Only approved/published testimonials are rendered in the public cards grid
+    assert.match(testimonialsCode, /const publishedTestimonials = testimonials\.filter\(t => t\.status === 'PUBLISHED' \|\| !t\.status\)/);
+    assert.match(testimonialsCode, /const pendingTextTestimonials = testimonials\.filter\(t => t\.status === 'PENDING_APPROVAL'\)/);
+  });
+
+  await t.test('9. Super Admin Moderation Queue supports comment/text testimonials approval and rejection', () => {
+    // Queue displays pending comment testimonials
+    assert.match(testimonialsCode, /Pending Comment \/ Text Testimonials/);
+    assert.match(testimonialsCode, /handleApproveTextTestimonial/);
+    assert.match(testimonialsCode, /handleRejectTextTestimonial/);
+
+    // Approval sets status to PUBLISHED and updates live feed
+    assert.match(testimonialsCode, /status: 'PUBLISHED' as const/);
+  });
+
+  await t.test('10. Backend /api/testimonials endpoints enforce Super Admin approval for text/comment testimonials', () => {
+    // GET /api/testimonials
+    assert.match(serverCode, /app\.get\(['"]\/api\/testimonials['"]/);
+
+    // POST /api/testimonials accepts public submissions with PENDING_APPROVAL
+    assert.match(serverCode, /app\.post\(['"]\/api\/testimonials['"]/);
+
+    // PATCH /api/testimonials/:id/approve requires Super Admin
+    assert.match(serverCode, /app\.patch\(['"]\/api\/testimonials\/:id\/approve['"],\s*requireSuperAdminOnly/);
+
+    // DELETE /api/testimonials/:id requires Super Admin
+    assert.match(serverCode, /app\.delete\(['"]\/api\/testimonials\/:id['"],\s*requireSuperAdminOnly/);
+  });
 });

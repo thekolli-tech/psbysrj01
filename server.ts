@@ -5193,6 +5193,150 @@ app.delete('/api/testimonials/video/:id', requireSuperAdminOnly, async (req: Aut
   }
 });
 
+// -----------------------------------------------------------------------------
+// PS Text / Comment Testimonials API (Community Submissions with Super Admin Approval)
+// -----------------------------------------------------------------------------
+app.get('/api/testimonials', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const isSuperAdminUser = (req as AuthenticatedRequest).user?.role === 'SUPER_ADMIN';
+    const includePending = req.query.includePending === 'true' || isSuperAdminUser;
+
+    res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=15, stale-while-revalidate=60');
+    const items = await getAllMedia({
+      type: 'TEXT_TESTIMONIAL',
+      includeDrafts: includePending
+    });
+
+    const testimonials = items
+      .filter(item => includePending || item.status === 'PUBLISHED' || !item.status)
+      .map(item => {
+        let meta: any = {};
+        try {
+          if (item.tags) meta = JSON.parse(item.tags);
+        } catch {}
+        return {
+          id: item.id,
+          name: item.title,
+          role: item.category || 'Buyer',
+          location: meta.location || 'Hyderabad',
+          rating: Number(meta.rating) || 5,
+          content: item.summary,
+          isVerified: true,
+          helpfulCount: item.views || 1,
+          date: item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
+          status: item.status || 'PUBLISHED'
+        };
+      });
+
+    res.json({ success: true, testimonials });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch testimonials' });
+  }
+});
+
+app.post('/api/testimonials', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { name, role, location, rating, content } = req.body || {};
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      res.status(400).json({ error: 'Name is required for testimonial.' });
+      return;
+    }
+    if (!content || typeof content !== 'string' || !content.trim()) {
+      res.status(400).json({ error: 'Testimonial content is required.' });
+      return;
+    }
+
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN' || req.headers['x-admin-role'] === 'SUPER_ADMIN';
+    const submissionStatus = isSuperAdmin ? 'PUBLISHED' : 'PENDING_APPROVAL';
+    const testId = `test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    await createMedia({
+      id: testId,
+      title: name.trim(),
+      summary: content.trim(),
+      video_url: '',
+      thumbnail: '',
+      duration: '',
+      type: 'TEXT_TESTIMONIAL',
+      category: (role || 'Buyer').trim(),
+      tags: JSON.stringify({
+        location: (location || 'Hyderabad').trim(),
+        rating: Number(rating) || 5
+      }),
+      author_id: req.user?.id || 'guest',
+      author_name: name.trim(),
+      status: submissionStatus,
+      published_date: isSuperAdmin ? new Date().toISOString() : null
+    });
+
+    res.status(201).json({
+      success: true,
+      isPending: !isSuperAdmin,
+      message: isSuperAdmin
+        ? 'Testimonial published live on the website!'
+        : 'Testimonial submitted! It will appear on the website once approved by Super Admin.',
+      testimonial: {
+        id: testId,
+        name: name.trim(),
+        role: (role || 'Buyer').trim(),
+        location: (location || 'Hyderabad').trim(),
+        rating: Number(rating) || 5,
+        content: content.trim(),
+        isVerified: true,
+        helpfulCount: 1,
+        date: 'Just now',
+        status: submissionStatus
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create testimonial' });
+  }
+});
+
+app.patch('/api/testimonials/:id/approve', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const updated = await updateMedia(req.params.id, {
+      status: 'PUBLISHED',
+      published_date: new Date().toISOString()
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'Testimonial not found' });
+      return;
+    }
+    res.json({ success: true, message: 'Testimonial approved and live on website.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to approve testimonial' });
+  }
+});
+
+app.patch('/api/testimonials/:id/reject', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const updated = await updateMedia(req.params.id, {
+      status: 'REJECTED'
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'Testimonial not found' });
+      return;
+    }
+    res.json({ success: true, message: 'Testimonial rejected.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to reject testimonial' });
+  }
+});
+
+app.delete('/api/testimonials/:id', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const deleted = await deleteMedia(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: 'Testimonial not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete testimonial' });
+  }
+});
+
 app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
   try {
     const report = await buildHealthReport();

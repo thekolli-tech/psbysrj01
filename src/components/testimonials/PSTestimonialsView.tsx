@@ -34,6 +34,7 @@ export interface Testimonial {
   isVerified: boolean;
   helpfulCount: number;
   date: string;
+  status?: 'PUBLISHED' | 'PENDING_APPROVAL' | 'REJECTED';
 }
 
 export interface VideoTestimonial {
@@ -123,7 +124,8 @@ const INITIAL_TESTIMONIALS: Testimonial[] = [
     content: 'The RERA audit checklists saved us months of anxiety. Completely transparent data without developer spin.',
     isVerified: true,
     helpfulCount: 42,
-    date: '2 days ago'
+    date: '2 days ago',
+    status: 'PUBLISHED'
   },
   {
     id: 'test-2',
@@ -134,7 +136,8 @@ const INITIAL_TESTIMONIALS: Testimonial[] = [
     content: 'Neopolis rental yield analytics are spot on. Highly recommended for NRI investors looking at premium Hyderabad high-rises.',
     isVerified: true,
     helpfulCount: 38,
-    date: '4 days ago'
+    date: '4 days ago',
+    status: 'PUBLISHED'
   },
   {
     id: 'test-3',
@@ -145,7 +148,8 @@ const INITIAL_TESTIMONIALS: Testimonial[] = [
     content: 'Lead marketplace economics are fair and transparent. Quality leads with verified budgets and zero broker spam.',
     isVerified: true,
     helpfulCount: 29,
-    date: '1 week ago'
+    date: '1 week ago',
+    status: 'PUBLISHED'
   },
   {
     id: 'test-4',
@@ -156,7 +160,8 @@ const INITIAL_TESTIMONIALS: Testimonial[] = [
     content: 'PMO workspace milestone tracking connects us directly with verified buyers and serious institutional investors.',
     isVerified: true,
     helpfulCount: 19,
-    date: '1 week ago'
+    date: '1 week ago',
+    status: 'PUBLISHED'
   },
   {
     id: 'test-5',
@@ -167,7 +172,8 @@ const INITIAL_TESTIMONIALS: Testimonial[] = [
     content: 'Found our 3BHK in Tellapur through verified listings without broker calls. The legal documentation checklist was indispensable.',
     isVerified: true,
     helpfulCount: 51,
-    date: '2 weeks ago'
+    date: '2 weeks ago',
+    status: 'PUBLISHED'
   },
   {
     id: 'test-6',
@@ -178,7 +184,8 @@ const INITIAL_TESTIMONIALS: Testimonial[] = [
     content: 'The corridor pulse and infrastructure milestone timeline is unmatched in Hyderabad real estate platforms.',
     isVerified: true,
     helpfulCount: 33,
-    date: '3 weeks ago'
+    date: '3 weeks ago',
+    status: 'PUBLISHED'
   }
 ];
 
@@ -187,7 +194,18 @@ export const PSTestimonialsView: React.FC = () => {
   const isSuperAdmin = Boolean(isLoggedIn && currentUser?.role === 'SUPER_ADMIN');
 
   const [selectedRole, setSelectedRole] = useState<string>('All');
-  const [testimonials, setTestimonials] = useState<Testimonial[]>(INITIAL_TESTIMONIALS);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('ps_text_testimonials_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return INITIAL_TESTIMONIALS;
+  });
   const [helpfulVoted, setHelpfulVoted] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -256,8 +274,33 @@ export const PSTestimonialsView: React.FC = () => {
     } catch {}
   };
 
+  // Load dynamic text / comment testimonials from backend
+  const loadTextTestimonials = async () => {
+    try {
+      const url = isSuperAdmin
+        ? '/api/testimonials?includePending=true'
+        : '/api/testimonials';
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.testimonials && Array.isArray(data.testimonials)) {
+          const apiIds = new Set(data.testimonials.map((t: any) => t.id));
+          const combined = [
+            ...data.testimonials,
+            ...INITIAL_TESTIMONIALS.filter(init => !apiIds.has(init.id))
+          ];
+          setTestimonials(combined);
+          try {
+            localStorage.setItem('ps_text_testimonials_cache', JSON.stringify(combined));
+          } catch {}
+        }
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     loadVideoTestimonials();
+    loadTextTestimonials();
   }, [isSuperAdmin]);
 
   // When opening video modal, resolve local blob or remote url
@@ -609,12 +652,14 @@ export const PSTestimonialsView: React.FC = () => {
     }
   };
 
-  const handleSubmitTestimonial = (e: React.FormEvent) => {
+  const handleSubmitTestimonial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authorName.trim() || !authorContent.trim()) return;
 
+    const expectedStatus = isSuperAdmin ? 'PUBLISHED' : 'PENDING_APPROVAL';
+    const testId = `test-${Date.now()}`;
     const newTestimonial: Testimonial = {
-      id: `test-${Date.now()}`,
+      id: testId,
       name: authorName.trim(),
       role: authorRole,
       location: authorLocation.trim() || 'Hyderabad',
@@ -622,18 +667,113 @@ export const PSTestimonialsView: React.FC = () => {
       content: authorContent.trim(),
       isVerified: true,
       helpfulCount: 1,
-      date: 'Just now'
+      date: 'Just now',
+      status: expectedStatus
     };
 
-    setTestimonials([newTestimonial, ...testimonials]);
+    try {
+      const res = await fetch('/api/testimonials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-role': currentUser?.role || ''
+        },
+        body: JSON.stringify({
+          name: authorName.trim(),
+          role: authorRole,
+          location: authorLocation.trim() || 'Hyderabad',
+          rating: authorRating,
+          content: authorContent.trim()
+        })
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data?.testimonial) {
+          newTestimonial.id = data.testimonial.id;
+          newTestimonial.status = data.testimonial.status || expectedStatus;
+        }
+      }
+    } catch {}
+
+    setTestimonials(prev => {
+      const updated = [newTestimonial, ...prev];
+      try {
+        localStorage.setItem('ps_text_testimonials_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
     setModalOpen(false);
     setAuthorName('');
     setAuthorLocation('');
     setAuthorContent('');
-    showToast('Your testimonial has been submitted and verified!');
+
+    if (isSuperAdmin) {
+      showToast('Your testimonial has been published live on the website!');
+    } else {
+      showToast('Testimonial submitted! It will appear on the website once approved by Super Admin.');
+    }
   };
 
-  const filteredTestimonials = testimonials.filter(t => {
+  // Super Admin Approval for Text / Comment Testimonials
+  const handleApproveTextTestimonial = async (id: string) => {
+    if (!isSuperAdmin) return;
+    try {
+      await fetch(`/api/testimonials/${id}/approve`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-role': currentUser?.role || ''
+        }
+      });
+    } catch {}
+
+    setTestimonials(prev => {
+      const updated = prev.map(t => (t.id === id ? { ...t, status: 'PUBLISHED' as const } : t));
+      try {
+        localStorage.setItem('ps_text_testimonials_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    showToast('Testimonial approved! It is now live on the website.');
+  };
+
+  // Super Admin Rejection for Text / Comment Testimonials
+  const handleRejectTextTestimonial = async (id: string) => {
+    if (!isSuperAdmin) return;
+    if (!window.confirm('Reject and delete this testimonial?')) return;
+
+    try {
+      await fetch(`/api/testimonials/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-role': currentUser?.role || ''
+        }
+      });
+    } catch {}
+
+    setTestimonials(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      try {
+        localStorage.setItem('ps_text_testimonials_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    showToast('Testimonial rejected.');
+  };
+
+  // Filter published vs pending video testimonials
+  const publishedVideos = videoTestimonials.filter(v => v.status === 'PUBLISHED');
+  const pendingVideos = videoTestimonials.filter(v => v.status === 'PENDING_APPROVAL');
+
+  // Filter published vs pending text / comment testimonials
+  const publishedTestimonials = testimonials.filter(t => t.status === 'PUBLISHED' || !t.status);
+  const pendingTextTestimonials = testimonials.filter(t => t.status === 'PENDING_APPROVAL');
+
+  const totalPending = pendingVideos.length + pendingTextTestimonials.length;
+
+  // Public cards only display APPROVED testimonials
+  const filteredTestimonials = publishedTestimonials.filter(t => {
     if (selectedRole === 'All') return true;
     if (selectedRole === 'Buyers') return t.role === 'Buyer';
     if (selectedRole === 'Investors') return t.role === 'Investor';
@@ -641,10 +781,6 @@ export const PSTestimonialsView: React.FC = () => {
     if (selectedRole === 'Developers') return t.role === 'Developer';
     return true;
   });
-
-  // Filter published vs pending video testimonials
-  const publishedVideos = videoTestimonials.filter(v => v.status === 'PUBLISHED');
-  const pendingVideos = videoTestimonials.filter(v => v.status === 'PENDING_APPROVAL');
 
   // Active featured video testimonial is the latest APPROVED video
   const featuredVideo = publishedVideos[0] || null;
@@ -688,6 +824,11 @@ export const PSTestimonialsView: React.FC = () => {
           >
             <Plus className="w-4 h-4" />
             <span>Add your testimonial</span>
+            {isSuperAdmin && pendingTextTestimonials.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-white text-[#B49029] text-[10px] font-bold">
+                {pendingTextTestimonials.length} pending
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -695,8 +836,8 @@ export const PSTestimonialsView: React.FC = () => {
       {/* =========================================================================
           SUPER ADMIN MODERATION QUEUE (ONLY VISIBLE TO SUPER ADMIN WHEN PENDING)
           ========================================================================= */}
-      {isSuperAdmin && pendingVideos.length > 0 && (
-        <div className="bg-amber-50/80 border-2 border-amber-300 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 animate-in fade-in duration-150">
+      {isSuperAdmin && totalPending > 0 && (
+        <div className="bg-amber-50/80 border-2 border-amber-300 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5 animate-in fade-in duration-150">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2.5">
               <span className="px-3 py-1 rounded-full bg-[#182A3E] text-amber-300 text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
@@ -704,67 +845,136 @@ export const PSTestimonialsView: React.FC = () => {
                 <span>Super Admin Moderation Queue</span>
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 text-xs font-bold font-mono">
-                {pendingVideos.length} Pending Approval
+                {totalPending} Pending Approval
               </span>
             </div>
             <p className="text-xs text-slate-600 font-medium">
-              Community video submissions awaiting your review. Approve to make live on website.
+              Community video & comment testimonial submissions awaiting your review. Approve to make live on website.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pendingVideos.map(pending => (
-              <div key={pending.id} className="bg-white rounded-2xl p-4 border border-amber-200 shadow-xs space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-slate-900 truncate">{pending.title}</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Submitted by <strong className="text-slate-800">{pending.clientName}</strong> · {pending.clientRole} ({pending.location})
-                    </p>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-amber-600" />
-                    <span>AWAITING APPROVAL</span>
-                  </span>
-                </div>
-
-                {pending.summary && (
-                  <p className="text-xs text-slate-600 line-clamp-2 italic">
-                    "{pending.summary}"
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setActiveModalVideo(pending)}
-                    className="text-xs font-bold text-[#182A3E] hover:text-[#B49029] inline-flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current text-[#B49029]" />
-                    <span>Preview Video ({pending.duration})</span>
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleRejectVideoTestimonial(pending.id)}
-                      className="px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                    >
-                      Reject
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleApproveVideoTestimonial(pending.id)}
-                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Approve & Make Live</span>
-                    </button>
-                  </div>
-                </div>
+          {/* Pending Video Submissions */}
+          {pendingVideos.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                <Video className="w-4 h-4 text-[#B49029]" />
+                <span>Pending Video Testimonials ({pendingVideos.length})</span>
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendingVideos.map(pending => (
+                  <div key={pending.id} className="bg-white rounded-2xl p-4 border border-amber-200 shadow-xs space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-slate-900 truncate">{pending.title}</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Submitted by <strong className="text-slate-800">{pending.clientName}</strong> · {pending.clientRole} ({pending.location})
+                        </p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-amber-600" />
+                        <span>AWAITING APPROVAL</span>
+                      </span>
+                    </div>
+
+                    {pending.summary && (
+                      <p className="text-xs text-slate-600 line-clamp-2 italic">
+                        "{pending.summary}"
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setActiveModalVideo(pending)}
+                        className="text-xs font-bold text-[#182A3E] hover:text-[#B49029] inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current text-[#B49029]" />
+                        <span>Preview Video ({pending.duration})</span>
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRejectVideoTestimonial(pending.id)}
+                          className="px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApproveVideoTestimonial(pending.id)}
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Approve & Make Live</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Comment / Text Testimonial Submissions */}
+          {pendingTextTestimonials.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                <Sparkles className="w-4 h-4 text-[#B49029]" />
+                <span>Pending Comment / Text Testimonials ({pendingTextTestimonials.length})</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendingTextTestimonials.map(pending => (
+                  <div key={pending.id} className="bg-white rounded-2xl p-4 border border-amber-200 shadow-xs space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-sm font-bold text-slate-900 truncate">{pending.name}</h4>
+                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                            {pending.role} · {pending.location}
+                          </span>
+                          <div className="flex items-center gap-0.5 text-amber-400">
+                            {Array.from({ length: pending.rating || 5 }).map((_, i) => (
+                              <Star key={i} className="w-3 h-3 fill-current" />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Submitted {pending.date}
+                        </p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-amber-600" />
+                        <span>AWAITING APPROVAL</span>
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-700 leading-relaxed italic bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      "{pending.content}"
+                    </p>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleRejectTextTestimonial(pending.id)}
+                        className="px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApproveTextTestimonial(pending.id)}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Approve & Make Live</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1397,7 +1607,9 @@ export const PSTestimonialsView: React.FC = () => {
                   Add Your Testimonial
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Share your experience with the Property Studio community.
+                  {isSuperAdmin
+                    ? 'Publish a verified testimonial directly to the website.'
+                    : 'Share your experience with the Property Studio community. Submissions are reviewed and approved by Super Admin before going live.'}
                 </p>
               </div>
               <button
@@ -1493,7 +1705,7 @@ export const PSTestimonialsView: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl font-bold shadow-xs transition-all cursor-pointer"
                 >
-                  Publish Testimonial
+                  {isSuperAdmin ? 'Publish Testimonial' : 'Submit for Approval'}
                 </button>
               </div>
             </form>
