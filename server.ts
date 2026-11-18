@@ -4917,6 +4917,12 @@ app.post('/api/programs', requireSuperAdminOnly, async (req: AuthenticatedReques
       return;
     }
 
+    const trimmedUrl = String(videoUrl || '').trim();
+    if (!trimmedUrl && !fileSizeBytes && !fileName) {
+      res.status(400).json({ error: 'Either a video link URL or a direct video upload file is required.' });
+      return;
+    }
+
     // Direct Video Upload: Enforce 700MB maximum limit
     const MAX_PROGRAM_VIDEO_SIZE = 700 * 1024 * 1024; // 700 MB
     if (fileSizeBytes && Number(fileSizeBytes) > MAX_PROGRAM_VIDEO_SIZE) {
@@ -4925,8 +4931,6 @@ app.post('/api/programs', requireSuperAdminOnly, async (req: AuthenticatedReques
       });
       return;
     }
-
-    const trimmedUrl = String(videoUrl || '').trim();
     let resolvedThumbnail = (thumbnailUrl || '').trim();
     if (!resolvedThumbnail && trimmedUrl) {
       const yt = parseYouTubeUrl(trimmedUrl);

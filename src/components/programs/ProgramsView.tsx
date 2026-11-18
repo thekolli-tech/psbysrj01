@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { parseYouTubeUrl } from '../../shared/mediaParser';
 import {
   BookOpen,
   Bookmark,
@@ -14,7 +15,8 @@ import {
   Trash2,
   UploadCloud,
   Film,
-  FileCheck
+  FileCheck,
+  Link as LinkIcon
 } from 'lucide-react';
 
 export interface ProgramCard {
@@ -244,6 +246,9 @@ export const ProgramsView: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Upload Mode: 'FILE' (Direct Video File Upload) or 'URL' (Video Link / URL)
+  const [uploadMode, setUploadMode] = useState<'FILE' | 'URL'>('FILE');
+
   // Direct File Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
@@ -251,6 +256,10 @@ export const ProgramsView: React.FC = () => {
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Video Link / URL State
+  const [videoUrl, setVideoUrl] = useState('');
+  const [urlPreviewValid, setUrlPreviewValid] = useState<boolean | null>(null);
 
   // Form Fields
   const [videoTitle, setVideoTitle] = useState('');
@@ -370,6 +379,26 @@ export const ProgramsView: React.FC = () => {
     }
   };
 
+  const handleVideoUrlChange = (val: string) => {
+    setVideoUrl(val);
+    const trimmed = val.trim();
+    if (!trimmed) {
+      setUrlPreviewValid(null);
+      return;
+    }
+    const yt = parseYouTubeUrl(trimmed);
+    if (yt.isValid && (yt.videoId || yt.embedUrl)) {
+      setUrlPreviewValid(true);
+      if (yt.thumbnailUrl && !videoThumbnailUrl) {
+        setVideoThumbnailUrl(yt.maxResThumbnailUrl || yt.thumbnailUrl);
+      }
+    } else if (/^https?:\/\/.+\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(trimmed) || trimmed.includes('vimeo.com')) {
+      setUrlPreviewValid(true);
+    } else {
+      setUrlPreviewValid(false);
+    }
+  };
+
   // Auto-detect duration and capture thumbnail frame from the loaded video element
   const handleVideoLoadedMetadata = () => {
     if (videoPreviewRef.current) {
@@ -433,6 +462,9 @@ export const ProgramsView: React.FC = () => {
 
   const resetForm = () => {
     handleRemoveFile();
+    setVideoUrl('');
+    setUrlPreviewValid(null);
+    setUploadMode('FILE');
     setVideoTitle('');
     setVideoCategory('Legal');
     setVideoTab('TIPS');
@@ -453,14 +485,21 @@ export const ProgramsView: React.FC = () => {
       showToast('Please enter a video title.');
       return;
     }
-    if (!selectedFile) {
-      showToast('Please select a video file to upload (Max 700 MB).');
-      return;
-    }
 
-    if (selectedFile.size > MAX_PROGRAM_VIDEO_SIZE_BYTES) {
-      showToast('File exceeds 700 MB limit. Please choose a smaller video.');
-      return;
+    if (uploadMode === 'FILE') {
+      if (!selectedFile) {
+        showToast('Please select a video file to upload (Max 700 MB).');
+        return;
+      }
+      if (selectedFile.size > MAX_PROGRAM_VIDEO_SIZE_BYTES) {
+        showToast('File exceeds 700 MB limit. Please choose a smaller video.');
+        return;
+      }
+    } else {
+      if (!videoUrl.trim()) {
+        showToast('Please enter a video link / URL (YouTube, Vimeo, MP4 direct).');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -468,12 +507,36 @@ export const ProgramsView: React.FC = () => {
 
     try {
       const programId = `prog_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-      // Save video file to local IndexedDB for immediate playback
-      await saveVideoBlob(programId, selectedFile);
-      setUploadProgress(65);
-
       const cleanSteps = videoSteps.map(s => s.trim()).filter(Boolean);
+
+      let finalVideoUrl = '';
+      let finalThumbnail = videoThumbnailUrl;
+      let finalFileName: string | undefined = undefined;
+      let finalFileSizeBytes: number | undefined = undefined;
+
+      if (uploadMode === 'FILE' && selectedFile) {
+        // Save video file to local IndexedDB for immediate playback
+        await saveVideoBlob(programId, selectedFile);
+        setUploadProgress(65);
+        finalVideoUrl = filePreviewUrl || `/api/programs/${programId}/video`;
+        finalFileName = selectedFile.name;
+        finalFileSizeBytes = selectedFile.size;
+        if (!finalThumbnail) {
+          finalThumbnail = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+        }
+      } else {
+        // Video Link / URL mode
+        finalVideoUrl = videoUrl.trim();
+        const yt = parseYouTubeUrl(finalVideoUrl);
+        if (yt.isValid && yt.thumbnailUrl && !finalThumbnail) {
+          finalThumbnail = yt.maxResThumbnailUrl || yt.thumbnailUrl;
+        }
+        if (!finalThumbnail) {
+          finalThumbnail = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+        }
+      }
+
+      setUploadProgress(75);
 
       // Post program metadata to backend
       const res = await fetch('/api/programs', {
@@ -482,14 +545,14 @@ export const ProgramsView: React.FC = () => {
         body: JSON.stringify({
           title: videoTitle.trim(),
           summary: videoSummary.trim(),
-          videoUrl: filePreviewUrl || `/api/programs/${programId}/video`,
+          videoUrl: finalVideoUrl,
           category: videoCategory,
           tab: videoTab,
           readTime: videoDuration.trim() || '5 min watch',
           steps: cleanSteps,
-          thumbnailUrl: videoThumbnailUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
-          fileName: selectedFile.name,
-          fileSizeBytes: selectedFile.size
+          thumbnailUrl: finalThumbnail,
+          fileName: finalFileName,
+          fileSizeBytes: finalFileSizeBytes
         })
       });
 
@@ -510,11 +573,11 @@ export const ProgramsView: React.FC = () => {
         tab: videoTab,
         readTime: videoDuration.trim() || '5 min watch',
         steps: cleanSteps,
-        videoUrl: filePreviewUrl || `/api/programs/${programId}/video`,
-        thumbnailUrl: videoThumbnailUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+        videoUrl: finalVideoUrl,
+        thumbnailUrl: finalThumbnail,
         isVideo: true,
-        fileName: selectedFile.name,
-        fileSizeBytes: selectedFile.size,
+        fileName: finalFileName,
+        fileSizeBytes: finalFileSizeBytes,
         authorName: currentUser?.name || 'Property Studio Secretariat',
         createdAt: new Date().toISOString()
       };
@@ -527,7 +590,11 @@ export const ProgramsView: React.FC = () => {
         return updated;
       });
 
-      showToast('Academy video guide uploaded successfully (Max 700MB verified)!');
+      showToast(
+        uploadMode === 'FILE'
+          ? 'Academy video guide uploaded successfully (Max 700MB verified)!'
+          : 'Academy video link published successfully!'
+      );
       resetForm();
     } catch (err: any) {
       showToast(err.message || 'Error uploading video guide');
@@ -810,7 +877,7 @@ export const ProgramsView: React.FC = () => {
                   Post Academy Video Guide
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Direct video file upload (Max 700 MB allowed) · PS Academy
+                  Direct video file upload (Max 700 MB) or video link (YouTube, Vimeo, MP4 direct) · PS Academy
                 </p>
               </div>
               <button
@@ -825,101 +892,219 @@ export const ProgramsView: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateVideoProgram} className="space-y-4">
-              {/* Direct Video File Upload Area (Max 700 MB) */}
+              {/* Segmented Mode Switcher: Direct Upload vs Video Link */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Upload Video File (Max 700 MB) *
-                  </label>
-                  {selectedFile && (
-                    <span className="text-[11px] font-mono text-[#B49029] font-bold">
-                      {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB / 700 MB
-                    </span>
-                  )}
-                </div>
-
-                {!selectedFile ? (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={handleFileDrop}
-                    className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
-                      isDragging
-                        ? 'border-[#B49029] bg-amber-50/50 scale-[0.99]'
-                        : 'border-slate-300 hover:border-[#B49029] bg-slate-50 hover:bg-white'
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Select Video Source *
+                </label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setUploadMode('FILE')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      uploadMode === 'FILE'
+                        ? 'bg-white text-[#182A3E] shadow-xs border border-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/*"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-[#B49029] border border-amber-200/80 flex items-center justify-center mx-auto mb-2 shadow-2xs">
-                      <UploadCloud className="w-6 h-6 text-[#B49029]" />
-                    </div>
-                    <p className="text-xs font-bold text-slate-800">
-                      Click to browse or drag video file here
-                    </p>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Direct video upload from files · MP4, WebM, MOV · Max 700 MB allowed
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-[#182A3E] text-white flex items-center justify-center shrink-0 shadow-xs">
-                          <Film className="w-5 h-5 text-amber-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-slate-900 truncate">
-                            {selectedFile.name}
-                          </div>
-                          <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
-                            <span className="font-mono font-semibold">{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</span>
-                            <span>·</span>
-                            <span className="text-emerald-600 font-semibold flex items-center gap-0.5">
-                              <FileCheck className="w-3 h-3 inline" />
-                              <span>Verified within 700MB limit</span>
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                    <UploadCloud className="w-4 h-4 text-[#B49029]" />
+                    <span>Direct Video Upload</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUploadMode('URL')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      uploadMode === 'URL'
+                        ? 'bg-white text-[#182A3E] shadow-xs border border-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <LinkIcon className="w-4 h-4 text-[#B49029]" />
+                    <span>Video Link / URL</span>
+                  </button>
+                </div>
+              </div>
 
-                      <button
-                        type="button"
-                        onClick={handleRemoveFile}
-                        className="px-2.5 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors cursor-pointer"
-                      >
-                        Change
-                      </button>
-                    </div>
-
-                    {/* Video Live Preview & Auto-Thumbnail Frame Capture */}
-                    {filePreviewUrl && (
-                      <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black shadow-inner">
-                        <video
-                          ref={videoPreviewRef}
-                          src={filePreviewUrl}
-                          controls
-                          className="w-full h-full object-contain"
-                          onLoadedMetadata={handleVideoLoadedMetadata}
-                        />
-                      </div>
+              {/* Mode 1: Direct Video File Upload Area (Max 700 MB) */}
+              {uploadMode === 'FILE' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Upload Video File (Max 700 MB) *
+                    </label>
+                    {selectedFile && (
+                      <span className="text-[11px] font-mono text-[#B49029] font-bold">
+                        {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB / 700 MB
+                      </span>
                     )}
                   </div>
-                )}
 
-                {fileError && (
-                  <p className="text-xs text-red-600 font-semibold mt-1.5 flex items-center gap-1">
-                    <span>⚠️</span>
-                    <span>{fileError}</span>
+                  {!selectedFile ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={handleFileDrop}
+                      className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
+                        isDragging
+                          ? 'border-[#B49029] bg-amber-50/50 scale-[0.99]'
+                          : 'border-slate-300 hover:border-[#B49029] bg-slate-50 hover:bg-white'
+                      }`}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-[#B49029] border border-amber-200/80 flex items-center justify-center mx-auto mb-2 shadow-2xs">
+                        <UploadCloud className="w-6 h-6 text-[#B49029]" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-800">
+                        Click to browse or drag video file here
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Direct video upload from files · MP4, WebM, MOV · Max 700 MB allowed
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-[#182A3E] text-white flex items-center justify-center shrink-0 shadow-xs">
+                            <Film className="w-5 h-5 text-amber-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-900 truncate">
+                              {selectedFile.name}
+                            </div>
+                            <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                              <span className="font-mono font-semibold">{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</span>
+                              <span>·</span>
+                              <span className="text-emerald-600 font-semibold flex items-center gap-0.5">
+                                <FileCheck className="w-3 h-3 inline" />
+                                <span>Verified within 700MB limit</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleRemoveFile}
+                          className="px-2.5 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors cursor-pointer"
+                        >
+                          Change
+                        </button>
+                      </div>
+
+                      {/* Video Live Preview & Auto-Thumbnail Frame Capture */}
+                      {filePreviewUrl && (
+                        <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black shadow-inner">
+                          <video
+                            ref={videoPreviewRef}
+                            src={filePreviewUrl}
+                            controls
+                            className="w-full h-full object-contain"
+                            onLoadedMetadata={handleVideoLoadedMetadata}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {fileError && (
+                    <p className="text-xs text-red-600 font-semibold mt-1.5 flex items-center gap-1">
+                      <span>⚠️</span>
+                      <span>{fileError}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Mode 2: Video Link / URL Input */}
+              {uploadMode === 'URL' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Video Link / URL *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <LinkIcon className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="url"
+                      value={videoUrl}
+                      onChange={e => handleVideoUrlChange(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=... or Vimeo or direct MP4 link"
+                      className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029] focus:bg-white"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Supports YouTube, Vimeo, and direct MP4 video links.
                   </p>
-                )}
-              </div>
+
+                  {/* Live Preview for Video URL */}
+                  {videoUrl.trim() && (
+                    <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                      {(() => {
+                        const yt = parseYouTubeUrl(videoUrl);
+                        if (yt.isValid && (yt.videoId || yt.embedUrl)) {
+                          const embedSrc = yt.videoId
+                            ? `https://www.youtube-nocookie.com/embed/${yt.videoId}`
+                            : yt.embedUrl;
+                          return (
+                            <div className="space-y-2">
+                              <div className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Valid YouTube Link Detected</span>
+                              </div>
+                              <div className="aspect-video w-full rounded-xl overflow-hidden bg-black shadow-inner">
+                                <iframe
+                                  src={embedSrc}
+                                  title="YouTube Preview"
+                                  className="w-full h-full border-0"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                />
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (videoUrl.includes('vimeo.com')) {
+                          const vimeoMatch = videoUrl.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)/);
+                          if (vimeoMatch && vimeoMatch[3]) {
+                            return (
+                              <div className="space-y-2">
+                                <div className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Valid Vimeo Link Detected</span>
+                                </div>
+                                <div className="aspect-video w-full rounded-xl overflow-hidden bg-black shadow-inner">
+                                  <iframe
+                                    src={`https://player.vimeo.com/video/${vimeoMatch[3]}`}
+                                    title="Vimeo Preview"
+                                    className="w-full h-full border-0"
+                                    allow="autoplay; fullscreen; picture-in-picture"
+                                    allowFullScreen
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+                        }
+                        return (
+                          <div className="text-[11px] text-slate-600 flex items-center gap-1.5">
+                            <Film className="w-4 h-4 text-[#B49029]" />
+                            <span>Direct video URL link configured</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Video Title */}
               <div>
@@ -1041,8 +1226,8 @@ export const ProgramsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Upload Progress Bar if submitting */}
-              {isSubmitting && (
+              {/* Upload Progress Bar if submitting file */}
+              {isSubmitting && uploadMode === 'FILE' && (
                 <div className="space-y-1.5 p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 animate-in fade-in duration-150">
                   <div className="flex items-center justify-between text-xs font-bold text-[#182A3E]">
                     <span>Uploading & Verifying Video File ({uploadProgress}%)</span>
@@ -1074,15 +1259,15 @@ export const ProgramsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !selectedFile}
+                  disabled={isSubmitting || (uploadMode === 'FILE' ? !selectedFile : !videoUrl.trim())}
                   className="px-5 py-2.5 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2 disabled:opacity-50"
                 >
                   {isSubmitting ? (
-                    <span>Uploading ({uploadProgress}%)...</span>
+                    <span>{uploadMode === 'FILE' ? `Uploading (${uploadProgress}%)...` : 'Publishing...'}</span>
                   ) : (
                     <>
-                      <UploadCloud className="w-4 h-4" />
-                      <span>Upload & Publish Video</span>
+                      {uploadMode === 'FILE' ? <UploadCloud className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                      <span>{uploadMode === 'FILE' ? 'Upload & Publish Video' : 'Publish Video Link'}</span>
                     </>
                   )}
                 </button>
@@ -1115,7 +1300,7 @@ export const ProgramsView: React.FC = () => {
                   {activeModalArticle.isVideo && (
                     <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
                       <Film className="w-3 h-3 text-[#B49029]" />
-                      <span>DIRECT VIDEO GUIDE</span>
+                      <span>ACADEMY VIDEO GUIDE</span>
                     </span>
                   )}
                 </div>
@@ -1133,15 +1318,47 @@ export const ProgramsView: React.FC = () => {
               </button>
             </div>
 
-            {/* Embedded Native HTML5 Video Player for uploaded direct videos */}
+            {/* Embedded Video Player (Supports YouTube, Vimeo, direct MP4 link, or direct upload) */}
             {activeModalArticle.videoUrl && (
               <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-md border border-slate-200">
-                <video
-                  src={activeModalVideoSrc || activeModalArticle.videoUrl}
-                  controls
-                  autoPlay
-                  className="w-full h-full object-contain"
-                />
+                {(() => {
+                  const targetUrl = activeModalArticle.videoUrl || '';
+                  const yt = parseYouTubeUrl(targetUrl);
+                  if (yt.isValid && (yt.videoId || yt.embedUrl)) {
+                    const embedSrc = yt.videoId
+                      ? `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&rel=0`
+                      : yt.embedUrl;
+                    return (
+                      <iframe
+                        src={embedSrc}
+                        title={activeModalArticle.title}
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    );
+                  }
+                  const vimeoMatch = targetUrl.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)/);
+                  if (vimeoMatch && vimeoMatch[3]) {
+                    return (
+                      <iframe
+                        src={`https://player.vimeo.com/video/${vimeoMatch[3]}?autoplay=1`}
+                        title={activeModalArticle.title}
+                        className="w-full h-full border-0"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                      />
+                    );
+                  }
+                  return (
+                    <video
+                      src={activeModalVideoSrc || targetUrl}
+                      controls
+                      autoPlay
+                      className="w-full h-full object-contain"
+                    />
+                  );
+                })()}
               </div>
             )}
 

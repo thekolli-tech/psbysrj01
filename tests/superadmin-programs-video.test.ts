@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-test('Super Admin exclusive Direct Video Upload Feature in Programs PS Academy', async (t) => {
+test('Super Admin exclusive Video Posting with BOTH Direct Upload and Video Link in Programs PS Academy', async (t) => {
   const programsViewCode = fs.readFileSync('src/components/programs/ProgramsView.tsx', 'utf-8');
   const serverCode = fs.readFileSync('server.ts', 'utf-8');
 
@@ -18,11 +18,12 @@ test('Super Admin exclusive Direct Video Upload Feature in Programs PS Academy',
     assert.match(programsViewCode, /isSuperAdmin\s*&&\s*article\.id\.startsWith/);
   });
 
-  await t.test('2. "YouTube, Vimeo, MP4 direct" URL inputs are completely removed', () => {
-    // Verifies no URL input or text for YouTube/Vimeo/MP4 direct
-    assert.doesNotMatch(programsViewCode, /YouTube,\s*Vimeo,\s*MP4 direct/i);
-    assert.doesNotMatch(programsViewCode, /Supports standard YouTube links,\s*Shorts/i);
-    assert.doesNotMatch(programsViewCode, /https:\/\/www\.youtube\.com\/watch/i);
+  await t.test('2. Dual-mode support: Both Direct Video Upload and Video Link / URL features are available', () => {
+    // Segmented switcher for both options
+    assert.match(programsViewCode, /Direct Video Upload/);
+    assert.match(programsViewCode, /Video Link \/ URL/);
+    assert.match(programsViewCode, /uploadMode\s*===\s*['"]FILE['"]/);
+    assert.match(programsViewCode, /uploadMode\s*===\s*['"]URL['"]/);
   });
 
   await t.test('3. Direct video upload from files is implemented with max 700MB size limit', () => {
@@ -41,19 +42,30 @@ test('Super Admin exclusive Direct Video Upload Feature in Programs PS Academy',
     assert.match(programsViewCode, /Direct video upload from files · MP4, WebM, MOV · Max 700 MB allowed/);
   });
 
-  await t.test('4. Embedded HTML5 video player handles direct uploaded videos with controls', () => {
-    assert.match(programsViewCode, /<video/);
-    assert.match(programsViewCode, /controls/);
-    assert.match(programsViewCode, /autoPlay/);
-    assert.match(programsViewCode, /DIRECT VIDEO GUIDE/);
+  await t.test('4. Video Link / URL input supports YouTube, Vimeo, and direct MP4 with live preview', () => {
+    assert.match(programsViewCode, /parseYouTubeUrl/);
+    assert.match(programsViewCode, /Supports YouTube, Vimeo, and direct MP4 video links/);
+    assert.match(programsViewCode, /Valid YouTube Link Detected/);
+    assert.match(programsViewCode, /vimeo\.com/);
   });
 
-  await t.test('5. Backend /api/programs enforces requireSuperAdminOnly and 700MB size limit server-side', () => {
+  await t.test('5. Embedded video player in modal handles both iframe (YouTube/Vimeo) and native HTML5 video (uploaded / MP4)', () => {
+    assert.match(programsViewCode, /<video/);
+    assert.match(programsViewCode, /<iframe/);
+    assert.match(programsViewCode, /youtube-nocookie\.com\/embed/);
+    assert.match(programsViewCode, /player\.vimeo\.com\/video/);
+    assert.match(programsViewCode, /controls/);
+  });
+
+  await t.test('6. Backend /api/programs enforces requireSuperAdminOnly, 700MB size limit, and accepts both file or URL', () => {
     // GET /api/programs is open for public viewing
     assert.match(serverCode, /app\.get\(['"]\/api\/programs['"]/);
 
     // POST /api/programs requires Super Admin only
     assert.match(serverCode, /app\.post\(['"]\/api\/programs['"],\s*requireSuperAdminOnly/);
+
+    // Requires either URL or file
+    assert.match(serverCode, /Either a video link URL or a direct video upload file is required/);
 
     // Server-side 700MB limit check
     assert.match(serverCode, /MAX_PROGRAM_VIDEO_SIZE\s*=\s*700\s*\*\s*1024\s*\*\s*1024/);
