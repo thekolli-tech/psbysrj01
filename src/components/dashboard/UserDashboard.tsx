@@ -232,8 +232,13 @@ export const UserDashboard: React.FC<{ initialMode?: 'FEED' | 'WORKSPACE' }> = (
   // Synchronize when activeWorkspaceTab changes
   useEffect(() => {
     if (activeWorkspaceTab) {
-      setActiveTab(activeWorkspaceTab);
-      setDashboardViewMode('WORKSPACE');
+      if (activeWorkspaceTab === 'SAVED') {
+        setDashboardViewMode('WORKSPACE');
+        setActiveTab('COMMUNITY');
+      } else {
+        setActiveTab(activeWorkspaceTab);
+        setDashboardViewMode('WORKSPACE');
+      }
     }
   }, [activeWorkspaceTab]);
 

@@ -1569,7 +1569,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
           }
 
           // Enforce channel association
-          const recordChannel: 'sms' | 'voice' = sessionRecord.channel || (sessionRecord.provider?.includes('voice') ? 'voice' : 'sms');
+          const recordChannel: 'sms' | 'voice' = sessionRecord.channel === 'voice' || sessionRecord.provider?.includes('voice') ? 'voice' : 'sms';
           if (requestedChannel && requestedChannel !== recordChannel) {
             res.status(400).json({
               error: `Verification channel mismatch. The verification code was sent via ${recordChannel.toUpperCase()}, but verification was requested for ${requestedChannel.toUpperCase()}.`,
@@ -1583,7 +1583,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
         const phoneRecord = await getAsyncOtpDeliveryStatus(phone);
         if (phoneRecord?.providerMessageId && phoneRecord.provider?.includes('2factor')) {
           activeSessionId = phoneRecord.providerMessageId;
-          const recordChannel: 'sms' | 'voice' = phoneRecord.channel || (phoneRecord.provider?.includes('voice') ? 'voice' : 'sms');
+          const recordChannel: 'sms' | 'voice' = phoneRecord.channel === 'voice' || phoneRecord.provider?.includes('voice') ? 'voice' : 'sms';
           if (requestedChannel && requestedChannel !== recordChannel) {
             res.status(400).json({
               error: `Verification channel mismatch. The active code was sent via ${recordChannel.toUpperCase()}.`,
@@ -4873,6 +4873,123 @@ app.put('/api/conference', requireAdmin, async (req: Request, res: Response): Pr
     res.json({ success: true, conference: updated });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// PS Academy Programs API
+// -----------------------------------------------------------------------------
+app.get('/api/programs', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=60, stale-while-revalidate=300');
+    const items = await getAllMedia({ type: 'ACADEMY_PROGRAM' });
+    const programs = items.map(item => {
+      let meta: { tab?: string; steps?: string[] } = {};
+      try {
+        if (item.tags) meta = JSON.parse(item.tags);
+      } catch {}
+      return {
+        id: item.id,
+        title: item.title,
+        summary: item.summary,
+        category: item.category || 'Legal',
+        tab: meta.tab || 'TIPS',
+        readTime: item.duration || '5 min watch',
+        steps: Array.isArray(meta.steps) ? meta.steps : [],
+        videoUrl: item.video_url || item.media_url || '',
+        thumbnailUrl: item.thumbnail || '',
+        isVideo: true,
+        authorName: item.author_name || 'Property Studio Secretariat',
+        createdAt: item.created_at
+      };
+    });
+    res.json({ success: true, programs });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch academy programs' });
+  }
+});
+
+app.post('/api/programs', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { title, summary, videoUrl, category, tab, readTime, steps, thumbnailUrl } = req.body || {};
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      res.status(400).json({ error: 'Title is required for academy video program.' });
+      return;
+    }
+    if (!videoUrl || typeof videoUrl !== 'string' || !videoUrl.trim()) {
+      res.status(400).json({ error: 'Video URL is required.' });
+      return;
+    }
+
+    const trimmedUrl = videoUrl.trim();
+    let resolvedThumbnail = (thumbnailUrl || '').trim();
+    if (!resolvedThumbnail && trimmedUrl) {
+      const yt = parseYouTubeUrl(trimmedUrl);
+      if (yt.isValid && yt.thumbnailUrl) {
+        resolvedThumbnail = yt.maxResThumbnailUrl || yt.thumbnailUrl;
+      }
+    }
+
+    const validCategories = ['Legal', 'Site visit', 'Pricing', 'Finance'];
+    const resolvedCategory = validCategories.includes(category) ? category : 'Legal';
+    const validTabs = ['TIPS', 'FACTS', 'DEEP_DIVE'];
+    const resolvedTab = validTabs.includes(tab) ? tab : 'TIPS';
+
+    const cleanSteps = Array.isArray(steps)
+      ? steps.map(s => String(s).trim()).filter(Boolean)
+      : [];
+
+    const programId = `prog_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    await createMedia({
+      id: programId,
+      title: title.trim(),
+      summary: (summary || '').trim(),
+      video_url: trimmedUrl,
+      media_url: trimmedUrl,
+      thumbnail: resolvedThumbnail || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+      type: 'ACADEMY_PROGRAM',
+      category: resolvedCategory,
+      duration: (readTime || '5 min watch').trim(),
+      tags: JSON.stringify({ tab: resolvedTab, steps: cleanSteps }),
+      author_id: req.user?.id || 'admin',
+      author_name: req.user?.name || 'Property Studio Secretariat',
+      status: 'PUBLISHED',
+      published_date: new Date().toISOString(),
+      content_type: 'VIDEO'
+    });
+
+    res.status(201).json({
+      success: true,
+      program: {
+        id: programId,
+        title: title.trim(),
+        summary: (summary || '').trim(),
+        category: resolvedCategory,
+        tab: resolvedTab,
+        readTime: (readTime || '5 min watch').trim(),
+        steps: cleanSteps,
+        videoUrl: trimmedUrl,
+        thumbnailUrl: resolvedThumbnail,
+        isVideo: true,
+        authorName: req.user?.name || 'Property Studio Secretariat',
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create academy video program' });
+  }
+});
+
+app.delete('/api/programs/:id', requireSuperAdminOnly, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const deleted = await deleteMedia(req.params.id);
+    if (!deleted) {
+      res.status(404).json({ error: 'Program not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete academy program' });
   }
 });
 

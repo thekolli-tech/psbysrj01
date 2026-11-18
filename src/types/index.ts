@@ -565,7 +565,8 @@ export type WorkspaceTabType =
   | 'REVIEWS'
   | 'NOTIFICATIONS'
   | 'COMMUNITY'
-  | 'SETTINGS';
+  | 'SETTINGS'
+  | 'SAVED';
 
 export type ViewType =
   | 'HOME'

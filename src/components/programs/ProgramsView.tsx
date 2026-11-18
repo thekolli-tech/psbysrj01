@@ -1,22 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { parseYouTubeUrl } from '../../shared/mediaParser';
 import {
   BookOpen,
   Bookmark,
   CheckCircle2,
   Clock,
   ArrowRight,
-  ShieldCheck,
-  Building,
-  TrendingUp,
-  FileCheck,
-  ChevronRight,
   X,
-  Search,
-  Sparkles
+  Sparkles,
+  Video,
+  Plus,
+  Play,
+  Trash2,
+  ExternalLink,
+  Film
 } from 'lucide-react';
 
-interface ProgramCard {
+export interface ProgramCard {
   id: string;
   category: 'Legal' | 'Site visit' | 'Pricing' | 'Finance';
   tab: 'TIPS' | 'FACTS' | 'DEEP_DIVE';
@@ -24,6 +25,11 @@ interface ProgramCard {
   title: string;
   summary: string;
   steps: string[];
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  isVideo?: boolean;
+  authorName?: string;
+  createdAt?: string;
 }
 
 const PROGRAM_ARTICLES: ProgramCard[] = [
@@ -147,11 +153,68 @@ const PROGRAM_ARTICLES: ProgramCard[] = [
 ];
 
 export const ProgramsView: React.FC = () => {
-  const { showToast } = useApp();
+  const { currentUser, isLoggedIn, showToast } = useApp();
+
+  // ONLY Super Admin has access to video posting feature
+  const isSuperAdmin = Boolean(isLoggedIn && currentUser?.role === 'SUPER_ADMIN');
+
   const [activeTab, setActiveTab] = useState<'TIPS' | 'FACTS' | 'DEEP_DIVE'>('TIPS');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [savedArticles, setSavedArticles] = useState<Set<string>>(new Set());
   const [activeModalArticle, setActiveModalArticle] = useState<ProgramCard | null>(null);
+
+  // Dynamic programs fetched from API & stored
+  const [dynamicArticles, setDynamicArticles] = useState<ProgramCard[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('ps_academy_programs_cache');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
+
+  // Post Video Modal State (Super Admin Only)
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [videoTitle, setVideoTitle] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoCategory, setVideoCategory] = useState<'Legal' | 'Site visit' | 'Pricing' | 'Finance'>('Legal');
+  const [videoTab, setVideoTab] = useState<'TIPS' | 'FACTS' | 'DEEP_DIVE'>('TIPS');
+  const [videoDuration, setVideoDuration] = useState('5 min watch');
+  const [videoSummary, setVideoSummary] = useState('');
+  const [videoSteps, setVideoSteps] = useState<string[]>(['']);
+  const [videoThumbnailUrl, setVideoThumbnailUrl] = useState('');
+
+  // Fetch dynamic programs from backend on load
+  const loadPrograms = async () => {
+    try {
+      const res = await fetch('/api/programs');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.programs && Array.isArray(data.programs)) {
+          setDynamicArticles(data.programs);
+          try {
+            localStorage.setItem('ps_academy_programs_cache', JSON.stringify(data.programs));
+          } catch {}
+        }
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadPrograms();
+  }, []);
+
+  // Auto-detect YouTube thumbnail when URL changes
+  useEffect(() => {
+    if (videoUrl.trim()) {
+      const yt = parseYouTubeUrl(videoUrl.trim());
+      if (yt.isValid && yt.thumbnailUrl) {
+        setVideoThumbnailUrl(yt.maxResThumbnailUrl || yt.thumbnailUrl);
+      }
+    }
+  }, [videoUrl]);
 
   const toggleSave = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -168,7 +231,133 @@ export const ProgramsView: React.FC = () => {
     });
   };
 
-  const filteredArticles = PROGRAM_ARTICLES.filter(item => {
+  const handleAddStep = () => {
+    setVideoSteps(prev => [...prev, '']);
+  };
+
+  const handleUpdateStep = (index: number, val: string) => {
+    setVideoSteps(prev => {
+      const copy = [...prev];
+      copy[index] = val;
+      return copy;
+    });
+  };
+
+  const handleRemoveStep = (index: number) => {
+    setVideoSteps(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const resetForm = () => {
+    setVideoTitle('');
+    setVideoUrl('');
+    setVideoCategory('Legal');
+    setVideoTab('TIPS');
+    setVideoDuration('5 min watch');
+    setVideoSummary('');
+    setVideoSteps(['']);
+    setVideoThumbnailUrl('');
+    setIsPostModalOpen(false);
+  };
+
+  const handleCreateVideoProgram = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin) {
+      showToast('Unauthorized: Only Super Admin can post academy videos.');
+      return;
+    }
+    if (!videoTitle.trim()) {
+      showToast('Please enter a video title.');
+      return;
+    }
+    if (!videoUrl.trim()) {
+      showToast('Please enter a valid video link.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const cleanSteps = videoSteps.map(s => s.trim()).filter(Boolean);
+      const res = await fetch('/api/programs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: videoTitle.trim(),
+          summary: videoSummary.trim(),
+          videoUrl: videoUrl.trim(),
+          category: videoCategory,
+          tab: videoTab,
+          readTime: videoDuration.trim() || '5 min watch',
+          steps: cleanSteps,
+          thumbnailUrl: videoThumbnailUrl.trim()
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to publish video');
+      }
+
+      const data = await res.json();
+      const newProgram: ProgramCard = data.program || {
+        id: `prog_${Date.now()}`,
+        title: videoTitle.trim(),
+        summary: videoSummary.trim(),
+        category: videoCategory,
+        tab: videoTab,
+        readTime: videoDuration.trim() || '5 min watch',
+        steps: cleanSteps,
+        videoUrl: videoUrl.trim(),
+        thumbnailUrl: videoThumbnailUrl.trim(),
+        isVideo: true,
+        authorName: currentUser?.name || 'Super Admin',
+        createdAt: new Date().toISOString()
+      };
+
+      setDynamicArticles(prev => {
+        const updated = [newProgram, ...prev];
+        try {
+          localStorage.setItem('ps_academy_programs_cache', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      showToast('Academy video guide published successfully!');
+      resetForm();
+    } catch (err: any) {
+      showToast(err.message || 'Error publishing video guide');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteProgram = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isSuperAdmin) return;
+    if (!window.confirm('Are you sure you want to delete this academy video?')) return;
+
+    try {
+      const res = await fetch(`/api/programs/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setDynamicArticles(prev => {
+          const updated = prev.filter(p => p.id !== id);
+          try {
+            localStorage.setItem('ps_academy_programs_cache', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        showToast('Video program deleted.');
+      } else {
+        showToast('Failed to delete program.');
+      }
+    } catch {
+      showToast('Error deleting program.');
+    }
+  };
+
+  // Merge dynamic video programs with static articles
+  const allArticles = [...dynamicArticles, ...PROGRAM_ARTICLES];
+
+  const filteredArticles = allArticles.filter(item => {
     const matchesTab = item.tab === activeTab;
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
     return matchesTab && matchesCategory;
@@ -177,8 +366,8 @@ export const ProgramsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Page Header Matching PDF Page 24 */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs relative overflow-hidden">
-        <div className="relative z-10 max-w-3xl space-y-2">
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="relative z-10 max-w-2xl space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-[#B49029] text-[11px] font-bold uppercase tracking-wider">
             <BookOpen className="w-3.5 h-3.5 text-[#B49029]" />
             <span>Programs · PS ACADEMY</span>
@@ -190,6 +379,21 @@ export const ProgramsView: React.FC = () => {
             Practical guidance, corridor facts and project breakdowns from Property Studio.
           </p>
         </div>
+
+        {/* Video Posting Button - VISIBLE ONLY ON SUPER ADMIN LOGIN */}
+        {isSuperAdmin && (
+          <div className="relative z-10 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsPostModalOpen(true)}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#182A3E] hover:bg-[#223954] text-white text-xs font-bold inline-flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md hover:shadow-lg border border-[#B49029]/40 active:scale-95 group"
+              aria-label="Post Academy Video"
+            >
+              <Video className="w-4 h-4 text-[#B49029] group-hover:scale-110 transition-transform" />
+              <span>Post Academy Video</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Primary Subtabs: Tips and Techniques | Facts and Figures | Project Deep Dive */}
@@ -236,41 +440,89 @@ export const ProgramsView: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredArticles.map(article => {
           const isSaved = savedArticles.has(article.id);
+          const hasVideo = Boolean(article.isVideo || article.videoUrl);
+
           return (
             <div
               key={article.id}
               className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-slate-300 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
             >
               <div>
-                {/* Top Row: Category tag, read time, save button */}
+                {/* Top Row: Category tag, read/watch time, video badge, save & admin delete */}
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-wider">
                       {article.category}
                     </span>
+                    {hasVideo && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-50 text-[#B49029] border border-amber-200/70 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-2xs">
+                        <Video className="w-3 h-3 text-[#B49029]" />
+                        <span>VIDEO GUIDE</span>
+                      </span>
+                    )}
                     <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-slate-400" />
+                      {hasVideo ? <Play className="w-3 h-3 text-slate-400 fill-slate-400" /> : <Clock className="w-3 h-3 text-slate-400" />}
                       {article.readTime}
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={(e) => toggleSave(article.id, e)}
-                    className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                      isSaved
-                        ? 'bg-amber-50 text-[#B49029] border-amber-300'
-                        : 'bg-white text-slate-400 hover:text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                    title={isSaved ? 'Saved' : 'Save guide'}
-                    aria-label="Save guide"
-                  >
-                    <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-current text-[#B49029]' : ''}`} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {/* Super Admin Delete Button for dynamic programs */}
+                    {isSuperAdmin && article.id.startsWith('prog_') && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteProgram(article.id, e)}
+                        className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                        title="Delete video guide"
+                        aria-label="Delete video guide"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={(e) => toggleSave(article.id, e)}
+                      className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                        isSaved
+                          ? 'bg-amber-50 text-[#B49029] border-amber-300'
+                          : 'bg-white text-slate-400 hover:text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                      title={isSaved ? 'Saved' : 'Save guide'}
+                      aria-label="Save guide"
+                    >
+                      <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-current text-[#B49029]' : ''}`} />
+                    </button>
+                  </div>
                 </div>
 
+                {/* Video Thumbnail Preview (if present) */}
+                {hasVideo && article.thumbnailUrl && (
+                  <div
+                    onClick={() => setActiveModalArticle(article)}
+                    className="relative aspect-video w-full rounded-xl overflow-hidden mb-3 bg-slate-900 border border-slate-200 group-hover:border-amber-400/50 transition-colors cursor-pointer"
+                  >
+                    <img
+                      src={article.thumbnailUrl}
+                      alt={article.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/35 flex items-center justify-center group-hover:bg-black/20 transition-colors">
+                      <div className="w-11 h-11 rounded-full bg-white/95 text-[#182A3E] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <Play className="w-4 h-4 ml-0.5 fill-[#182A3E]" />
+                      </div>
+                    </div>
+                    <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 text-white text-[10px] font-mono font-semibold">
+                      {article.readTime}
+                    </div>
+                  </div>
+                )}
+
                 {/* Article Title */}
-                <h3 className="text-base font-bold text-slate-900 group-hover:text-[#B49029] transition-colors leading-snug">
+                <h3
+                  onClick={() => setActiveModalArticle(article)}
+                  className="text-base font-bold text-slate-900 group-hover:text-[#B49029] transition-colors leading-snug cursor-pointer"
+                >
                   {article.title}
                 </h3>
 
@@ -280,18 +532,29 @@ export const ProgramsView: React.FC = () => {
                 </p>
               </div>
 
-              {/* Bottom Action: Read steps button */}
+              {/* Bottom Action: Read / Watch steps button */}
               <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setActiveModalArticle(article)}
-                  className="px-4 py-2 bg-[#182A3E] hover:bg-[#223954] text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs active:scale-95"
+                  className={`px-4 py-2 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs active:scale-95 ${
+                    hasVideo ? 'bg-[#B49029] hover:bg-[#A99137]' : 'bg-[#182A3E] hover:bg-[#223954]'
+                  }`}
                 >
-                  <span>Read steps</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
+                  {hasVideo ? (
+                    <>
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Watch Video</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Read steps</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
+                    </>
+                  )}
                 </button>
                 <span className="text-[11px] text-slate-400 font-medium">
-                  {article.steps.length} verified steps
+                  {article.steps.length > 0 ? `${article.steps.length} verified steps` : 'Interactive Guide'}
                 </span>
               </div>
             </div>
@@ -309,7 +572,232 @@ export const ProgramsView: React.FC = () => {
         </div>
       )}
 
-      {/* Read Steps Detailed Modal */}
+      {/* =========================================================================
+          POST ACADEMY VIDEO MODAL (SUPER ADMIN ONLY)
+          ========================================================================= */}
+      {isPostModalOpen && isSuperAdmin && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => !isSubmitting && resetForm()}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto space-y-5 animate-in zoom-in-95 duration-150"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-[#B49029] text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                  <Video className="w-3 h-3 text-[#B49029]" />
+                  <span>Super Admin Studio</span>
+                </span>
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-1">
+                  Post Academy Video Guide
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Publish a masterclass, legal walkthrough, or corridor breakdown to PS Academy.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={resetForm}
+                className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100 cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateVideoProgram} className="space-y-4">
+              {/* Video Title */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Video Guide Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={videoTitle}
+                  onChange={e => setVideoTitle(e.target.value)}
+                  placeholder="e.g. How to scrutinize Encumbrance Certificate (EC) online"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029] focus:bg-white"
+                />
+              </div>
+
+              {/* Video Link */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Video URL (YouTube, Vimeo, MP4 direct) *
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={videoUrl}
+                  onChange={e => setVideoUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029] focus:bg-white"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Supports standard YouTube links, Shorts, and MP4 direct videos. Thumbnails auto-detect.
+                </p>
+              </div>
+
+              {/* Live Preview If Video Thumbnail Detected */}
+              {videoThumbnailUrl && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3">
+                  <div className="relative w-24 aspect-video rounded-lg overflow-hidden bg-slate-900 shrink-0">
+                    <img src={videoThumbnailUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/25">
+                      <Play className="w-4 h-4 text-white fill-white" />
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-bold text-slate-800 truncate">Video Preview Ready</div>
+                    <div className="text-[10px] text-slate-500 truncate">Thumbnail automatically linked</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Section (Tab) & Category */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Academy Section
+                  </label>
+                  <select
+                    value={videoTab}
+                    onChange={e => setVideoTab(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029]"
+                  >
+                    <option value="TIPS">Tips and Techniques</option>
+                    <option value="FACTS">Facts and Figures</option>
+                    <option value="DEEP_DIVE">Project Deep Dive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Category Pillar
+                  </label>
+                  <select
+                    value={videoCategory}
+                    onChange={e => setVideoCategory(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029]"
+                  >
+                    <option value="Legal">Legal</option>
+                    <option value="Site visit">Site visit</option>
+                    <option value="Pricing">Pricing</option>
+                    <option value="Finance">Finance</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Duration / Watch Time */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Watch Time Duration
+                </label>
+                <input
+                  type="text"
+                  value={videoDuration}
+                  onChange={e => setVideoDuration(e.target.value)}
+                  placeholder="e.g. 5 min watch or 8:30"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029]"
+                />
+              </div>
+
+              {/* Summary */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Guide Summary & Takeaway *
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  value={videoSummary}
+                  onChange={e => setVideoSummary(e.target.value)}
+                  placeholder="Describe the key guidance and lessons covered in this video masterclass..."
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#B49029] resize-none"
+                />
+              </div>
+
+              {/* Actionable Steps / Checklist */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Actionable Key Steps (Optional Checklist)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddStep}
+                    className="text-[11px] font-bold text-[#B49029] hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Step</span>
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {videoSteps.map((step, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={step}
+                        onChange={e => handleUpdateStep(idx, e.target.value)}
+                        placeholder={`Step ${idx + 1} guidance...`}
+                        className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-[#B49029]"
+                      />
+                      {videoSteps.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveStep(idx)}
+                          className="p-1 text-slate-400 hover:text-red-500 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={resetForm}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 bg-[#B49029] hover:bg-[#A99137] text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <span>Publishing...</span>
+                  ) : (
+                    <>
+                      <Video className="w-4 h-4" />
+                      <span>Publish Video Guide</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          READ STEPS & WATCH VIDEO DETAILED MODAL
+          ========================================================================= */}
       {activeModalArticle && (
         <div
           role="dialog"
@@ -318,14 +806,22 @@ export const ProgramsView: React.FC = () => {
           onClick={() => setActiveModalArticle(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-5 animate-in zoom-in-95 duration-150"
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto space-y-5 animate-in zoom-in-95 duration-150"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-[#B49029] text-[10px] font-bold uppercase tracking-wider">
-                  {activeModalArticle.category} · {activeModalArticle.readTime}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-[#B49029] text-[10px] font-bold uppercase tracking-wider">
+                    {activeModalArticle.category} · {activeModalArticle.readTime}
+                  </span>
+                  {activeModalArticle.isVideo && (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                      <Film className="w-3 h-3 text-[#B49029]" />
+                      <span>VIDEO MASTERCLASS</span>
+                    </span>
+                  )}
+                </div>
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-2">
                   {activeModalArticle.title}
                 </h2>
@@ -340,25 +836,59 @@ export const ProgramsView: React.FC = () => {
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
+            {/* Embedded Video Player if this is a video program */}
+            {activeModalArticle.videoUrl && (
+              <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-md border border-slate-200">
+                {(() => {
+                  const yt = parseYouTubeUrl(activeModalArticle.videoUrl || '');
+                  if (yt.isValid && (yt.videoId || yt.embedUrl)) {
+                    const embedSrc = yt.videoId
+                      ? `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&rel=0`
+                      : yt.embedUrl;
+                    return (
+                      <iframe
+                        src={embedSrc}
+                        title={activeModalArticle.title}
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    );
+                  }
+                  return (
+                    <video
+                      src={activeModalArticle.videoUrl}
+                      controls
+                      autoPlay
+                      className="w-full h-full object-contain"
+                    />
+                  );
+                })()}
+              </div>
+            )}
+
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               {activeModalArticle.summary}
             </p>
 
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 font-display">
-                Actionable Execution Steps
-              </h4>
-              <div className="space-y-2.5">
-                {activeModalArticle.steps.map((step, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-700">
-                    <span className="w-5 h-5 rounded-full bg-[#182A3E] text-white flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    <span className="leading-relaxed">{step}</span>
-                  </div>
-                ))}
+            {/* Steps / Key Takeaways */}
+            {activeModalArticle.steps && activeModalArticle.steps.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 font-display">
+                  Actionable Execution Steps
+                </h4>
+                <div className="space-y-2.5">
+                  {activeModalArticle.steps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-700">
+                      <span className="w-5 h-5 rounded-full bg-[#182A3E] text-white flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      <span className="leading-relaxed">{step}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">

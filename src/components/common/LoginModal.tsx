@@ -939,7 +939,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       });
       const result = await readApiResponse(res);
       if (!result.ok || result.data?.verified !== true) {
-        const errorText = result.error || result.data?.error || '';
+        const rawError = result.error || result.data?.error || '';
+        const errorText = typeof rawError === 'string' ? rawError : String(rawError || '');
         if (errorText.toLowerCase().includes('mismatch') || errorText.toLowerCase().includes('invalid')) {
           throw new Error('Invalid verification code. Please check the digits and try again.');
         }
