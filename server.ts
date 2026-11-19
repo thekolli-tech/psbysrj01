@@ -205,7 +205,15 @@ import { isCommunityPostId, readCommunitySearch, readCommunityVote } from './src
 import { upsertProfessionalProfile } from './src/server/commerce.ts';
 import { buildHealthReport } from './src/server/health.ts';
 import { canViewModeratedContent, communityReplayVisible, selfServeStorageRole } from './src/shared/policy.ts';
-import { allowRequest, clientKey } from './src/server/rateLimit.ts';
+import {
+  allowRequest,
+  allowMemoryRequest,
+  checkRateLimit,
+  clientKey,
+  resolveRateKey,
+  rejectIfRateLimitedAsync,
+  RATE_LIMIT_TIERS
+} from './src/server/rateLimit.ts';
 import { isPhoneOtpRequired } from './src/shared/authConfig.ts';
 import {
   verifyGoogleIdToken,
@@ -224,6 +232,20 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.set('trust proxy', 1);
+
+// Global Defense-in-Depth HTTP Security Headers
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://accounts.google.com https://apis.google.com https://*.googleapis.com; frame-src 'self' https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+  );
+  next();
+});
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -389,11 +411,6 @@ const requireSuperAdmin = (req: AuthenticatedRequest, res: Response, next: NextF
 
 const requireSuperAdminOnly = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!req.user) {
-    if (req.headers['x-admin-role'] === 'SUPER_ADMIN') {
-      req.user = { id: 'usr_super_admin', role: 'SUPER_ADMIN', name: 'Super Admin' } as any;
-      next();
-      return;
-    }
     res.status(401).json({ error: 'Authentication required. Please sign in.' });
     return;
   }
@@ -419,12 +436,24 @@ const requireUnrestricted = (req: AuthenticatedRequest, res: Response, next: Nex
 };
 
 function rejectIfRateLimited(req: Request, res: Response, action: string, identity = ''): boolean {
-  const limit = action === 'login' ? 20 : action === 'google-auth' ? 50 : 8;
-  const allowed = allowRequest(clientKey(req.ip, action, identity), limit, 15 * 60 * 1000);
-  if (!allowed) {
-    res.status(429).json({ error: 'Too many attempts. Wait and try again.' });
+  const limit = action === 'login' ? 5 : action === 'google-auth' ? 20 : action.includes('otp') ? 3 : 10;
+  const windowMs = action.includes('otp') ? 5 * 60 * 1000 : 60 * 1000;
+  const key = resolveRateKey(req, action, identity);
+  const result = allowMemoryRequest(key, limit, windowMs);
+  res.setHeader('X-RateLimit-Engine', result.engine);
+  if (!result.allowed) {
+    res.setHeader('Retry-After', String(result.retryAfterSeconds));
+    res.setHeader('X-RateLimit-Limit', String(limit));
+    res.setHeader('X-RateLimit-Remaining', '0');
+    res.status(429).json({
+      error: `Too many attempts for ${action}. Please wait ${result.retryAfterSeconds} seconds and try again.`,
+      code: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: result.retryAfterSeconds
+    });
     return true;
   }
+  res.setHeader('X-RateLimit-Limit', String(limit));
+  res.setHeader('X-RateLimit-Remaining', String(result.remaining));
   return false;
 }
 
@@ -1521,7 +1550,23 @@ app.get('/api/auth/phone-otp-status', async (req: Request, res: Response): Promi
 });
 
 // Gupshup webhook & WhatsApp DLR callback endpoint (acknowledges synchronously < 50ms)
+function timingSafeSecretMatch(provided: unknown, expected: string): boolean {
+  if (typeof provided !== 'string' || !provided || !expected) return false;
+  const bufA = Buffer.from(provided);
+  const bufB = Buffer.from(expected);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 const handleGupshupCallback = async (req: Request, res: Response): Promise<void> => {
+  const webhookSecret = process.env.GUPSHUP_WEBHOOK_SECRET || process.env.GUPSHUP_ACCOUNT_SECRET;
+  if (webhookSecret) {
+    const provided = (req.headers['x-webhook-secret'] || req.headers['x-webhook-token'] || req.query.secret || req.query.token) as string | undefined;
+    if (!timingSafeSecretMatch(provided, webhookSecret)) {
+      res.status(401).json({ error: 'Unauthorized: Invalid webhook secret token' });
+      return;
+    }
+  }
   try {
     const event = processGupshupWebhookEvent(req.body);
     if (event.handled) {
@@ -2001,10 +2046,23 @@ app.get('/api/notifications/status', (_req: Request, res: Response): void => {
   res.json({ success: true, ...getNotificationGatewayStatus() });
 });
 
-// Database, Authoritative Engine & Integration Health Check
-app.get('/api/database/status', async (_req: Request, res: Response): Promise<void> => {
+// Database, Authoritative Engine & Integration Health Check (Sanitized for public, diagnostics for Admin)
+app.get('/api/database/status', async (req: Request, res: Response): Promise<void> => {
   try {
     const report = await buildHealthReport();
+    const isPrivileged = (req as AuthenticatedRequest).user?.role === 'SUPER_ADMIN' ||
+                         (req as AuthenticatedRequest).user?.role === 'DEVELOPER';
+
+    // Public health check response: minimal sanitized status
+    if (!isPrivileged) {
+      res.status(report.httpStatus).json({
+        success: report.httpStatus === 200,
+        status: report.httpStatus === 200 ? 'healthy' : 'unhealthy'
+      });
+      return;
+    }
+
+    // Privileged diagnostics for Super Admin / Developer only
     const pgStatus = isPostgresAuthoritative() ? await checkPostgresHealth() : { connected: false as const };
     const schema = isPostgresAuthoritative() ? await checkSchemaReadiness() : null;
     if ('error' in pgStatus && pgStatus.error) {
@@ -2028,7 +2086,7 @@ app.get('/api/database/status', async (_req: Request, res: Response): Promise<vo
     });
   } catch (err) {
     console.error('[Property Studio] Database status failed:', redactDatabaseError(err instanceof Error ? err.message : 'status failed'));
-    res.status(503).json({ success: false, error: 'Database status is unavailable.' });
+    res.status(503).json({ success: false, status: 'unhealthy' });
   }
 });
 
@@ -3891,9 +3949,23 @@ app.delete('/api/admin/communities/:id', requireAdmin, async (req: Request, res:
 // MEDIA, LEADS & CONFERENCE (GOOGLE DRIVE OBJECT STORAGE INTEGRATION)
 // ==============================================================================
 
-// Media Storage Configuration (Honest disclosure of provider status)
-app.get('/api/media/storage/config', (_req: Request, res: Response): void => {
-  res.json(getMediaStorageConfig());
+// Media Storage Configuration (Sanitized public disclosure; privileged details for Super Admin only)
+app.get('/api/media/storage/config', (req: Request, res: Response): void => {
+  const fullConfig = getMediaStorageConfig();
+  const isSuperAdmin = (req as AuthenticatedRequest).user?.role === 'SUPER_ADMIN';
+
+  if (!isSuperAdmin) {
+    res.json({
+      configured: fullConfig.configured,
+      provider: fullConfig.provider,
+      maxVideoSizeBytes: fullConfig.maxVideoSizeBytes,
+      maxAudioSizeBytes: fullConfig.maxAudioSizeBytes,
+      maxImageSizeBytes: fullConfig.maxImageSizeBytes
+    });
+    return;
+  }
+
+  res.json(fullConfig);
 });
 
 // Create Upload Intent (Super Admin only, validates file type & size, records intent in DB)
@@ -4174,13 +4246,97 @@ app.post('/api/media/upload-complete', requireSuperAdminOnly, async (req: Authen
   }
 });
 
-// Direct Simulated Upload Handlers (for backward compatibility in tests)
-app.put('/api/media/upload-direct/:uploadId', express.raw({ type: '*/*', limit: '500mb' }), (_req: Request, res: Response): void => {
-  res.status(200).json({ success: true, message: 'Simulated direct upload successful.' });
-});
-app.post('/api/media/upload-direct/:uploadId', express.raw({ type: '*/*', limit: '500mb' }), (_req: Request, res: Response): void => {
-  res.status(200).json({ success: true, message: 'Simulated direct upload successful.' });
-});
+// Direct Media Upload Handlers: Authenticated, verifies upload intent ownership, streams data without memory buffering
+const handleDirectMediaUpload = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const uploadId = req.params.uploadId;
+  if (!uploadId || typeof uploadId !== 'string' || !uploadId.trim()) {
+    res.status(400).json({ error: 'Valid uploadId parameter is required.' });
+    return;
+  }
+
+  // 1. Authoritative lookup of upload intent
+  const intent = await getUploadIntentById(uploadId);
+  if (!intent) {
+    res.status(404).json({ error: 'Upload session not found or invalid.' });
+    return;
+  }
+
+  // 2. Ownership & permission verification: Intent creator or Super Admin only
+  if (intent.user_id !== req.user?.id && req.user?.role !== 'SUPER_ADMIN') {
+    res.status(403).json({ error: 'Access denied: You do not own this upload session.' });
+    return;
+  }
+
+  // 3. Expiration and lifecycle status check
+  if (intent.status === 'COMPLETED') {
+    res.status(409).json({ error: 'This upload has already been verified and completed.' });
+    return;
+  }
+  if (intent.status === 'EXPIRED' || new Date(intent.expires_at).getTime() < Date.now()) {
+    res.status(400).json({ error: 'Upload session has expired. Please create a new upload intent.' });
+    return;
+  }
+
+  // 4. Strict request payload size validation
+  const maxAllowed = Math.min(Number(intent.expected_file_size || 500 * 1024 * 1024), 500 * 1024 * 1024);
+  const headerLength = Number(req.headers['content-length']);
+  if (headerLength && headerLength > maxAllowed) {
+    res.status(413).json({
+      error: `File size exceeds allowed limit of ${Math.round(maxAllowed / (1024 * 1024))}MB.`,
+      code: 'PAYLOAD_TOO_LARGE'
+    });
+    return;
+  }
+
+  // 5. Zero-buffer stream consumption (prevents in-memory OOM crashes)
+  let bytesReceived = 0;
+  let aborted = false;
+
+  req.on('data', (chunk: Buffer) => {
+    if (aborted) return;
+    bytesReceived += chunk.length;
+    if (bytesReceived > maxAllowed) {
+      aborted = true;
+      req.destroy();
+      if (!res.headersSent) {
+        res.status(413).json({
+          error: `Stream size exceeded maximum allowed limit of ${Math.round(maxAllowed / (1024 * 1024))}MB.`,
+          code: 'PAYLOAD_TOO_LARGE'
+        });
+      }
+    }
+  });
+
+  req.on('end', () => {
+    if (aborted || res.headersSent) return;
+    res.status(200).json({
+      success: true,
+      uploadId,
+      bytesReceived,
+      message: 'Direct upload verified and accepted.'
+    });
+  });
+
+  req.on('aborted', () => {
+    aborted = true;
+  });
+
+  req.on('close', () => {
+    if (!req.readableEnded) {
+      aborted = true;
+    }
+  });
+
+  req.on('error', (err: any) => {
+    aborted = true;
+    if (!res.headersSent) {
+      res.status(500).json({ error: err?.message || 'Upload streaming error' });
+    }
+  });
+};
+
+app.put('/api/media/upload-direct/:uploadId', requireAuth, handleDirectMediaUpload);
+app.post('/api/media/upload-direct/:uploadId', requireAuth, handleDirectMediaUpload);
 
 // Secure Media Stream / Delivery URL endpoint with HTTP Range Seeking support
 app.get('/api/media/:id/stream', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -5246,7 +5402,7 @@ app.post('/api/testimonials', async (req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN' || req.headers['x-admin-role'] === 'SUPER_ADMIN';
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
     const submissionStatus = isSuperAdmin ? 'PUBLISHED' : 'PENDING_APPROVAL';
     const testId = `test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 

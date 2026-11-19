@@ -5219,20 +5219,20 @@ function sqliteUpdateMedia(
   fields.push("updated_at = datetime('now')");
   args.push(id);
   const stmt = db.prepare("UPDATE media_items SET " + fields.join(', ') + " WHERE id = ?");
-  stmt.run(...args);
-  return true;
+  const result = stmt.run(...args);
+  return result.changes > 0;
 }
 
 function sqliteDeleteMedia(id: string): boolean {
   const stmt = db.prepare('DELETE FROM media_items WHERE id = ?');
-  stmt.run(id);
-  return true;
+  const result = stmt.run(id);
+  return result.changes > 0;
 }
 
 function sqlitePublishMedia(id: string, published: boolean): boolean {
   const status = published ? 'PUBLISHED' : 'DRAFT';
-  db.prepare("UPDATE media_items SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
-  return true;
+  const result = db.prepare("UPDATE media_items SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
+  return result.changes > 0;
 }
 
 function sqliteArchiveMedia(id: string): boolean {
@@ -5467,11 +5467,11 @@ function sqliteCreateUploadIntentRecord(intent: DbMediaUploadIntent): void {
     intent.user_id,
     intent.storage_key,
     intent.storage_provider || 'CLOUDFLARE_R2',
-    intent.expected_mime_type,
-    intent.expected_file_size,
-    intent.media_category,
+    intent.expected_mime_type || 'video/mp4',
+    intent.expected_file_size || 0,
+    intent.media_category || 'VIDEO',
     intent.status || 'PENDING',
-    intent.expires_at,
+    intent.expires_at || new Date(Date.now() + 3600000).toISOString(),
     intent.created_at || new Date().toISOString(),
     intent.updated_at || new Date().toISOString()
   );

@@ -544,8 +544,7 @@ export const PSTestimonialsView: React.FC = () => {
       const res = await fetch(`/api/testimonials/video/${id}/approve`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'x-admin-role': currentUser?.role || ''
+          'Content-Type': 'application/json'
         }
       });
       if (res.ok) {
@@ -581,10 +580,7 @@ export const PSTestimonialsView: React.FC = () => {
     try {
       await deleteTestimonialVideoBlob(id);
       const res = await fetch(`/api/testimonials/video/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'x-admin-role': currentUser?.role || ''
-        }
+        method: 'DELETE'
       });
       if (res.ok || res.status === 401 || res.status === 403) {
         setVideoTestimonials(prev => {
@@ -611,10 +607,7 @@ export const PSTestimonialsView: React.FC = () => {
     try {
       await deleteTestimonialVideoBlob(id);
       const res = await fetch(`/api/testimonials/video/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'x-admin-role': currentUser?.role || ''
-        }
+        method: 'DELETE'
       });
       if (res.ok || res.status === 401 || res.status === 403) {
         setVideoTestimonials(prev => {
@@ -675,8 +668,7 @@ export const PSTestimonialsView: React.FC = () => {
       const res = await fetch('/api/testimonials', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-admin-role': currentUser?.role || ''
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           name: authorName.trim(),
@@ -722,8 +714,7 @@ export const PSTestimonialsView: React.FC = () => {
       await fetch(`/api/testimonials/${id}/approve`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          'x-admin-role': currentUser?.role || ''
+          'Content-Type': 'application/json'
         }
       });
     } catch {}
@@ -745,10 +736,7 @@ export const PSTestimonialsView: React.FC = () => {
 
     try {
       await fetch(`/api/testimonials/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'x-admin-role': currentUser?.role || ''
-        }
+        method: 'DELETE'
       });
     } catch {}
 
