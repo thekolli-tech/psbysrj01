@@ -104,7 +104,12 @@ async function checkUpstashRedis(
   limit: number,
   windowMs: number
 ): Promise<RateLimitResult> {
-  const cleanUrl = url.replace(/\/+$/, '');
+  const cleanUrl = url.trim().replace(/\/+$/, '');
+  if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+    console.warn('[RateLimit] Malformed UPSTASH_REDIS_REST_URL, falling back to local memory');
+    return allowMemoryRequest(key, limit, windowMs);
+  }
+
   const pipelineEndpoint = `${cleanUrl}/pipeline`;
 
   // Atomic pipeline: Increment key, set expiration if new, and query remaining TTL
@@ -121,20 +126,23 @@ async function checkUpstashRedis(
     const response = await fetch(pipelineEndpoint, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${token.trim()}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(commands),
       signal: controller.signal
     });
 
-    clearTimeout(timeoutId);
-
     if (!response.ok) {
-      throw new Error(`Upstash HTTP ${response.status}: ${await response.text()}`);
+      const errSnippet = (await response.text()).slice(0, 200);
+      throw new Error(`Upstash HTTP ${response.status}: ${errSnippet}`);
     }
 
     const results = (await response.json()) as Array<{ result?: any; error?: string }>;
+    if (results[0]?.error) {
+      throw new Error(`Upstash Redis command error: ${results[0].error}`);
+    }
+
     const hits = Number(results[0]?.result || 1);
     const rawPttl = Number(results[2]?.result ?? results[1]?.result ?? windowMs);
     const pttl = rawPttl > 0 ? rawPttl : windowMs;
@@ -158,10 +166,11 @@ async function checkUpstashRedis(
       engine: 'upstash_redis'
     };
   } catch (err) {
-    clearTimeout(timeoutId);
     console.warn('[RateLimit] Upstash Redis check failed, falling back to local memory:', err instanceof Error ? err.message : String(err));
     // Fail secure: fall back to bounded in-memory rate limiter so protections are never dropped
     return allowMemoryRequest(key, limit, windowMs);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -174,8 +183,8 @@ export async function checkRateLimit(
   limit: number,
   windowMs: number
 ): Promise<RateLimitResult> {
-  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
-  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 
   if (upstashUrl && upstashToken) {
     return checkUpstashRedis(upstashUrl, upstashToken, key, limit, windowMs);
@@ -359,6 +368,7 @@ export const RATE_LIMIT_TIERS = {
 
 /**
  * Helper to reject a request with 429 and Retry-After header.
+ * Directly integrates Upstash Redis distributed rate-limiting with memory fallback.
  */
 export async function rejectIfRateLimitedAsync(
   req: Request,
@@ -369,8 +379,9 @@ export async function rejectIfRateLimitedAsync(
 ): Promise<boolean> {
   const effectiveTier = tier || (
     action.includes('otp') ? RATE_LIMIT_TIERS.OTP_DISPATCH :
-    action === 'login' || action === 'register' ? RATE_LIMIT_TIERS.AUTH :
-    { limit: 20, windowMs: 60 * 1000 }
+    action === 'login' ? RATE_LIMIT_TIERS.AUTH :
+    action === 'google-auth' ? { limit: 20, windowMs: 60 * 1000 } :
+    { limit: 10, windowMs: 60 * 1000 }
   );
 
   const key = resolveRateKey(req, action, identity);
@@ -383,7 +394,7 @@ export async function rejectIfRateLimitedAsync(
     res.setHeader('X-RateLimit-Limit', String(effectiveTier.limit));
     res.setHeader('X-RateLimit-Remaining', '0');
     res.status(429).json({
-      error: `Too many requests for ${action}. Please wait ${result.retryAfterSeconds} seconds and try again.`,
+      error: `Too many attempts for ${action}. Please wait ${result.retryAfterSeconds} seconds and try again.`,
       code: 'RATE_LIMIT_EXCEEDED',
       retryAfter: result.retryAfterSeconds
     });
@@ -399,7 +410,9 @@ export async function rejectIfRateLimitedAsync(
  * Reports current rate limiting operational mode for telemetry and diagnostic health.
  */
 export function getRateLimiterStatus(): { isDistributed: boolean; provider: 'upstash_redis' | 'memory_fallback' } {
-  const isDistributed = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const isDistributed = Boolean(upstashUrl && upstashToken);
   return {
     isDistributed,
     provider: isDistributed ? 'upstash_redis' : 'memory_fallback'

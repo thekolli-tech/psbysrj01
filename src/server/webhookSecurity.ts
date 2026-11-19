@@ -150,35 +150,36 @@ export async function isWebhookEventDuplicate(
   const dedupKey = `ps:wh:dedup:${cleanId}:${cleanType}`;
 
   // 1. Upstash Redis Atomic SET NX
-  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
-  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 
   if (upstashUrl && upstashToken) {
-    try {
-      const cleanUrl = upstashUrl.replace(/\/+$/, '');
+    const cleanUrl = upstashUrl.replace(/\/+$/, '');
+    if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
       const endpoint = `${cleanUrl}/set/${encodeURIComponent(dedupKey)}/1/ex/86400/nx`;
-
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 1500);
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${upstashToken}` },
-        signal: controller.signal
-      });
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${upstashToken}` },
+          signal: controller.signal
+        });
 
-      clearTimeout(timeout);
-
-      if (res.ok) {
-        const data = (await res.json()) as { result?: string | null };
-        // If SET ... NX succeeded, result is "OK". If already exists, result is null.
-        if (data.result === 'OK') {
-          return false; // First time seeing this event
+        if (res.ok) {
+          const data = (await res.json()) as { result?: string | null };
+          // If SET ... NX succeeded, result is "OK". If already exists, result is null.
+          if (data.result === 'OK') {
+            return false; // First time seeing this event
+          }
+          return true; // Duplicate!
         }
-        return true; // Duplicate!
+      } catch {
+        // Fall through to memory fallback on network error
+      } finally {
+        clearTimeout(timeout);
       }
-    } catch {
-      // Fall through to memory fallback on network error
     }
   }
 

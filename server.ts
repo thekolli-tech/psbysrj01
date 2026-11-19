@@ -443,26 +443,12 @@ const requireUnrestricted = (req: AuthenticatedRequest, res: Response, next: Nex
   next();
 };
 
-function rejectIfRateLimited(req: Request, res: Response, action: string, identity = ''): boolean {
-  const limit = action === 'login' ? 5 : action === 'google-auth' ? 20 : action.includes('otp') ? 3 : 10;
-  const windowMs = action.includes('otp') ? 5 * 60 * 1000 : 60 * 1000;
-  const key = resolveRateKey(req, action, identity);
-  const result = allowMemoryRequest(key, limit, windowMs);
-  res.setHeader('X-RateLimit-Engine', result.engine);
-  if (!result.allowed) {
-    res.setHeader('Retry-After', String(result.retryAfterSeconds));
-    res.setHeader('X-RateLimit-Limit', String(limit));
-    res.setHeader('X-RateLimit-Remaining', '0');
-    res.status(429).json({
-      error: `Too many attempts for ${action}. Please wait ${result.retryAfterSeconds} seconds and try again.`,
-      code: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: result.retryAfterSeconds
-    });
-    return true;
-  }
-  res.setHeader('X-RateLimit-Limit', String(limit));
-  res.setHeader('X-RateLimit-Remaining', String(result.remaining));
-  return false;
+/**
+ * Asynchronous Upstash Redis rate-limiter with bounded local memory fallback.
+ * Evaluates distributed Upstash Redis if configured; preserves strict 429 Retry-After semantics.
+ */
+async function rejectIfRateLimited(req: Request, res: Response, action: string, identity = ''): Promise<boolean> {
+  return rejectIfRateLimitedAsync(req, res, action, identity);
 }
 
 const requireDeveloper = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
@@ -582,7 +568,7 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
       res.status(400).json({ error: 'Email and password are required' });
       return;
     }
-    if (rejectIfRateLimited(req, res, 'login', String(email))) return;
+    if (await rejectIfRateLimitedAsync(req, res, 'login', String(email))) return;
 
     const user = await findUserByEmail(email);
     const passwordMatches = Boolean(user) && verifyPassword(password, user!.password_hash, user!.salt);
@@ -645,7 +631,7 @@ app.post('/api/auth/logout', async (req: AuthenticatedRequest, res: Response): P
 
 // 1. POST /api/auth/google: Handles Google Identity Services ID Token credential OR auth code
 app.post('/api/auth/google', async (req: Request, res: Response): Promise<void> => {
-  if (rejectIfRateLimited(req, res, 'google-auth')) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'google-auth')) return;
 
   try {
     const { credential, code, redirectUri } = req.body || {};
@@ -1231,7 +1217,7 @@ app.get('/api/auth/me', (req: AuthenticatedRequest, res: Response): void => {
 
 // Send Email OTP for Account Registration
 app.post('/api/auth/send-email-otp', async (req: Request, res: Response): Promise<void> => {
-  if (rejectIfRateLimited(req, res, 'email-otp', String(req.body?.email || ''))) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'email-otp', String(req.body?.email || ''))) return;
   try {
     const { email } = req.body;
     if (!email || !email.includes('@')) {
@@ -1268,7 +1254,7 @@ app.post('/api/auth/send-email-otp', async (req: Request, res: Response): Promis
 
 // Verify Email OTP
 app.post('/api/auth/verify-email-otp', async (req: Request, res: Response): Promise<void> => {
-  if (rejectIfRateLimited(req, res, 'verify-email-otp', String(req.body?.email || ''))) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'verify-email-otp', String(req.body?.email || ''))) return;
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -1288,7 +1274,7 @@ app.post('/api/auth/verify-email-otp', async (req: Request, res: Response): Prom
 
 // Self-Service Forgot Password
 app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promise<void> => {
-  if (rejectIfRateLimited(req, res, 'forgot-password', String(req.body?.email || ''))) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'forgot-password', String(req.body?.email || ''))) return;
   try {
     const { email } = req.body;
     if (!email || !email.includes('@')) {
@@ -1322,7 +1308,7 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response): Promi
 
 // Self-Service Reset Password
 app.post('/api/auth/reset-password', async (req: Request, res: Response): Promise<void> => {
-  if (rejectIfRateLimited(req, res, 'reset-password', String(req.body?.email || ''))) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'reset-password', String(req.body?.email || ''))) return;
   try {
     const { email, otp, newPassword } = req.body;
     if (!email || !otp || !newPassword) {
@@ -1375,7 +1361,7 @@ function phoneOtpUnavailable(res: Response, code: 'WHATSAPP_NOT_CONFIGURED' | 'P
 app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promise<void> => {
   const phone = normalizeIndianMobile(req.body?.phone);
   const channel: 'sms' = 'sms';
-  if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'phone-otp', phone || 'invalid')) return;
   try {
     if (!phone) {
       res.status(400).json({ error: 'A valid Indian mobile number is required' });
@@ -1486,7 +1472,7 @@ app.post('/api/auth/send-phone-otp', async (req: Request, res: Response): Promis
 // Dedicated Voice OTP trigger endpoint - routed to SMS per client requirement
 app.post('/api/auth/send-voice-otp', async (req: Request, res: Response): Promise<void> => {
   const phone = normalizeIndianMobile(req.body?.phone);
-  if (rejectIfRateLimited(req, res, 'phone-otp', phone || 'invalid')) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'phone-otp', phone || 'invalid')) return;
   try {
     if (!phone) {
       res.status(400).json({ error: 'A valid Indian mobile number is required' });
@@ -1612,7 +1598,7 @@ app.post('/api/auth/verify-phone-otp', async (req: Request, res: Response): Prom
   const otp = String(req.body?.otp || '').trim();
   const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
   const requestedChannel = (req.body?.channel === 'voice' ? 'voice' : req.body?.channel === 'sms' ? 'sms' : undefined) as 'sms' | 'voice' | undefined;
-  if (rejectIfRateLimited(req, res, 'phone-otp-verify', phone || 'invalid')) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'phone-otp-verify', phone || 'invalid')) return;
   try {
     if (!phone || !otp) {
       res.status(400).json({ error: 'Phone number and verification code are required' });
@@ -1778,7 +1764,7 @@ app.get('/api/auth/twofactor-status', requireAuth, async (req: AuthenticatedRequ
 
 // Registration endpoint
 app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
-  if (rejectIfRateLimited(req, res, 'register', String(req.body?.email || ''))) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'register', String(req.body?.email || ''))) return;
   try {
     const { name, email, password, role, phone, organization, otp, phoneOtp, townCity, location, city, state, profession, company, interests, avatar } = req.body;
     if (!name || !email || !password) {
@@ -1963,7 +1949,7 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
 
 // Request Password Change OTP (Authenticated)
 app.post('/api/auth/request-password-change-otp', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  if (rejectIfRateLimited(req, res, 'request-password-change-otp', req.user.id)) return;
+  if (await rejectIfRateLimitedAsync(req, res, 'request-password-change-otp', req.user.id)) return;
   try {
     const user = await findUserById(req.user.id);
     if (!user) {
