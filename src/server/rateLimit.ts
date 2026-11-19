@@ -1,4 +1,6 @@
+import crypto from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
+import { normalizeIndianMobile } from '../shared/indianMobile.ts';
 
 /**
  * Distributed Rate Limiting System for Property Studio
@@ -190,13 +192,144 @@ export function allowRequest(key: string, limit: number, windowMs: number): bool
 }
 
 /**
- * Builds canonical rate limit key.
- * Backwards compatible with legacy 3-param calls.
+ * Cryptographic Domain Separation Salt for Rate Limit Key Derivation.
+ * Guarantees that derived keys cannot be confused or cross-used with OTP hashing or session encryption.
+ */
+export const RATE_LIMIT_DERIVATION_DOMAIN = 'PropertyStudio:RateLimitKey:v1';
+export const TEST_ONLY_RATE_LIMIT_SEED = 'test-only-isolated-development-seed-not-for-production';
+
+let hasWarnedMissingSecret = false;
+
+/**
+ * Consistently normalizes email addresses, phone numbers, and raw identifiers before HMAC hashing.
+ * Domain-tags each identifier type (phone:, email:, raw:) to mathematically prevent
+ * distinct identities (e.g. invalid phone 'invalid' vs email 'invalid@domain.com')
+ * from ever collapsing into the same rate-limit bucket.
+ */
+export function normalizeRateLimitIdentity(identity: string): string {
+  if (!identity || typeof identity !== 'string') return '';
+  const trimmed = identity.trim();
+  if (!trimmed) return '';
+
+  // 1. Indian mobile phone detection (normalizes to E.164 +91XXXXXXXXXX)
+  const indianMobile = normalizeIndianMobile(trimmed);
+  if (indianMobile) {
+    return `phone:${indianMobile}`;
+  }
+
+  // 2. International E.164 phone detection (e.g. +1 555-123-4567, +44 20 7946 0991)
+  if (trimmed.startsWith('+')) {
+    const digitsOnly = trimmed.replace(/\D/g, '');
+    if (digitsOnly.length >= 7 && digitsOnly.length <= 15) {
+      return `phone:+${digitsOnly}`;
+    }
+  }
+
+  // 3. Raw digit-only international phone numbers (at least 10 digits without leading +)
+  if (/^\d{10,15}$/.test(trimmed)) {
+    return `phone:+${trimmed}`;
+  }
+
+  // 4. Email address normalization (lowercase and trim with email: domain prefix)
+  if (trimmed.includes('@')) {
+    return `email:${trimmed.toLowerCase()}`;
+  }
+
+  // 5. Raw/Generic string identifier (e.g. 'invalid', 'anonymous', user IDs)
+  return `raw:${trimmed.toLowerCase()}`;
+}
+
+/**
+ * Retrieves or derives a cryptographically secure key for HMAC-SHA-256 rate-limit key pseudonymization.
+ *
+ * Precedence:
+ * 1. Dedicated secret: process.env.RATE_LIMIT_KEY_SECRET (Preferred in production)
+ * 2. Cryptographic domain-separated derivation from OTP_HASH_SECRET or SESSION_SECRET:
+ *    HMAC-SHA-256(sourceSecret, 'PropertyStudio:RateLimitKey:v1')
+ * 3. In non-production (development/test): isolated fallback seed with loud warning.
+ *
+ * Production policy:
+ * - If RATE_LIMIT_KEY_SECRET is configured: uses it directly.
+ * - If unset but OTP_HASH_SECRET or SESSION_SECRET exists: derives a domain-separated key.
+ * - If ALL server secrets are missing in production: THROWS a ConfigurationError.
+ *   Static development seeds are NEVER used in production.
+ */
+export function getRateLimitKeySecret(): string {
+  const dedicated = process.env.RATE_LIMIT_KEY_SECRET?.trim();
+  if (dedicated) {
+    return dedicated;
+  }
+
+  // Cryptographic domain-separated derivation from existing production secrets
+  const sourceFallback = process.env.OTP_HASH_SECRET?.trim() || process.env.SESSION_SECRET?.trim();
+  if (sourceFallback) {
+    if (!hasWarnedMissingSecret) {
+      hasWarnedMissingSecret = true;
+      console.warn(
+        '[RateLimit Notice] RATE_LIMIT_KEY_SECRET is not set. ' +
+        'Derived a domain-separated rate-limit key from existing server secrets. ' +
+        'For isolated secret rotation, configure RATE_LIMIT_KEY_SECRET in production.'
+      );
+    }
+    return crypto
+      .createHmac('sha256', sourceFallback)
+      .update(RATE_LIMIT_DERIVATION_DOMAIN)
+      .digest('hex');
+  }
+
+  // In production, strictly reject static predictable seeds
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      '[RateLimit Configuration Error] Missing RATE_LIMIT_KEY_SECRET in production environment. ' +
+      'Refusing to generate predictable pseudonymous identifiers with a static seed.'
+    );
+  }
+
+  return TEST_ONLY_RATE_LIMIT_SEED;
+}
+
+/**
+ * Generates a deterministic HMAC-SHA-256 pseudonymous identifier for an identity string.
+ * Ensures plaintext emails and phone numbers never appear in Redis keys or logs.
+ * Produces a 32-character hex digest (128-bit collision resistance).
+ */
+export function hashRateLimitIdentity(identity: string): string {
+  if (!identity || typeof identity !== 'string' || !identity.trim()) {
+    return '';
+  }
+  const normalized = normalizeRateLimitIdentity(identity);
+  const secret = getRateLimitKeySecret();
+  return crypto.createHmac('sha256', secret).update(normalized).digest('hex').slice(0, 32);
+}
+
+/**
+ * Formats IP address for rate limit keys.
+ * Default in production: IP is pseudonymized with HMAC-SHA-256 (unless explicitly set to false).
+ * Default in dev/test: clean sanitized IP is retained for debugging (unless explicitly enabled).
+ */
+export function formatRateLimitIp(ip: string | undefined): string {
+  const cleanIp = (ip || 'unknown').replace(/[^a-zA-Z0-9:._-]/g, '').slice(0, 64);
+  const shouldPseudonymize =
+    process.env.RATE_LIMIT_PSEUDONYMIZE_IP === 'true' ||
+    (process.env.NODE_ENV === 'production' && process.env.RATE_LIMIT_PSEUDONYMIZE_IP !== 'false');
+
+  if (shouldPseudonymize) {
+    const secret = getRateLimitKeySecret();
+    return 'ip_' + crypto.createHmac('sha256', secret).update(`ip:${cleanIp}`).digest('hex').slice(0, 16);
+  }
+  return cleanIp;
+}
+
+/**
+ * Builds canonical rate limit key with pseudonymous identity hashing.
+ * Plaintext emails and phone numbers are NEVER embedded.
  */
 export function clientKey(ip: string | undefined, action: string, identity = ''): string {
-  const cleanIp = (ip || 'unknown').replace(/[^a-zA-Z0-9:._-]/g, '').slice(0, 64);
-  const cleanIdentity = identity.trim().toLowerCase().slice(0, 128);
-  return `ps:rl:${action}:${cleanIp}:${cleanIdentity}`;
+  const formattedIp = formatRateLimitIp(ip);
+  const pseudonymizedId = hashRateLimitIdentity(identity);
+  return pseudonymizedId
+    ? `ps:rl:${action}:${formattedIp}:id_${pseudonymizedId}`
+    : `ps:rl:${action}:${formattedIp}:`;
 }
 
 /**

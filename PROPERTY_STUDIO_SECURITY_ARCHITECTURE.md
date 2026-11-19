@@ -178,6 +178,23 @@ No critical vulnerabilities remain. The following operational enhancements are q
 * **API Cache Bypass:** Explicit rule to bypass cache on `/api/*` while caching static assets (`/assets/*`).
 * **Instant Rollback:** Toggle Cloudflare proxy from Orange Cloud (Proxied) to Grey Cloud (DNS Only) to route directly to Vercel within 60 seconds with zero downtime.
 
+### 6.5 Rate-Limit Privacy Hardening (Phase 4A Implemented)
+* **Pseudonymous Identity Keys:** Plaintext emails and phone numbers are completely removed from rate-limit keys and replaced with HMAC-SHA-256 128-bit digests (`ps:rl:<action>:<ip>:id_<32-hex-hmac>`).
+* **Canonical Identity Normalization & Collision Prevention:**
+  * Domain-tags every identifier type (`phone:`, `email:`, `raw:`) to mathematically prevent distinct identity types (such as raw string `'invalid'` vs email `'invalid@domain.com'`) from ever collapsing into the same rate-limit bucket.
+  * Indian mobile phones are normalized to canonical E.164 (`+91XXXXXXXXXX`) before hashing so variations (`9876543210`, `+91 98765 43210`, `09876543210`) map to the exact same rate-limiting bucket.
+  * International phone numbers are normalized to E.164 (`phone:+<digits>`).
+  * Emails are trimmed and lowercased with `email:` prefix.
+* **Cryptographic Domain-Separated Secret Derivation:**
+  * Production requires `RATE_LIMIT_KEY_SECRET`.
+  * If unset, safely derives an isolated key from `OTP_HASH_SECRET` or `SESSION_SECRET` using cryptographic domain separation: `HMAC-SHA-256(sourceSecret, 'PropertyStudio:RateLimitKey:v1')`. Source secrets are never logged or exposed, and derived keys cannot be confused or cross-used with OTP hashes or session tokens.
+  * Strict production failure policy: If all secrets are missing in production (`NODE_ENV === 'production'`), throws a configuration error; static development seeds are strictly forbidden and never used in production.
+  * Development and test environments use an isolated, non-production test seed.
+* **Rotation Implications:** Changing `RATE_LIMIT_KEY_SECRET` creates a brand new pseudonymous namespace with zero downtime. Active buckets self-expire within 60s - 300s.
+* **Production IP Pseudonymization by Default:**
+  * In production (`NODE_ENV === 'production'`), client IPs are pseudonymized by default with HMAC-SHA-256 (`ps:rl:<action>:ip_<16-hex>:id_<hash>`), ensuring zero raw personal data resides in external Redis stores while keeping IP-based rate limiting 100% deterministic and effective.
+  * Setting `RATE_LIMIT_PSEUDONYMIZE_IP=false` allows operators to opt into raw IP keys when required for active network abuse triage. In development and test environments, clean sanitized IPs are preserved by default for debugging.
+
 ---
 
 ## 7. INFRASTRUCTURE SETUP REQUIRED FROM PLATFORM OWNER
