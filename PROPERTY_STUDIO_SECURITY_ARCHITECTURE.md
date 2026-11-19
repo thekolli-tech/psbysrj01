@@ -150,7 +150,37 @@ No critical vulnerabilities remain. The following operational enhancements are q
 
 ---
 
-## 6. INFRASTRUCTURE SETUP REQUIRED FROM PLATFORM OWNER
+## 6. PHASE 3 ARCHITECTURE: INFRASTRUCTURE & ADVERSARIAL VALIDATION
+
+### 6.1 Atomic Upload Intent State Machine (FINDING-3B Remediated)
+* **Atomic State Claim:** When a direct media upload begins, an atomic PostgreSQL `UPDATE ... WHERE ... RETURNING *` transitions the intent from `PENDING` to `UPLOADING`.
+* **Exact-Once Claim Invariant:** If concurrent requests attempt to upload using the same `uploadId`, database row-level locking ensures exactly one request claims the transfer; all concurrent callers immediately receive HTTP `409 Conflict` (`code: 'INTENT_STATE_CONFLICT'`).
+* **Finalization on Completion:** The intent is transitioned to `COMPLETED` only after the entire request stream completes (`req.on('end')`) and storage is finalized.
+* **Failure & Abort Cleanup:** If the client disconnects prematurely (`req.on('aborted')`, `req.on('close')`) or exceeds byte quotas, the intent is transitioned to `FAILED`. Failed intents can never be reused or reclaimed.
+* **Serverless Disconnect Recovery:** Uploads left in `UPLOADING` state for > 15 minutes due to cold container terminations can be reclaimed safely.
+
+### 6.2 Gupshup Webhook Defense & Multi-Secret Rotation (FINDING-3D Remediated)
+* **Multi-Secret Rotation:** Supports `GUPSHUP_WEBHOOK_SECRETS` (comma-separated list), `GUPSHUP_WEBHOOK_SECRET` (primary), and `GUPSHUP_ACCOUNT_SECRET` (fallback). Secrets can be rotated with zero downtime by listing `new_secret,old_secret` and retiring the old secret after Gupshup console updates.
+* **Timing-Safe Comparison:** All secret token comparisons evaluate via `crypto.timingSafeEqual` across constant-length buffers, preventing side-channel timing attacks.
+* **Durable Event Deduplication:** Delivery receipts (`gsId` + event type) are deduplicated via Redis `SET ... EX 86400 NX` (or bounded local memory). Duplicate webhook requests are acknowledged idempotently with HTTP `200 OK` (`{ success: true, duplicate: true }`) without re-running state transitions.
+* **Timestamp Freshness:** Carrier WhatsApp DLR timestamps are checked against reasonable bounds (within 48 hours in the past and 5 minutes in the future) to reject clock-skew anomalies without dropping carrier-delayed delivery receipts.
+
+### 6.3 Upstash Redis Provisioning Guide (FINDING-3A Prepared)
+1. **Create Database:** Log into [Upstash Console](https://console.upstash.com/), create a free Redis database in `AWS ap-south-1 (Mumbai)` or `AWS us-east-1`.
+2. **Retrieve REST Credentials:** From the database dashboard, copy `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from the REST API tab.
+3. **Configure in Vercel:** Under Project Settings -> Environment Variables, add both keys for Production, Preview, and Development.
+4. **Zero-Secret Verification:** Once set, the serverless application automatically detects both variables. The response header flips from `X-RateLimit-Engine: memory_fallback` to `X-RateLimit-Engine: upstash_redis` with atomic REST pipeline execution.
+
+### 6.4 Cloudflare Edge Protection & Origin Cloaking (FINDING-3E Prepared)
+* **DNS CNAME Mapping:** Root `@` and `www` CNAME records proxied through Cloudflare pointing to `cname.vercel-dns.com`.
+* **SSL/TLS Full (Strict):** Ensures end-to-end encryption between Cloudflare edge and Vercel origin certificate.
+* **WAF Rules:** Edge rate limiting and challenge on `/api/auth/*` for anomalous threat scores; Bot Fight Mode enabled.
+* **API Cache Bypass:** Explicit rule to bypass cache on `/api/*` while caching static assets (`/assets/*`).
+* **Instant Rollback:** Toggle Cloudflare proxy from Orange Cloud (Proxied) to Grey Cloud (DNS Only) to route directly to Vercel within 60 seconds with zero downtime.
+
+---
+
+## 7. INFRASTRUCTURE SETUP REQUIRED FROM PLATFORM OWNER
 
 Before or after deployment, configure the following environment variables in your Vercel Dashboard (**Project Settings -> Environment Variables**):
 

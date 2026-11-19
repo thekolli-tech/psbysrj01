@@ -140,6 +140,9 @@ import {
   pgGetUploadIntentById,
   pgUpdateUploadIntentStatus,
   pgUpdateUploadIntentStorageKey,
+  pgClaimUploadIntent,
+  pgFinalizeUploadIntent,
+  pgFailUploadIntent,
   pgGetUserNotificationPreferences,
   pgUpdateUserNotificationPreferences,
   pgGetPreferencesByUnsubscribeToken,
@@ -524,11 +527,11 @@ export interface DbMediaUploadIntent {
   expected_mime_type: string;
   expected_file_size: number;
   media_category: 'VIDEO' | 'AUDIO' | 'IMAGE';
-  status: 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'FAILED';
+  status: 'PENDING' | 'UPLOADING' | 'COMPLETED' | 'EXPIRED' | 'FAILED';
   expires_at: string;
   completed_at?: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface DbMediaItem {
@@ -1617,11 +1620,31 @@ export async function getUploadIntentById(id: string): Promise<DbMediaUploadInte
 
 export async function updateUploadIntentStatus(
   id: string,
-  status: 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
+  status: 'PENDING' | 'UPLOADING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
   completedAt?: string
 ): Promise<boolean> {
   if (isPostgresAuthoritative()) return pgUpdateUploadIntentStatus(id, status, completedAt);
   return sqliteUpdateUploadIntentStatus(id, status, completedAt);
+}
+
+export async function claimUploadIntent(
+  id: string,
+  userId: string,
+  isSuperAdmin: boolean,
+  staleTimeoutMinutes = 15
+): Promise<{ success: boolean; intent?: DbMediaUploadIntent; error?: string; status: number }> {
+  if (isPostgresAuthoritative()) return pgClaimUploadIntent(id, userId, isSuperAdmin, staleTimeoutMinutes);
+  return sqliteClaimUploadIntent(id, userId, isSuperAdmin, staleTimeoutMinutes);
+}
+
+export async function finalizeUploadIntent(id: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgFinalizeUploadIntent(id);
+  return sqliteFinalizeUploadIntent(id);
+}
+
+export async function failUploadIntent(id: string, reason?: string): Promise<boolean> {
+  if (isPostgresAuthoritative()) return pgFailUploadIntent(id, reason);
+  return sqliteFailUploadIntent(id, reason);
 }
 
 export async function updateUploadIntentStorageKey(
@@ -5498,24 +5521,98 @@ function sqliteGetUploadIntentById(id: string): DbMediaUploadIntent | null {
 
 function sqliteUpdateUploadIntentStatus(
   id: string,
-  status: 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
+  status: 'PENDING' | 'UPLOADING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
   completedAt?: string
 ): boolean {
   if (completedAt) {
-    db.prepare('UPDATE media_upload_intents SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?').run(
+    const result = db.prepare('UPDATE media_upload_intents SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?').run(
       status,
       completedAt,
       new Date().toISOString(),
       id
     );
+    return result.changes > 0;
   } else {
-    db.prepare('UPDATE media_upload_intents SET status = ?, updated_at = ? WHERE id = ?').run(
+    const result = db.prepare('UPDATE media_upload_intents SET status = ?, updated_at = ? WHERE id = ?').run(
       status,
       new Date().toISOString(),
       id
     );
+    return result.changes > 0;
   }
-  return true;
+}
+
+function sqliteClaimUploadIntent(
+  id: string,
+  userId: string,
+  isSuperAdmin: boolean,
+  staleTimeoutMinutes = 15
+): { success: boolean; intent?: DbMediaUploadIntent; error?: string; status: number } {
+  const staleModifier = `-${staleTimeoutMinutes} minutes`;
+  const result = db.prepare(`
+    UPDATE media_upload_intents
+    SET status = 'UPLOADING', updated_at = datetime('now')
+    WHERE id = ?
+      AND (? = 1 OR user_id = ?)
+      AND (
+        status = 'PENDING'
+        OR (status = 'UPLOADING' AND updated_at < datetime('now', ?))
+      )
+      AND expires_at > datetime('now')
+  `).run(id, isSuperAdmin ? 1 : 0, userId, staleModifier);
+
+  if (result.changes > 0) {
+    const row = sqliteGetUploadIntentById(id);
+    if (row) {
+      return { success: true, status: 200, intent: row };
+    }
+  }
+
+  const existing = sqliteGetUploadIntentById(id);
+  if (!existing) {
+    return { success: false, status: 404, error: 'Upload intent not found.' };
+  }
+
+  if (existing.user_id !== userId && !isSuperAdmin) {
+    return { success: false, status: 403, error: 'Access denied: You do not own this upload session.' };
+  }
+
+  const expiresAtMs = new Date(existing.expires_at).getTime();
+  if (Date.now() > expiresAtMs || existing.status === 'EXPIRED') {
+    return { success: false, status: 400, error: 'Upload session has expired. Please create a new upload intent.' };
+  }
+
+  if (existing.status === 'COMPLETED') {
+    return { success: false, status: 409, error: 'This upload has already been verified and completed.' };
+  }
+
+  if (existing.status === 'UPLOADING') {
+    return { success: false, status: 409, error: 'An upload transfer is already in progress for this session.' };
+  }
+
+  if (existing.status === 'FAILED') {
+    return { success: false, status: 409, error: 'This upload intent has failed and cannot be reused.' };
+  }
+
+  return { success: false, status: 409, error: 'Upload intent is not in an uploadable state.' };
+}
+
+function sqliteFinalizeUploadIntent(id: string): boolean {
+  const result = db.prepare(`
+    UPDATE media_upload_intents
+    SET status = 'COMPLETED', completed_at = datetime('now'), updated_at = datetime('now')
+    WHERE id = ? AND status = 'UPLOADING'
+  `).run(id);
+  return result.changes > 0;
+}
+
+function sqliteFailUploadIntent(id: string, reason?: string): boolean {
+  const result = db.prepare(`
+    UPDATE media_upload_intents
+    SET status = 'FAILED', updated_at = datetime('now')
+    WHERE id = ? AND (status = 'UPLOADING' OR status = 'PENDING')
+  `).run(id);
+  return result.changes > 0;
 }
 
 function sqliteUpdateUploadIntentStorageKey(

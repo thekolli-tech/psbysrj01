@@ -134,6 +134,9 @@ import {
   getUploadIntentById,
   updateUploadIntentStatus,
   updateUploadIntentStorageKey,
+  claimUploadIntent,
+  finalizeUploadIntent,
+  failUploadIntent,
   getUserNotificationPreferences,
   updateUserNotificationPreferences,
   getPreferencesByUnsubscribeToken,
@@ -195,6 +198,11 @@ import {
 import { InvalidPhoneError } from './src/server/otpTarget.ts';
 import { normalizeIndianMobile, indianNationalDigits } from './src/shared/indianMobile.ts';
 import { getOtpDeliveryStatus, getAsyncOtpDeliveryStatus, processGupshupWebhookEvent } from './src/server/otpDeliveryTracker.ts';
+import {
+  verifyWebhookSecret,
+  isWebhookEventDuplicate,
+  isValidWebhookTimestamp
+} from './src/server/webhookSecurity.ts';
 import { createHostedApiHandler, expressPathForHostedRequest } from './src/server/hostedApi.ts';
 import { issueEmailOtp, publicEmailOtpFailure } from './src/server/emailOtp.ts';
 import { RegistrationRejected } from './src/server/registrationError.ts';
@@ -1550,31 +1558,48 @@ app.get('/api/auth/phone-otp-status', async (req: Request, res: Response): Promi
 });
 
 // Gupshup webhook & WhatsApp DLR callback endpoint (acknowledges synchronously < 50ms)
-function timingSafeSecretMatch(provided: unknown, expected: string): boolean {
-  if (typeof provided !== 'string' || !provided || !expected) return false;
-  const bufA = Buffer.from(provided);
-  const bufB = Buffer.from(expected);
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
-}
-
 const handleGupshupCallback = async (req: Request, res: Response): Promise<void> => {
-  const webhookSecret = process.env.GUPSHUP_WEBHOOK_SECRET || process.env.GUPSHUP_ACCOUNT_SECRET;
-  if (webhookSecret) {
-    const provided = (req.headers['x-webhook-secret'] || req.headers['x-webhook-token'] || req.query.secret || req.query.token) as string | undefined;
-    if (!timingSafeSecretMatch(provided, webhookSecret)) {
-      res.status(401).json({ error: 'Unauthorized: Invalid webhook secret token' });
+  const provided = (req.headers['x-webhook-secret'] || req.headers['x-webhook-token'] || req.query.secret || req.query.token) as string | undefined;
+
+  // 1. Timing-safe verification supporting multi-secret rotation (GUPSHUP_WEBHOOK_SECRETS, GUPSHUP_WEBHOOK_SECRET, GUPSHUP_ACCOUNT_SECRET)
+  if (!verifyWebhookSecret(provided)) {
+    res.status(401).json({ error: 'Unauthorized: Invalid webhook secret token' });
+    return;
+  }
+
+  // 2. Validate timestamp freshness if present in payload (tolerant of carrier DLR delay, blocks clock-skew anomalies)
+  const rawTimestamp = req.body?.timestamp ?? req.body?.payload?.ts ?? req.body?.payload?.timestamp;
+  if (!isValidWebhookTimestamp(rawTimestamp)) {
+    console.warn('[Property Studio Webhook] Rejected callback with anomalous timestamp:', rawTimestamp);
+    res.status(400).json({ error: 'Invalid or stale webhook event timestamp' });
+    return;
+  }
+
+  // 3. Durable Event Deduplication: Detect and safely acknowledge duplicate delivery receipts
+  const rawPayload = req.body?.payload || {};
+  const gsId = String(rawPayload.gsId || rawPayload.id || req.body?.messageId || req.body?.id || '').trim();
+  const eventType = String(rawPayload.type || req.body?.status || '').toLowerCase().trim();
+
+  if (gsId && eventType) {
+    const isDuplicate = await isWebhookEventDuplicate(gsId, eventType);
+    if (isDuplicate) {
+      // Safe acknowledgment without re-running state machine side-effects
+      res.status(200).json({ success: true, duplicate: true, message: 'Duplicate event acknowledged' });
       return;
     }
   }
+
+  // 4. Process event with sanitized logging (no phone numbers or sensitive payload content in logs)
   try {
     const event = processGupshupWebhookEvent(req.body);
     if (event.handled) {
-      console.log(`[Property Studio] WhatsApp status callback processed: status=${event.status}, msgId=${event.messageId || 'unknown'}`);
+      const maskedId = gsId ? `${gsId.slice(0, 8)}...` : 'unknown';
+      console.log(`[Property Studio Webhook] Processed status callback: status=${event.status}, msgId=${maskedId}`);
     }
   } catch (err: any) {
-    console.warn('[Property Studio] Webhook processing warning:', err?.message || err);
+    console.warn('[Property Studio Webhook] Processing warning:', err?.message || 'unknown error');
   }
+
   res.status(200).json({ success: true });
 };
 
@@ -4020,35 +4045,27 @@ app.post('/api/media/upload-intent', requireSuperAdminOnly, async (req: Authenti
 
 // Google Drive Streaming Upload Handler (Super Admin only - streams bytes to Google Drive v3 Resumable Upload)
 const handleGoogleDriveUploadStream = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  let createdDriveFileId: string | null = null;
+  const uploadId = String(req.query.uploadId || '').trim();
+  if (!uploadId) {
+    res.status(400).json({ error: 'uploadId query parameter is required.' });
+    return;
+  }
+
+  // 1. Atomic claim transition from PENDING to UPLOADING with Super Admin authorization
+  const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+  const claimResult = await claimUploadIntent(uploadId, req.user!.id, isSuperAdmin);
+  if (!claimResult.success) {
+    res.status(claimResult.status).json({
+      error: claimResult.error,
+      code: claimResult.status === 409 ? 'INTENT_STATE_CONFLICT' : undefined
+    });
+    return;
+  }
+
+  const intent = claimResult.intent!;
+
   try {
-    const uploadId = String(req.query.uploadId || '').trim();
-    if (!uploadId) {
-      res.status(400).json({ error: 'uploadId query parameter is required.' });
-      return;
-    }
-
-    const intent = await getUploadIntentById(uploadId);
-    if (!intent) {
-      res.status(404).json({ error: 'Upload intent not found.' });
-      return;
-    }
-
-    if (intent.user_id !== req.user.id && req.user.role !== 'SUPER_ADMIN') {
-      res.status(403).json({ error: 'Unauthorized: You do not own this upload intent.' });
-      return;
-    }
-
-    if (intent.status === 'COMPLETED') {
-      res.status(409).json({ error: 'This upload has already been verified and completed.' });
-      return;
-    }
-
-    if (intent.status === 'EXPIRED' || new Date(intent.expires_at).getTime() < Date.now()) {
-      await updateUploadIntentStatus(uploadId, 'EXPIRED');
-      res.status(400).json({ error: 'Upload intent has expired. Please initiate a new upload session.' });
-      return;
-    }
-
     const driveConfig = getGoogleDriveConfig();
 
     if (driveConfig.configured) {
@@ -4075,7 +4092,9 @@ const handleGoogleDriveUploadStream = async (req: AuthenticatedRequest, res: Res
         fileSizeBytes: intent.expected_file_size
       });
 
-      // 4. Update intent with authoritative Google Drive File ID
+      createdDriveFileId = uploadResult.id;
+
+      // 4. Update intent with authoritative Google Drive File ID (kept in UPLOADING until /upload-complete finalizes metadata)
       intent.storage_key = uploadResult.id;
       intent.storage_provider = 'GOOGLE_DRIVE';
       await updateUploadIntentStorageKey(uploadId, uploadResult.id, 'GOOGLE_DRIVE');
@@ -4091,6 +4110,7 @@ const handleGoogleDriveUploadStream = async (req: AuthenticatedRequest, res: Res
 
     // Simulated fallback in local development or test environment only
     if (process.env.NODE_ENV === 'production') {
+      await failUploadIntent(uploadId, 'GOOGLE_DRIVE_NOT_CONFIGURED');
       res.status(503).json({ error: 'Google Drive cloud storage is not configured in production.' });
       return;
     }
@@ -4104,8 +4124,17 @@ const handleGoogleDriveUploadStream = async (req: AuthenticatedRequest, res: Res
       simulated: true
     });
   } catch (err: any) {
+    // Failure & abort handling: Clean up partial storage file and mark intent as FAILED
+    if (createdDriveFileId) {
+      deleteDriveFile(createdDriveFileId).catch((cleanupErr) => {
+        console.warn(`[GoogleDriveStorage] Notice: Failed to cleanup partial file ${createdDriveFileId}:`, cleanupErr?.message);
+      });
+    }
+    await failUploadIntent(uploadId, err?.message || 'DRIVE_STREAM_FAILED');
     console.error('[GoogleDriveStorage] Upload stream error:', err);
-    res.status(500).json({ error: err.message || 'Google Drive upload streaming error' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || 'Google Drive upload streaming error' });
+    }
   }
 };
 
@@ -4254,33 +4283,25 @@ const handleDirectMediaUpload = async (req: AuthenticatedRequest, res: Response)
     return;
   }
 
-  // 1. Authoritative lookup of upload intent
-  const intent = await getUploadIntentById(uploadId);
-  if (!intent) {
-    res.status(404).json({ error: 'Upload session not found or invalid.' });
+  // 1. Atomic state transition from PENDING to UPLOADING with ownership check
+  // Guaranteed atomic: only one concurrent transfer can claim the intent; rejects replays with 409
+  const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+  const claimResult = await claimUploadIntent(uploadId, req.user!.id, isSuperAdmin);
+  if (!claimResult.success) {
+    res.status(claimResult.status).json({
+      error: claimResult.error,
+      code: claimResult.status === 409 ? 'INTENT_STATE_CONFLICT' : undefined
+    });
     return;
   }
 
-  // 2. Ownership & permission verification: Intent creator or Super Admin only
-  if (intent.user_id !== req.user?.id && req.user?.role !== 'SUPER_ADMIN') {
-    res.status(403).json({ error: 'Access denied: You do not own this upload session.' });
-    return;
-  }
+  const intent = claimResult.intent!;
 
-  // 3. Expiration and lifecycle status check
-  if (intent.status === 'COMPLETED') {
-    res.status(409).json({ error: 'This upload has already been verified and completed.' });
-    return;
-  }
-  if (intent.status === 'EXPIRED' || new Date(intent.expires_at).getTime() < Date.now()) {
-    res.status(400).json({ error: 'Upload session has expired. Please create a new upload intent.' });
-    return;
-  }
-
-  // 4. Strict request payload size validation
-  const maxAllowed = Math.min(Number(intent.expected_file_size || 500 * 1024 * 1024), 500 * 1024 * 1024);
+  // 2. Strict request payload size validation
+  const maxAllowed = Math.min(Number(intent.expected_file_size || 700 * 1024 * 1024), 700 * 1024 * 1024);
   const headerLength = Number(req.headers['content-length']);
   if (headerLength && headerLength > maxAllowed) {
+    await failUploadIntent(uploadId, 'PAYLOAD_TOO_LARGE');
     res.status(413).json({
       error: `File size exceeds allowed limit of ${Math.round(maxAllowed / (1024 * 1024))}MB.`,
       code: 'PAYLOAD_TOO_LARGE'
@@ -4288,9 +4309,20 @@ const handleDirectMediaUpload = async (req: AuthenticatedRequest, res: Response)
     return;
   }
 
-  // 5. Zero-buffer stream consumption (prevents in-memory OOM crashes)
+  // 3. Zero-buffer stream consumption with lifecycle state management
   let bytesReceived = 0;
   let aborted = false;
+
+  const markFailed = async (reason: string) => {
+    if (!aborted) {
+      aborted = true;
+      try {
+        await failUploadIntent(uploadId, reason);
+      } catch (e) {
+        console.warn(`[UploadIntent] Failed to mark intent ${uploadId} as FAILED:`, e);
+      }
+    }
+  };
 
   req.on('data', (chunk: Buffer) => {
     if (aborted) return;
@@ -4298,6 +4330,7 @@ const handleDirectMediaUpload = async (req: AuthenticatedRequest, res: Response)
     if (bytesReceived > maxAllowed) {
       aborted = true;
       req.destroy();
+      failUploadIntent(uploadId, 'STREAM_OVERSIZED').catch(() => {});
       if (!res.headersSent) {
         res.status(413).json({
           error: `Stream size exceeded maximum allowed limit of ${Math.round(maxAllowed / (1024 * 1024))}MB.`,
@@ -4307,28 +4340,36 @@ const handleDirectMediaUpload = async (req: AuthenticatedRequest, res: Response)
     }
   });
 
-  req.on('end', () => {
+  req.on('end', async () => {
     if (aborted || res.headersSent) return;
-    res.status(200).json({
-      success: true,
-      uploadId,
-      bytesReceived,
-      message: 'Direct upload verified and accepted.'
-    });
+    try {
+      // Transition to COMPLETED only after successful transfer
+      await finalizeUploadIntent(uploadId);
+      res.status(200).json({
+        success: true,
+        uploadId,
+        bytesReceived,
+        message: 'Direct upload verified and accepted.'
+      });
+    } catch {
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to finalize upload session.' });
+      }
+    }
   });
 
   req.on('aborted', () => {
-    aborted = true;
+    markFailed('CLIENT_ABORTED');
   });
 
   req.on('close', () => {
     if (!req.readableEnded) {
-      aborted = true;
+      markFailed('CONNECTION_CLOSED_PREMATURELY');
     }
   });
 
   req.on('error', (err: any) => {
-    aborted = true;
+    markFailed(err?.message || 'STREAM_ERROR');
     if (!res.headersSent) {
       res.status(500).json({ error: err?.message || 'Upload streaming error' });
     }

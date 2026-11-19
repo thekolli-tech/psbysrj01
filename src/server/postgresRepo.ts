@@ -3584,21 +3584,22 @@ export async function pgGetUploadIntentById(id: string): Promise<any | null> {
 
 export async function pgUpdateUploadIntentStatus(
   id: string,
-  status: 'PENDING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
+  status: 'PENDING' | 'UPLOADING' | 'COMPLETED' | 'EXPIRED' | 'FAILED',
   completedAt?: string
 ): Promise<boolean> {
   if (completedAt) {
-    await queryPostgres(
+    const res = await queryPostgres(
       `UPDATE media_upload_intents SET status = $1, completed_at = $2, updated_at = NOW() WHERE id = $3`,
       [status, completedAt, id]
     );
+    return res.rowCount ? res.rowCount > 0 : true;
   } else {
-    await queryPostgres(
+    const res = await queryPostgres(
       `UPDATE media_upload_intents SET status = $1, updated_at = NOW() WHERE id = $2`,
       [status, id]
     );
+    return res.rowCount ? res.rowCount > 0 : true;
   }
-  return true;
 }
 
 export async function pgUpdateUploadIntentStorageKey(
@@ -3606,11 +3607,121 @@ export async function pgUpdateUploadIntentStorageKey(
   storageKey: string,
   storageProvider: string = 'GOOGLE_DRIVE'
 ): Promise<boolean> {
-  await queryPostgres(
+  const res = await queryPostgres(
     `UPDATE media_upload_intents SET storage_key = $1, storage_provider = $2, updated_at = NOW() WHERE id = $3`,
     [storageKey, storageProvider, id]
   );
-  return true;
+  return res.rowCount ? res.rowCount > 0 : true;
+}
+
+/**
+ * Atomically claims an upload intent: transitions from PENDING to UPLOADING in a single statement.
+ * Concurrency protection: Locks the row and guarantees only one request can claim.
+ * Stale recovery: Reclaims intents stuck in UPLOADING for > 15 minutes due to client/serverless disconnects.
+ */
+export async function pgClaimUploadIntent(
+  id: string,
+  userId: string,
+  isSuperAdmin: boolean,
+  staleTimeoutMinutes = 15
+): Promise<{ success: boolean; intent?: any; error?: string; status: number }> {
+  const res = await queryPostgres(
+    `UPDATE media_upload_intents
+     SET status = 'UPLOADING', updated_at = NOW()
+     WHERE id = $1
+       AND ($2 = TRUE OR user_id = $3)
+       AND (
+         status = 'PENDING'
+         OR (status = 'UPLOADING' AND updated_at < NOW() - make_interval(mins => $4))
+       )
+       AND expires_at > NOW()
+     RETURNING *`,
+    [id, isSuperAdmin, userId, staleTimeoutMinutes]
+  );
+
+  if (res.rows.length > 0) {
+    const row = res.rows[0];
+    return {
+      success: true,
+      status: 200,
+      intent: {
+        id: row.id,
+        user_id: row.user_id,
+        storage_key: row.storage_key,
+        storage_provider: row.storage_provider,
+        expected_mime_type: row.expected_mime_type,
+        expected_file_size: Number(row.expected_file_size),
+        media_category: row.media_category,
+        status: row.status,
+        expires_at: toIso(row.expires_at),
+        completed_at: row.completed_at ? toIso(row.completed_at) : null,
+        created_at: toIso(row.created_at),
+        updated_at: toIso(row.updated_at)
+      }
+    };
+  }
+
+  // Atomic claim failed; query row to diagnose exact reason
+  const checkRes = await queryPostgres(
+    `SELECT * FROM media_upload_intents WHERE id = $1`,
+    [id]
+  );
+
+  if (checkRes.rows.length === 0) {
+    return { success: false, status: 404, error: 'Upload intent not found.' };
+  }
+
+  const row = checkRes.rows[0];
+  if (row.user_id !== userId && !isSuperAdmin) {
+    return { success: false, status: 403, error: 'Access denied: You do not own this upload session.' };
+  }
+
+  const expiresAtMs = new Date(row.expires_at).getTime();
+  if (Date.now() > expiresAtMs || row.status === 'EXPIRED') {
+    return { success: false, status: 400, error: 'Upload session has expired. Please create a new upload intent.' };
+  }
+
+  if (row.status === 'COMPLETED') {
+    return { success: false, status: 409, error: 'This upload has already been verified and completed.' };
+  }
+
+  if (row.status === 'UPLOADING') {
+    return { success: false, status: 409, error: 'An upload transfer is already in progress for this session.' };
+  }
+
+  if (row.status === 'FAILED') {
+    return { success: false, status: 409, error: 'This upload intent has failed and cannot be reused.' };
+  }
+
+  return { success: false, status: 409, error: 'Upload intent is not in an uploadable state.' };
+}
+
+/**
+ * Atomically marks an in-progress upload intent as COMPLETED.
+ */
+export async function pgFinalizeUploadIntent(id: string): Promise<boolean> {
+  const res = await queryPostgres(
+    `UPDATE media_upload_intents
+     SET status = 'COMPLETED', completed_at = NOW(), updated_at = NOW()
+     WHERE id = $1 AND status = 'UPLOADING'
+     RETURNING id`,
+    [id]
+  );
+  return (res.rowCount || 0) > 0;
+}
+
+/**
+ * Marks an in-progress or pending upload intent as FAILED.
+ */
+export async function pgFailUploadIntent(id: string, reason?: string): Promise<boolean> {
+  const res = await queryPostgres(
+    `UPDATE media_upload_intents
+     SET status = 'FAILED', updated_at = NOW()
+     WHERE id = $1 AND (status = 'UPLOADING' OR status = 'PENDING')
+     RETURNING id`,
+    [id]
+  );
+  return (res.rowCount || 0) > 0;
 }
 
 export async function pgCreateStudioBroadcast(item: {
